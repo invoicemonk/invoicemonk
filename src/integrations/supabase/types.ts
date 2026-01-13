@@ -14,16 +14,858 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          actor_id: string | null
+          actor_role: string | null
+          business_id: string | null
+          entity_id: string | null
+          entity_type: string
+          event_hash: string | null
+          event_type: Database["public"]["Enums"]["audit_event_type"]
+          id: string
+          metadata: Json | null
+          new_state: Json | null
+          previous_state: Json | null
+          source_ip: unknown
+          timestamp_utc: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role?: string | null
+          business_id?: string | null
+          entity_id?: string | null
+          entity_type: string
+          event_hash?: string | null
+          event_type: Database["public"]["Enums"]["audit_event_type"]
+          id?: string
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          source_ip?: unknown
+          timestamp_utc?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: string | null
+          business_id?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          event_hash?: string | null
+          event_type?: Database["public"]["Enums"]["audit_event_type"]
+          id?: string
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          source_ip?: unknown
+          timestamp_utc?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_members: {
+        Row: {
+          accepted_at: string | null
+          business_id: string
+          created_at: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          role: Database["public"]["Enums"]["business_role"]
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          business_id: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["business_role"]
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["business_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          address: Json | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_prefix: string | null
+          jurisdiction: string
+          legal_name: string | null
+          logo_url: string | null
+          name: string
+          next_invoice_number: number | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          jurisdiction?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          name: string
+          next_invoice_number?: number | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          jurisdiction?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          name?: string
+          next_invoice_number?: number | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          address: Json | null
+          business_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          tax_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          address?: Json | null
+          business_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          address?: Json | null
+          business_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_notes: {
+        Row: {
+          amount: number
+          business_id: string | null
+          created_at: string
+          credit_note_hash: string | null
+          credit_note_number: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          original_invoice_id: string
+          reason: string
+          retention_locked_until: string | null
+          user_id: string | null
+          verification_id: string | null
+        }
+        Insert: {
+          amount: number
+          business_id?: string | null
+          created_at?: string
+          credit_note_hash?: string | null
+          credit_note_number: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          original_invoice_id: string
+          reason: string
+          retention_locked_until?: string | null
+          user_id?: string | null
+          verification_id?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string | null
+          created_at?: string
+          credit_note_hash?: string | null
+          credit_note_number?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          original_invoice_id?: string
+          reason?: string
+          retention_locked_until?: string | null
+          user_id?: string | null
+          verification_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_original_invoice_id_fkey"
+            columns: ["original_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      export_manifests: {
+        Row: {
+          actor_email: string
+          actor_id: string
+          actor_role: string | null
+          business_id: string | null
+          export_type: string
+          format: string
+          id: string
+          integrity_hash: string
+          record_count: number
+          scope: Json
+          source_ip: unknown
+          timestamp_utc: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          actor_email: string
+          actor_id: string
+          actor_role?: string | null
+          business_id?: string | null
+          export_type: string
+          format: string
+          id?: string
+          integrity_hash: string
+          record_count: number
+          scope: Json
+          source_ip?: unknown
+          timestamp_utc?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          actor_email?: string
+          actor_id?: string
+          actor_role?: string | null
+          business_id?: string | null
+          export_type?: string
+          format?: string
+          id?: string
+          integrity_hash?: string
+          record_count?: number
+          scope?: Json
+          source_ip?: unknown
+          timestamp_utc?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          discount_percent: number
+          id: string
+          invoice_id: string
+          quantity: number
+          sort_order: number
+          tax_amount: number
+          tax_rate: number
+          unit_price: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          discount_percent?: number
+          id?: string
+          invoice_id: string
+          quantity?: number
+          sort_order?: number
+          tax_amount?: number
+          tax_rate?: number
+          unit_price: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          discount_percent?: number
+          id?: string
+          invoice_id?: string
+          quantity?: number
+          sort_order?: number
+          tax_amount?: number
+          tax_rate?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount_paid: number
+          business_id: string | null
+          client_id: string
+          created_at: string
+          currency: string
+          discount_amount: number
+          due_date: string | null
+          id: string
+          invoice_hash: string | null
+          invoice_number: string
+          issue_date: string | null
+          issued_at: string | null
+          issued_by: string | null
+          issuer_snapshot: Json | null
+          notes: string | null
+          recipient_snapshot: Json | null
+          retention_locked_until: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          tax_amount: number
+          tax_schema_id: string | null
+          tax_schema_snapshot: Json | null
+          tax_schema_version: string | null
+          terms: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string | null
+          verification_id: string | null
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          amount_paid?: number
+          business_id?: string | null
+          client_id: string
+          created_at?: string
+          currency?: string
+          discount_amount?: number
+          due_date?: string | null
+          id?: string
+          invoice_hash?: string | null
+          invoice_number: string
+          issue_date?: string | null
+          issued_at?: string | null
+          issued_by?: string | null
+          issuer_snapshot?: Json | null
+          notes?: string | null
+          recipient_snapshot?: Json | null
+          retention_locked_until?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          tax_schema_id?: string | null
+          tax_schema_snapshot?: Json | null
+          tax_schema_version?: string | null
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string | null
+          verification_id?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          amount_paid?: number
+          business_id?: string | null
+          client_id?: string
+          created_at?: string
+          currency?: string
+          discount_amount?: number
+          due_date?: string | null
+          id?: string
+          invoice_hash?: string | null
+          invoice_number?: string
+          issue_date?: string | null
+          issued_at?: string | null
+          issued_by?: string | null
+          issuer_snapshot?: Json | null
+          notes?: string | null
+          recipient_snapshot?: Json | null
+          retention_locked_until?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          tax_schema_id?: string | null
+          tax_schema_snapshot?: Json | null
+          tax_schema_version?: string | null
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string | null
+          verification_id?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tax_schema_id_fkey"
+            columns: ["tax_schema_id"]
+            isOneToOne: false
+            referencedRelation: "tax_schemas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          payment_reference: string | null
+          recorded_by: string | null
+          retention_locked_until: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          recorded_by?: string | null
+          retention_locked_until?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          recorded_by?: string | null
+          retention_locked_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          account_closed_at: string | null
+          account_status: string | null
+          avatar_url: string | null
+          closed_by: string | null
+          closure_reason: string | null
+          created_at: string | null
+          email: string
+          email_verified: boolean | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_closed_at?: string | null
+          account_status?: string | null
+          avatar_url?: string | null
+          closed_by?: string | null
+          closure_reason?: string | null
+          created_at?: string | null
+          email: string
+          email_verified?: boolean | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_closed_at?: string | null
+          account_status?: string | null
+          avatar_url?: string | null
+          closed_by?: string | null
+          closure_reason?: string | null
+          created_at?: string | null
+          email?: string
+          email_verified?: boolean | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      retention_policies: {
+        Row: {
+          created_at: string | null
+          entity_type: string
+          id: string
+          jurisdiction: string
+          legal_basis: string | null
+          retention_years: number
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type: string
+          id?: string
+          jurisdiction?: string
+          legal_basis?: string | null
+          retention_years?: number
+        }
+        Update: {
+          created_at?: string | null
+          entity_type?: string
+          id?: string
+          jurisdiction?: string
+          legal_basis?: string | null
+          retention_years?: number
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          business_id: string | null
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          business_id?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          business_id?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_schemas: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          effective_from: string
+          effective_until: string | null
+          id: string
+          is_active: boolean | null
+          jurisdiction: string
+          name: string
+          rates: Json
+          rules: Json | null
+          version: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_from: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          jurisdiction: string
+          name: string
+          rates: Json
+          rules?: Json | null
+          version: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          jurisdiction?: string
+          name?: string
+          rates?: Json
+          rules?: Json | null
+          version?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          org_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      close_account: {
+        Args: { _reason?: string; _user_id: string }
+        Returns: undefined
+      }
+      has_business_role: {
+        Args: {
+          _business_id: string
+          _role: Database["public"]["Enums"]["business_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _org_id?: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_business_member: {
+        Args: { _business_id: string; _user_id: string }
+        Returns: boolean
+      }
+      issue_invoice: {
+        Args: { _invoice_id: string }
+        Returns: {
+          amount_paid: number
+          business_id: string | null
+          client_id: string
+          created_at: string
+          currency: string
+          discount_amount: number
+          due_date: string | null
+          id: string
+          invoice_hash: string | null
+          invoice_number: string
+          issue_date: string | null
+          issued_at: string | null
+          issued_by: string | null
+          issuer_snapshot: Json | null
+          notes: string | null
+          recipient_snapshot: Json | null
+          retention_locked_until: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          tax_amount: number
+          tax_schema_id: string | null
+          tax_schema_snapshot: Json | null
+          tax_schema_version: string | null
+          terms: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string | null
+          verification_id: string | null
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      log_audit_event: {
+        Args: {
+          _business_id?: string
+          _entity_id?: string
+          _entity_type: string
+          _event_type: Database["public"]["Enums"]["audit_event_type"]
+          _metadata?: Json
+          _new_state?: Json
+          _previous_state?: Json
+          _user_id?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "user"
+        | "business_admin"
+        | "team_member"
+        | "auditor"
+        | "platform_admin"
+      audit_event_type:
+        | "USER_LOGIN"
+        | "USER_LOGOUT"
+        | "USER_SIGNUP"
+        | "EMAIL_VERIFIED"
+        | "PASSWORD_RESET"
+        | "INVOICE_CREATED"
+        | "INVOICE_UPDATED"
+        | "INVOICE_ISSUED"
+        | "INVOICE_SENT"
+        | "INVOICE_VIEWED"
+        | "INVOICE_VOIDED"
+        | "INVOICE_CREDITED"
+        | "PAYMENT_RECORDED"
+        | "CLIENT_CREATED"
+        | "CLIENT_UPDATED"
+        | "BUSINESS_CREATED"
+        | "BUSINESS_UPDATED"
+        | "TEAM_MEMBER_ADDED"
+        | "TEAM_MEMBER_REMOVED"
+        | "ROLE_CHANGED"
+        | "DATA_EXPORTED"
+        | "SUBSCRIPTION_CHANGED"
+        | "SETTINGS_UPDATED"
+        | "ACCOUNT_CLOSED"
+      business_role: "owner" | "admin" | "member" | "auditor"
+      invoice_status:
+        | "draft"
+        | "issued"
+        | "sent"
+        | "viewed"
+        | "paid"
+        | "voided"
+        | "credited"
+      subscription_status: "active" | "cancelled" | "past_due" | "trialing"
+      subscription_tier: "starter" | "professional" | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +992,52 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "user",
+        "business_admin",
+        "team_member",
+        "auditor",
+        "platform_admin",
+      ],
+      audit_event_type: [
+        "USER_LOGIN",
+        "USER_LOGOUT",
+        "USER_SIGNUP",
+        "EMAIL_VERIFIED",
+        "PASSWORD_RESET",
+        "INVOICE_CREATED",
+        "INVOICE_UPDATED",
+        "INVOICE_ISSUED",
+        "INVOICE_SENT",
+        "INVOICE_VIEWED",
+        "INVOICE_VOIDED",
+        "INVOICE_CREDITED",
+        "PAYMENT_RECORDED",
+        "CLIENT_CREATED",
+        "CLIENT_UPDATED",
+        "BUSINESS_CREATED",
+        "BUSINESS_UPDATED",
+        "TEAM_MEMBER_ADDED",
+        "TEAM_MEMBER_REMOVED",
+        "ROLE_CHANGED",
+        "DATA_EXPORTED",
+        "SUBSCRIPTION_CHANGED",
+        "SETTINGS_UPDATED",
+        "ACCOUNT_CLOSED",
+      ],
+      business_role: ["owner", "admin", "member", "auditor"],
+      invoice_status: [
+        "draft",
+        "issued",
+        "sent",
+        "viewed",
+        "paid",
+        "voided",
+        "credited",
+      ],
+      subscription_status: ["active", "cancelled", "past_due", "trialing"],
+      subscription_tier: ["starter", "professional", "business"],
+    },
   },
 } as const

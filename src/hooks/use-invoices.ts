@@ -1,0 +1,494 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+
+export type Invoice = Tables<'invoices'> & {
+  clients?: Tables<'clients'> | null;
+  invoice_items?: Tables<'invoice_items'>[];
+};
+
+export type InvoiceItem = Tables<'invoice_items'>;
+export type InvoiceInsert = TablesInsert<'invoices'>;
+export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
+
+// Fetch all invoices for the current user
+export function useInvoices() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['invoices', user?.id],
+    queryFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          clients (*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as Invoice[];
+    },
+    enabled: !!user,
+  });
+}
+
+// Fetch a single invoice by ID
+export function useInvoice(invoiceId: string | undefined) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['invoice', invoiceId],
+    queryFn: async () => {
+      if (!invoiceId || !user) throw new Error('Invalid invoice ID or not authenticated');
+
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          clients (*),
+          invoice_items (*)
+        `)
+        .eq('id', invoiceId)
+        .single();
+
+      if (error) throw error;
+      return data as Invoice;
+    },
+    enabled: !!invoiceId && !!user,
+  });
+}
+
+// Create a new draft invoice
+export function useCreateInvoice() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ 
+      invoice, 
+      items 
+    }: { 
+      invoice: Omit<InvoiceInsert, 'user_id' | 'invoice_number'>; 
+      items: Omit<InvoiceItemInsert, 'invoice_id'>[] 
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Generate invoice number (get next number from business or user)
+      const { data: existingInvoices, error: countError } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (countError) throw countError;
+
+      let nextNumber = 1;
+      if (existingInvoices && existingInvoices.length > 0) {
+        const lastNumber = existingInvoices[0].invoice_number;
+        const match = lastNumber.match(/\d+$/);
+        if (match) {
+          nextNumber = parseInt(match[0], 10) + 1;
+        }
+      }
+
+      const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`;
+
+      // Create the invoice
+      const { data: createdInvoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          ...invoice,
+          user_id: user.id,
+          invoice_number: invoiceNumber,
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      // Create invoice items
+      if (items.length > 0) {
+        const itemsWithInvoiceId = items.map((item, index) => ({
+          ...item,
+          invoice_id: createdInvoice.id,
+          sort_order: index,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(itemsWithInvoiceId);
+
+        if (itemsError) throw itemsError;
+      }
+
+      // Log audit event
+      await supabase.rpc('log_audit_event', {
+        _event_type: 'INVOICE_CREATED',
+        _entity_type: 'invoice',
+        _entity_id: createdInvoice.id,
+        _user_id: user.id,
+        _new_state: createdInvoice,
+      });
+
+      return createdInvoice;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({
+        title: 'Invoice created',
+        description: 'Your draft invoice has been saved.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error creating invoice',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Update a draft invoice
+export function useUpdateInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      invoiceId,
+      updates,
+      items,
+    }: {
+      invoiceId: string;
+      updates: TablesUpdate<'invoices'>;
+      items?: Omit<InvoiceItemInsert, 'invoice_id'>[];
+    }) => {
+      // Update the invoice
+      const { data: updatedInvoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .update(updates)
+        .eq('id', invoiceId)
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      // If items provided, replace all items
+      if (items) {
+        // Delete existing items
+        await supabase
+          .from('invoice_items')
+          .delete()
+          .eq('invoice_id', invoiceId);
+
+        // Insert new items
+        if (items.length > 0) {
+          const itemsWithInvoiceId = items.map((item, index) => ({
+            ...item,
+            invoice_id: invoiceId,
+            sort_order: index,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('invoice_items')
+            .insert(itemsWithInvoiceId);
+
+          if (itemsError) throw itemsError;
+        }
+      }
+
+      return updatedInvoice;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', data.id] });
+      toast({
+        title: 'Invoice updated',
+        description: 'Your changes have been saved.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error updating invoice',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Issue an invoice (makes it immutable)
+export function useIssueInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { data, error } = await supabase
+        .rpc('issue_invoice', { _invoice_id: invoiceId });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      toast({
+        title: 'Invoice issued',
+        description: 'This invoice is now immutable and cannot be modified.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error issuing invoice',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Void an invoice (creates credit note)
+export function useVoidInvoice() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ 
+      invoiceId, 
+      reason 
+    }: { 
+      invoiceId: string; 
+      reason: string 
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Get the invoice first
+      const { data: invoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!invoice) throw new Error('Invoice not found');
+      if (invoice.status === 'draft') throw new Error('Cannot void a draft invoice');
+      if (invoice.status === 'voided') throw new Error('Invoice is already voided');
+
+      // Generate credit note number
+      const { data: existingCreditNotes } = await supabase
+        .from('credit_notes')
+        .select('credit_note_number')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      let nextNumber = 1;
+      if (existingCreditNotes && existingCreditNotes.length > 0) {
+        const lastNumber = existingCreditNotes[0].credit_note_number;
+        const match = lastNumber.match(/\d+$/);
+        if (match) {
+          nextNumber = parseInt(match[0], 10) + 1;
+        }
+      }
+
+      const creditNoteNumber = `CN-${String(nextNumber).padStart(4, '0')}`;
+
+      // Create credit note
+      const { error: creditNoteError } = await supabase
+        .from('credit_notes')
+        .insert({
+          original_invoice_id: invoiceId,
+          credit_note_number: creditNoteNumber,
+          amount: invoice.total_amount,
+          reason,
+          user_id: user.id,
+          business_id: invoice.business_id,
+          issued_by: user.id,
+        });
+
+      if (creditNoteError) throw creditNoteError;
+
+      // Update invoice status to voided
+      const { data: updatedInvoice, error: updateError } = await supabase
+        .from('invoices')
+        .update({
+          status: 'voided',
+          voided_at: new Date().toISOString(),
+          voided_by: user.id,
+          void_reason: reason,
+        })
+        .eq('id', invoiceId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Log audit event
+      await supabase.rpc('log_audit_event', {
+        _event_type: 'INVOICE_VOIDED',
+        _entity_type: 'invoice',
+        _entity_id: invoiceId,
+        _user_id: user.id,
+        _previous_state: invoice,
+        _new_state: updatedInvoice,
+        _metadata: { reason, credit_note_number: creditNoteNumber },
+      });
+
+      return updatedInvoice;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      toast({
+        title: 'Invoice voided',
+        description: 'A credit note has been created. The original invoice is preserved.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error voiding invoice',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Record a payment
+export function useRecordPayment() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      invoiceId,
+      amount,
+      paymentMethod,
+      paymentReference,
+      notes,
+      paymentDate,
+    }: {
+      invoiceId: string;
+      amount: number;
+      paymentMethod?: string;
+      paymentReference?: string;
+      notes?: string;
+      paymentDate?: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Get current invoice
+      const { data: invoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!invoice) throw new Error('Invoice not found');
+
+      // Create payment record
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          invoice_id: invoiceId,
+          amount,
+          payment_method: paymentMethod,
+          payment_reference: paymentReference,
+          notes,
+          payment_date: paymentDate || new Date().toISOString().split('T')[0],
+          recorded_by: user.id,
+        });
+
+      if (paymentError) throw paymentError;
+
+      // Calculate new amount paid
+      const newAmountPaid = Number(invoice.amount_paid) + amount;
+      const newStatus = newAmountPaid >= Number(invoice.total_amount) ? 'paid' : invoice.status;
+
+      // Update invoice
+      const { data: updatedInvoice, error: updateError } = await supabase
+        .from('invoices')
+        .update({
+          amount_paid: newAmountPaid,
+          status: newStatus,
+        })
+        .eq('id', invoiceId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Log audit event
+      await supabase.rpc('log_audit_event', {
+        _event_type: 'PAYMENT_RECORDED',
+        _entity_type: 'invoice',
+        _entity_id: invoiceId,
+        _user_id: user.id,
+        _previous_state: invoice,
+        _new_state: updatedInvoice,
+        _metadata: { amount, payment_method: paymentMethod },
+      });
+
+      return updatedInvoice;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      toast({
+        title: 'Payment recorded',
+        description: 'The payment has been recorded successfully.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error recording payment',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Delete a draft invoice
+export function useDeleteInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      // Delete invoice items first
+      await supabase
+        .from('invoice_items')
+        .delete()
+        .eq('invoice_id', invoiceId);
+
+      // Delete the invoice
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({
+        title: 'Invoice deleted',
+        description: 'The draft invoice has been deleted.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error deleting invoice',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
