@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, FileCheck } from "lucide-react";
+import { motion } from "framer-motion";
 
 const Hero = () => {
   return (
@@ -13,24 +14,44 @@ const Hero = () => {
       <div className="container">
         <div className="max-w-3xl mx-auto text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-primary/10 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-primary/10 mb-8"
+          >
             <Shield className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-primary">Compliance-First Invoicing</span>
-          </div>
+          </motion.div>
 
           {/* Headline */}
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="font-display text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6"
+          >
             Invoices that are{" "}
             <span className="text-gradient">verifiable, immutable,</span> and audit-ready
-          </h1>
+          </motion.h1>
 
           {/* Subheadline */}
-          <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto"
+          >
             Create professional invoices with built-in audit trails, timestamped logs, and government-friendly compliance. Every record is permanent and verifiable.
-          </p>
+          </motion.p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
             <Button variant="hero" size="xl" asChild>
               <a href="https://app.invoicemonk.com/signup">
                 Start Free Trial
@@ -42,10 +63,15 @@ const Hero = () => {
                 See How It Works
               </a>
             </Button>
-          </div>
+          </motion.div>
 
           {/* Trust indicators */}
-          <div className="flex items-center justify-center gap-8 mt-12 pt-8 border-t border-border/50">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="flex flex-wrap items-center justify-center gap-6 md:gap-8 mt-12 pt-8 border-t border-border/50"
+          >
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileCheck className="w-4 h-4 text-primary" />
               <span>Immutable Records</span>
@@ -54,11 +80,11 @@ const Hero = () => {
               <Shield className="w-4 h-4 text-primary" />
               <span>Audit-Ready</span>
             </div>
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileCheck className="w-4 h-4 text-primary" />
               <span>Timestamped Logs</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

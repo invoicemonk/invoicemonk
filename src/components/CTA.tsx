@@ -1,11 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 const CTA = () => {
   return (
     <section className="py-20 md:py-32">
       <div className="container">
-        <div className="relative max-w-4xl mx-auto text-center p-12 md:p-16 rounded-3xl hero-gradient overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="relative max-w-4xl mx-auto text-center p-12 md:p-16 rounded-3xl hero-gradient overflow-hidden"
+        >
           {/* Background decoration */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,white_0%,transparent_50%)]" />
@@ -31,7 +38,7 @@ const CTA = () => {
               </Button>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );

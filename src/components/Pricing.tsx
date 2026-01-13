@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import { motion } from "framer-motion";
 
 const tiers = [
   {
@@ -49,26 +50,54 @@ const tiers = [
   },
 ];
 
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 30 },
+  show: { opacity: 1, y: 0 },
+};
+
 const Pricing = () => {
   return (
     <section id="pricing" className="py-20 md:py-32">
       <div className="container">
-        <div className="text-center max-w-2xl mx-auto mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-2xl mx-auto mb-16"
+        >
           <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
             Simple, transparent pricing
           </h2>
           <p className="text-lg text-muted-foreground">
             Start free, upgrade when you need full compliance features.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <motion.div
+          variants={container}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+        >
           {tiers.map((tier, index) => (
-            <div
+            <motion.div
               key={index}
+              variants={item}
               className={`relative p-8 rounded-2xl border transition-all duration-300 ${
                 tier.popular
-                  ? "bg-card border-primary/30 card-shadow-hover scale-105"
+                  ? "bg-card border-primary/30 card-shadow-hover md:scale-105"
                   : "bg-card border-border/50 card-shadow hover:card-shadow-hover"
               }`}
             >
@@ -114,9 +143,9 @@ const Pricing = () => {
               >
                 <a href="https://app.invoicemonk.com/signup">{tier.cta}</a>
               </Button>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
