@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserOrganizations } from '@/hooks/use-organization';
 
 const statsCards = [
   {
@@ -65,7 +66,12 @@ const item = {
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
+  const { data: organizations } = useUserOrganizations();
+  const currentBusiness = organizations?.[0]?.business;
   const isEmailVerified = user?.email_confirmed_at;
+  
+  // Server-derived compliance status
+  const businessComplianceStatus = currentBusiness?.compliance_status || 'incomplete';
 
   return (
     <motion.div
@@ -215,7 +221,9 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Business Profile</span>
-                  <Badge variant="secondary">Incomplete</Badge>
+                  <Badge variant={businessComplianceStatus === 'complete' ? 'default' : 'secondary'}>
+                    {businessComplianceStatus === 'complete' ? 'Complete' : 'Incomplete'}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Immutable Records</span>

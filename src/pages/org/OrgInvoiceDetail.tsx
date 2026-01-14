@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye
+  ArrowLeft, Lock, Download, Send, FileText, History, 
+  Ban, DollarSign, Loader2, Building2, User, Shield, Eye, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { useInvoice, useIssueInvoice, useVoidInvoice, useRecordPayment } from '@
 import { useInvoiceAuditLogs } from '@/hooks/use-audit-logs';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
+import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useSubscription } from '@/hooks/use-subscription';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -51,8 +52,8 @@ const statusColors: Record<InvoiceStatus, string> = {
   credited: 'bg-orange-500/10 text-orange-600',
 };
 
-export default function InvoiceDetail() {
-  const { id } = useParams();
+export default function OrgInvoiceDetail() {
+  const { orgId, id } = useParams();
   const navigate = useNavigate();
   const { data: invoice, isLoading, error } = useInvoice(id);
   const { data: auditLogs } = useInvoiceAuditLogs(id);
@@ -65,6 +66,7 @@ export default function InvoiceDetail() {
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
 
@@ -84,8 +86,6 @@ export default function InvoiceDetail() {
   };
 
   const isImmutable = invoice?.status !== 'draft';
-  
-  // Parse snapshots
   const issuerSnapshot = invoice?.issuer_snapshot as IssuerSnapshot | null;
   const recipientSnapshot = invoice?.recipient_snapshot as RecipientSnapshot | null;
   const hasSnapshots = !!issuerSnapshot || !!recipientSnapshot;
@@ -134,7 +134,7 @@ export default function InvoiceDetail() {
           <CardContent className="flex flex-col items-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">This invoice doesn't exist or you don't have access.</p>
-            <Button onClick={() => navigate('/invoices')}>Back to Invoices</Button>
+            <Button onClick={() => navigate(`/org/${orgId}/invoices`)}>Back to Invoices</Button>
           </CardContent>
         </Card>
       </motion.div>
@@ -158,14 +158,13 @@ export default function InvoiceDetail() {
             <p className="text-muted-foreground">{invoice.clients?.name}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {invoice.status === 'draft' && (
             <>
               <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
+                <Eye className="h-4 w-4 mr-2" />Preview
               </Button>
-              <Button variant="outline" onClick={() => navigate(`/invoices/${id}/edit`)}>
+              <Button variant="outline" onClick={() => navigate(`/org/${orgId}/invoices/${id}/edit`)}>
                 Edit Draft
               </Button>
               <Button onClick={handleIssue} disabled={issueInvoice.isPending}>
@@ -180,6 +179,11 @@ export default function InvoiceDetail() {
                 {downloadPdf.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
                 Download PDF
               </Button>
+              {invoice.status !== 'voided' && (
+                <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+                  <Mail className="h-4 w-4 mr-2" />Send Email
+                </Button>
+              )}
               {invoice.status !== 'voided' && invoice.status !== 'paid' && (
                 <>
                   <Button variant="outline" onClick={() => setPaymentDialogOpen(true)}>
@@ -253,7 +257,7 @@ export default function InvoiceDetail() {
             </CardContent>
           </Card>
 
-          {/* Legal Identity Snapshots - Only shown for issued invoices */}
+          {/* Legal Identity Snapshots */}
           {isImmutable && hasSnapshots && (
             <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
               <CardHeader>
@@ -263,11 +267,10 @@ export default function InvoiceDetail() {
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2">
                   <Lock className="h-3 w-3" />
-                  Identity recorded at time of issuance ({formatDateTime(invoice.issued_at || invoice.created_at)})
+                  Identity recorded at time of issuance
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Issuer Snapshot */}
                 {issuerSnapshot && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -281,37 +284,16 @@ export default function InvoiceDetail() {
                           <span className="font-medium">{issuerSnapshot.legal_name}</span>
                         </div>
                       )}
-                      {issuerSnapshot.name && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Business Name</span>
-                          <span>{issuerSnapshot.name}</span>
-                        </div>
-                      )}
                       {issuerSnapshot.tax_id && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Tax ID</span>
                           <span className="font-mono text-xs">{issuerSnapshot.tax_id}</span>
                         </div>
                       )}
-                      {issuerSnapshot.jurisdiction && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Jurisdiction</span>
-                          <span>{issuerSnapshot.jurisdiction}</span>
-                        </div>
-                      )}
-                      {issuerSnapshot.contact_email && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Email</span>
-                          <span>{issuerSnapshot.contact_email}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
-
                 {issuerSnapshot && recipientSnapshot && <Separator />}
-
-                {/* Recipient Snapshot */}
                 {recipientSnapshot && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -331,18 +313,6 @@ export default function InvoiceDetail() {
                           <span>{recipientSnapshot.email}</span>
                         </div>
                       )}
-                      {recipientSnapshot.tax_id && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tax ID</span>
-                          <span className="font-mono text-xs">{recipientSnapshot.tax_id}</span>
-                        </div>
-                      )}
-                      {recipientSnapshot.phone && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Phone</span>
-                          <span>{recipientSnapshot.phone}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -359,12 +329,6 @@ export default function InvoiceDetail() {
               <div className="flex justify-between"><span className="text-muted-foreground">Issue Date</span><span>{formatDate(invoice.issue_date)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Due Date</span><span>{formatDate(invoice.due_date)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Currency</span><span>{invoice.currency}</span></div>
-              {invoice.tax_schema_version && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax Schema</span>
-                  <span className="font-mono text-xs">{invoice.tax_schema_version}</span>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -385,22 +349,10 @@ export default function InvoiceDetail() {
                 ))}
               </div>
               <Button variant="outline" size="sm" className="w-full mt-4" asChild>
-                <Link to="/audit-logs">View Full Log</Link>
+                <Link to={`/org/${orgId}/audit-logs`}>View Full Log</Link>
               </Button>
             </CardContent>
           </Card>
-
-          {invoice.verification_id && (
-            <Card>
-              <CardHeader><CardTitle>Verification</CardTitle></CardHeader>
-              <CardContent>
-                <div className="text-xs font-mono bg-muted p-2 rounded break-all mb-2">
-                  ID: {invoice.verification_id.slice(0, 8)}...
-                </div>
-                <p className="text-xs text-muted-foreground">This invoice can be publicly verified.</p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
 
@@ -453,6 +405,15 @@ export default function InvoiceDetail() {
           onOpenChange={setPreviewOpen}
           invoice={invoice}
           showWatermark={isStarter}
+        />
+      )}
+
+      {/* Send Invoice Dialog */}
+      {invoice && (
+        <SendInvoiceDialog
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          invoice={invoice}
         />
       )}
     </motion.div>

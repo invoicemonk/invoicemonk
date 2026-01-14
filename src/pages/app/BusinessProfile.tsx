@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -8,7 +8,8 @@ import {
   Phone,
   MapPin,
   FileText,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -23,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
+import { useUserBusiness, useUpdateBusiness, useCreateBusiness } from '@/hooks/use-business';
 
 const jurisdictions = [
   { value: 'NG', label: 'Nigeria' },
@@ -34,8 +36,20 @@ const jurisdictions = [
   { value: 'FR', label: 'France' },
 ];
 
+interface AddressData {
+  street?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  [key: string]: string | undefined; // Allow Json indexing
+}
+
 export default function BusinessProfile() {
-  const [isLoading, setIsLoading] = useState(false);
+  const { data: business, isLoading: isLoadingBusiness } = useUserBusiness();
+  const updateBusiness = useUpdateBusiness();
+  const createBusiness = useCreateBusiness();
+
   const [formData, setFormData] = useState({
     name: '',
     legalName: '',
@@ -47,17 +61,88 @@ export default function BusinessProfile() {
     invoicePrefix: 'INV',
   });
 
-  const handleSave = async () => {
-    setIsLoading(true);
-    // TODO: Implement save functionality
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: 'Profile saved',
-        description: 'Your business profile has been updated.',
+  // Load business data into form when it arrives
+  useEffect(() => {
+    if (business) {
+      const addressData = business.address as AddressData | null;
+      const addressString = addressData 
+        ? [addressData.street, addressData.city, addressData.state, addressData.postal_code, addressData.country]
+            .filter(Boolean)
+            .join('\n')
+        : '';
+
+      setFormData({
+        name: business.name || '',
+        legalName: business.legal_name || '',
+        jurisdiction: business.jurisdiction || 'NG',
+        taxId: business.tax_id || '',
+        email: business.contact_email || '',
+        phone: business.contact_phone || '',
+        address: addressString,
+        invoicePrefix: business.invoice_prefix || 'INV',
       });
-    }, 1000);
+    }
+  }, [business]);
+
+  const handleSave = async () => {
+    // Parse address into structured format
+    const addressLines = formData.address.split('\n').filter(Boolean);
+    const addressData: AddressData = {
+      street: addressLines[0] || undefined,
+      city: addressLines[1] || undefined,
+      state: addressLines[2] || undefined,
+      postal_code: addressLines[3] || undefined,
+      country: addressLines[4] || undefined,
+    };
+
+    const businessData = {
+      name: formData.name,
+      legal_name: formData.legalName || null,
+      jurisdiction: formData.jurisdiction,
+      tax_id: formData.taxId || null,
+      contact_email: formData.email || null,
+      contact_phone: formData.phone || null,
+      address: Object.values(addressData).some(Boolean) ? addressData : null,
+      invoice_prefix: formData.invoicePrefix || 'INV',
+    };
+
+    if (business) {
+      // Update existing business
+      await updateBusiness.mutateAsync({
+        businessId: business.id,
+        updates: businessData,
+      });
+    } else {
+      // Create new business
+      await createBusiness.mutateAsync(businessData);
+    }
   };
+
+  const isLoading = updateBusiness.isPending || createBusiness.isPending;
+  const nextInvoiceNumber = business?.next_invoice_number || 1;
+
+  if (isLoadingBusiness) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-5 w-72 mt-2" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-24 w-full" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -74,7 +159,11 @@ export default function BusinessProfile() {
           </p>
         </div>
         <Button onClick={handleSave} disabled={isLoading}>
-          <Save className="h-4 w-4 mr-2" />
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
           {isLoading ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
@@ -245,7 +334,7 @@ export default function BusinessProfile() {
                 <Label>Next Invoice Number</Label>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-lg font-mono">
-                    {formData.invoicePrefix || 'INV'}-0001
+                    {formData.invoicePrefix || 'INV'}-{String(nextInvoiceNumber).padStart(4, '0')}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">

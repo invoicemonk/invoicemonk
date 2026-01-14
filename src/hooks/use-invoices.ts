@@ -100,11 +100,14 @@ export function useCreateInvoice() {
       const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`;
 
       // Create the invoice
+      // Note: invoice_owner_check constraint requires either user_id OR business_id, not both
+      const isBusinessInvoice = !!invoice.business_id;
       const { data: createdInvoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
           ...invoice,
-          user_id: user.id,
+          user_id: isBusinessInvoice ? null : user.id,
+          business_id: invoice.business_id || null,
           invoice_number: invoiceNumber,
           status: 'draft',
         })
@@ -233,21 +236,26 @@ export function useIssueInvoice() {
       const { data, error } = await supabase
         .rpc('issue_invoice', { _invoice_id: invoiceId });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Issue invoice RPC error:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-limit-check'] });
       toast({
         title: 'Invoice issued',
         description: 'This invoice is now immutable and cannot be modified.',
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
+      console.error('Issue invoice error:', error);
       toast({
         title: 'Error issuing invoice',
-        description: error.message,
+        description: error.message || 'Failed to issue invoice. Please try again.',
         variant: 'destructive',
       });
     },

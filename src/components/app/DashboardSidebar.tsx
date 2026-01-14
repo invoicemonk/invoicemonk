@@ -9,7 +9,6 @@ import {
   CreditCard, 
   Settings,
   LogOut,
-  ChevronLeft,
   Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +25,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { OrganizationSwitcher } from '@/components/app/OrganizationSwitcher';
@@ -62,20 +60,16 @@ export function DashboardSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarHeader className="border-b border-border/50 p-4">
-        <div className="flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={logo} alt="Invoicemonk" className="h-8 w-8 object-contain" />
-            {!isCollapsed && (
-              <span className="font-semibold text-foreground">Invoicemonk</span>
-            )}
-          </Link>
-          <SidebarTrigger className="ml-auto">
-            <ChevronLeft className={cn(
-              "h-4 w-4 transition-transform",
-              isCollapsed && "rotate-180"
-            )} />
-          </SidebarTrigger>
-        </div>
+        <Link to="/dashboard" className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="Invoicemonk" 
+            className={cn(
+              "object-contain transition-all",
+              isCollapsed ? "h-8 w-8" : "h-8"
+            )} 
+          />
+        </Link>
         <div className="mt-3">
           <OrganizationSwitcher collapsed={isCollapsed} />
         </div>

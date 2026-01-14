@@ -120,10 +120,14 @@ export type Database = {
       businesses: {
         Row: {
           address: Json | null
+          compliance_status: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
           created_by: string | null
+          currency_locked: boolean | null
+          currency_locked_at: string | null
+          default_currency: string | null
           id: string
           invoice_prefix: string | null
           jurisdiction: string
@@ -136,10 +140,14 @@ export type Database = {
         }
         Insert: {
           address?: Json | null
+          compliance_status?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          currency_locked?: boolean | null
+          currency_locked_at?: string | null
+          default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
           jurisdiction?: string
@@ -152,10 +160,14 @@ export type Database = {
         }
         Update: {
           address?: Json | null
+          compliance_status?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          currency_locked?: boolean | null
+          currency_locked_at?: string | null
+          default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
           jurisdiction?: string
@@ -379,6 +391,57 @@ export type Database = {
           },
         ]
       }
+      invoice_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          layout: Json
+          name: string
+          preview_url: string | null
+          sort_order: number | null
+          styles: Json | null
+          supports_branding: boolean | null
+          tier_required: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string | null
+          watermark_required: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          layout?: Json
+          name: string
+          preview_url?: string | null
+          sort_order?: number | null
+          styles?: Json | null
+          supports_branding?: boolean | null
+          tier_required?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+          watermark_required?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          layout?: Json
+          name?: string
+          preview_url?: string | null
+          sort_order?: number | null
+          styles?: Json | null
+          supports_branding?: boolean | null
+          tier_required?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+          watermark_required?: boolean | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount_paid: number
@@ -386,6 +449,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency: string
+          currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
           id: string
@@ -400,10 +464,13 @@ export type Database = {
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
+          summary: string | null
           tax_amount: number
           tax_schema_id: string | null
           tax_schema_snapshot: Json | null
           tax_schema_version: string | null
+          template_id: string | null
+          template_snapshot: Json | null
           terms: string | null
           total_amount: number
           updated_at: string
@@ -419,6 +486,7 @@ export type Database = {
           client_id: string
           created_at?: string
           currency?: string
+          currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
           id?: string
@@ -433,10 +501,13 @@ export type Database = {
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
+          summary?: string | null
           tax_amount?: number
           tax_schema_id?: string | null
           tax_schema_snapshot?: Json | null
           tax_schema_version?: string | null
+          template_id?: string | null
+          template_snapshot?: Json | null
           terms?: string | null
           total_amount?: number
           updated_at?: string
@@ -452,6 +523,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           currency?: string
+          currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
           id?: string
@@ -466,10 +538,13 @@ export type Database = {
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
+          summary?: string | null
           tax_amount?: number
           tax_schema_id?: string | null
           tax_schema_snapshot?: Json | null
           tax_schema_version?: string | null
+          template_id?: string | null
+          template_snapshot?: Json | null
           terms?: string | null
           total_amount?: number
           updated_at?: string
@@ -499,6 +574,13 @@ export type Database = {
             columns: ["tax_schema_id"]
             isOneToOne: false
             referencedRelation: "tax_schemas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -714,6 +796,39 @@ export type Database = {
         }
         Relationships: []
       }
+      tier_limits: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          feature: string
+          id: string
+          limit_type: string
+          limit_value: number | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          feature: string
+          id?: string
+          limit_type?: string
+          limit_value?: number | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          feature?: string
+          id?: string
+          limit_type?: string
+          limit_value?: number | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -743,10 +858,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_tier_limit: {
+        Args: { _feature: string; _user_id: string }
+        Returns: Json
+      }
       close_account: {
         Args: { _reason?: string; _user_id: string }
         Returns: undefined
       }
+      has_audit_access: { Args: { _user_id: string }; Returns: boolean }
       has_business_role: {
         Args: {
           _business_id: string
@@ -763,6 +883,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_tier: {
+        Args: {
+          _required_tier: Database["public"]["Enums"]["subscription_tier"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_business_member: {
         Args: { _business_id: string; _user_id: string }
         Returns: boolean
@@ -775,6 +902,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency: string
+          currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
           id: string
@@ -789,10 +917,13 @@ export type Database = {
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
+          summary: string | null
           tax_amount: number
           tax_schema_id: string | null
           tax_schema_snapshot: Json | null
           tax_schema_version: string | null
+          template_id: string | null
+          template_snapshot: Json | null
           terms: string | null
           total_amount: number
           updated_at: string

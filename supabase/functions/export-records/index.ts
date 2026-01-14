@@ -109,6 +109,26 @@ Deno.serve(async (req) => {
     
     const actorRole = roleData?.role || 'user'
 
+    // CHECK TIER LIMITS FOR EXPORTS (Server-side enforcement)
+    const { data: tierCheck, error: tierError } = await supabaseUser.rpc('check_tier_limit', {
+      _user_id: userId,
+      _feature: 'exports_enabled',
+    })
+
+    console.log('Tier check for exports:', tierCheck, tierError)
+
+    if (tierError || !tierCheck?.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Data exports require a Professional subscription. Upgrade to export your financial records.',
+          upgrade_required: true,
+          tier: tierCheck?.tier || 'starter'
+        } as ExportRecordsResponse),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Parse request body
     const body: ExportRecordsRequest = await req.json()
     

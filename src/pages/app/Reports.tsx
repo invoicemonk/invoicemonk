@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useSubscription } from '@/hooks/use-subscription';
+import { UpgradePrompt } from '@/components/app/UpgradePrompt';
 
 const reportTypes = [
   {
@@ -50,10 +52,40 @@ const reportTypes = [
 ];
 
 export default function Reports() {
+  const { canAccess, isLoading } = useSubscription();
+  const hasReportsAccess = canAccess('reports_enabled');
+
   const handleGenerateReport = (reportId: string) => {
     // TODO: Implement report generation
     console.log('Generating report:', reportId);
   };
+
+  // Show upgrade prompt if user doesn't have access
+  if (!isLoading && !hasReportsAccess) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground mt-1">
+            Generate compliance-ready reports and exports
+          </p>
+        </div>
+        
+        <UpgradePrompt 
+          feature="Reports"
+          title="Unlock Powerful Reports"
+          description="Generate tax-ready reports, revenue summaries, and audit exports with a Professional subscription."
+          requiredTier="professional"
+          variant="card"
+          className="max-w-xl mx-auto mt-12"
+        />
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

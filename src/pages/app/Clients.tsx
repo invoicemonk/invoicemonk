@@ -7,14 +7,15 @@ import {
   MoreHorizontal,
   Mail,
   Phone,
-  Building2,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -30,44 +31,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from '@/hooks/use-toast';
-
-interface Client {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  company?: string;
-  invoiceCount: number;
-}
-
-// Placeholder for when we have real data
-const clients: Client[] = [];
+import { useClients, useCreateClient, type Client } from '@/hooks/use-clients';
+import { useNavigate } from 'react-router-dom';
 
 export default function Clients() {
+  const navigate = useNavigate();
+  const { data: clients = [], isLoading, error } = useClients();
+  const createClient = useCreateClient();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newClient, setNewClient] = useState({
     name: '',
     email: '',
     phone: '',
-    company: '',
   });
 
   const filteredClients = clients.filter(client => 
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.company?.toLowerCase().includes(searchQuery.toLowerCase())
+    client.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddClient = () => {
-    // TODO: Implement add client functionality
-    toast({
-      title: 'Client added',
-      description: `${newClient.name} has been added to your clients.`,
+  const handleAddClient = async () => {
+    if (!newClient.name) return;
+    
+    await createClient.mutateAsync({
+      name: newClient.name,
+      email: newClient.email || null,
+      phone: newClient.phone || null,
     });
+    
     setIsAddDialogOpen(false);
-    setNewClient({ name: '', email: '', phone: '', company: '' });
+    setNewClient({ name: '', email: '', phone: '' });
   };
 
   const getInitials = (name: string) => {
@@ -107,13 +102,13 @@ export default function Clients() {
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
-                  placeholder="John Doe"
+                  placeholder="John Doe or Company Name"
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -132,21 +127,16 @@ export default function Clients() {
                   onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input
-                  id="company"
-                  placeholder="Acme Inc."
-                  value={newClient.company}
-                  onChange={(e) => setNewClient({ ...newClient, company: e.target.value })}
-                />
-              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddClient} disabled={!newClient.name || !newClient.email}>
+              <Button 
+                onClick={handleAddClient} 
+                disabled={!newClient.name || createClient.isPending}
+              >
+                {createClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Add Client
               </Button>
             </DialogFooter>
@@ -169,8 +159,46 @@ export default function Clients() {
         </CardContent>
       </Card>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="p-4 rounded-full bg-destructive/10 mb-4">
+              <Users className="h-8 w-8 text-destructive" />
+            </div>
+            <h3 className="font-semibold mb-1">Error loading clients</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-sm text-center">
+              {error.message}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Client List */}
-      {filteredClients.length > 0 ? (
+      {!isLoading && !error && filteredClients.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredClients.map((client) => (
             <Card key={client.id} className="hover:shadow-md transition-shadow">
@@ -184,8 +212,8 @@ export default function Clients() {
                     </Avatar>
                     <div>
                       <h3 className="font-semibold">{client.name}</h3>
-                      {client.company && (
-                        <p className="text-sm text-muted-foreground">{client.company}</p>
+                      {client.tax_id && (
+                        <p className="text-sm text-muted-foreground font-mono">{client.tax_id}</p>
                       )}
                     </div>
                   </div>
@@ -196,47 +224,58 @@ export default function Clients() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Create Invoice</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/invoices/new?client=${client.id}`)}>
+                        Create Invoice
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
                 
                 <div className="mt-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    <span>{client.email}</span>
-                  </div>
+                  {client.email && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span className="truncate">{client.email}</span>
+                    </div>
+                  )}
                   {client.phone && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Phone className="h-4 w-4" />
                       <span>{client.phone}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>{client.invoiceCount} invoice{client.invoiceCount !== 1 ? 's' : ''}</span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : (
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && filteredClients.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="p-4 rounded-full bg-muted mb-4">
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="font-semibold mb-1">No clients yet</h3>
+            <h3 className="font-semibold mb-1">
+              {searchQuery ? 'No clients found' : 'No clients yet'}
+            </h3>
             <p className="text-sm text-muted-foreground mb-4 max-w-sm text-center">
-              Add your first client to start creating invoices for them.
+              {searchQuery 
+                ? 'Try adjusting your search query.'
+                : 'Add your first client to start creating invoices for them.'
+              }
             </p>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Client
-            </Button>
+            {!searchQuery && (
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Client
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

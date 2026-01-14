@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Plus, 
   Trash2, 
@@ -12,8 +12,7 @@ import {
   Loader2,
   Lock,
   HelpCircle,
-  Sparkles,
-  Eye
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,16 +43,14 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
-import { useCreateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
-import { useInvoiceTemplates, TemplateWithAccess } from '@/hooks/use-invoice-templates';
+import { useInvoice, useUpdateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
+import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
 import { useInvoiceLimitCheck, useSubscription } from '@/hooks/use-subscription';
 import { useBusinessCurrency } from '@/hooks/use-business-currency';
 import { useUserOrganizations } from '@/hooks/use-organization';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
-import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
-import type { Tables } from '@/integrations/supabase/types';
 
 interface InvoiceItem {
   id: string;
@@ -63,11 +60,13 @@ interface InvoiceItem {
   taxRate: number;
 }
 
-export default function InvoiceNew() {
+export default function InvoiceEdit() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isEmailVerified = user?.email_confirmed_at;
 
+  const { data: invoice, isLoading: invoiceLoading } = useInvoice(id);
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: templates } = useInvoiceTemplates();
   const { data: invoiceLimitCheck } = useInvoiceLimitCheck();
@@ -76,7 +75,7 @@ export default function InvoiceNew() {
   const currentBusiness = organizations?.[0]?.business;
   const { data: businessCurrency } = useBusinessCurrency(currentBusiness?.id);
   const createClient = useCreateClient();
-  const createInvoice = useCreateInvoice();
+  const updateInvoice = useUpdateInvoice();
   const issueInvoice = useIssueInvoice();
 
   // Currency lock state
@@ -86,94 +85,57 @@ export default function InvoiceNew() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [currency, setCurrency] = useState('NGN');
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [issueDate, setIssueDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
-  const [items, setItems] = useState<InvoiceItem[]>([
-    { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: 0 }
-  ]);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [newClient, setNewClient] = useState({
     name: '',
     email: '',
     phone: '',
   });
 
-  // Get selected client for preview
-  const selectedClient = clients?.find(c => c.id === selectedClientId);
+  // Initialize form with invoice data
+  useEffect(() => {
+    if (invoice && !isInitialized) {
+      setSelectedClientId(invoice.client_id);
+      setSelectedTemplateId(invoice.template_id || '');
+      setCurrency(invoice.currency);
+      setIssueDate(invoice.issue_date || new Date().toISOString().split('T')[0]);
+      setDueDate(invoice.due_date || '');
+      setNotes(invoice.notes || '');
+      setTerms(invoice.terms || '');
+      
+      if (invoice.invoice_items && invoice.invoice_items.length > 0) {
+        setItems(invoice.invoice_items.map(item => ({
+          id: item.id,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: Number(item.unit_price),
+          taxRate: item.tax_rate,
+        })));
+      } else {
+        setItems([{ id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: 0 }]);
+      }
+      setIsInitialized(true);
+    }
+  }, [invoice, isInitialized]);
 
-  // Build a preview invoice object from current form state
-  const buildPreviewInvoice = (): Tables<'invoices'> & { clients?: Tables<'clients'> | null; invoice_items?: Tables<'invoice_items'>[] } => {
-    const validItems = items.filter(item => item.description || item.unitPrice > 0);
-    return {
-      id: 'preview',
-      invoice_number: 'PREVIEW',
-      user_id: user?.id || null,
-      business_id: currentBusiness?.id || null,
-      client_id: selectedClientId || '',
-      status: 'draft',
-      currency: isCurrencyLocked && lockedCurrency ? lockedCurrency : currency,
-      issue_date: issueDate,
-      due_date: dueDate || null,
-      notes: notes || null,
-      terms: terms || null,
-      summary: null,
-      subtotal: calculateSubtotal(),
-      tax_amount: calculateTax(),
-      discount_amount: 0,
-      total_amount: calculateTotal(),
-      amount_paid: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      issued_at: null,
-      issued_by: null,
-      voided_at: null,
-      voided_by: null,
-      void_reason: null,
-      invoice_hash: null,
-      verification_id: null,
-      template_id: selectedTemplateId || null,
-      template_snapshot: null,
-      tax_schema_id: null,
-      tax_schema_snapshot: null,
-      tax_schema_version: null,
-      issuer_snapshot: currentBusiness ? {
-        name: currentBusiness.name,
-        legal_name: currentBusiness.legal_name,
-        tax_id: currentBusiness.tax_id,
-        address: currentBusiness.address,
-        contact_email: currentBusiness.contact_email,
-        contact_phone: currentBusiness.contact_phone,
-        jurisdiction: currentBusiness.jurisdiction,
-      } : null,
-      recipient_snapshot: selectedClient ? {
-        name: selectedClient.name,
-        email: selectedClient.email,
-        phone: selectedClient.phone,
-        tax_id: selectedClient.tax_id,
-        address: selectedClient.address,
-      } : null,
-      retention_locked_until: null,
-      currency_locked_at: null,
-      clients: selectedClient || null,
-      invoice_items: validItems.map((item, index) => ({
-        id: `item-${index}`,
-        invoice_id: 'preview',
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
-        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
-        discount_percent: 0,
-        amount: item.quantity * item.unitPrice,
-        sort_order: index,
-        created_at: new Date().toISOString(),
-      })),
-    };
-  };
+  // Redirect if not a draft
+  useEffect(() => {
+    if (invoice && invoice.status !== 'draft') {
+      toast({
+        title: 'Cannot edit',
+        description: 'Only draft invoices can be edited.',
+        variant: 'destructive',
+      });
+      navigate(`/invoices/${id}`);
+    }
+  }, [invoice, id, navigate]);
 
   const addItem = () => {
     setItems([
@@ -182,15 +144,15 @@ export default function InvoiceNew() {
     ]);
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = (itemId: string) => {
     if (items.length > 1) {
-      setItems(items.filter(item => item.id !== id));
+      setItems(items.filter(item => item.id !== itemId));
     }
   };
 
-  const updateItem = (id: string, field: keyof InvoiceItem, value: string | number) => {
+  const updateItem = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
     setItems(items.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
+      item.id === itemId ? { ...item, [field]: value } : item
     ));
   };
 
@@ -253,65 +215,15 @@ export default function InvoiceNew() {
     }
   };
 
-  const handleSaveDraft = async () => {
-    if (!validateForm()) return;
+  const handleSave = async () => {
+    if (!validateForm() || !id) return;
 
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
 
-    await createInvoice.mutateAsync({
-      invoice: {
-        business_id: currentBusiness?.id || null,
-        client_id: selectedClientId,
-        currency,
-        issue_date: issueDate,
-        due_date: dueDate || null,
-        notes: notes || null,
-        terms: terms || null,
-        subtotal: calculateSubtotal(),
-        tax_amount: calculateTax(),
-        total_amount: calculateTotal(),
-      },
-      items: validItems.map(item => ({
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
-        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
-        amount: item.quantity * item.unitPrice,
-      })),
-    });
-
-    navigate('/invoices');
-  };
-
-  const handleIssue = async () => {
-    if (!isEmailVerified) {
-      toast({
-        title: 'Email verification required',
-        description: 'Please verify your email before issuing invoices.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Check invoice limit before issuing
-    if (invoiceLimitCheck && !invoiceLimitCheck.allowed) {
-      toast({
-        title: 'Invoice limit reached',
-        description: `You have issued ${invoiceLimitCheck.current_count} of ${invoiceLimitCheck.limit_value} invoices this month. Upgrade to Professional for unlimited invoices.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!validateForm()) return;
-
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
-
-    // First create the invoice with template
-    const invoice = await createInvoice.mutateAsync({
-      invoice: {
-        business_id: currentBusiness?.id || null,
+    await updateInvoice.mutateAsync({
+      invoiceId: id,
+      updates: {
+        business_id: currentBusiness?.id || invoice?.business_id || null,
         client_id: selectedClientId,
         currency,
         issue_date: issueDate,
@@ -333,17 +245,85 @@ export default function InvoiceNew() {
       })),
     });
 
-    if (invoice) {
-      // Then issue it
-      await issueInvoice.mutateAsync(invoice.id);
-      navigate('/invoices');
-    }
+    navigate(`/invoices/${id}`);
   };
 
-  const isLoading = createInvoice.isPending || issueInvoice.isPending;
+  const handleIssue = async () => {
+    if (!isEmailVerified) {
+      toast({
+        title: 'Email verification required',
+        description: 'Please verify your email before issuing invoices.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-  // Check if user is at invoice limit
+    if (invoiceLimitCheck && !invoiceLimitCheck.allowed) {
+      toast({
+        title: 'Invoice limit reached',
+        description: `You have issued ${invoiceLimitCheck.current_count} of ${invoiceLimitCheck.limit_value} invoices this month. Upgrade to Professional for unlimited invoices.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!validateForm() || !id) return;
+
+    // First save, then issue
+    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+
+    await updateInvoice.mutateAsync({
+      invoiceId: id,
+      updates: {
+        business_id: currentBusiness?.id || invoice?.business_id || null,
+        client_id: selectedClientId,
+        currency,
+        issue_date: issueDate,
+        due_date: dueDate || null,
+        notes: notes || null,
+        terms: terms || null,
+        subtotal: calculateSubtotal(),
+        tax_amount: calculateTax(),
+        total_amount: calculateTotal(),
+        template_id: selectedTemplateId || null,
+      },
+      items: validItems.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        tax_rate: item.taxRate,
+        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
+        amount: item.quantity * item.unitPrice,
+      })),
+    });
+
+    await issueInvoice.mutateAsync(id);
+    navigate('/invoices');
+  };
+
+  const isLoading = updateInvoice.isPending || issueInvoice.isPending;
   const isAtInvoiceLimit = invoiceLimitCheck && !invoiceLimitCheck.allowed;
+
+  if (invoiceLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold">Invoice Not Found</h1>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -353,13 +333,13 @@ export default function InvoiceNew() {
     >
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/invoices/${id}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">New Invoice</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Edit Invoice</h1>
           <p className="text-muted-foreground mt-1">
-            Create a new draft invoice
+            {invoice.invoice_number} • Draft
           </p>
         </div>
       </div>
@@ -485,28 +465,23 @@ export default function InvoiceNew() {
                           <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
-                          <p>Your business currency is permanently locked to {lockedCurrency} after issuing your first invoice. This ensures consistency across all financial records for compliance.</p>
+                          <p>Your business currency is permanently locked to {lockedCurrency} after issuing your first invoice.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
                 ) : (
-                  <>
-                    <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Currency will be locked after your first issued invoice
-                    </p>
-                  </>
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
+                      <SelectItem value="USD">USD - US Dollar</SelectItem>
+                      <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                      <SelectItem value="EUR">EUR - Euro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
 
@@ -532,22 +507,11 @@ export default function InvoiceNew() {
                               {template.tier_required}
                             </Badge>
                           )}
-                          {template.watermark_required && (
-                            <Badge variant="secondary" className="text-xs">
-                              Watermark
-                            </Badge>
-                          )}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {templates?.find(t => t.id === selectedTemplateId)?.watermark_required && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    This template includes Invoicemonk watermark
-                  </p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -687,26 +651,18 @@ export default function InvoiceNew() {
               <Separator />
 
               <div className="space-y-3">
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setIsPreviewOpen(true)}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Preview as Recipient
-                </Button>
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={handleSaveDraft}
+                  onClick={handleSave}
                   disabled={isLoading}
                 >
-                  {createInvoice.isPending && !issueInvoice.isPending ? (
+                  {updateInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
                   )}
-                  Save as Draft
+                  Save Changes
                 </Button>
                 <Button 
                   className="w-full"
@@ -789,14 +745,6 @@ export default function InvoiceNew() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Invoice Preview Dialog */}
-      <InvoicePreviewDialog
-        open={isPreviewOpen}
-        onOpenChange={setIsPreviewOpen}
-        invoice={buildPreviewInvoice()}
-        showWatermark={isStarter}
-      />
     </motion.div>
   );
 }

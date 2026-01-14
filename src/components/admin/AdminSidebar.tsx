@@ -9,7 +9,6 @@ import {
   Globe,
   Settings,
   LogOut,
-  ChevronLeft,
   ShieldAlert,
   ArrowLeft,
   Clock
@@ -29,7 +28,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import logo from '@/assets/invoicemonk-logo.png';
@@ -44,6 +42,7 @@ const mainNavItems = [
 
 const complianceNavItems = [
   { title: 'Retention Policies', url: '/admin/retention-policies', icon: Clock },
+  { title: 'Invoice Templates', url: '/admin/templates', icon: FileText },
 ];
 
 const systemNavItems = [
@@ -68,23 +67,19 @@ export function AdminSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-destructive/20 bg-background">
       <SidebarHeader className="border-b border-destructive/20 p-4">
-        <div className="flex items-center justify-between">
-          <Link to="/admin" className="flex items-center gap-2">
-            <img src={logo} alt="Invoicemonk" className="h-8 w-8 object-contain" />
-            {!isCollapsed && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-foreground">Admin</span>
-                <Badge variant="destructive" className="text-xs">Platform</Badge>
-              </div>
-            )}
-          </Link>
-          <SidebarTrigger className="ml-auto">
-            <ChevronLeft className={cn(
-              "h-4 w-4 transition-transform",
-              isCollapsed && "rotate-180"
-            )} />
-          </SidebarTrigger>
-        </div>
+        <Link to="/admin" className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="Invoicemonk" 
+            className={cn(
+              "object-contain transition-all",
+              isCollapsed ? "h-8 w-8" : "h-8"
+            )} 
+          />
+          {!isCollapsed && (
+            <Badge variant="destructive" className="text-xs">Admin</Badge>
+          )}
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="px-2">

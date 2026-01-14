@@ -2,18 +2,51 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { useCallback, useEffect, useRef } from 'react';
 
 type AuditEventType = Database['public']['Enums']['audit_event_type'];
 type SubscriptionStatus = Database['public']['Enums']['subscription_status'];
 type SubscriptionTier = Database['public']['Enums']['subscription_tier'];
 type AppRole = Database['public']['Enums']['app_role'];
 
+// Helper to log admin data access (for audit trail)
+async function logAdminDataAccess(entityType: string, scope: string, recordCount: number) {
+  try {
+    await supabase.rpc('log_audit_event', {
+      _event_type: 'SETTINGS_UPDATED' as AuditEventType, // Using existing event type for now
+      _entity_type: 'admin_view',
+      _metadata: {
+        admin_action: true,
+        action_type: 'data_view',
+        entity_type: entityType,
+        scope,
+        record_count: recordCount,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to log admin data access:', error);
+  }
+}
+
+// Hook to log admin view on first data load
+function useAdminViewLogger(entityType: string, data: unknown[] | null | undefined, search?: string) {
+  const hasLogged = useRef(false);
+  
+  useEffect(() => {
+    if (data && data.length > 0 && !hasLogged.current) {
+      hasLogged.current = true;
+      logAdminDataAccess(entityType, search || 'all', data.length);
+    }
+  }, [data, entityType, search]);
+}
+
 // Fetch all users with profiles
 export function useAdminUsers(search?: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['admin-users', search],
     queryFn: async () => {
-      let query = supabase
+      let q = supabase
         .from('profiles')
         .select(`
           *,
@@ -23,22 +56,27 @@ export function useAdminUsers(search?: string) {
         .limit(100);
 
       if (search) {
-        query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+        q = q.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
   });
+
+  // Log admin data access
+  useAdminViewLogger('users', query.data, search);
+
+  return query;
 }
 
 // Fetch all businesses (read-only for admin - no mutation capabilities)
 export function useAdminBusinesses(search?: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['admin-businesses', search],
     queryFn: async () => {
-      let query = supabase
+      let q = supabase
         .from('businesses')
         .select(`
           *,
@@ -49,22 +87,25 @@ export function useAdminBusinesses(search?: string) {
         .limit(100);
 
       if (search) {
-        query = query.or(`name.ilike.%${search}%,legal_name.ilike.%${search}%,tax_id.ilike.%${search}%`);
+        q = q.or(`name.ilike.%${search}%,legal_name.ilike.%${search}%,tax_id.ilike.%${search}%`);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
   });
+
+  useAdminViewLogger('businesses', query.data, search);
+  return query;
 }
 
 // Fetch all invoices (read-only - admin cannot modify financial records)
 export function useAdminInvoices(search?: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['admin-invoices', search],
     queryFn: async () => {
-      let query = supabase
+      let q = supabase
         .from('invoices')
         .select(`
           *,
@@ -75,14 +116,17 @@ export function useAdminInvoices(search?: string) {
         .limit(200);
 
       if (search) {
-        query = query.or(`invoice_number.ilike.%${search}%,verification_id::text.ilike.%${search}%`);
+        q = q.or(`invoice_number.ilike.%${search}%,verification_id::text.ilike.%${search}%`);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
   });
+
+  useAdminViewLogger('invoices', query.data, search);
+  return query;
 }
 
 // Fetch system-wide audit logs

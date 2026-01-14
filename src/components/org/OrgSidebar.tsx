@@ -2,14 +2,11 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileText, 
-  Users, 
   BarChart3, 
   History, 
   Settings,
   LogOut,
-  ChevronLeft,
   Shield,
-  Building2,
   UserCog,
   ArrowLeft
 } from 'lucide-react';
@@ -29,7 +26,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import logo from '@/assets/invoicemonk-logo.png';
@@ -74,22 +70,21 @@ export function OrgSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarHeader className="border-b border-border/50 p-4">
-        <div className="flex items-center justify-between">
-          <Link to={`/org/${orgId}/dashboard`} className="flex items-center gap-2">
-            <img src={logo} alt="Invoicemonk" className="h-8 w-8 object-contain" />
-            {!isCollapsed && (
-              <span className="font-semibold text-foreground truncate max-w-[140px]">
-                {currentOrg?.name || 'Organization'}
-              </span>
-            )}
-          </Link>
-          <SidebarTrigger className="ml-auto">
-            <ChevronLeft className={cn(
-              "h-4 w-4 transition-transform",
-              isCollapsed && "rotate-180"
-            )} />
-          </SidebarTrigger>
-        </div>
+        <Link to={`/org/${orgId}/dashboard`} className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="Invoicemonk" 
+            className={cn(
+              "object-contain transition-all",
+              isCollapsed ? "h-8 w-8" : "h-8"
+            )} 
+          />
+          {!isCollapsed && (
+            <span className="font-semibold text-foreground truncate max-w-[140px]">
+              {currentOrg?.name || 'Organization'}
+            </span>
+          )}
+        </Link>
         
         {!isCollapsed && currentRole && (
           <div className="mt-2">
