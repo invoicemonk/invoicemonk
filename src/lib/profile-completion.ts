@@ -13,20 +13,24 @@ interface ProfileField {
   getValue: (data: FormDataInput) => boolean;
 }
 
-interface FormDataInput {
+export interface FormDataInput {
   name: string;
   legalName: string;
   taxId: string;
   email: string;
-  address: string;
+  addressCity: string;
+  addressCountry: string;
 }
 
+// Required fields matching the database compute_business_compliance trigger:
+// name, legal_name, tax_id, contact_email, address->city, address->country
 const REQUIRED_FIELDS: ProfileField[] = [
   { key: 'name', label: 'Business Name', getValue: (d) => !!d.name?.trim() },
   { key: 'legalName', label: 'Legal Name', getValue: (d) => !!d.legalName?.trim() },
   { key: 'taxId', label: 'Tax ID', getValue: (d) => !!d.taxId?.trim() },
   { key: 'email', label: 'Email', getValue: (d) => !!d.email?.trim() },
-  { key: 'address', label: 'Address', getValue: (d) => !!d.address?.trim() },
+  { key: 'addressCity', label: 'City', getValue: (d) => !!d.addressCity?.trim() },
+  { key: 'addressCountry', label: 'Country', getValue: (d) => !!d.addressCountry?.trim() },
 ];
 
 export interface ProfileCompletionResult {

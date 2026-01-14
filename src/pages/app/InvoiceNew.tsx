@@ -796,6 +796,14 @@ export default function InvoiceNew() {
         onOpenChange={setIsPreviewOpen}
         invoice={buildPreviewInvoice()}
         showWatermark={isStarter}
+        business={currentBusiness ? {
+          name: currentBusiness.name,
+          legal_name: currentBusiness.legal_name,
+          tax_id: currentBusiness.tax_id,
+          address: currentBusiness.address as { street?: string; city?: string; state?: string; postal_code?: string; country?: string } | null,
+          contact_email: currentBusiness.contact_email,
+          contact_phone: currentBusiness.contact_phone,
+        } : null}
       />
     </motion.div>
   );
