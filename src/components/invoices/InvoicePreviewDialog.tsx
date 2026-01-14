@@ -9,18 +9,36 @@ type Invoice = Tables<'invoices'> & {
   invoice_items?: Tables<'invoice_items'>[];
 };
 
+// Local Business type matching InvoicePreviewCard's expected format
+interface Business {
+  name: string;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+  } | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+}
+
 interface InvoicePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice: Invoice;
   showWatermark?: boolean;
+  business?: Business | null;
 }
 
 export function InvoicePreviewDialog({ 
   open, 
   onOpenChange, 
   invoice,
-  showWatermark = false 
+  showWatermark = false,
+  business
 }: InvoicePreviewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -37,7 +55,7 @@ export function InvoicePreviewDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="mt-4">
-          <InvoicePreviewCard invoice={invoice} showWatermark={showWatermark} />
+          <InvoicePreviewCard invoice={invoice} showWatermark={showWatermark} business={business} />
         </div>
       </DialogContent>
     </Dialog>

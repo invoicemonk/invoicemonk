@@ -223,7 +223,7 @@ export default function InvoiceEdit() {
     await updateInvoice.mutateAsync({
       invoiceId: id,
       updates: {
-        business_id: currentBusiness?.id || invoice?.business_id || null,
+        // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
         currency,
         issue_date: issueDate,
@@ -275,7 +275,7 @@ export default function InvoiceEdit() {
     await updateInvoice.mutateAsync({
       invoiceId: id,
       updates: {
-        business_id: currentBusiness?.id || invoice?.business_id || null,
+        // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
         currency,
         issue_date: issueDate,

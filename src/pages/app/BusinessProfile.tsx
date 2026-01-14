@@ -124,8 +124,17 @@ export default function BusinessProfile() {
   const nextInvoiceNumber = business?.next_invoice_number || 1;
 
   // Calculate profile completion from current form data for real-time updates
+  // Parse address lines to extract city (line 2) and country (line 5)
   const profileCompletion = useMemo(() => {
-    return calculateProfileCompletion(formData);
+    const addressLines = formData.address.split('\n').filter(Boolean);
+    return calculateProfileCompletion({
+      name: formData.name,
+      legalName: formData.legalName,
+      taxId: formData.taxId,
+      email: formData.email,
+      addressCity: addressLines[1] || '', // City is line 2
+      addressCountry: addressLines[4] || '', // Country is line 5
+    });
   }, [formData]);
 
   if (isLoadingBusiness) {
