@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useUserBusiness, useUpdateBusiness, useCreateBusiness } from '@/hooks/use-business';
+import { calculateProfileCompletion } from '@/lib/profile-completion';
 
 const jurisdictions = [
   { value: 'NG', label: 'Nigeria' },
@@ -121,6 +123,11 @@ export default function BusinessProfile() {
   const isLoading = updateBusiness.isPending || createBusiness.isPending;
   const nextInvoiceNumber = business?.next_invoice_number || 1;
 
+  // Calculate profile completion from current form data for real-time updates
+  const profileCompletion = useMemo(() => {
+    return calculateProfileCompletion(formData);
+  }, [formData]);
+
   if (isLoadingBusiness) {
     return (
       <motion.div
@@ -168,21 +175,39 @@ export default function BusinessProfile() {
         </Button>
       </div>
 
-      {/* Compliance Notice */}
-      <Card className="bg-amber-500/5 border-amber-500/20">
-        <CardContent className="flex items-center gap-4 py-4">
-          <Shield className="h-5 w-5 text-amber-500 shrink-0" />
-          <div>
-            <p className="font-medium text-amber-700 dark:text-amber-400">
-              Complete your profile for compliance
-            </p>
-            <p className="text-sm text-muted-foreground">
-              A complete business profile ensures your invoices meet regulatory requirements 
-              and builds trust with your clients.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Compliance Notice - only show when profile is incomplete */}
+      {!profileCompletion.isComplete && (
+        <Card className="bg-amber-500/5 border-amber-500/20">
+          <CardContent className="flex flex-col gap-4 py-4">
+            <div className="flex items-start gap-4">
+              <Shield className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  Complete your profile for compliance
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  A complete business profile ensures your invoices meet regulatory requirements 
+                  and builds trust with your clients.
+                </p>
+              </div>
+            </div>
+            
+            {/* Progress Indicator */}
+            <div className="space-y-2 pl-9">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Profile completion</span>
+                <span className="font-medium">{profileCompletion.completed} of {profileCompletion.total} fields complete</span>
+              </div>
+              <Progress value={profileCompletion.percentage} className="h-2" />
+              {profileCompletion.missingFields.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Missing: {profileCompletion.missingFields.join(', ')}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Business Identity */}
