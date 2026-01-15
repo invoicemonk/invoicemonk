@@ -59,7 +59,11 @@ export default function BusinessProfile() {
     taxId: '',
     email: '',
     phone: '',
-    address: '',
+    street: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: '',
     invoicePrefix: 'INV',
   });
 
@@ -67,11 +71,6 @@ export default function BusinessProfile() {
   useEffect(() => {
     if (business) {
       const addressData = business.address as AddressData | null;
-      const addressString = addressData 
-        ? [addressData.street, addressData.city, addressData.state, addressData.postal_code, addressData.country]
-            .filter(Boolean)
-            .join('\n')
-        : '';
 
       setFormData({
         name: business.name || '',
@@ -80,21 +79,23 @@ export default function BusinessProfile() {
         taxId: business.tax_id || '',
         email: business.contact_email || '',
         phone: business.contact_phone || '',
-        address: addressString,
+        street: addressData?.street || '',
+        city: addressData?.city || '',
+        state: addressData?.state || '',
+        postalCode: addressData?.postal_code || '',
+        country: addressData?.country || '',
         invoicePrefix: business.invoice_prefix || 'INV',
       });
     }
   }, [business]);
 
   const handleSave = async () => {
-    // Parse address into structured format
-    const addressLines = formData.address.split('\n').filter(Boolean);
     const addressData: AddressData = {
-      street: addressLines[0] || undefined,
-      city: addressLines[1] || undefined,
-      state: addressLines[2] || undefined,
-      postal_code: addressLines[3] || undefined,
-      country: addressLines[4] || undefined,
+      street: formData.street || undefined,
+      city: formData.city || undefined,
+      state: formData.state || undefined,
+      postal_code: formData.postalCode || undefined,
+      country: formData.country || undefined,
     };
 
     const businessData = {
@@ -109,13 +110,11 @@ export default function BusinessProfile() {
     };
 
     if (business) {
-      // Update existing business
       await updateBusiness.mutateAsync({
         businessId: business.id,
         updates: businessData,
       });
     } else {
-      // Create new business
       await createBusiness.mutateAsync(businessData);
     }
   };
@@ -124,16 +123,14 @@ export default function BusinessProfile() {
   const nextInvoiceNumber = business?.next_invoice_number || 1;
 
   // Calculate profile completion from current form data for real-time updates
-  // Parse address lines to extract city (line 2) and country (line 5)
   const profileCompletion = useMemo(() => {
-    const addressLines = formData.address.split('\n').filter(Boolean);
     return calculateProfileCompletion({
       name: formData.name,
       legalName: formData.legalName,
       taxId: formData.taxId,
       email: formData.email,
-      addressCity: addressLines[1] || '', // City is line 2
-      addressCountry: addressLines[4] || '', // Country is line 5
+      addressCity: formData.city,
+      addressCountry: formData.country,
     });
   }, [formData]);
 
@@ -323,17 +320,71 @@ export default function BusinessProfile() {
                 />
               </div>
             </div>
+            {/* Structured Address Fields */}
             <div className="space-y-2">
-              <Label htmlFor="address">Business Address</Label>
+              <Label htmlFor="street">Street Address</Label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Textarea
-                  id="address"
-                  className="pl-9 min-h-[100px]"
-                  placeholder="123 Business Street&#10;Lagos, Nigeria"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="street"
+                  className="pl-9"
+                  placeholder="123 Business Street"
+                  value={formData.street}
+                  onChange={(e) => setFormData({ ...formData, street: e.target.value })}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">
+                  City <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="city"
+                  placeholder="Lagos"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State/Province</Label>
+                <Input
+                  id="state"
+                  placeholder="Lagos State"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postalCode">Postal Code</Label>
+                <Input
+                  id="postalCode"
+                  placeholder="100001"
+                  value={formData.postalCode}
+                  onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">
+                  Country <span className="text-destructive">*</span>
+                </Label>
+                <Select 
+                  value={formData.country}
+                  onValueChange={(value) => setFormData({ ...formData, country: value })}
+                >
+                  <SelectTrigger id="country">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurisdictions.map((j) => (
+                      <SelectItem key={j.value} value={j.label}>
+                        {j.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
