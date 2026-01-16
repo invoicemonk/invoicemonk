@@ -419,8 +419,8 @@ export default function InvoiceDetail() {
             </CardContent>
           </Card>
 
-          {/* Payment History */}
-          {payments && payments.length > 0 && (
+          {/* Payment History - Show for all issued invoices */}
+          {isImmutable && invoice.status !== 'voided' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -428,52 +428,75 @@ export default function InvoiceDetail() {
                   Payment History
                 </CardTitle>
                 <CardDescription>
-                  {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
+                  {payments?.length || 0} payment{(payments?.length || 0) !== 1 ? 's' : ''} recorded
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {payments.map((payment) => (
-                    <div key={payment.id} className="flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                          <span className="font-medium text-emerald-600">
-                            {formatCurrency(Number(payment.amount), invoice.currency)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(payment.payment_date)}
-                        </p>
-                        {payment.payment_method && (
-                          <p className="text-xs text-muted-foreground capitalize">
-                            via {payment.payment_method}
+                {payments && payments.length > 0 ? (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payments.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                            <TableCell className="capitalize">
+                              {payment.payment_method?.replace('_', ' ') || '-'}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {payment.payment_reference || '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-emerald-600">
+                              {formatCurrency(Number(payment.amount), invoice.currency)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    
+                    {/* Payment Notes Section */}
+                    {payments.some(p => p.notes) && (
+                      <div className="mt-4 p-3 bg-muted/50 rounded-lg space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Payment Notes</p>
+                        {payments.filter(p => p.notes).map(p => (
+                          <p key={p.id} className="text-sm">
+                            <span className="font-medium">{formatDate(p.payment_date)}:</span> {p.notes}
                           </p>
-                        )}
+                        ))}
                       </div>
-                      {payment.payment_reference && (
-                        <span className="text-xs font-mono text-muted-foreground">
-                          Ref: {payment.payment_reference}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Separator className="my-3" />
-                <div className="flex justify-between text-sm font-medium">
-                  <span>Total Paid</span>
-                  <span className="text-emerald-600">
-                    {formatCurrency(Number(invoice.amount_paid), invoice.currency)}
-                  </span>
-                </div>
-                {Number(invoice.total_amount) - Number(invoice.amount_paid) > 0 && (
-                  <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                    <span>Outstanding</span>
-                    <span>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No payments recorded yet
+                  </p>
+                )}
+                
+                {/* Summary Section */}
+                <Separator className="my-4" />
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Invoice</span>
+                    <span className="font-medium">{formatCurrency(Number(invoice.total_amount), invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Paid</span>
+                    <span className="font-medium text-emerald-600">{formatCurrency(Number(invoice.amount_paid), invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium">
+                    <span className="text-muted-foreground">Outstanding</span>
+                    <span className={Number(invoice.total_amount) - Number(invoice.amount_paid) > 0 ? 'text-amber-600' : 'text-emerald-600'}>
                       {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
                     </span>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}

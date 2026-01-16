@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FileText, 
@@ -9,7 +10,8 @@ import {
   ArrowUpRight,
   Shield,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,9 +19,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserOrganizations } from '@/hooks/use-organization';
-import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard } from '@/hooks/use-dashboard-stats';
+import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard, useRevenueTrend, type DateRange } from '@/hooks/use-dashboard-stats';
 import { useRealtimeInvoices } from '@/hooks/use-realtime-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format } from 'date-fns';
+
 const container = {
   hidden: { opacity: 0 },
   show: {
@@ -67,20 +75,77 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+type DateRangePreset = 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'all_time' | 'custom';
+
+function getDateRangeFromPreset(preset: DateRangePreset): DateRange | undefined {
+  const now = new Date();
+  
+  switch (preset) {
+    case 'this_week': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'this_month': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'this_quarter': {
+      const quarter = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), quarter * 3, 1);
+      const end = new Date(now.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'this_year': {
+      const start = new Date(now.getFullYear(), 0, 1);
+      const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'all_time':
+      return undefined;
+    case 'custom':
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const { data: organizations } = useUserOrganizations();
   const currentBusiness = organizations?.[0]?.business;
   const isEmailVerified = user?.email_confirmed_at;
   
+  // Date range filter state
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('all_time');
+  const [customDateFrom, setCustomDateFrom] = useState<Date>();
+  const [customDateTo, setCustomDateTo] = useState<Date>();
+  
+  // Compute effective date range
+  const dateRange = useMemo((): DateRange | undefined => {
+    if (dateRangePreset === 'custom' && customDateFrom && customDateTo) {
+      const start = new Date(customDateFrom);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customDateTo);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    return getDateRangeFromPreset(dateRangePreset);
+  }, [dateRangePreset, customDateFrom, customDateTo]);
+  
   // Real-time subscriptions for instant updates
   useRealtimeInvoices(currentBusiness?.id, user?.id);
   const { refresh, isRefreshing } = useRefreshDashboard();
   
-  // Fetch real dashboard stats
-  const { data: stats, isLoading: statsLoading } = useDashboardStats(currentBusiness?.id);
+  // Fetch real dashboard stats with date range
+  const { data: stats, isLoading: statsLoading } = useDashboardStats(currentBusiness?.id, dateRange);
   const { data: recentInvoices, isLoading: invoicesLoading } = useRecentInvoices(currentBusiness?.id);
   const { data: dueDateStats, isLoading: dueDateLoading } = useDueDateStats(currentBusiness?.id);
+  const { data: revenueTrend, isLoading: trendLoading } = useRevenueTrend(currentBusiness?.id, 12);
   
   // Server-derived compliance status
   const businessComplianceStatus = currentBusiness?.compliance_status || 'incomplete';
@@ -90,7 +155,7 @@ export default function Dashboard() {
     {
       title: 'Total Revenue',
       value: statsLoading ? null : formatCurrency(stats?.totalRevenue || 0, stats?.currency),
-      change: 'All time revenue',
+      change: dateRangePreset === 'all_time' ? 'All time revenue' : 'In selected period',
       icon: DollarSign,
     },
     {
@@ -130,7 +195,61 @@ export default function Dashboard() {
             Here's what's happening with your invoices today.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Range Filter */}
+          <Select value={dateRangePreset} onValueChange={(v) => setDateRangePreset(v as DateRangePreset)}>
+            <SelectTrigger className="w-[140px]">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="this_week">This Week</SelectItem>
+              <SelectItem value="this_month">This Month</SelectItem>
+              <SelectItem value="this_quarter">This Quarter</SelectItem>
+              <SelectItem value="this_year">This Year</SelectItem>
+              <SelectItem value="all_time">All Time</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {/* Custom Date Range Popovers */}
+          {dateRangePreset === 'custom' && (
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-[120px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateFrom ? format(customDateFrom, 'MMM d, yyyy') : 'From'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateFrom}
+                    onSelect={setCustomDateFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-[120px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateTo ? format(customDateTo, 'MMM d, yyyy') : 'To'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateTo}
+                    onSelect={setCustomDateTo}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+          
           <Button 
             variant="outline" 
             size="icon"
@@ -195,7 +314,68 @@ export default function Dashboard() {
         ))}
       </motion.div>
 
-      {/* Payment Alerts - Overdue & Upcoming */}
+      {/* Revenue Trend Chart */}
+      <motion.div variants={item}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Revenue Trend
+            </CardTitle>
+            <CardDescription>Monthly revenue over the past 12 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {trendLoading ? (
+              <div className="h-[250px] flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : revenueTrend && revenueTrend.length > 0 ? (
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12 }} 
+                      tickLine={false}
+                      axisLine={false}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }} 
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => formatCurrency(value, stats?.currency).replace(/\.00$/, '')}
+                      width={80}
+                      className="text-muted-foreground"
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value, stats?.currency), 'Revenue']}
+                      labelFormatter={(label) => `Month: ${label}`}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--popover))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="revenue" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <p>No revenue data available yet. Issue some invoices to see your trend!</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+
       {(dueDateStats?.overdueCount > 0 || dueDateStats?.upcomingCount > 0) && (
         <motion.div variants={item}>
           <Card className={dueDateStats?.overdueCount > 0 ? "border-destructive/50" : "border-amber-500/50"}>
