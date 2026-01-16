@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,11 +15,204 @@ interface IssuerSnapshot {
   legal_name?: string
   name?: string
   contact_email?: string
+  contact_phone?: string
+  logo_url?: string
+  tax_id?: string
+  address?: {
+    line1?: string
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postal_code?: string
+  }
 }
 
 interface RecipientSnapshot {
   name?: string
   email?: string
+  phone?: string
+  address?: {
+    line1?: string
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postal_code?: string
+  }
+}
+
+interface InvoiceItem {
+  id: string
+  description: string
+  quantity: number
+  unit_price: number
+  amount: number
+  tax_rate: number
+  tax_amount: number
+  discount_percent: number
+}
+
+// Helper: Format currency
+const formatCurrency = (amount: number, currency: string): string => {
+  const localeMap: Record<string, string> = {
+    'NGN': 'en-NG', 'USD': 'en-US', 'EUR': 'de-DE', 'GBP': 'en-GB',
+    'INR': 'en-IN', 'CAD': 'en-CA', 'AUD': 'en-AU', 'ZAR': 'en-ZA',
+    'KES': 'en-KE', 'GHS': 'en-GH', 'EGP': 'en-EG', 'AED': 'ar-AE'
+  }
+  const locale = localeMap[currency] || 'en-US'
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
+}
+
+// Helper: Format date
+const formatDate = (date: string | null): string => {
+  if (!date) return 'Not specified'
+  return new Date(date).toLocaleDateString('en-US', { 
+    year: 'numeric', month: 'long', day: 'numeric' 
+  })
+}
+
+// Helper: Format address compactly
+const formatAddressCompact = (address: IssuerSnapshot['address'] | RecipientSnapshot['address']): string => {
+  if (!address) return ''
+  const parts = [
+    address.line1 || address.street,
+    address.city,
+    address.state,
+    address.country
+  ].filter(Boolean)
+  return parts.join(', ')
+}
+
+// Helper: Generate print-ready HTML for PDF (will be converted via html2pdf service)
+const generatePrintableHtml = (
+  invoice: Record<string, unknown>,
+  items: InvoiceItem[],
+  issuerSnapshot: IssuerSnapshot | null,
+  recipientSnapshot: RecipientSnapshot | null,
+  verificationUrl: string | null
+): string => {
+  const businessName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'
+  const clientName = recipientSnapshot?.name || 'Client'
+  const clientAddress = formatAddressCompact(recipientSnapshot?.address)
+  const clientEmail = recipientSnapshot?.email || ''
+  const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
+  const issuerEmail = issuerSnapshot?.contact_email || ''
+  const issuerPhone = issuerSnapshot?.contact_phone || ''
+  const currency = invoice.currency as string
+  const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
+  const summary = invoice.summary as string | null
+
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.description}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.quantity}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(item.unit_price, currency)}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(item.amount, currency)}</td>
+    </tr>
+  `).join('')
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 20px; }
+    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
+    .brand { font-size: 18px; font-weight: bold; }
+    .invoice-meta { text-align: right; }
+    .invoice-title { font-size: 24px; font-weight: bold; }
+    .status { display: inline-block; background: #dbeafe; color: #1d4ed8; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
+    .parties { display: flex; gap: 30px; margin-bottom: 20px; }
+    .party { flex: 1; }
+    .party-label { font-size: 10px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+    .party-name { font-size: 14px; font-weight: bold; }
+    .summary-box { background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; }
+    .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
+    .summary-row.total { font-size: 14px; font-weight: bold; border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th { background: #f8f9fa; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd; }
+    th.right { text-align: right; }
+    .totals { width: 250px; margin-left: auto; margin-top: 10px; }
+    .total-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .total-row.grand { font-size: 14px; font-weight: bold; border-top: 2px solid #1a1a1a; padding-top: 8px; margin-top: 5px; }
+    .balance-box { background: #fef3c7; padding: 6px 10px; border-radius: 4px; }
+    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #888; display: flex; justify-content: space-between; }
+    .notes { background: #fafafa; padding: 10px; border-radius: 4px; margin-top: 15px; }
+    .notes-label { font-size: 9px; color: #666; text-transform: uppercase; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">${businessName}</div>
+      <div style="font-size: 10px; color: #666; margin-top: 4px;">${issuerAddress}</div>
+      <div style="font-size: 10px; color: #666;">${issuerEmail}${issuerPhone ? ' • ' + issuerPhone : ''}</div>
+    </div>
+    <div class="invoice-meta">
+      <div class="invoice-title">INVOICE</div>
+      <div style="color: #666; margin-top: 3px;">${invoice.invoice_number}</div>
+      <div class="status">${(invoice.status as string || 'ISSUED').toUpperCase()}</div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="party-label">Bill To</div>
+      <div class="party-name">${clientName}</div>
+      ${clientAddress ? `<div style="font-size: 11px; color: #444; margin-top: 3px;">${clientAddress}</div>` : ''}
+      ${clientEmail ? `<div style="font-size: 11px; color: #444;">${clientEmail}</div>` : ''}
+    </div>
+    <div class="party">
+      <div class="summary-box">
+        <div class="summary-row"><span>Invoice Date</span><span>${formatDate(invoice.issue_date as string)}</span></div>
+        <div class="summary-row"><span>Due Date</span><span>${formatDate(invoice.due_date as string)}</span></div>
+        <div class="summary-row"><span>Currency</span><span>${currency}</span></div>
+        <div class="summary-row total"><span>Amount Due</span><span>${formatCurrency(balanceDue, currency)}</span></div>
+      </div>
+    </div>
+  </div>
+
+  ${summary ? `<div style="background: #f9fafb; padding: 10px; border-left: 3px solid #e5e7eb; margin-bottom: 15px; font-style: italic; color: #666;">${summary}</div>` : ''}
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="right">Qty</th>
+        <th class="right">Unit Price</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsHtml}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="total-row"><span>Subtotal</span><span>${formatCurrency(invoice.subtotal as number, currency)}</span></div>
+    ${(invoice.tax_amount as number) > 0 ? `<div class="total-row"><span>Tax</span><span>${formatCurrency(invoice.tax_amount as number, currency)}</span></div>` : ''}
+    ${(invoice.discount_amount as number) > 0 ? `<div class="total-row"><span>Discount</span><span style="color: #059669;">-${formatCurrency(invoice.discount_amount as number, currency)}</span></div>` : ''}
+    <div class="total-row grand"><span>Total</span><span>${formatCurrency(invoice.total_amount as number, currency)}</span></div>
+    ${(invoice.amount_paid as number) > 0 ? `<div class="total-row" style="color: #059669;"><span>Paid</span><span>-${formatCurrency(invoice.amount_paid as number, currency)}</span></div>` : ''}
+    <div class="total-row balance-box"><span>Balance Due</span><span>${formatCurrency(balanceDue, currency)}</span></div>
+  </div>
+
+  ${invoice.notes ? `<div class="notes"><div class="notes-label">Notes</div><div style="font-size: 10px; color: #444; margin-top: 4px;">${invoice.notes}</div></div>` : ''}
+
+  <div class="footer">
+    <div>
+      <div>${businessName} • ${issuerAddress}</div>
+      <div style="margin-top: 3px;">© ${new Date().getFullYear()} Invoicemonk LTD. All Rights Reserved.</div>
+    </div>
+    <div style="text-align: right;">
+      ${invoice.verification_id ? `<div>Verification: ${(invoice.verification_id as string).substring(0, 8)}...</div>` : ''}
+      ${invoice.invoice_hash ? `<div>Hash: ${(invoice.invoice_hash as string).substring(0, 12)}...</div>` : ''}
+    </div>
+  </div>
+</body>
+</html>`
 }
 
 Deno.serve(async (req) => {
@@ -70,10 +262,25 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Fetch invoice
+    // Get Brevo API key
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+    const smtpFrom = Deno.env.get('SMTP_FROM') || 'noreply@invoicemonk.com'
+
+    if (!brevoApiKey) {
+      console.error('BREVO_API_KEY not configured')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Email sending is not configured. Please configure BREVO_API_KEY.' 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Fetch invoice with items
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select(`*, clients (*)`)
+      .select(`*, clients (*), invoice_items (*)`)
       .eq('id', body.invoice_id)
       .single()
 
@@ -93,78 +300,74 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get SMTP credentials from secrets
-    const smtpHost = Deno.env.get('SMTP_HOST')
-    const smtpPort = Deno.env.get('SMTP_PORT')
-    const smtpUser = Deno.env.get('SMTP_USER')
-    const smtpPassword = Deno.env.get('SMTP_PASSWORD')
-    const smtpFromEmail = Deno.env.get('SMTP_FROM_EMAIL')
-    const smtpFromName = Deno.env.get('SMTP_FROM_NAME') || 'Invoicemonk'
-
-    if (!smtpHost || !smtpUser || !smtpPassword || !smtpFromEmail) {
-      console.error('SMTP credentials not configured')
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Email sending is not configured. Please add SMTP credentials.' 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Generate PDF by calling the generate-pdf function internally
-    const pdfResponse = await fetch(`${supabaseUrl}/functions/v1/generate-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader
-      },
-      body: JSON.stringify({ invoice_id: body.invoice_id })
-    })
-
-    if (!pdfResponse.ok) {
-      const errorText = await pdfResponse.text()
-      console.error('PDF generation failed:', errorText)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to generate invoice PDF' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Get PDF as base64
-    const pdfBuffer = await pdfResponse.arrayBuffer()
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)))
-
     // Parse snapshots for email content
     const issuerSnapshot = invoice.issuer_snapshot as IssuerSnapshot | null
     const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null
+    const items = (invoice.invoice_items || []) as InvoiceItem[]
     
     const businessName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'
     const clientName = recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer'
+    const invoiceSummary = invoice.summary as string | null
 
-    // Format currency
-    const formatCurrency = (amount: number, currency: string = 'NGN') => {
-      const localeMap: Record<string, string> = {
-        'NGN': 'en-NG', 'USD': 'en-US', 'EUR': 'de-DE', 'GBP': 'en-GB'
-      }
-      const locale = localeMap[currency] || 'en-US'
-      return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
-    }
-
-    // Format date
-    const formatDate = (date: string | null) => {
-      if (!date) return 'Not specified'
-      return new Date(date).toLocaleDateString('en-US', { 
-        year: 'numeric', month: 'long', day: 'numeric' 
-      })
-    }
+    // Format issuer address for header
+    const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
+    const issuerEmail = issuerSnapshot?.contact_email || ''
+    const issuerPhone = issuerSnapshot?.contact_phone || ''
+    const issuerLogoUrl = issuerSnapshot?.logo_url || null
 
     // Verification URL
+    const appUrl = Deno.env.get('APP_URL') || 'https://id-preview--af0fa778-97c6-4e74-8769-9640f7e7d956.lovable.app'
     const verificationUrl = invoice.verification_id 
-      ? `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/verify/invoice/${invoice.verification_id}`
+      ? `${appUrl}/verify/invoice/${invoice.verification_id}`
+      : null
+    
+    // Generate QR code for email
+    const qrCodeUrl = verificationUrl 
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(verificationUrl)}&format=png`
       : null
 
-    // Build email HTML
+    // Generate printable HTML for PDF
+    const printableHtml = generatePrintableHtml(invoice, items, issuerSnapshot, recipientSnapshot, verificationUrl)
+    
+    // Convert HTML to PDF using html2pdf.app API (free tier)
+    console.log('Generating PDF via html2pdf.app...')
+    let pdfBase64: string | null = null
+    try {
+      const pdfResponse = await fetch('https://api.html2pdf.app/v1/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: printableHtml,
+          apiKey: 'free', // Using free tier
+          format: 'A4',
+          marginTop: 10,
+          marginBottom: 10,
+          marginLeft: 10,
+          marginRight: 10,
+        }),
+      })
+
+      if (pdfResponse.ok) {
+        const pdfArrayBuffer = await pdfResponse.arrayBuffer()
+        const pdfBytes = new Uint8Array(pdfArrayBuffer)
+        // Convert to base64
+        let binary = ''
+        for (let i = 0; i < pdfBytes.length; i++) {
+          binary += String.fromCharCode(pdfBytes[i])
+        }
+        pdfBase64 = btoa(binary)
+        console.log('PDF generated successfully, size:', pdfBase64.length)
+      } else {
+        console.error('PDF generation failed:', await pdfResponse.text())
+      }
+    } catch (pdfError) {
+      console.error('PDF generation error:', pdfError)
+      // Continue without attachment if PDF fails
+    }
+
+    // Build enhanced email HTML with branded header and clean footer
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -175,30 +378,37 @@ Deno.serve(async (req) => {
 <body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
-      <td style="background-color: #ffffff; border-radius: 8px; padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <!-- Header -->
-        <table width="100%" cellpadding="0" cellspacing="0">
+      <td style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        
+        <!-- Branded Header - Logo + Business Name Only -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1a1a1a 0%, #333333 100%); padding: 24px 32px;">
           <tr>
-            <td style="padding-bottom: 24px; border-bottom: 1px solid #e5e7eb;">
-              <h1 style="margin: 0; font-size: 24px; color: #1f2937;">${businessName}</h1>
+            <td style="text-align: center;">
+              ${issuerLogoUrl ? `
+              <img src="${issuerLogoUrl}" alt="${businessName}" style="height: 48px; max-width: 160px; object-fit: contain; margin-bottom: 12px;" />
+              <br>
+              ` : ''}
+              <span style="font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">${businessName}</span>
             </td>
           </tr>
         </table>
 
         <!-- Main Content -->
-        <table width="100%" cellpadding="0" cellspacing="0">
+        <table width="100%" cellpadding="0" cellspacing="0" style="padding: 32px;">
           <tr>
-            <td style="padding: 24px 0;">
+            <td>
               <p style="margin: 0 0 16px; color: #374151; font-size: 16px;">Dear ${clientName},</p>
               
               ${body.custom_message ? `<p style="margin: 0 0 16px; color: #374151; font-size: 16px;">${body.custom_message}</p>` : ''}
               
-              <p style="margin: 0 0 24px; color: #374151; font-size: 16px;">
-                Please find attached invoice <strong>${invoice.invoice_number}</strong> for your review.
+              <p style="margin: 0 0 16px; color: #374151; font-size: 16px;">
+                Please find below the details for invoice <strong>${invoice.invoice_number}</strong>.
               </p>
 
+              ${invoiceSummary ? `<p style="margin: 0 0 24px; color: #6b7280; font-style: italic; font-size: 15px; padding-left: 16px; border-left: 3px solid #e5e7eb;">${invoiceSummary}</p>` : ''}
+
               <!-- Invoice Summary Box -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
                 <tr>
                   <td>
                     <table width="100%" cellpadding="0" cellspacing="0">
@@ -240,11 +450,50 @@ Deno.serve(async (req) => {
               </table>
 
               ${verificationUrl ? `
-              <p style="margin: 0 0 16px; color: #374151; font-size: 14px;">
-                You can verify the authenticity of this invoice at:
-                <br>
-                <a href="${verificationUrl}" style="color: #2563eb; text-decoration: underline;">${verificationUrl}</a>
-              </p>
+              <!-- Verification Section with QR Code -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bfdbfe;">
+                <tr>
+                  <td>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align: top;">
+                          <p style="margin: 0 0 12px; color: #1e40af; font-size: 14px; font-weight: 600;">
+                            🔒 Verify Invoice Authenticity
+                          </p>
+                          <p style="margin: 0 0 12px; color: #374151; font-size: 14px;">
+                            Scan the QR code or click the button to verify this invoice is genuine.
+                          </p>
+                          <a href="${verificationUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                            Verify Invoice
+                          </a>
+                          <p style="margin: 12px 0 0; color: #6b7280; font-size: 12px;">
+                            Verification ID: ${invoice.verification_id}
+                          </p>
+                        </td>
+                        ${qrCodeUrl ? `
+                        <td style="width: 120px; text-align: right; vertical-align: top;">
+                          <img src="${qrCodeUrl}" alt="QR Code" style="width: 100px; height: 100px; border-radius: 4px;" />
+                          <p style="margin: 4px 0 0; color: #6b7280; font-size: 10px; text-align: center;">Scan to verify</p>
+                        </td>
+                        ` : ''}
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+
+              <!-- PDF Attachment Notice -->
+              ${pdfBase64 ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border-radius: 8px; padding: 16px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
+                <tr>
+                  <td>
+                    <p style="margin: 0; color: #166534; font-size: 14px;">
+                      📎 <strong>PDF Attached:</strong> Please find the invoice PDF attached to this email for your records.
+                    </p>
+                  </td>
+                </tr>
+              </table>
               ` : ''}
 
               <p style="margin: 24px 0 0; color: #374151; font-size: 16px;">
@@ -259,16 +508,29 @@ Deno.serve(async (req) => {
           </tr>
         </table>
 
-        <!-- Footer -->
-        <table width="100%" cellpadding="0" cellspacing="0">
+        <!-- Business Contact Footer -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; padding: 24px 32px; border-top: 1px solid #e5e7eb;">
           <tr>
-            <td style="padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                This is an automated email from Invoicemonk. The attached invoice is an official financial document.
+            <td style="text-align: center;">
+              <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1f2937;">${businessName}</p>
+              ${issuerPhone ? `<p style="margin: 8px 0 0; font-size: 14px; color: #374151;">📞 ${issuerPhone}</p>` : ''}
+              ${issuerEmail ? `<p style="margin: 4px 0 0; font-size: 14px; color: #374151;">✉️ ${issuerEmail}</p>` : ''}
+              ${issuerAddress ? `<p style="margin: 8px 0 0; font-size: 13px; color: #6b7280;">📍 ${issuerAddress}</p>` : ''}
+            </td>
+          </tr>
+        </table>
+
+        <!-- Platform Footer -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; padding: 16px 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.7);">
+                Powered by Invoicemonk • © ${new Date().getFullYear()} Invoicemonk LTD
               </p>
             </td>
           </tr>
         </table>
+
       </td>
     </tr>
   </table>
@@ -276,42 +538,65 @@ Deno.serve(async (req) => {
 </html>
 `
 
-    // Send email via SMTP
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: parseInt(smtpPort || '587'),
-        tls: true,
-        auth: {
-          username: smtpUser,
-          password: smtpPassword
-        }
-      }
-    })
+    // Send email via Brevo API with PDF attachment
+    console.log('Sending email via Brevo API to:', body.recipient_email)
 
     try {
-      await client.send({
-        from: `${smtpFromName} <${smtpFromEmail}>`,
-        to: body.recipient_email,
-        subject: `Invoice ${invoice.invoice_number} from ${businessName}`,
-        html: emailHtml,
-        attachments: [
+      const brevoPayload: Record<string, unknown> = {
+        sender: {
+          name: businessName,
+          email: smtpFrom,
+        },
+        to: [
           {
-            filename: `${invoice.invoice_number}.pdf`,
+            email: body.recipient_email,
+            name: clientName,
+          },
+        ],
+        subject: `Invoice ${invoice.invoice_number} from ${businessName}`,
+        htmlContent: emailHtml,
+      }
+
+      // Add PDF attachment if generated
+      if (pdfBase64) {
+        brevoPayload.attachment = [
+          {
             content: pdfBase64,
-            encoding: 'base64',
-            contentType: 'application/pdf'
-          }
+            name: `Invoice-${invoice.invoice_number}.pdf`,
+          },
         ]
+      }
+
+      const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoApiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(brevoPayload),
       })
 
-      await client.close()
-    } catch (smtpError) {
-      console.error('SMTP error:', smtpError)
+      if (!brevoResponse.ok) {
+        const errorData = await brevoResponse.json()
+        console.error('Brevo API error:', errorData)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Failed to send email: ${errorData.message || 'Brevo API error'}` 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const brevoResult = await brevoResponse.json()
+      console.log('Email sent successfully via Brevo:', brevoResult)
+    } catch (emailError) {
+      console.error('Email sending error:', emailError)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to send email. Please check SMTP configuration.' 
+          error: `Failed to send email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}` 
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -325,10 +610,12 @@ Deno.serve(async (req) => {
         .eq('id', body.invoice_id)
     }
 
-    // Log audit event using service role for proper logging
+    // Log audit event and create notification using service role
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (serviceRoleKey) {
       const adminClient = createClient(supabaseUrl, serviceRoleKey)
+      
+      // Log audit event
       await adminClient.rpc('log_audit_event', {
         _event_type: 'INVOICE_SENT',
         _entity_type: 'invoice',
@@ -337,16 +624,31 @@ Deno.serve(async (req) => {
         _business_id: invoice.business_id,
         _metadata: {
           recipient_email: body.recipient_email,
-          sent_at: new Date().toISOString()
+          sent_at: new Date().toISOString(),
+          verification_url: verificationUrl,
+          pdf_attached: !!pdfBase64
         }
+      })
+
+      // Create INVOICE_SENT notification
+      await adminClient.from('notifications').insert({
+        user_id: userId,
+        business_id: invoice.business_id,
+        type: 'INVOICE_SENT',
+        title: 'Invoice Sent',
+        message: `Invoice ${invoice.invoice_number} was sent to ${body.recipient_email}`,
+        entity_type: 'invoice',
+        entity_id: invoice.id,
+        is_read: false,
       })
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Invoice sent successfully',
-        recipient: body.recipient_email
+        message: `Invoice sent successfully${pdfBase64 ? ' with PDF attachment' : ''}`,
+        recipient: body.recipient_email,
+        pdf_attached: !!pdfBase64
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

@@ -585,6 +585,53 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -709,6 +756,8 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           id: string
+          priority_support: boolean | null
+          sla_response_hours: number | null
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -723,6 +772,8 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          priority_support?: boolean | null
+          sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -737,6 +788,8 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          priority_support?: boolean | null
+          sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -829,6 +882,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          browser_notifications: boolean
+          created_at: string
+          email_invoice_issued: boolean
+          email_overdue_alerts: boolean
+          email_payment_received: boolean
+          email_payment_reminders: boolean
+          reminder_days_before: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          browser_notifications?: boolean
+          created_at?: string
+          email_invoice_issued?: boolean
+          email_overdue_alerts?: boolean
+          email_payment_received?: boolean
+          email_payment_reminders?: boolean
+          reminder_days_before?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          browser_notifications?: boolean
+          created_at?: string
+          email_invoice_issued?: boolean
+          email_overdue_alerts?: boolean
+          email_payment_received?: boolean
+          email_payment_reminders?: boolean
+          reminder_days_before?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -865,6 +954,18 @@ export type Database = {
       close_account: {
         Args: { _reason?: string; _user_id: string }
         Returns: undefined
+      }
+      create_notification: {
+        Args: {
+          _business_id?: string
+          _entity_id?: string
+          _entity_type?: string
+          _message: string
+          _title: string
+          _type: string
+          _user_id: string
+        }
+        Returns: string
       }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }
       has_business_role: {

@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoice, useIssueInvoice, useVoidInvoice, useRecordPayment } from '@/hooks/use-invoices';
 import { useInvoiceAuditLogs } from '@/hooks/use-audit-logs';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
@@ -69,6 +70,10 @@ export default function OrgInvoiceDetail() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentNotes, setPaymentNotes] = useState('');
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
@@ -109,9 +114,20 @@ export default function OrgInvoiceDetail() {
 
   const handleRecordPayment = async () => {
     if (id && paymentAmount) {
-      await recordPayment.mutateAsync({ invoiceId: id, amount: parseFloat(paymentAmount) });
+      await recordPayment.mutateAsync({ 
+        invoiceId: id, 
+        amount: parseFloat(paymentAmount),
+        paymentMethod: paymentMethod || undefined,
+        paymentReference: paymentReference || undefined,
+        paymentDate: paymentDate,
+        notes: paymentNotes || undefined
+      });
       setPaymentDialogOpen(false);
       setPaymentAmount('');
+      setPaymentMethod('');
+      setPaymentReference('');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentNotes('');
     }
   };
 
@@ -380,20 +396,80 @@ export default function OrgInvoiceDetail() {
 
       {/* Payment Dialog */}
       <AlertDialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Record Payment</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Record Payment
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Outstanding: {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label>Amount</Label>
-            <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="mt-2" />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount *</Label>
+              <Input 
+                id="amount"
+                type="number" 
+                value={paymentAmount} 
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="method">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reference">Reference / Transaction ID</Label>
+              <Input 
+                id="reference"
+                value={paymentReference} 
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="e.g., TXN123456789"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Payment Date</Label>
+              <Input 
+                id="date"
+                type="date" 
+                value={paymentDate} 
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea 
+                id="notes"
+                value={paymentNotes} 
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="Additional notes..."
+                rows={2}
+              />
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRecordPayment} disabled={!paymentAmount}>Record Payment</AlertDialogAction>
+            <AlertDialogAction 
+              onClick={handleRecordPayment} 
+              disabled={!paymentAmount || recordPayment.isPending}
+            >
+              {recordPayment.isPending ? 'Recording...' : 'Record Payment'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

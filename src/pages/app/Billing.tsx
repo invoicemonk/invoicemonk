@@ -5,12 +5,20 @@ import {
   Zap,
   Building2,
   Shield,
-  ArrowRight
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useSubscription } from '@/hooks/use-subscription';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const plans = [
   {
@@ -24,7 +32,6 @@ const plans = [
       'Email support',
       'Single user',
     ],
-    current: true,
   },
   {
     id: 'professional',
@@ -49,7 +56,7 @@ const plans = [
     features: [
       'Everything in Professional',
       'Unlimited team members',
-      'API access',
+      'API access (Coming Soon)',
       'Dedicated account manager',
       'Custom integrations',
       'SLA guarantee',
@@ -58,7 +65,8 @@ const plans = [
 ];
 
 export default function Billing() {
-  const currentPlan = plans.find(p => p.current);
+  const { tier } = useSubscription();
+  const currentPlan = plans.find(p => p.id === tier) || plans[0];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -94,14 +102,14 @@ export default function Billing() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold">{currentPlan?.name}</h3>
+                <h3 className="text-xl font-bold">{currentPlan.name}</h3>
                 <Badge>Current</Badge>
               </div>
-              <p className="text-muted-foreground">{currentPlan?.description}</p>
+              <p className="text-muted-foreground">{currentPlan.description}</p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">
-                {formatCurrency(currentPlan?.price || 0)}
+                {formatCurrency(currentPlan.price)}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
             </div>
@@ -109,57 +117,82 @@ export default function Billing() {
         </CardContent>
       </Card>
 
+      {/* Coming Soon Notice */}
+      <Alert>
+        <Clock className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Subscription upgrades coming soon!</strong> We're integrating with Stripe to enable seamless plan upgrades. 
+          You'll be notified when this feature is available.
+        </AlertDescription>
+      </Alert>
+
       {/* Available Plans */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Available Plans</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          {plans.map((plan) => (
-            <Card 
-              key={plan.id} 
-              className={`relative ${plan.recommended ? 'border-primary shadow-lg' : ''}`}
-            >
-              {plan.recommended && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  Recommended
-                </Badge>
-              )}
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {plan.id === 'starter' && <Zap className="h-5 w-5" />}
-                  {plan.id === 'professional' && <Shield className="h-5 w-5" />}
-                  {plan.id === 'business' && <Building2 className="h-5 w-5" />}
-                  {plan.name}
-                </CardTitle>
-                <CardDescription>{plan.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <span className="text-3xl font-bold">{formatCurrency(plan.price)}</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
-                
-                <Separator />
-                
-                <ul className="space-y-2">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                
-                <Button 
-                  className="w-full" 
-                  variant={plan.current ? 'secondary' : plan.recommended ? 'default' : 'outline'}
-                  disabled={plan.current}
-                >
-                  {plan.current ? 'Current Plan' : 'Upgrade'}
-                  {!plan.current && <ArrowRight className="h-4 w-4 ml-2" />}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {plans.map((plan) => {
+            const isCurrent = plan.id === tier;
+            return (
+              <Card 
+                key={plan.id} 
+                className={`relative ${plan.recommended ? 'border-primary shadow-lg' : ''} ${isCurrent ? 'bg-muted/30' : ''}`}
+              >
+                {plan.recommended && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    Recommended
+                  </Badge>
+                )}
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {plan.id === 'starter' && <Zap className="h-5 w-5" />}
+                    {plan.id === 'professional' && <Shield className="h-5 w-5" />}
+                    {plan.id === 'business' && <Building2 className="h-5 w-5" />}
+                    {plan.name}
+                  </CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <span className="text-3xl font-bold">{formatCurrency(plan.price)}</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <ul className="space-y-2">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  {isCurrent ? (
+                    <Button className="w-full" variant="secondary" disabled>
+                      Current Plan
+                    </Button>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          className="w-full" 
+                          variant={plan.recommended ? 'default' : 'outline'}
+                          disabled
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Coming Soon
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Stripe integration coming soon</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
@@ -176,7 +209,7 @@ export default function Billing() {
             </div>
             <h3 className="font-semibold mb-1">No payment history</h3>
             <p className="text-sm text-muted-foreground">
-              You're currently on the free plan. Upgrade to see billing history.
+              Payment history will appear here once Stripe integration is enabled.
             </p>
           </div>
         </CardContent>

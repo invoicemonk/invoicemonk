@@ -89,6 +89,7 @@ export default function InvoiceEdit() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
+  const [summary, setSummary] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -109,6 +110,7 @@ export default function InvoiceEdit() {
       setDueDate(invoice.due_date || '');
       setNotes(invoice.notes || '');
       setTerms(invoice.terms || '');
+      setSummary(invoice.summary || '');
       
       if (invoice.invoice_items && invoice.invoice_items.length > 0) {
         setItems(invoice.invoice_items.map(item => ({
@@ -230,6 +232,7 @@ export default function InvoiceEdit() {
         due_date: dueDate || null,
         notes: notes || null,
         terms: terms || null,
+        summary: summary || null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -282,6 +285,7 @@ export default function InvoiceEdit() {
         due_date: dueDate || null,
         notes: notes || null,
         terms: terms || null,
+        summary: summary || null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -483,6 +487,19 @@ export default function InvoiceEdit() {
                     </SelectContent>
                   </Select>
                 )}
+              </div>
+
+              {/* Summary / Description */}
+              <div className="space-y-2">
+                <Label htmlFor="summary">Summary / Description</Label>
+                <Textarea
+                  id="summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value.slice(0, 500))}
+                  placeholder="Brief description of what this invoice is for..."
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-muted-foreground text-right">{summary.length}/500</p>
               </div>
 
               {/* Template Selection */}

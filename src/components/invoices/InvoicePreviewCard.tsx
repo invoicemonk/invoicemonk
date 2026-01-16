@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Lock } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Invoice = Tables<'invoices'> & {
@@ -52,6 +53,7 @@ interface Business {
   } | null;
   contact_email?: string | null;
   contact_phone?: string | null;
+  logo_url?: string | null;
 }
 
 interface InvoicePreviewCardProps {
@@ -107,15 +109,30 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
         {/* Invoice Header */}
         <CardHeader className="pb-6">
           <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">INVOICE</h2>
-              <p className="text-lg text-muted-foreground mt-1">{invoice.invoice_number}</p>
-              {isImmutable && (
-                <Badge variant="outline" className="mt-2 gap-1">
-                  <Lock className="h-3 w-3" />
-                  Immutable Record
-                </Badge>
+            <div className="flex items-start gap-4">
+              {/* Business Logo */}
+              {business?.logo_url && (
+                <img 
+                  src={business.logo_url} 
+                  alt="Business Logo" 
+                  className="h-16 w-auto max-w-[120px] object-contain"
+                />
               )}
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">INVOICE</h2>
+                <p className="text-lg text-muted-foreground mt-1">{invoice.invoice_number}</p>
+                {invoice.summary && (
+                  <p className="text-sm text-muted-foreground italic mt-2 max-w-md">
+                    {invoice.summary}
+                  </p>
+                )}
+                {isImmutable && (
+                  <Badge variant="outline" className="mt-2 gap-1">
+                    <Lock className="h-3 w-3" />
+                    Immutable Record
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Issue Date</p>
@@ -289,12 +306,27 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
             </>
           )}
 
-          {/* Verification ID */}
+          {/* Verification Section with QR Code */}
           {invoice.verification_id && (
-            <div className="pt-4 border-t border-dashed">
-              <p className="text-xs text-muted-foreground text-center">
-                Verification ID: <span className="font-mono">{invoice.verification_id}</span>
-              </p>
+            <div className="pt-4 border-t border-dashed flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Verification</p>
+                <p className="text-xs text-muted-foreground">
+                  ID: <span className="font-mono">{invoice.verification_id}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Scan QR code or visit the verification portal to verify this invoice
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <QRCodeSVG 
+                  value={`${window.location.origin}/verify/invoice/${invoice.verification_id}`}
+                  size={80}
+                  level="M"
+                  className="border border-border rounded p-1"
+                />
+                <span className="text-[10px] text-muted-foreground">Scan to verify</span>
+              </div>
             </div>
           )}
         </CardContent>

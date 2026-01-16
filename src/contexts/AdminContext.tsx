@@ -12,7 +12,7 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   
   const [isAdmin, setIsAdmin] = useState(false);
@@ -21,9 +21,15 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkAdminRole = async () => {
+      // Wait for auth to finish loading first
+      if (authLoading) {
+        return;
+      }
+      
       if (!user) {
         setIsAdmin(false);
         setLoading(false);
+        navigate('/login');
         return;
       }
 
@@ -62,7 +68,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     };
 
     checkAdminRole();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   return (
     <AdminContext.Provider value={{ isAdmin, loading, error }}>

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useClients } from '@/hooks/use-clients';
+import { useOrgClients } from '@/hooks/use-clients';
 import { useCreateInvoice } from '@/hooks/use-invoices';
 import { useBusinessCurrency } from '@/hooks/use-business-currency';
 import { toast } from 'sonner';
@@ -26,7 +26,7 @@ export default function OrgInvoiceNew() {
   const { orgId } = useParams();
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
-  const { data: clients, isLoading: clientsLoading } = useClients();
+  const { data: clients, isLoading: clientsLoading } = useOrgClients(orgId);
   const createInvoice = useCreateInvoice();
   const { data: businessCurrency, isLoading: currencyLoading } = useBusinessCurrency(orgId);
 

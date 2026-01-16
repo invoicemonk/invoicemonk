@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   BarChart3, 
@@ -5,7 +6,8 @@ import {
   Calendar,
   FileText,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,8 +21,15 @@ import {
 } from '@/components/ui/select';
 import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
+import { useGenerateReport, useReportStats, useAuditEventsCount, type ReportType } from '@/hooks/use-reports';
 
-const reportTypes = [
+const reportTypes: {
+  id: ReportType;
+  title: string;
+  description: string;
+  icon: typeof DollarSign;
+  format: string;
+}[] = [
   {
     id: 'revenue-summary',
     title: 'Revenue Summary',
@@ -51,13 +60,55 @@ const reportTypes = [
   },
 ];
 
+function formatCurrency(amount: number, currency: string = 'NGN'): string {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 export default function Reports() {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
+  
   const { canAccess, isLoading } = useSubscription();
   const hasReportsAccess = canAccess('reports_enabled');
+  
+  const generateReport = useGenerateReport();
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useReportStats(
+    parseInt(selectedYear)
+  );
+  const { data: auditEventsCount, isLoading: auditLoading, isError: auditError } = useAuditEventsCount(
+    parseInt(selectedYear)
+  );
 
-  const handleGenerateReport = (reportId: string) => {
-    // TODO: Implement report generation
-    console.log('Generating report:', reportId);
+  const handleGenerateReport = async (reportId: ReportType) => {
+    setGeneratingReport(reportId);
+    try {
+      await generateReport.mutateAsync({
+        report_type: reportId,
+        year: parseInt(selectedYear),
+        format: 'json'
+      });
+    } finally {
+      setGeneratingReport(null);
+    }
+  };
+
+  const handleDownloadCSV = async (reportId: ReportType) => {
+    setGeneratingReport(reportId);
+    try {
+      await generateReport.mutateAsync({
+        report_type: reportId,
+        year: parseInt(selectedYear),
+        format: 'csv'
+      });
+    } finally {
+      setGeneratingReport(null);
+    }
   };
 
   // Show upgrade prompt if user doesn't have access
@@ -102,42 +153,71 @@ export default function Reports() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select defaultValue="2026">
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
             <SelectTrigger className="w-[120px]">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2026">2026</SelectItem>
-              <SelectItem value="2025">2025</SelectItem>
+              <SelectItem value={currentYear.toString()}>{currentYear}</SelectItem>
+              <SelectItem value={(currentYear - 1).toString()}>{currentYear - 1}</SelectItem>
+              <SelectItem value={(currentYear - 2).toString()}>{currentYear - 2}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - Real Data */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">₦0.00</div>
+            {statsLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : statsError ? (
+              <div className="text-2xl font-bold text-muted-foreground">--</div>
+            ) : (
+              <div className="text-2xl font-bold">
+                {formatCurrency(stats?.totalRevenue || 0, stats?.currency)}
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">Total Revenue (YTD)</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">0</div>
+            {statsLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : statsError ? (
+              <div className="text-2xl font-bold text-muted-foreground">--</div>
+            ) : (
+              <div className="text-2xl font-bold">{stats?.totalInvoices || 0}</div>
+            )}
             <p className="text-sm text-muted-foreground">Invoices Issued (YTD)</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">₦0.00</div>
+            {statsLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : statsError ? (
+              <div className="text-2xl font-bold text-muted-foreground">--</div>
+            ) : (
+              <div className="text-2xl font-bold">
+                {formatCurrency(stats?.totalTax || 0, stats?.currency)}
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">Tax Collected (YTD)</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">0</div>
+            {auditLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : auditError ? (
+              <div className="text-2xl font-bold text-muted-foreground">--</div>
+            ) : (
+              <div className="text-2xl font-bold">{auditEventsCount?.toLocaleString() || 0}</div>
+            )}
             <p className="text-sm text-muted-foreground">Audit Events (YTD)</p>
           </CardContent>
         </Card>
@@ -145,38 +225,62 @@ export default function Reports() {
 
       {/* Report Types */}
       <div className="grid gap-4 md:grid-cols-2">
-        {reportTypes.map((report) => (
-          <Card key={report.id} className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <report.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{report.title}</CardTitle>
-                    <CardDescription>{report.description}</CardDescription>
+        {reportTypes.map((report) => {
+          const isGenerating = generatingReport === report.id;
+          return (
+            <Card key={report.id} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <report.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{report.title}</CardTitle>
+                      <CardDescription>{report.description}</CardDescription>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-xs">
-                  {report.format}
-                </Badge>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleGenerateReport(report.id)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Generate
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className="text-xs">
+                    {report.format}
+                  </Badge>
+                  <div className="flex gap-2">
+                    {(report.id === 'invoice-register' || report.id === 'revenue-summary' || report.id === 'tax-report') && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownloadCSV(report.id)}
+                        disabled={isGenerating}
+                      >
+                        {isGenerating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>CSV</>
+                        )}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleGenerateReport(report.id)}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Generate
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Compliance Notice */}

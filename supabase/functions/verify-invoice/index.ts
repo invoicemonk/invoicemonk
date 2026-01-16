@@ -5,6 +5,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface IssuerSnapshot {
+  name?: string
+  legal_name?: string
+  tax_id?: string
+  address?: Record<string, unknown>
+  contact_email?: string
+  contact_phone?: string
+  logo_url?: string
+}
+
 interface VerificationResponse {
   verified: boolean
   invoice?: {
@@ -18,6 +28,7 @@ interface VerificationResponse {
     integrity_valid: boolean
   }
   error?: string
+  upgrade_required?: boolean
 }
 
 Deno.serve(async (req) => {
@@ -47,7 +58,7 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Query invoice by verification_id
+    // Query invoice by verification_id - using snapshots for immutable data
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -59,11 +70,10 @@ Deno.serve(async (req) => {
         total_amount,
         currency,
         invoice_hash,
+        user_id,
         business_id,
-        businesses!invoices_business_id_fkey (
-          name,
-          legal_name
-        )
+        issuer_snapshot,
+        recipient_snapshot
       `)
       .eq('verification_id', verification_id)
       .maybeSingle()
@@ -103,13 +113,47 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get business name (prefer legal_name, fall back to name)
-    // Handle both single object and array cases from Supabase join
+    // TIER ENFORCEMENT: Check issuer's subscription tier
+    // Verification portal is only available for Professional+ invoices
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('tier')
+      .eq('user_id', invoice.user_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const issuerTier = subscription?.tier || 'starter'
+
+    if (issuerTier === 'starter') {
+      const response: VerificationResponse = {
+        verified: false,
+        error: 'Verification portal is not available for invoices issued on the Free tier. The issuer must upgrade to Professional to enable public verification.',
+        upgrade_required: true
+      }
+      return new Response(JSON.stringify(response), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // USE SNAPSHOT DATA - Not live data
+    // This ensures verification matches the invoice as it was at issuance time
     let issuerName = 'Unknown Business'
-    if (invoice.businesses) {
-      const business = Array.isArray(invoice.businesses) 
-        ? invoice.businesses[0] 
-        : invoice.businesses
+    const snapshot = invoice.issuer_snapshot as IssuerSnapshot | null
+    
+    if (snapshot) {
+      issuerName = snapshot.legal_name || snapshot.name || 'Unknown Business'
+    } else {
+      // Fallback: Query live data only if snapshot missing (legacy invoices)
+      console.warn('Invoice missing issuer_snapshot, falling back to live data:', invoice.id)
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('name, legal_name')
+        .eq('id', invoice.business_id)
+        .maybeSingle()
+      
       if (business) {
         issuerName = business.legal_name || business.name || 'Unknown Business'
       }
@@ -157,13 +201,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Log the verification event (optional - for audit purposes)
+    // Log the verification event (for audit purposes)
     try {
       await supabase.rpc('log_audit_event', {
         _entity_type: 'invoice',
         _entity_id: invoice.id,
         _event_type: 'INVOICE_VIEWED',
-        _metadata: { verification_type: 'public_portal' }
+        _metadata: { 
+          verification_type: 'public_portal',
+          issuer_tier: issuerTier,
+          snapshot_used: !!snapshot
+        }
       })
     } catch (auditErr) {
       // Don't fail the request if audit logging fails

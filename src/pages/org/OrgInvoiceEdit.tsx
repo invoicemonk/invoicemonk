@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useClients } from '@/hooks/use-clients';
+import { useOrgClients } from '@/hooks/use-clients';
 import { useInvoice, useUpdateInvoice } from '@/hooks/use-invoices';
 import { toast } from 'sonner';
 
@@ -26,7 +26,7 @@ export default function OrgInvoiceEdit() {
   const navigate = useNavigate();
   const { currentOrg } = useOrganization();
   const { data: invoice, isLoading: invoiceLoading } = useInvoice(id);
-  const { data: clients, isLoading: clientsLoading } = useClients();
+  const { data: clients, isLoading: clientsLoading } = useOrgClients(orgId);
   const updateInvoice = useUpdateInvoice();
 
   const [clientId, setClientId] = useState('');

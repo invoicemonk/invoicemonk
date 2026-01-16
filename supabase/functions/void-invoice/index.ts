@@ -5,6 +5,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to create notification
+async function createNotification(
+  supabase: any,
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  entityType: string,
+  entityId: string,
+  businessId?: string | null
+) {
+  try {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      message,
+      entity_type: entityType,
+      entity_id: entityId,
+      business_id: businessId || null
+    })
+  } catch (err) {
+    console.error('Failed to create notification:', err)
+  }
+}
+
 interface VoidInvoiceRequest {
   invoice_id: string
   reason: string
@@ -194,6 +220,18 @@ Deno.serve(async (req) => {
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
     }
+
+    // Create notification for invoice voided
+    await createNotification(
+      supabaseService,
+      userId,
+      'INVOICE_VOIDED',
+      'Invoice Voided',
+      `Invoice ${invoice.invoice_number} has been voided. Credit note ${creditNoteNumber} created.`,
+      'invoice',
+      invoice.id,
+      invoice.business_id
+    )
 
     const response: VoidInvoiceResponse = {
       success: true,

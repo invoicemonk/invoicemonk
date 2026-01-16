@@ -28,6 +28,7 @@ interface IssuerSnapshot {
   jurisdiction?: string
   contact_email?: string
   contact_phone?: string
+  logo_url?: string
 }
 
 interface RecipientSnapshot {
@@ -141,16 +142,10 @@ Deno.serve(async (req) => {
     const templateSnapshot = invoice.template_snapshot as TemplateSnapshot | null
 
     // Determine if watermark should be applied
-    // Watermark is required if:
-    // 1. Template requires it (template_snapshot.watermark_required = true)
-    // 2. User's tier doesn't allow removing watermarks
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
     // Check branding permission
-    // Branding is allowed if:
-    // 1. Template supports branding (template_snapshot.supports_branding = true)
-    // 2. User's tier allows branding
     const { data: brandingResult } = await supabase.rpc('check_tier_limit', {
       _user_id: userId,
       _feature: 'custom_branding'
@@ -158,8 +153,8 @@ Deno.serve(async (req) => {
     const brandingData = typeof brandingResult === 'object' && brandingResult !== null ? brandingResult : { allowed: false }
     const canUseBranding = brandingData.allowed === true && templateSnapshot?.supports_branding !== false
 
-    // Format currency with proper locale based on currency
-    const formatCurrency = (amount: number, currency: string = 'NGN') => {
+    // Format currency with proper locale based on currency - uses invoice currency, no fallback to NGN
+    const formatCurrency = (amount: number, currency: string) => {
       const localeMap: Record<string, string> = {
         'NGN': 'en-NG', 'USD': 'en-US', 'EUR': 'de-DE', 'GBP': 'en-GB',
         'INR': 'en-IN', 'CAD': 'en-CA', 'AUD': 'en-AU', 'ZAR': 'en-ZA',
@@ -169,197 +164,349 @@ Deno.serve(async (req) => {
       return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
     }
 
-    // Format date with proper handling
+    // Format date compactly
     const formatDate = (date: string | null | undefined) => {
-      if (!date) return 'Not specified'
+      if (!date) return '—'
       try {
         return new Date(date).toLocaleDateString('en-US', { 
           year: 'numeric', 
-          month: 'long', 
+          month: 'short', 
           day: 'numeric' 
         })
       } catch {
-        return 'Not specified'
+        return '—'
       }
     }
 
-    // Format address with better structure
-    const formatAddress = (address: Record<string, unknown> | null | undefined): string => {
+    // Format address as compact single line
+    const formatAddressCompact = (address: Record<string, unknown> | null | undefined): string => {
       if (!address) return ''
       const parts = [
         address.line1 as string || address.street as string,
-        address.line2 as string,
         address.city as string,
         address.state as string,
-        address.postal_code as string || address.zip as string,
         address.country as string
       ].filter(Boolean)
       return parts.join(', ')
     }
 
-    // Format address as HTML for multi-line display
-    const formatAddressHtml = (address: Record<string, unknown> | null | undefined): string => {
-      if (!address) return ''
-      const lines = [
-        address.line1 as string || address.street as string,
-        address.line2 as string,
-        [address.city as string, address.state as string, address.postal_code as string || address.zip as string].filter(Boolean).join(', '),
-        address.country as string
-      ].filter(Boolean)
-      return lines.map(line => `<div>${line}</div>`).join('')
-    }
-
-    // Generate HTML for PDF (using snapshot data for issued invoices)
+    // Get issuer and recipient data from snapshots
     const issuerName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk User'
     const issuerTaxId = issuerSnapshot?.tax_id || ''
-    const issuerAddress = formatAddress(issuerSnapshot?.address)
+    const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
     
     const recipientName = recipientSnapshot?.name || invoice.clients?.name || 'Client'
     const recipientEmail = recipientSnapshot?.email || invoice.clients?.email || ''
-    const recipientTaxId = recipientSnapshot?.tax_id || invoice.clients?.tax_id || ''
-    const recipientAddress = formatAddress(recipientSnapshot?.address || invoice.clients?.address as Record<string, unknown>)
+    const recipientAddress = formatAddressCompact(recipientSnapshot?.address || invoice.clients?.address as Record<string, unknown>)
 
-    // Generate line items HTML
+    // Generate compact line items HTML
     const items = (invoice.invoice_items || []) as InvoiceItem[]
     const itemsHtml = items.map(item => `
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${item.description}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.quantity}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.unit_price, invoice.currency)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.amount, invoice.currency)}</td>
+        <td>${item.description}</td>
+        <td class="right">${item.quantity}</td>
+        <td class="right">${formatCurrency(item.unit_price, invoice.currency)}</td>
+        <td class="right">${formatCurrency(item.amount, invoice.currency)}</td>
       </tr>
     `).join('')
 
-    // Verification URL
-    const verificationUrl = invoice.verification_id 
-      ? `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/verify/invoice/${invoice.verification_id}`
-      : null
+    // Status color mapping
+    const statusColors: Record<string, { bg: string; color: string }> = {
+      'issued': { bg: '#dbeafe', color: '#1d4ed8' },
+      'sent': { bg: '#e0e7ff', color: '#4338ca' },
+      'viewed': { bg: '#fef3c7', color: '#d97706' },
+      'paid': { bg: '#d1fae5', color: '#059669' },
+      'voided': { bg: '#fee2e2', color: '#dc2626' },
+      'credited': { bg: '#fce7f3', color: '#db2777' }
+    }
+    const statusStyle = statusColors[invoice.status] || statusColors['issued']
 
-    // Generate watermark HTML if needed
+    // Calculate balance due
+    const balanceDue = invoice.total_amount - (invoice.amount_paid || 0)
+
+    // Watermark HTML (subtle, doesn't take space)
     const watermarkHtml = showWatermark ? `
-      <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); 
-                  font-size: 80px; color: rgba(0,0,0,0.05); font-weight: bold; z-index: -1; white-space: nowrap;">
-        INVOICEMONK
-      </div>
+      <div class="watermark">INVOICEMONK</div>
     ` : ''
 
-    // Generate HTML document
-    const html = `
-<!DOCTYPE html>
+    // QR Code generation - SVG-based for better quality
+    const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    const verificationUrl = invoice.verification_id 
+      ? `${appUrl}/verify/invoice/${invoice.verification_id}` 
+      : null
+    
+    // Get business logo URL if branding is allowed
+    const issuerLogoUrl = canUseBranding && issuerSnapshot?.logo_url ? issuerSnapshot.logo_url : null
+
+    // Generate QR code data for SVG (simplified matrix representation)
+    const generateQRCodeSVG = (data: string, size: number = 60): string => {
+      // Use a simple URL-safe encoding and generate a placeholder QR pattern
+      // For production, this would use a proper QR library
+      const encoded = encodeURIComponent(data)
+      // Use an external QR code service as inline SVG generation is complex
+      return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&format=svg" alt="QR Code" style="width: ${size}px; height: ${size}px;" />`
+    }
+
+    const qrCodeHtml = verificationUrl ? generateQRCodeSVG(verificationUrl, 50) : ''
+
+    // Compact footer line
+    const verificationLine = invoice.verification_id 
+      ? `Verification: ${invoice.verification_id.substring(0, 8)}...` 
+      : ''
+    const hashLine = invoice.invoice_hash 
+      ? `Hash: ${invoice.invoice_hash.substring(0, 12)}...` 
+      : ''
+
+    // Generate compact HTML document
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <title>Invoice ${invoice.invoice_number}</title>
   <style>
+    @page { size: A4; margin: 12mm 15mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-break { page-break-inside: avoid; }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.5; }
-    .container { max-width: 800px; margin: 0 auto; padding: 40px; }
-    .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
-    .logo { font-size: 24px; font-weight: bold; color: #1f2937; }
-    .invoice-info { text-align: right; }
-    .invoice-number { font-size: 20px; font-weight: bold; color: #1f2937; }
-    .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-    .status-issued { background: #dbeafe; color: #1d4ed8; }
-    .status-paid { background: #d1fae5; color: #059669; }
-    .status-voided { background: #fee2e2; color: #dc2626; }
-    .parties { display: flex; justify-content: space-between; margin-bottom: 40px; gap: 40px; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      color: #1a1a1a; 
+      font-size: 11px; 
+      line-height: 1.35; 
+    }
+    .container { max-width: 100%; padding: 0; }
+    
+    /* Header - Compact two-column */
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: flex-start;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
+    .invoice-meta { text-align: right; }
+    .invoice-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a; }
+    .invoice-number { font-size: 12px; color: #666; margin-top: 2px; }
+    .status { 
+      display: inline-block; 
+      padding: 2px 8px; 
+      border-radius: 3px; 
+      font-size: 9px; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      margin-top: 4px;
+    }
+    
+    /* Two-column layout for parties */
+    .parties { 
+      display: flex; 
+      gap: 24px; 
+      margin-bottom: 16px;
+    }
     .party { flex: 1; }
-    .party-label { font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 8px; }
-    .party-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-    .party-details { font-size: 14px; color: #4b5563; }
-    .dates { display: flex; gap: 40px; margin-bottom: 40px; }
-    .date-item { }
-    .date-label { font-size: 12px; color: #6b7280; }
-    .date-value { font-size: 14px; font-weight: 500; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th { background: #f9fafb; padding: 12px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
-    th:last-child, td:last-child { text-align: right; }
-    .totals { margin-left: auto; width: 280px; }
-    .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-    .total-row.grand { font-size: 18px; font-weight: bold; border-top: 2px solid #1f2937; padding-top: 12px; margin-top: 8px; }
-    .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
-    .verification { background: #f9fafb; padding: 16px; border-radius: 8px; margin-top: 20px; }
-    .verification-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
-    .verification-id { font-family: monospace; font-size: 11px; color: #4b5563; word-break: break-all; }
-    .immutable-notice { background: #dbeafe; border: 1px solid #93c5fd; padding: 12px 16px; border-radius: 8px; font-size: 12px; color: #1d4ed8; margin-bottom: 24px; display: flex; align-items: center; gap: 8px; }
-    .tax-info { font-size: 12px; color: #6b7280; margin-top: 8px; }
-    .legal-snapshot { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin-top: 24px; font-size: 12px; }
-    .legal-snapshot-label { font-weight: 600; color: #166534; margin-bottom: 8px; }
+    .party-label { 
+      font-size: 9px; 
+      font-weight: 600; 
+      color: #666; 
+      text-transform: uppercase; 
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .party-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .party-details { font-size: 10px; color: #444; line-height: 1.4; }
+    
+    /* Invoice summary box */
+    .summary-box {
+      background: #f8f9fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+    }
+    .summary-row { 
+      display: flex; 
+      justify-content: space-between; 
+      font-size: 10px; 
+      color: #444;
+      padding: 2px 0;
+    }
+    .summary-row.amount-due {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+      padding-top: 6px;
+      margin-top: 4px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    /* Table - Compact styling */
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-bottom: 12px;
+      font-size: 10px;
+    }
+    th { 
+      background: #f8f9fa; 
+      padding: 6px 8px; 
+      text-align: left; 
+      font-weight: 600; 
+      font-size: 9px; 
+      text-transform: uppercase; 
+      color: #666;
+      border-bottom: 1px solid #d1d5db;
+    }
+    td { 
+      padding: 6px 8px; 
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    th.right, td.right { text-align: right; }
+    tr:last-child td { border-bottom: 1px solid #d1d5db; }
+    
+    /* Totals - Right-aligned, compact */
+    .totals-wrapper { 
+      display: flex; 
+      justify-content: flex-end; 
+      margin-bottom: 16px;
+    }
+    .totals { width: 220px; }
+    .total-row { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 3px 0; 
+      font-size: 10px;
+      color: #444;
+    }
+    .total-row.grand { 
+      font-size: 13px; 
+      font-weight: 700; 
+      color: #1a1a1a;
+      border-top: 2px solid #1a1a1a; 
+      padding-top: 6px; 
+      margin-top: 4px; 
+    }
+    .total-row.paid { color: #059669; }
+    .total-row.balance { 
+      font-weight: 600; 
+      background: #fef3c7;
+      padding: 4px 6px;
+      margin: 4px -6px 0;
+      border-radius: 3px;
+    }
+    
+    /* Notes section - compact */
+    .notes-section { 
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-radius: 4px;
+    }
+    .notes-label { 
+      font-size: 9px; 
+      font-weight: 600; 
+      color: #666; 
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .notes-content { font-size: 10px; color: #444; }
+    
+    /* Footer - Single compact line */
+    .footer { 
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb; 
+      font-size: 8px; 
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-left { }
+    .footer-right { text-align: right; }
+    
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 60px;
+      color: rgba(0,0,0,0.04);
+      font-weight: 700;
+      z-index: -1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   ${watermarkHtml}
   <div class="container">
+    <!-- Header -->
     <div class="header">
-      <div>
-        <div class="logo">${canUseBranding && issuerName ? issuerName : 'INVOICEMONK'}</div>
-        ${!canUseBranding ? '<div style="font-size: 11px; color: #6b7280;">Powered by Invoicemonk</div>' : ''}
+      <div style="display: flex; align-items: center; gap: 12px;">
+        ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
+        <div>
+          <div class="brand">${canUseBranding ? issuerName : 'INVOICEMONK'}</div>
+          ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
+          ${canUseBranding && issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+        </div>
       </div>
-      <div class="invoice-info">
+      <div class="invoice-meta">
+        <div class="invoice-title">INVOICE</div>
         <div class="invoice-number">${invoice.invoice_number}</div>
-        <div class="status status-${invoice.status}">${invoice.status}</div>
+        <div class="status" style="background: ${statusStyle.bg}; color: ${statusStyle.color};">${invoice.status.toUpperCase()}</div>
       </div>
     </div>
 
-    <div class="immutable-notice">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-      This invoice is immutable. Issued on ${formatDate(invoice.issued_at)}.
-    </div>
-
+    <!-- Two-column: Bill To + Invoice Summary -->
     <div class="parties">
       <div class="party">
-        <div class="party-label">From (Issuer)</div>
-        <div class="party-name">${issuerName}</div>
+        <div class="party-label">Bill To</div>
+        <div class="party-name">${recipientName}</div>
         <div class="party-details">
-          ${issuerTaxId ? `<div style="margin-top: 4px;"><strong>Tax ID:</strong> ${issuerTaxId}</div>` : ''}
-          ${issuerSnapshot?.address ? `<div style="margin-top: 8px;">${formatAddressHtml(issuerSnapshot.address)}</div>` : ''}
-          ${issuerEmail ? `<div style="margin-top: 8px;">📧 ${issuerEmail}</div>` : ''}
-          ${issuerPhone ? `<div>📞 ${issuerPhone}</div>` : ''}
-          ${issuerSnapshot?.jurisdiction ? `<div style="margin-top: 4px; font-size: 11px; color: #9ca3af;">Jurisdiction: ${issuerSnapshot.jurisdiction}</div>` : ''}
+          ${recipientAddress ? `${recipientAddress}<br>` : ''}
+          ${recipientEmail ? `${recipientEmail}` : ''}
         </div>
       </div>
       <div class="party">
-        <div class="party-label">Bill To (Recipient)</div>
-        <div class="party-name">${recipientName}</div>
-        <div class="party-details">
-          ${recipientTaxId ? `<div style="margin-top: 4px;"><strong>Tax ID:</strong> ${recipientTaxId}</div>` : ''}
-          ${recipientSnapshot?.address || invoice.clients?.address ? `<div style="margin-top: 8px;">${formatAddressHtml(recipientSnapshot?.address || invoice.clients?.address as Record<string, unknown>)}</div>` : ''}
-          ${recipientEmail ? `<div style="margin-top: 8px;">📧 ${recipientEmail}</div>` : ''}
-          ${recipientSnapshot?.phone || invoice.clients?.phone ? `<div>📞 ${recipientSnapshot?.phone || invoice.clients?.phone}</div>` : ''}
+        <div class="summary-box">
+          <div class="summary-row">
+            <span>Invoice Date</span>
+            <span>${formatDate(invoice.issue_date)}</span>
+          </div>
+          <div class="summary-row">
+            <span>Due Date</span>
+            <span>${formatDate(invoice.due_date)}</span>
+          </div>
+          <div class="summary-row">
+            <span>Currency</span>
+            <span>${invoice.currency}</span>
+          </div>
+          <div class="summary-row amount-due">
+            <span>Amount Due</span>
+            <span>${formatCurrency(balanceDue, invoice.currency)}</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="dates">
-      <div class="date-item">
-        <div class="date-label">Issue Date</div>
-        <div class="date-value">${formatDate(invoice.issue_date)}</div>
-      </div>
-      <div class="date-item">
-        <div class="date-label">Due Date</div>
-        <div class="date-value">${formatDate(invoice.due_date)}</div>
-      </div>
-      <div class="date-item">
-        <div class="date-label">Currency</div>
-        <div class="date-value">${invoice.currency}</div>
-      </div>
-      ${invoice.tax_schema_version ? `
-      <div class="date-item">
-        <div class="date-label">Tax Schema</div>
-        <div class="date-value">${invoice.tax_schema_version}</div>
-      </div>
-      ` : ''}
-    </div>
-
-    <table>
+    <!-- Items Table -->
+    <table class="no-break">
       <thead>
         <tr>
-          <th style="width: 50%;">Description</th>
-          <th>Qty</th>
-          <th>Unit Price</th>
-          <th>Amount</th>
+          <th style="width: 55%;">Description</th>
+          <th class="right" style="width: 10%;">Qty</th>
+          <th class="right" style="width: 17%;">Rate</th>
+          <th class="right" style="width: 18%;">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -367,84 +514,88 @@ Deno.serve(async (req) => {
       </tbody>
     </table>
 
-    <div class="totals">
-      <div class="total-row">
-        <span>Subtotal</span>
-        <span>${formatCurrency(invoice.subtotal, invoice.currency)}</span>
+    <!-- Totals -->
+    <div class="totals-wrapper no-break">
+      <div class="totals">
+        <div class="total-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(invoice.subtotal, invoice.currency)}</span>
+        </div>
+        ${invoice.tax_amount > 0 ? `
+        <div class="total-row">
+          <span>Tax</span>
+          <span>${formatCurrency(invoice.tax_amount, invoice.currency)}</span>
+        </div>
+        ` : ''}
+        ${invoice.discount_amount > 0 ? `
+        <div class="total-row">
+          <span>Discount</span>
+          <span>-${formatCurrency(invoice.discount_amount, invoice.currency)}</span>
+        </div>
+        ` : ''}
+        <div class="total-row grand">
+          <span>Total</span>
+          <span>${formatCurrency(invoice.total_amount, invoice.currency)}</span>
+        </div>
+        ${invoice.amount_paid > 0 ? `
+        <div class="total-row paid">
+          <span>Paid</span>
+          <span>-${formatCurrency(invoice.amount_paid, invoice.currency)}</span>
+        </div>
+        <div class="total-row balance">
+          <span>Balance Due</span>
+          <span>${formatCurrency(balanceDue, invoice.currency)}</span>
+        </div>
+        ` : ''}
       </div>
-      <div class="total-row">
-        <span>Tax</span>
-        <span>${formatCurrency(invoice.tax_amount, invoice.currency)}</span>
-      </div>
-      ${invoice.discount_amount > 0 ? `
-      <div class="total-row">
-        <span>Discount</span>
-        <span>-${formatCurrency(invoice.discount_amount, invoice.currency)}</span>
-      </div>
+    </div>
+
+    ${invoice.notes || invoice.terms ? `
+    <!-- Notes/Terms -->
+    <div class="notes-section no-break">
+      ${invoice.notes ? `
+      <div class="notes-label">Notes</div>
+      <div class="notes-content">${invoice.notes}</div>
       ` : ''}
-      <div class="total-row grand">
-        <span>Total</span>
-        <span>${formatCurrency(invoice.total_amount, invoice.currency)}</span>
-      </div>
-      ${invoice.amount_paid > 0 ? `
-      <div class="total-row" style="color: #059669;">
-        <span>Paid</span>
-        <span>-${formatCurrency(invoice.amount_paid, invoice.currency)}</span>
-      </div>
-      <div class="total-row" style="font-weight: 600;">
-        <span>Balance Due</span>
-        <span>${formatCurrency(invoice.total_amount - invoice.amount_paid, invoice.currency)}</span>
-      </div>
+      ${invoice.notes && invoice.terms ? '<div style="height: 8px;"></div>' : ''}
+      ${invoice.terms ? `
+      <div class="notes-label">Terms</div>
+      <div class="notes-content">${invoice.terms}</div>
       ` : ''}
     </div>
-
-    ${invoice.notes ? `
-    <div style="margin-top: 24px;">
-      <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Notes</div>
-      <div style="font-size: 14px;">${invoice.notes}</div>
-    </div>
     ` : ''}
 
-    ${invoice.terms ? `
-    <div style="margin-top: 16px;">
-      <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Terms</div>
-      <div style="font-size: 14px;">${invoice.terms}</div>
-    </div>
-    ` : ''}
-
-    ${issuerSnapshot || recipientSnapshot ? `
-    <div class="legal-snapshot">
-      <div class="legal-snapshot-label">🔒 Legal Identity Record (Captured at Issuance)</div>
-      <div style="color: #166534;">Business and client identity preserved for compliance. This record cannot be altered.</div>
-    </div>
-    ` : ''}
-
-    ${verificationUrl ? `
-    <div class="verification">
-      <div class="verification-label">Verification</div>
-      <div class="verification-id">ID: ${invoice.verification_id}</div>
-      <div style="margin-top: 8px; font-size: 12px;">This invoice can be publicly verified at the verification portal.</div>
-    </div>
-    ` : ''}
-
+    <!-- Footer with QR Code -->
     <div class="footer">
-      <div>Invoice Hash: ${invoice.invoice_hash || 'N/A'}</div>
-      <div style="margin-top: 8px;">Generated by Invoicemonk • ${new Date().toISOString()}</div>
-      ${showWatermark ? '<div style="margin-top: 4px; color: #9ca3af;">Upgrade to Professional or Business tier to remove Invoicemonk branding.</div>' : ''}
+      <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
+        ${verificationUrl && qrCodeHtml ? `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          ${qrCodeHtml}
+          <span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span>
+        </div>
+        ` : ''}
+      </div>
+      <div class="footer-right">
+        ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
+        <br>
+        ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}
+        ${showWatermark ? '<br>Upgrade to remove branding' : ''}
+      </div>
     </div>
   </div>
 </body>
-</html>
-    `
+</html>`
 
-    // Log PDF generation event
+    // Log PDF export event for compliance
     await supabase.rpc('log_audit_event', {
-      _event_type: 'INVOICE_VIEWED',
+      _event_type: 'DATA_EXPORTED',
       _entity_type: 'invoice',
       _entity_id: body.invoice_id,
       _user_id: userId,
+      _business_id: invoice.business_id,
       _metadata: { 
-        action: 'pdf_download', 
+        export_type: 'pdf',
+        invoice_number: invoice.invoice_number,
         tier: userTier,
         watermark_shown: showWatermark,
         branding_used: canUseBranding
@@ -452,8 +603,6 @@ Deno.serve(async (req) => {
     })
 
     // Return HTML (frontend will use browser print/PDF functionality)
-    // For server-side PDF generation, we'd need a service like Puppeteer or wkhtmltopdf
-    // For now, returning HTML that can be printed to PDF in browser
     return new Response(html, {
       status: 200,
       headers: { 

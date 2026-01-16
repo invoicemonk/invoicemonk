@@ -9,7 +9,9 @@ import {
   CreditCard, 
   Settings,
   LogOut,
-  Shield
+  Shield,
+  FileX,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -27,14 +29,18 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { Badge } from '@/components/ui/badge';
 import { OrganizationSwitcher } from '@/components/app/OrganizationSwitcher';
+import { useUnreadCount } from '@/hooks/use-notifications';
 import logo from '@/assets/invoicemonk-logo.png';
 
 const mainNavItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Invoices', url: '/invoices', icon: FileText },
+  { title: 'Credit Notes', url: '/credit-notes', icon: FileX },
   { title: 'Clients', url: '/clients', icon: Users },
   { title: 'Reports', url: '/reports', icon: BarChart3 },
+  { title: 'Notifications', url: '/notifications', icon: Bell, showBadge: true },
   { title: 'Audit Logs', url: '/audit-logs', icon: History },
 ];
 
@@ -49,6 +55,7 @@ export function DashboardSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const { data: unreadCount = 0 } = useUnreadCount();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -89,9 +96,16 @@ export function DashboardSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <Link to={item.url} className="flex items-center justify-between w-full">
+                      <span className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </span>
+                      {item.showBadge && unreadCount > 0 && !isCollapsed && (
+                        <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

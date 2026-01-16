@@ -217,38 +217,19 @@ export default function AdminDashboard() {
             <Activity className="h-5 w-5" />
             System Health
           </CardTitle>
-          <CardDescription>Platform status indicators</CardDescription>
+          <CardDescription>Platform status - Real-time monitoring via Supabase Dashboard</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg border">
-              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
-              <div>
-                <p className="font-medium">Database</p>
-                <p className="text-xs text-muted-foreground">Operational</p>
-              </div>
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <div className="p-3 rounded-full bg-muted mb-4">
+              <Activity className="h-6 w-6 text-muted-foreground" />
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg border">
-              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
-              <div>
-                <p className="font-medium">Authentication</p>
-                <p className="text-xs text-muted-foreground">Operational</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg border">
-              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
-              <div>
-                <p className="font-medium">Edge Functions</p>
-                <p className="text-xs text-muted-foreground">Operational</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg border">
-              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
-              <div>
-                <p className="font-medium">Audit System</p>
-                <p className="text-xs text-muted-foreground">Recording</p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground mb-2">
+              For real-time system health monitoring, please use the Supabase Dashboard.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Database, Auth, Edge Functions, and Storage health are monitored directly through Supabase.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -5,6 +5,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to create notification
+async function createNotification(
+  supabase: any,
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  entityType: string,
+  entityId: string,
+  businessId?: string | null
+) {
+  try {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      message,
+      entity_type: entityType,
+      entity_id: entityId,
+      business_id: businessId || null
+    })
+  } catch (err) {
+    console.error('Failed to create notification:', err)
+  }
+}
+
 interface RecordPaymentRequest {
   invoice_id: string
   amount: number
@@ -181,6 +207,23 @@ Deno.serve(async (req) => {
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
     }
+
+    // Create notification for payment received
+    const formattedAmount = new Intl.NumberFormat('en-NG', { 
+      style: 'currency', 
+      currency: 'NGN' 
+    }).format(body.amount)
+    
+    await createNotification(
+      supabaseService,
+      userId,
+      'PAYMENT_RECEIVED',
+      'Payment Received',
+      `Payment of ${formattedAmount} has been recorded. ${isFullyPaid ? 'Invoice is now fully paid!' : ''}`,
+      'invoice',
+      body.invoice_id,
+      invoice.business_id
+    )
 
     const response: RecordPaymentResponse = {
       success: true,

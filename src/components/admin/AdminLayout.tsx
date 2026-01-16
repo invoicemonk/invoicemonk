@@ -3,14 +3,29 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminProvider, useAdmin } from '@/contexts/AdminContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
 function AdminLayoutContent() {
+  const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading, error } = useAdmin();
 
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while checking admin role
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

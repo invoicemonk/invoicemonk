@@ -162,6 +162,7 @@ export function useCreateInvoice() {
 // Update a draft invoice
 export function useUpdateInvoice() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -173,6 +174,13 @@ export function useUpdateInvoice() {
       updates: TablesUpdate<'invoices'>;
       items?: Omit<InvoiceItemInsert, 'invoice_id'>[];
     }) => {
+      // Get previous state for audit logging
+      const { data: previousState } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+
       // Update the invoice
       const { data: updatedInvoice, error: invoiceError } = await supabase
         .from('invoices')
@@ -205,6 +213,19 @@ export function useUpdateInvoice() {
 
           if (itemsError) throw itemsError;
         }
+      }
+
+      // Log audit event for draft invoice changes (compliance requirement)
+      if (user && previousState) {
+        await supabase.rpc('log_audit_event', {
+          _event_type: 'INVOICE_UPDATED',
+          _entity_type: 'invoice',
+          _entity_id: invoiceId,
+          _user_id: user.id,
+          _business_id: updatedInvoice.business_id,
+          _previous_state: previousState,
+          _new_state: updatedInvoice,
+        });
       }
 
       return updatedInvoice;
@@ -429,9 +450,10 @@ export function useRecordPayment() {
         })
         .eq('id', invoiceId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (updateError) throw updateError;
+      if (!updatedInvoice) throw new Error('Failed to update invoice - no rows affected. You may not have permission to update this invoice.');
 
       // Log audit event
       await supabase.rpc('log_audit_event', {

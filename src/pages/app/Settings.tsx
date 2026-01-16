@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Settings as SettingsIcon, 
@@ -9,7 +9,8 @@ import {
   Save,
   Eye,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,9 +22,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { AccountClosureSection } from '@/components/settings/AccountClosureSection';
+import { useUserPreferences, useUpdatePreferences } from '@/hooks/use-user-preferences';
 
 export default function Settings() {
   const { profile, updatePassword } = useAuth();
+  const { data: preferences, isLoading: preferencesLoading } = useUserPreferences();
+  const updatePreferences = useUpdatePreferences();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwords, setPasswords] = useState({
@@ -31,12 +36,30 @@ export default function Settings() {
     new: '',
     confirm: '',
   });
+  
+  // Local state for notifications - synced with database
   const [notifications, setNotifications] = useState({
     emailInvoice: true,
     emailPayment: true,
     emailReminders: false,
+    emailOverdue: true,
     browserNotifications: false,
+    reminderDaysBefore: 3,
   });
+
+  // Sync local state with database preferences
+  useEffect(() => {
+    if (preferences) {
+      setNotifications({
+        emailInvoice: preferences.email_invoice_issued,
+        emailPayment: preferences.email_payment_received,
+        emailReminders: preferences.email_payment_reminders,
+        emailOverdue: preferences.email_overdue_alerts,
+        browserNotifications: preferences.browser_notifications,
+        reminderDaysBefore: preferences.reminder_days_before,
+      });
+    }
+  }, [preferences]);
 
   const handlePasswordChange = async () => {
     if (passwords.new !== passwords.confirm) {
@@ -74,6 +97,21 @@ export default function Settings() {
       });
       setPasswords({ current: '', new: '', confirm: '' });
     }
+  };
+
+  const handleNotificationChange = (key: keyof typeof notifications, value: boolean | number) => {
+    setNotifications(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveNotifications = () => {
+    updatePreferences.mutate({
+      email_invoice_issued: notifications.emailInvoice,
+      email_payment_received: notifications.emailPayment,
+      email_payment_reminders: notifications.emailReminders,
+      email_overdue_alerts: notifications.emailOverdue,
+      browser_notifications: notifications.browserNotifications,
+      reminder_days_before: notifications.reminderDaysBefore,
+    });
   };
 
   return (
@@ -238,50 +276,100 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Invoice Issued</p>
-                  <p className="text-sm text-muted-foreground">
-                    Receive confirmation when invoices are issued
-                  </p>
+              {preferencesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-                <Switch
-                  checked={notifications.emailInvoice}
-                  onCheckedChange={(checked) => 
-                    setNotifications({ ...notifications, emailInvoice: checked })
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Payment Received</p>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when payments are recorded
-                  </p>
-                </div>
-                <Switch
-                  checked={notifications.emailPayment}
-                  onCheckedChange={(checked) => 
-                    setNotifications({ ...notifications, emailPayment: checked })
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Payment Reminders</p>
-                  <p className="text-sm text-muted-foreground">
-                    Reminders for overdue invoices
-                  </p>
-                </div>
-                <Switch
-                  checked={notifications.emailReminders}
-                  onCheckedChange={(checked) => 
-                    setNotifications({ ...notifications, emailReminders: checked })
-                  }
-                />
-              </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Invoice Issued</p>
+                      <p className="text-sm text-muted-foreground">
+                        Receive confirmation when invoices are issued
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.emailInvoice}
+                      onCheckedChange={(checked) => handleNotificationChange('emailInvoice', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Payment Received</p>
+                      <p className="text-sm text-muted-foreground">
+                        Get notified when payments are recorded
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.emailPayment}
+                      onCheckedChange={(checked) => handleNotificationChange('emailPayment', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Payment Reminders</p>
+                      <p className="text-sm text-muted-foreground">
+                        Send reminder emails to clients before due dates
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.emailReminders}
+                      onCheckedChange={(checked) => handleNotificationChange('emailReminders', checked)}
+                    />
+                  </div>
+                  {notifications.emailReminders && (
+                    <div className="ml-4 p-4 rounded-lg bg-muted/50 space-y-2">
+                      <Label htmlFor="reminderDays">Days before due date</Label>
+                      <Input
+                        id="reminderDays"
+                        type="number"
+                        min={1}
+                        max={14}
+                        value={notifications.reminderDaysBefore}
+                        onChange={(e) => handleNotificationChange('reminderDaysBefore', parseInt(e.target.value) || 3)}
+                        className="w-24"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Clients will receive a reminder this many days before the invoice is due
+                      </p>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Overdue Alerts</p>
+                      <p className="text-sm text-muted-foreground">
+                        Get notified when invoices become overdue
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.emailOverdue}
+                      onCheckedChange={(checked) => handleNotificationChange('emailOverdue', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <Button 
+                    onClick={handleSaveNotifications} 
+                    disabled={updatePreferences.isPending}
+                    className="mt-4"
+                  >
+                    {updatePreferences.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Notification Settings
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -305,11 +393,26 @@ export default function Settings() {
                 </div>
                 <Switch
                   checked={notifications.browserNotifications}
-                  onCheckedChange={(checked) => 
-                    setNotifications({ ...notifications, browserNotifications: checked })
-                  }
+                  onCheckedChange={(checked) => handleNotificationChange('browserNotifications', checked)}
                 />
               </div>
+              <Separator />
+              <Button 
+                onClick={handleSaveNotifications} 
+                disabled={updatePreferences.isPending}
+              >
+                {updatePreferences.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Preferences
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

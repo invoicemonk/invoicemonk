@@ -6,6 +6,117 @@ import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Business = Tables<'businesses'>;
 
+// Upload business logo
+export function useUploadBusinessLogo() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ businessId, file }: { businessId: string; file: File }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Validate file
+      const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Please upload a PNG, JPEG, SVG, or WebP image.');
+      }
+      if (file.size > 500 * 1024) {
+        throw new Error('File too large. Maximum size is 500KB.');
+      }
+
+      // Create file path: userId/businessId/logo.extension
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${businessId}/logo.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('business-logos')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('business-logos')
+        .getPublicUrl(filePath);
+
+      // Update business with logo URL
+      const { error: updateError } = await supabase
+        .from('businesses')
+        .update({ logo_url: publicUrl })
+        .eq('id', businessId);
+
+      if (updateError) throw updateError;
+
+      return publicUrl;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      toast({
+        title: 'Logo uploaded',
+        description: 'Your business logo has been updated.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error uploading logo',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Delete business logo
+export function useDeleteBusinessLogo() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (businessId: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Get current business to find the logo path
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('logo_url')
+        .eq('id', businessId)
+        .single();
+
+      if (business?.logo_url) {
+        // Extract path from URL and delete from storage
+        const url = new URL(business.logo_url);
+        const path = url.pathname.split('/storage/v1/object/public/business-logos/')[1];
+        if (path) {
+          await supabase.storage.from('business-logos').remove([path]);
+        }
+      }
+
+      // Clear logo URL in database
+      const { error } = await supabase
+        .from('businesses')
+        .update({ logo_url: null })
+        .eq('id', businessId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      toast({
+        title: 'Logo removed',
+        description: 'Your business logo has been removed.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error removing logo',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Fetch the current user's business (via business_members)
 export function useUserBusiness() {
   const { user } = useAuth();

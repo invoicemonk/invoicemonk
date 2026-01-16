@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye
+  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoice, useIssueInvoice, useVoidInvoice, useRecordPayment } from '@/hooks/use-invoices';
 import { useInvoiceAuditLogs } from '@/hooks/use-audit-logs';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
+import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
+import { useInvoicePayments } from '@/hooks/use-payments';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
+import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useSubscription } from '@/hooks/use-subscription';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -56,6 +60,8 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const { data: invoice, isLoading, error } = useInvoice(id);
   const { data: auditLogs } = useInvoiceAuditLogs(id);
+  const { data: creditNote } = useCreditNoteByInvoice(id);
+  const { data: payments } = useInvoicePayments(id);
   const issueInvoice = useIssueInvoice();
   const voidInvoice = useVoidInvoice();
   const recordPayment = useRecordPayment();
@@ -65,8 +71,13 @@ export default function InvoiceDetail() {
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentNotes, setPaymentNotes] = useState('');
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
@@ -109,9 +120,20 @@ export default function InvoiceDetail() {
 
   const handleRecordPayment = async () => {
     if (id && paymentAmount) {
-      await recordPayment.mutateAsync({ invoiceId: id, amount: parseFloat(paymentAmount) });
+      await recordPayment.mutateAsync({ 
+        invoiceId: id, 
+        amount: parseFloat(paymentAmount),
+        paymentMethod: paymentMethod || undefined,
+        paymentReference: paymentReference || undefined,
+        paymentDate: paymentDate,
+        notes: paymentNotes || undefined
+      });
       setPaymentDialogOpen(false);
       setPaymentAmount('');
+      setPaymentMethod('');
+      setPaymentReference('');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentNotes('');
     }
   };
 
@@ -180,6 +202,12 @@ export default function InvoiceDetail() {
                 {downloadPdf.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
                 Download PDF
               </Button>
+              {(invoice.status === 'issued' || invoice.status === 'sent') && (
+                <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send
+                </Button>
+              )}
               {invoice.status !== 'voided' && invoice.status !== 'paid' && (
                 <>
                   <Button variant="outline" onClick={() => setPaymentDialogOpen(true)}>
@@ -196,7 +224,7 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Immutability Notice */}
-      {isImmutable && (
+      {isImmutable && invoice.status !== 'voided' && (
         <Card className="bg-blue-500/5 border-blue-500/20">
           <CardContent className="flex items-center gap-4 py-4">
             <Lock className="h-5 w-5 text-blue-500" />
@@ -206,6 +234,29 @@ export default function InvoiceDetail() {
                 Issued on {formatDateTime(invoice.issued_at || invoice.created_at)} and cannot be altered.
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Credit Note Notice for Voided Invoices */}
+      {invoice.status === 'voided' && creditNote && (
+        <Card className="bg-destructive/5 border-destructive/20">
+          <CardContent className="flex items-center justify-between gap-4 py-4">
+            <div className="flex items-center gap-4">
+              <FileX className="h-5 w-5 text-destructive" />
+              <div>
+                <p className="font-medium text-destructive">This invoice has been voided</p>
+                <p className="text-sm text-muted-foreground">
+                  Credit note {creditNote.credit_note_number} was created on {formatDateTime(creditNote.issued_at)}.
+                  Reason: {creditNote.reason}
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/credit-notes/${creditNote.id}`}>
+                View Credit Note
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -368,6 +419,65 @@ export default function InvoiceDetail() {
             </CardContent>
           </Card>
 
+          {/* Payment History */}
+          {payments && payments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Payment History
+                </CardTitle>
+                <CardDescription>
+                  {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {payments.map((payment) => (
+                    <div key={payment.id} className="flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          <span className="font-medium text-emerald-600">
+                            {formatCurrency(Number(payment.amount), invoice.currency)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(payment.payment_date)}
+                        </p>
+                        {payment.payment_method && (
+                          <p className="text-xs text-muted-foreground capitalize">
+                            via {payment.payment_method}
+                          </p>
+                        )}
+                      </div>
+                      {payment.payment_reference && (
+                        <span className="text-xs font-mono text-muted-foreground">
+                          Ref: {payment.payment_reference}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <Separator className="my-3" />
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Total Paid</span>
+                  <span className="text-emerald-600">
+                    {formatCurrency(Number(invoice.amount_paid), invoice.currency)}
+                  </span>
+                </div>
+                {Number(invoice.total_amount) - Number(invoice.amount_paid) > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                    <span>Outstanding</span>
+                    <span>
+                      {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Audit Trail</CardTitle>
@@ -428,20 +538,80 @@ export default function InvoiceDetail() {
 
       {/* Payment Dialog */}
       <AlertDialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Record Payment</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Record Payment
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Outstanding: {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label>Amount</Label>
-            <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="mt-2" />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount *</Label>
+              <Input 
+                id="amount"
+                type="number" 
+                value={paymentAmount} 
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="method">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reference">Reference / Transaction ID</Label>
+              <Input 
+                id="reference"
+                value={paymentReference} 
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="e.g., TXN123456789"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Payment Date</Label>
+              <Input 
+                id="date"
+                type="date" 
+                value={paymentDate} 
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea 
+                id="notes"
+                value={paymentNotes} 
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="Additional notes..."
+                rows={2}
+              />
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRecordPayment} disabled={!paymentAmount}>Record Payment</AlertDialogAction>
+            <AlertDialogAction 
+              onClick={handleRecordPayment} 
+              disabled={!paymentAmount || recordPayment.isPending}
+            >
+              {recordPayment.isPending ? 'Recording...' : 'Record Payment'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -453,6 +623,15 @@ export default function InvoiceDetail() {
           onOpenChange={setPreviewOpen}
           invoice={invoice}
           showWatermark={isStarter}
+        />
+      )}
+
+      {/* Send Invoice Dialog */}
+      {invoice && (
+        <SendInvoiceDialog
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          invoice={invoice}
         />
       )}
     </motion.div>

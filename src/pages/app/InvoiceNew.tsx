@@ -90,6 +90,7 @@ export default function InvoiceNew() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
+  const [summary, setSummary] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: 0 }
   ]);
@@ -120,7 +121,7 @@ export default function InvoiceNew() {
       due_date: dueDate || null,
       notes: notes || null,
       terms: terms || null,
-      summary: null,
+      summary: summary || null,
       subtotal: calculateSubtotal(),
       tax_amount: calculateTax(),
       discount_amount: 0,
@@ -254,19 +255,32 @@ export default function InvoiceNew() {
   };
 
   const handleSaveDraft = async () => {
+    // Validate business exists
+    if (!currentBusiness?.id) {
+      toast({
+        title: 'Business profile required',
+        description: 'Please complete your business profile before creating invoices.',
+        variant: 'destructive',
+      });
+      navigate('/business-profile');
+      return;
+    }
+
     if (!validateForm()) return;
 
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
 
     await createInvoice.mutateAsync({
       invoice: {
-        business_id: currentBusiness?.id || null,
+        business_id: currentBusiness.id,
         client_id: selectedClientId,
-        currency,
+        currency: effectiveCurrency,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
         terms: terms || null,
+        summary: summary || null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -285,6 +299,17 @@ export default function InvoiceNew() {
   };
 
   const handleIssue = async () => {
+    // Validate business exists
+    if (!currentBusiness?.id) {
+      toast({
+        title: 'Business profile required',
+        description: 'Please complete your business profile before issuing invoices.',
+        variant: 'destructive',
+      });
+      navigate('/business-profile');
+      return;
+    }
+
     if (!isEmailVerified) {
       toast({
         title: 'Email verification required',
@@ -307,17 +332,19 @@ export default function InvoiceNew() {
     if (!validateForm()) return;
 
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
 
     // First create the invoice with template
     const invoice = await createInvoice.mutateAsync({
       invoice: {
-        business_id: currentBusiness?.id || null,
+        business_id: currentBusiness.id,
         client_id: selectedClientId,
-        currency,
+        currency: effectiveCurrency,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
         terms: terms || null,
+        summary: summary || null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -508,6 +535,19 @@ export default function InvoiceNew() {
                     </p>
                   </>
                 )}
+              </div>
+
+              {/* Summary / Description */}
+              <div className="space-y-2">
+                <Label htmlFor="summary">Summary / Description</Label>
+                <Textarea
+                  id="summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value.slice(0, 500))}
+                  placeholder="Brief description of what this invoice is for..."
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-muted-foreground text-right">{summary.length}/500</p>
               </div>
 
               {/* Template Selection */}

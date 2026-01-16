@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
 import { 
   FileText, 
   Plus, 
@@ -12,7 +13,11 @@ import {
   Trash2,
   Lock,
   Ban,
-  Loader2
+  Loader2,
+  X,
+  Calendar,
+  Download,
+  ChevronDown
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +31,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -44,9 +61,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useInvoices, useDeleteInvoice, useVoidInvoice } from '@/hooks/use-invoices';
+import { useClients } from '@/hooks/use-clients';
+import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
+import { useExportRecords } from '@/hooks/use-export';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -71,6 +93,8 @@ const statusLabels: Record<InvoiceStatus, string> = {
   credited: 'Credited',
 };
 
+const allStatuses: InvoiceStatus[] = ['draft', 'issued', 'sent', 'viewed', 'paid', 'voided', 'credited'];
+
 export default function Invoices() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,20 +102,146 @@ export default function Invoices() {
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [selectedSendInvoice, setSelectedSendInvoice] = useState<typeof filteredInvoices[0] | null>(null);
+  
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>('all');
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  
+  // Custom date range states
+  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>();
+  const [customDateTo, setCustomDateTo] = useState<Date | undefined>();
+  const [dateFromPopoverOpen, setDateFromPopoverOpen] = useState(false);
+  const [dateToPopoverOpen, setDateToPopoverOpen] = useState(false);
 
   const { data: invoices, isLoading, error } = useInvoices();
+  const { data: clients } = useClients();
   const deleteInvoice = useDeleteInvoice();
   const voidInvoice = useVoidInvoice();
+  const { exportRecords, isExporting } = useExportRecords();
 
-  const filteredInvoices = (invoices || []).filter(invoice => {
-    if (activeTab !== 'all' && invoice.status !== activeTab) return false;
-    if (searchQuery && 
-        !invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !invoice.clients?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+  // Check if any filter is active
+  const hasActiveFilters = statusFilter !== 'all' || clientFilter !== 'all' || dateRangeFilter !== 'all' || customDateFrom || customDateTo;
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setClientFilter('all');
+    setDateRangeFilter('all');
+    setCustomDateFrom(undefined);
+    setCustomDateTo(undefined);
+  };
+
+  // Date range helpers
+  const getDateRangeStart = (range: string): Date | null => {
+    const now = new Date();
+    switch (range) {
+      case 'today':
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      case 'week':
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 7);
+        return weekAgo;
+      case 'month':
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(now.getMonth() - 1);
+        return monthAgo;
+      case 'quarter':
+        const quarterAgo = new Date(now);
+        quarterAgo.setMonth(now.getMonth() - 3);
+        return quarterAgo;
+      case 'year':
+        const yearAgo = new Date(now);
+        yearAgo.setFullYear(now.getFullYear() - 1);
+        return yearAgo;
+      default:
+        return null;
     }
-    return true;
-  });
+  };
+
+  const filteredInvoices = useMemo(() => {
+    return (invoices || []).filter(invoice => {
+      // Tab filter
+      if (activeTab !== 'all' && invoice.status !== activeTab) return false;
+      
+      // Search filter
+      if (searchQuery && 
+          !invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !invoice.clients?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Status dropdown filter (only if tab is 'all')
+      if (activeTab === 'all' && statusFilter !== 'all' && invoice.status !== statusFilter) {
+        return false;
+      }
+      
+      // Client filter
+      if (clientFilter !== 'all' && invoice.client_id !== clientFilter) {
+        return false;
+      }
+      
+      // Date range filter
+      if (dateRangeFilter === 'custom') {
+        const invoiceDate = invoice.issue_date ? new Date(invoice.issue_date) : new Date(invoice.created_at);
+        if (customDateFrom && invoiceDate < customDateFrom) return false;
+        if (customDateTo) {
+          const endOfDay = new Date(customDateTo);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (invoiceDate > endOfDay) return false;
+        }
+      } else if (dateRangeFilter !== 'all') {
+        const rangeStart = getDateRangeStart(dateRangeFilter);
+        if (rangeStart) {
+          const invoiceDate = invoice.issue_date ? new Date(invoice.issue_date) : new Date(invoice.created_at);
+          if (invoiceDate < rangeStart) return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [invoices, activeTab, searchQuery, statusFilter, clientFilter, dateRangeFilter, customDateFrom, customDateTo]);
+
+  // Handle export
+  const handleExport = async (exportFormat: 'csv' | 'json') => {
+    await exportRecords({
+      export_type: 'invoices',
+      format: exportFormat,
+      date_from: dateRangeFilter === 'custom' && customDateFrom 
+        ? customDateFrom.toISOString() 
+        : dateRangeFilter !== 'all' 
+          ? getDateRangeStart(dateRangeFilter)?.toISOString() 
+          : undefined,
+      date_to: dateRangeFilter === 'custom' && customDateTo 
+        ? customDateTo.toISOString() 
+        : undefined,
+    });
+  };
+
+  // Get the date range display label
+  const getDateRangeLabel = () => {
+    if (dateRangeFilter === 'custom') {
+      if (customDateFrom && customDateTo) {
+        return `${format(customDateFrom, 'MMM d')} - ${format(customDateTo, 'MMM d, yyyy')}`;
+      } else if (customDateFrom) {
+        return `From ${format(customDateFrom, 'MMM d, yyyy')}`;
+      } else if (customDateTo) {
+        return `Until ${format(customDateTo, 'MMM d, yyyy')}`;
+      }
+      return 'Custom range';
+    }
+    const labels: Record<string, string> = {
+      all: 'All time',
+      today: 'Today',
+      week: 'Last 7 days',
+      month: 'Last 30 days',
+      quarter: 'Last 3 months',
+      year: 'Last year',
+    };
+    return labels[dateRangeFilter] || 'All time';
+  };
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', {
@@ -142,6 +292,11 @@ export default function Invoices() {
 
   const isImmutable = (status: InvoiceStatus) => status !== 'draft';
 
+  const handleSend = (invoice: typeof filteredInvoices[0]) => {
+    setSelectedSendInvoice(invoice);
+    setSendDialogOpen(true);
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -185,9 +340,211 @@ export default function Invoices() {
                 className="pl-9"
               />
             </div>
-            <Button variant="outline" size="icon">
-              <Filter className="h-4 w-4" />
-            </Button>
+            
+            <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {[statusFilter !== 'all', clientFilter !== 'all', dateRangeFilter !== 'all' || customDateFrom || customDateTo].filter(Boolean).length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Filter Invoices</h4>
+                    {hasActiveFilters && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs">
+                        <X className="h-3 w-3 mr-1" />
+                        Clear all
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {allStatuses.map(status => (
+                          <SelectItem key={status} value={status}>
+                            {statusLabels[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Client Filter */}
+                  <div className="space-y-2">
+                    <Label>Client</Label>
+                    <Select value={clientFilter} onValueChange={setClientFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All clients" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All clients</SelectItem>
+                        {clients?.map(client => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Date Range Filter */}
+                  <div className="space-y-2">
+                    <Label>Date Range</Label>
+                    <Select 
+                      value={dateRangeFilter} 
+                      onValueChange={(value) => {
+                        setDateRangeFilter(value);
+                        if (value !== 'custom') {
+                          setCustomDateFrom(undefined);
+                          setCustomDateTo(undefined);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span className="truncate">{getDateRangeLabel()}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All time</SelectItem>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="week">Last 7 days</SelectItem>
+                        <SelectItem value="month">Last 30 days</SelectItem>
+                        <SelectItem value="quarter">Last 3 months</SelectItem>
+                        <SelectItem value="year">Last year</SelectItem>
+                        <SelectItem value="custom">Custom range...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Custom Date Pickers */}
+                  {dateRangeFilter === 'custom' && (
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">From</Label>
+                        <Popover open={dateFromPopoverOpen} onOpenChange={setDateFromPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !customDateFrom && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {customDateFrom ? format(customDateFrom, "PPP") : "Select start date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={customDateFrom}
+                              onSelect={(date) => {
+                                setCustomDateFrom(date);
+                                setDateFromPopoverOpen(false);
+                              }}
+                              disabled={(date) => customDateTo ? date > customDateTo : false}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">To</Label>
+                        <Popover open={dateToPopoverOpen} onOpenChange={setDateToPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !customDateTo && "text-muted-foreground"
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {customDateTo ? format(customDateTo, "PPP") : "Select end date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={customDateTo}
+                              onSelect={(date) => {
+                                setCustomDateTo(date);
+                                setDateToPopoverOpen(false);
+                              }}
+                              disabled={(date) => customDateFrom ? date < customDateFrom : false}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      
+                      {(customDateFrom || customDateTo) && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => {
+                            setCustomDateFrom(undefined);
+                            setCustomDateTo(undefined);
+                          }}
+                          className="w-full text-xs"
+                        >
+                          Clear dates
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Export Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" disabled={isExporting}>
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Export
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('json')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                <X className="h-4 w-4 mr-1" />
+                Clear filters
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -262,7 +619,7 @@ export default function Invoices() {
                               </Link>
                             </DropdownMenuItem>
                             {invoice.status === 'issued' && (
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSend(invoice)}>
                                 <Send className="h-4 w-4 mr-2" />
                                 Send
                               </DropdownMenuItem>
@@ -407,6 +764,15 @@ export default function Invoices() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Send Invoice Dialog */}
+      {selectedSendInvoice && (
+        <SendInvoiceDialog
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          invoice={selectedSendInvoice}
+        />
+      )}
     </motion.div>
   );
 }

@@ -7,7 +7,9 @@ import {
   TrendingUp,
   AlertCircle,
   ArrowUpRight,
-  Shield
+  Shield,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,42 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserOrganizations } from '@/hooks/use-organization';
-
-const statsCards = [
-  {
-    title: 'Total Revenue',
-    value: '₦0.00',
-    change: '+0%',
-    changeType: 'neutral' as const,
-    icon: DollarSign,
-    description: 'All time revenue',
-  },
-  {
-    title: 'Outstanding',
-    value: '₦0.00',
-    change: '0 invoices',
-    changeType: 'neutral' as const,
-    icon: Clock,
-    description: 'Pending payments',
-  },
-  {
-    title: 'Paid This Month',
-    value: '₦0.00',
-    change: '0 invoices',
-    changeType: 'neutral' as const,
-    icon: CheckCircle2,
-    description: 'January 2026',
-  },
-  {
-    title: 'Draft Invoices',
-    value: '0',
-    change: 'Ready to issue',
-    changeType: 'neutral' as const,
-    icon: FileText,
-    description: 'Awaiting completion',
-  },
-];
-
+import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard } from '@/hooks/use-dashboard-stats';
+import { useRealtimeInvoices } from '@/hooks/use-realtime-invoices';
+import { Skeleton } from '@/components/ui/skeleton';
 const container = {
   hidden: { opacity: 0 },
   show: {
@@ -64,14 +33,85 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
+// Currency formatting utility
+function formatCurrency(amount: number, currency: string = 'USD'): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    // Fallback for invalid currency codes
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
+// Status badge component
+function StatusBadge({ status }: { status: string }) {
+  const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    draft: 'secondary',
+    issued: 'outline',
+    sent: 'outline',
+    viewed: 'outline',
+    paid: 'default',
+    voided: 'destructive',
+    credited: 'destructive',
+  };
+
+  return (
+    <Badge variant={variants[status] || 'secondary'} className="capitalize">
+      {status}
+    </Badge>
+  );
+}
+
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const { data: organizations } = useUserOrganizations();
   const currentBusiness = organizations?.[0]?.business;
   const isEmailVerified = user?.email_confirmed_at;
   
+  // Real-time subscriptions for instant updates
+  useRealtimeInvoices(currentBusiness?.id, user?.id);
+  const { refresh, isRefreshing } = useRefreshDashboard();
+  
+  // Fetch real dashboard stats
+  const { data: stats, isLoading: statsLoading } = useDashboardStats(currentBusiness?.id);
+  const { data: recentInvoices, isLoading: invoicesLoading } = useRecentInvoices(currentBusiness?.id);
+  const { data: dueDateStats, isLoading: dueDateLoading } = useDueDateStats(currentBusiness?.id);
+  
   // Server-derived compliance status
   const businessComplianceStatus = currentBusiness?.compliance_status || 'incomplete';
+
+  // Build stats cards with real data
+  const statsCards = [
+    {
+      title: 'Total Revenue',
+      value: statsLoading ? null : formatCurrency(stats?.totalRevenue || 0, stats?.currency),
+      change: 'All time revenue',
+      icon: DollarSign,
+    },
+    {
+      title: 'Outstanding',
+      value: statsLoading ? null : formatCurrency(stats?.outstanding || 0, stats?.currency),
+      change: `${stats?.outstandingCount || 0} invoice${stats?.outstandingCount !== 1 ? 's' : ''}`,
+      icon: Clock,
+    },
+    {
+      title: 'Paid This Month',
+      value: statsLoading ? null : formatCurrency(stats?.paidThisMonth || 0, stats?.currency),
+      change: `${stats?.paidThisMonthCount || 0} invoice${stats?.paidThisMonthCount !== 1 ? 's' : ''}`,
+      icon: CheckCircle2,
+    },
+    {
+      title: 'Draft Invoices',
+      value: statsLoading ? null : String(stats?.draftCount || 0),
+      change: 'Ready to issue',
+      icon: FileText,
+    },
+  ];
 
   return (
     <motion.div
@@ -90,12 +130,23 @@ export default function Dashboard() {
             Here's what's happening with your invoices today.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/invoices/new">
-            <FileText className="h-4 w-4 mr-2" />
-            Create Invoice
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={refresh}
+            disabled={isRefreshing}
+            title="Refresh dashboard"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button asChild>
+            <Link to="/invoices/new">
+              <FileText className="h-4 w-4 mr-2" />
+              Create Invoice
+            </Link>
+          </Button>
+        </div>
       </motion.div>
 
       {/* Email Verification Warning */}
@@ -122,7 +173,7 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statsCards.map((stat, index) => (
+        {statsCards.map((stat) => (
           <Card key={stat.title} className="relative overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -131,7 +182,11 @@ export default function Dashboard() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              {stat.value === null ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-2xl font-bold">{stat.value}</div>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
                 {stat.change}
               </p>
@@ -139,6 +194,81 @@ export default function Dashboard() {
           </Card>
         ))}
       </motion.div>
+
+      {/* Payment Alerts - Overdue & Upcoming */}
+      {(dueDateStats?.overdueCount > 0 || dueDateStats?.upcomingCount > 0) && (
+        <motion.div variants={item}>
+          <Card className={dueDateStats?.overdueCount > 0 ? "border-destructive/50" : "border-amber-500/50"}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <AlertCircle className={`h-5 w-5 ${dueDateStats?.overdueCount > 0 ? 'text-destructive' : 'text-amber-500'}`} />
+                Payment Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Overdue Section */}
+                <div className={`p-4 rounded-lg ${dueDateStats?.overdueCount > 0 ? 'bg-destructive/10' : 'bg-muted/50'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-muted-foreground">OVERDUE</span>
+                    {dueDateStats?.overdueCount > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        {dueDateStats.overdueCount}
+                      </Badge>
+                    )}
+                  </div>
+                  {dueDateLoading ? (
+                    <Skeleton className="h-7 w-32" />
+                  ) : dueDateStats?.overdueCount > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold text-destructive">
+                        {formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3" asChild>
+                        <Link to="/invoices?status=overdue">View Overdue</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No overdue invoices</p>
+                  )}
+                </div>
+
+                {/* Upcoming Section */}
+                <div className="p-4 rounded-lg bg-amber-500/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-muted-foreground">DUE THIS WEEK</span>
+                    {dueDateStats?.upcomingCount > 0 && (
+                      <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
+                        {dueDateStats.upcomingCount}
+                      </Badge>
+                    )}
+                  </div>
+                  {dueDateLoading ? (
+                    <Skeleton className="h-7 w-32" />
+                  ) : dueDateStats?.upcomingCount > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
+                        {formatCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {dueDateStats.upcomingCount} invoice{dueDateStats.upcomingCount !== 1 ? 's' : ''} due soon
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3" asChild>
+                        <Link to="/invoices?status=outstanding">View Upcoming</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No invoices due this week</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Quick Actions & Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -245,26 +375,66 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* Recent Invoices (Empty State) */}
+      {/* Recent Invoices */}
       <motion.div variants={item}>
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Invoices</CardTitle>
-            <CardDescription>Your latest invoice activity</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Recent Invoices</CardTitle>
+              <CardDescription>Your latest invoice activity</CardDescription>
+            </div>
+            {recentInvoices && recentInvoices.length > 0 && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/invoices">View All</Link>
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="p-4 rounded-full bg-muted mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground" />
+            {invoicesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No invoices yet</h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                Create your first compliance-ready invoice to get started. All invoices are immutable once issued.
-              </p>
-              <Button asChild>
-                <Link to="/invoices/new">Create Your First Invoice</Link>
-              </Button>
-            </div>
+            ) : recentInvoices && recentInvoices.length > 0 ? (
+              <div className="space-y-3">
+                {recentInvoices.map((invoice) => (
+                  <Link
+                    key={invoice.id}
+                    to={`/invoices/${invoice.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 rounded-lg bg-muted shrink-0">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{invoice.invoice_number}</p>
+                        <p className="text-sm text-muted-foreground truncate">{invoice.client_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="font-medium">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
+                        <StatusBadge status={invoice.status} />
+                      </div>
+                      <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="p-4 rounded-full bg-muted mb-4">
+                  <FileText className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold mb-1">No invoices yet</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                  Create your first compliance-ready invoice to get started. All invoices are immutable once issued.
+                </p>
+                <Button asChild>
+                  <Link to="/invoices/new">Create Your First Invoice</Link>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

@@ -3,6 +3,9 @@ project_id = "skcxogeaerudoadluexz"
 [functions.generate-pdf]
 verify_jwt = false
 
+[functions.generate-report]
+verify_jwt = false
+
 [functions.issue-invoice]
 verify_jwt = false
 
@@ -16,4 +19,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.export-records]
+verify_jwt = false
+
+[functions.send-invoice-email]
+verify_jwt = false
+
+[functions.cleanup-expired-records]
+verify_jwt = false
+
+[functions.check-overdue-invoices]
+verify_jwt = false
+
+[functions.send-due-date-reminders]
 verify_jwt = false

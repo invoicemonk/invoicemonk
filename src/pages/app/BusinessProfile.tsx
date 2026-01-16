@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -9,7 +9,10 @@ import {
   MapPin,
   FileText,
   Shield,
-  Loader2
+  Loader2,
+  Upload,
+  X,
+  ImageIcon
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUserBusiness, useUpdateBusiness, useCreateBusiness } from '@/hooks/use-business';
+import { useUserBusiness, useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 
 const jurisdictions = [
@@ -51,6 +54,9 @@ export default function BusinessProfile() {
   const { data: business, isLoading: isLoadingBusiness } = useUserBusiness();
   const updateBusiness = useUpdateBusiness();
   const createBusiness = useCreateBusiness();
+  const uploadLogo = useUploadBusinessLogo();
+  const deleteLogo = useDeleteBusinessLogo();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -120,7 +126,24 @@ export default function BusinessProfile() {
   };
 
   const isLoading = updateBusiness.isPending || createBusiness.isPending;
+  const isUploadingLogo = uploadLogo.isPending;
+  const isDeletingLogo = deleteLogo.isPending;
   const nextInvoiceNumber = business?.next_invoice_number || 1;
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !business) return;
+    
+    await uploadLogo.mutateAsync({ businessId: business.id, file });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    if (!business) return;
+    await deleteLogo.mutateAsync(business.id);
+  };
 
   // Calculate profile completion from current form data for real-time updates
   const profileCompletion = useMemo(() => {
@@ -216,6 +239,80 @@ export default function BusinessProfile() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Business Logo */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Business Logo
+            </CardTitle>
+            <CardDescription>
+              Upload your business logo to display on invoices (max 500KB, PNG/JPEG/SVG/WebP)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {/* Logo Preview */}
+              <div className="shrink-0">
+                {business?.logo_url ? (
+                  <div className="relative group">
+                    <img 
+                      src={business.logo_url} 
+                      alt="Business Logo" 
+                      className="h-24 w-auto max-w-[180px] object-contain rounded-lg border border-border bg-muted/50 p-2"
+                    />
+                    <button
+                      onClick={handleLogoDelete}
+                      disabled={isDeletingLogo}
+                      className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove logo"
+                    >
+                      {isDeletingLogo ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-24 w-32 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Section */}
+              <div className="flex-1 space-y-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingLogo || !business}
+                  className="w-full sm:w-auto"
+                >
+                  {isUploadingLogo ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {isUploadingLogo ? 'Uploading...' : business?.logo_url ? 'Replace Logo' : 'Upload Logo'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Your logo will appear on generated invoices and PDF exports.
+                  {!business && ' Save your business profile first to upload a logo.'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Business Identity */}
         <Card>
           <CardHeader>

@@ -5,6 +5,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to create notification
+async function createNotification(
+  supabase: any,
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  entityType: string,
+  entityId: string,
+  businessId?: string | null
+) {
+  try {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      message,
+      entity_type: entityType,
+      entity_id: entityId,
+      business_id: businessId || null
+    })
+  } catch (err) {
+    console.error('Failed to create notification:', err)
+  }
+}
+
 interface IssueInvoiceRequest {
   invoice_id: string
 }
@@ -108,6 +134,21 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Create notification for invoice issued
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey)
+    
+    await createNotification(
+      supabaseService,
+      userId,
+      'INVOICE_ISSUED',
+      'Invoice Issued',
+      `Invoice ${issuedInvoice.invoice_number} has been successfully issued.`,
+      'invoice',
+      issuedInvoice.id,
+      issuedInvoice.business_id
+    )
 
     const response: IssueInvoiceResponse = {
       success: true,

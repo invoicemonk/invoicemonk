@@ -1,6 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { Bell, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
@@ -12,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 
 const routeTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -67,10 +67,7 @@ export function DashboardHeader() {
           />
         </div>
         
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full" />
-        </Button>
+        <NotificationDropdown />
       </div>
     </header>
   );

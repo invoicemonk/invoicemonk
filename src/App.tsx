@@ -22,13 +22,17 @@ import Invoices from "./pages/app/Invoices";
 import InvoiceNew from "./pages/app/InvoiceNew";
 import InvoiceDetail from "./pages/app/InvoiceDetail";
 import InvoiceEdit from "./pages/app/InvoiceEdit";
+import CreditNotes from "./pages/app/CreditNotes";
+import CreditNoteDetail from "./pages/app/CreditNoteDetail";
 import Clients from "./pages/app/Clients";
 import ClientDetail from "./pages/app/ClientDetail";
+import ClientEdit from "./pages/app/ClientEdit";
 import Reports from "./pages/app/Reports";
 import AuditLogs from "./pages/app/AuditLogs";
 import BusinessProfile from "./pages/app/BusinessProfile";
 import Billing from "./pages/app/Billing";
 import Settings from "./pages/app/Settings";
+import Notifications from "./pages/app/Notifications";
 
 // Organization pages
 import { OrgLayout } from "./components/org/OrgLayout";
@@ -105,13 +109,17 @@ const App = () => (
               <Route path="/invoices/new" element={<InvoiceNew />} />
               <Route path="/invoices/:id" element={<InvoiceDetail />} />
               <Route path="/invoices/:id/edit" element={<InvoiceEdit />} />
+              <Route path="/credit-notes" element={<CreditNotes />} />
+              <Route path="/credit-notes/:id" element={<CreditNoteDetail />} />
               <Route path="/clients" element={<Clients />} />
               <Route path="/clients/:id" element={<ClientDetail />} />
+              <Route path="/clients/:id/edit" element={<ClientEdit />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
               <Route path="/business-profile" element={<BusinessProfile />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/notifications" element={<Notifications />} />
             </Route>
 
             {/* Organization routes (Phase 5) */}
@@ -128,7 +136,7 @@ const App = () => (
               <Route path="/org/:orgId/settings" element={<OrgSettings />} />
             </Route>
 
-            {/* Platform Admin routes (Phase 6) */}
+            {/* Platform Admin routes (Phase 6) - Protected + AdminLayout handles admin role check */}
             <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
