@@ -3,6 +3,11 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+export interface DateRange {
+  start: Date;
+  end: Date;
+}
+
 export function useRefreshDashboard() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -13,6 +18,7 @@ export function useRefreshDashboard() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
       queryClient.invalidateQueries({ queryKey: ['recent-invoices'] }),
       queryClient.invalidateQueries({ queryKey: ['due-date-stats'] }),
+      queryClient.invalidateQueries({ queryKey: ['revenue-trend'] }),
     ]);
     setIsRefreshing(false);
   }, [queryClient]);
@@ -41,12 +47,12 @@ interface RecentInvoice {
   created_at: string;
 }
 
-export function useDashboardStats(businessId: string | undefined) {
+export function useDashboardStats(businessId: string | undefined, dateRange?: DateRange) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard-stats', businessId, user?.id],
-    refetchInterval: 30000, // Refetch every 30 seconds
+    queryKey: ['dashboard-stats', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<DashboardStats> => {
       if (!user?.id) {
@@ -72,6 +78,12 @@ export function useDashboardStats(businessId: string | undefined) {
         query = query.eq('user_id', user.id);
       }
 
+      // Apply date range filter for issued invoices
+      if (dateRange) {
+        query = query.gte('issued_at', dateRange.start.toISOString())
+                     .lte('issued_at', dateRange.end.toISOString());
+      }
+
       const { data: invoices, error } = await query;
 
       if (error) {
@@ -93,10 +105,10 @@ export function useDashboardStats(businessId: string | undefined) {
         }
       }
 
-      // Calculate stats
+      // Calculate stats - when date range is set, use it; otherwise use current month
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const startOfMonth = dateRange?.start || new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = dateRange?.end || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
       const paidInvoices = invoices?.filter(i => i.status === 'paid') || [];
       const outstandingInvoices = invoices?.filter(i => ['issued', 'sent', 'viewed'].includes(i.status)) || [];
@@ -117,6 +129,83 @@ export function useDashboardStats(businessId: string | undefined) {
         outstandingCount: outstandingInvoices.length,
         paidThisMonthCount: paidThisMonthInvoices.length,
       };
+    },
+    enabled: !!user?.id,
+  });
+}
+
+interface RevenueTrendPoint {
+  month: string;
+  revenue: number;
+  invoiceCount: number;
+}
+
+export function useRevenueTrend(businessId: string | undefined, months = 12) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['revenue-trend', businessId, user?.id, months],
+    refetchInterval: 60000,
+    queryFn: async (): Promise<RevenueTrendPoint[]> => {
+      if (!user?.id) return [];
+
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - months);
+      startDate.setDate(1);
+      startDate.setHours(0, 0, 0, 0);
+
+      let query = supabase
+        .from('invoices')
+        .select('total_amount, issued_at')
+        .eq('status', 'paid')
+        .gte('issued_at', startDate.toISOString());
+
+      if (businessId) {
+        query = query.eq('business_id', businessId);
+      } else {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data: invoices, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching revenue trend:', error);
+        throw error;
+      }
+
+      // Create buckets for each month
+      const monthBuckets: Map<string, { revenue: number; count: number }> = new Map();
+      
+      // Initialize all months with zero
+      for (let i = 0; i < months; i++) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - (months - 1 - i));
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthBuckets.set(key, { revenue: 0, count: 0 });
+      }
+
+      // Aggregate invoice data by month
+      (invoices || []).forEach(invoice => {
+        if (!invoice.issued_at) return;
+        const date = new Date(invoice.issued_at);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const bucket = monthBuckets.get(key);
+        if (bucket) {
+          bucket.revenue += Number(invoice.total_amount) || 0;
+          bucket.count += 1;
+        }
+      });
+
+      // Convert to array with formatted month names
+      return Array.from(monthBuckets.entries()).map(([key, data]) => {
+        const [year, month] = key.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        return {
+          month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+          revenue: data.revenue,
+          invoiceCount: data.count,
+        };
+      });
     },
     enabled: !!user?.id,
   });
