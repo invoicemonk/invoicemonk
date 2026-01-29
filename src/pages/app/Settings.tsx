@@ -10,7 +10,8 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,15 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { AccountClosureSection } from '@/components/settings/AccountClosureSection';
 import { useUserPreferences, useUpdatePreferences } from '@/hooks/use-user-preferences';
+
+const PRESET_REMINDER_DAYS = [1, 3, 7, 14];
+const PRESET_OVERDUE_DAYS = [1, 7, 14, 30];
 
 export default function Settings() {
   const { profile, updatePassword } = useAuth();
@@ -45,6 +51,10 @@ export default function Settings() {
     emailOverdue: true,
     browserNotifications: false,
     reminderDaysBefore: 3,
+    reminderSchedule: [] as number[],
+    overdueReminderEnabled: false,
+    overdueReminderSchedule: [] as number[],
+    reminderEmailTemplate: '',
   });
 
   // Sync local state with database preferences
@@ -57,6 +67,10 @@ export default function Settings() {
         emailOverdue: preferences.email_overdue_alerts,
         browserNotifications: preferences.browser_notifications,
         reminderDaysBefore: preferences.reminder_days_before,
+        reminderSchedule: preferences.reminder_schedule || [],
+        overdueReminderEnabled: preferences.overdue_reminder_enabled,
+        overdueReminderSchedule: preferences.overdue_reminder_schedule || [],
+        reminderEmailTemplate: preferences.reminder_email_template || '',
       });
     }
   }, [preferences]);
@@ -99,8 +113,19 @@ export default function Settings() {
     }
   };
 
-  const handleNotificationChange = (key: keyof typeof notifications, value: boolean | number) => {
+  const handleNotificationChange = (key: keyof typeof notifications, value: boolean | number | string | number[]) => {
     setNotifications(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleReminderDay = (day: number, schedule: 'reminderSchedule' | 'overdueReminderSchedule') => {
+    setNotifications(prev => {
+      const currentSchedule = prev[schedule];
+      if (currentSchedule.includes(day)) {
+        return { ...prev, [schedule]: currentSchedule.filter(d => d !== day) };
+      } else {
+        return { ...prev, [schedule]: [...currentSchedule, day].sort((a, b) => a - b) };
+      }
+    });
   };
 
   const handleSaveNotifications = () => {
@@ -111,7 +136,36 @@ export default function Settings() {
       email_overdue_alerts: notifications.emailOverdue,
       browser_notifications: notifications.browserNotifications,
       reminder_days_before: notifications.reminderDaysBefore,
+      reminder_schedule: notifications.reminderSchedule,
+      overdue_reminder_enabled: notifications.overdueReminderEnabled,
+      overdue_reminder_schedule: notifications.overdueReminderSchedule,
+      reminder_email_template: notifications.reminderEmailTemplate || null,
     });
+  };
+
+  const formatReminderPreview = () => {
+    const beforeDays = notifications.reminderSchedule.length > 0 
+      ? notifications.reminderSchedule 
+      : [notifications.reminderDaysBefore];
+    const afterDays = notifications.overdueReminderEnabled 
+      ? notifications.overdueReminderSchedule 
+      : [];
+
+    const beforeText = beforeDays.length > 0 
+      ? `${beforeDays.join(', ')} day${beforeDays.length > 1 || beforeDays[0] !== 1 ? 's' : ''} before due date`
+      : '';
+    const afterText = afterDays.length > 0 
+      ? `${afterDays.join(', ')} day${afterDays.length > 1 || afterDays[0] !== 1 ? 's' : ''} after if still unpaid`
+      : '';
+
+    if (beforeText && afterText) {
+      return `Reminders will be sent ${beforeText}, and ${afterText}.`;
+    } else if (beforeText) {
+      return `Reminders will be sent ${beforeText}.`;
+    } else if (afterText) {
+      return `Reminders will be sent ${afterText}.`;
+    }
+    return 'Configure your reminder schedule above.';
   };
 
   return (
@@ -308,35 +362,98 @@ export default function Settings() {
                     />
                   </div>
                   <Separator />
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Payment Reminders</p>
-                      <p className="text-sm text-muted-foreground">
-                        Send reminder emails to clients before due dates
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.emailReminders}
-                      onCheckedChange={(checked) => handleNotificationChange('emailReminders', checked)}
-                    />
-                  </div>
-                  {notifications.emailReminders && (
-                    <div className="ml-4 p-4 rounded-lg bg-muted/50 space-y-2">
-                      <Label htmlFor="reminderDays">Days before due date</Label>
-                      <Input
-                        id="reminderDays"
-                        type="number"
-                        min={1}
-                        max={14}
-                        value={notifications.reminderDaysBefore}
-                        onChange={(e) => handleNotificationChange('reminderDaysBefore', parseInt(e.target.value) || 3)}
-                        className="w-24"
+                  
+                  {/* Enhanced Payment Reminders Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Payment Reminders</p>
+                        <p className="text-sm text-muted-foreground">
+                          Send reminder emails to clients before due dates
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.emailReminders}
+                        onCheckedChange={(checked) => handleNotificationChange('emailReminders', checked)}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Clients will receive a reminder this many days before the invoice is due
-                      </p>
                     </div>
-                  )}
+                    
+                    {notifications.emailReminders && (
+                      <div className="ml-4 space-y-6 p-4 rounded-lg bg-muted/50 border border-border/50">
+                        {/* Before Due Date */}
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Before Due Date</Label>
+                          <div className="flex flex-wrap gap-3">
+                            {PRESET_REMINDER_DAYS.map(day => (
+                              <label key={day} className="flex items-center gap-2 cursor-pointer">
+                                <Checkbox
+                                  checked={notifications.reminderSchedule.includes(day)}
+                                  onCheckedChange={() => toggleReminderDay(day, 'reminderSchedule')}
+                                />
+                                <span className="text-sm">{day} day{day !== 1 ? 's' : ''} before</span>
+                              </label>
+                            ))}
+                          </div>
+                          {notifications.reminderSchedule.length === 0 && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Info className="h-4 w-4" />
+                              <span>Legacy setting: {notifications.reminderDaysBefore} days before due date</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        {/* After Due Date (Overdue) */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">After Due Date (Overdue)</Label>
+                            <Switch
+                              checked={notifications.overdueReminderEnabled}
+                              onCheckedChange={(checked) => handleNotificationChange('overdueReminderEnabled', checked)}
+                            />
+                          </div>
+                          {notifications.overdueReminderEnabled && (
+                            <div className="flex flex-wrap gap-3">
+                              {PRESET_OVERDUE_DAYS.map(day => (
+                                <label key={day} className="flex items-center gap-2 cursor-pointer">
+                                  <Checkbox
+                                    checked={notifications.overdueReminderSchedule.includes(day)}
+                                    onCheckedChange={() => toggleReminderDay(day, 'overdueReminderSchedule')}
+                                  />
+                                  <span className="text-sm">{day} day{day !== 1 ? 's' : ''} after</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Custom Message */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Custom Message (optional)</Label>
+                          <Textarea
+                            placeholder="Add a personal note to include in all reminder emails..."
+                            value={notifications.reminderEmailTemplate}
+                            onChange={(e) => handleNotificationChange('reminderEmailTemplate', e.target.value)}
+                            className="min-h-[80px]"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This message will be included in reminder emails sent to clients
+                          </p>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="p-3 rounded-md bg-background border border-border">
+                          <p className="text-sm text-muted-foreground">
+                            <strong>Preview:</strong> {formatReminderPreview()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>

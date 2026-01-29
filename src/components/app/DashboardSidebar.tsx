@@ -11,7 +11,8 @@ import {
   LogOut,
   Shield,
   FileX,
-  Bell
+  Bell,
+  PieChart
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ const mainNavItems = [
   { title: 'Credit Notes', url: '/credit-notes', icon: FileX },
   { title: 'Clients', url: '/clients', icon: Users },
   { title: 'Reports', url: '/reports', icon: BarChart3 },
+  { title: 'Analytics', url: '/analytics', icon: PieChart },
   { title: 'Notifications', url: '/notifications', icon: Bell, showBadge: true },
   { title: 'Audit Logs', url: '/audit-logs', icon: History },
 ];
