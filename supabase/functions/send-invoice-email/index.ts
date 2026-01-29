@@ -329,43 +329,11 @@ Deno.serve(async (req) => {
     // Generate printable HTML for PDF
     const printableHtml = generatePrintableHtml(invoice, items, issuerSnapshot, recipientSnapshot, verificationUrl)
     
-    // Convert HTML to PDF using html2pdf.app API (free tier)
-    console.log('Generating PDF via html2pdf.app...')
-    let pdfBase64: string | null = null
-    try {
-      const pdfResponse = await fetch('https://api.html2pdf.app/v1/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          html: printableHtml,
-          apiKey: 'free', // Using free tier
-          format: 'A4',
-          marginTop: 10,
-          marginBottom: 10,
-          marginLeft: 10,
-          marginRight: 10,
-        }),
-      })
-
-      if (pdfResponse.ok) {
-        const pdfArrayBuffer = await pdfResponse.arrayBuffer()
-        const pdfBytes = new Uint8Array(pdfArrayBuffer)
-        // Convert to base64
-        let binary = ''
-        for (let i = 0; i < pdfBytes.length; i++) {
-          binary += String.fromCharCode(pdfBytes[i])
-        }
-        pdfBase64 = btoa(binary)
-        console.log('PDF generated successfully, size:', pdfBase64.length)
-      } else {
-        console.error('PDF generation failed:', await pdfResponse.text())
-      }
-    } catch (pdfError) {
-      console.error('PDF generation error:', pdfError)
-      // Continue without attachment if PDF fails
-    }
+    // Attach the HTML as an HTML file (can be opened and printed as PDF by recipient)
+    // This avoids the need for external PDF generation APIs
+    console.log('Preparing invoice HTML attachment...')
+    const htmlBase64 = btoa(unescape(encodeURIComponent(printableHtml)))
+    console.log('HTML attachment prepared, size:', htmlBase64.length)
 
     // Build enhanced email HTML with branded header and clean footer
     const emailHtml = `
@@ -483,18 +451,16 @@ Deno.serve(async (req) => {
               </table>
               ` : ''}
 
-              <!-- PDF Attachment Notice -->
-              ${pdfBase64 ? `
+              <!-- Invoice Attachment Notice -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border-radius: 8px; padding: 16px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
                 <tr>
                   <td>
                     <p style="margin: 0; color: #166534; font-size: 14px;">
-                      📎 <strong>PDF Attached:</strong> Please find the invoice PDF attached to this email for your records.
+                      📎 <strong>Invoice Attached:</strong> Open the attached HTML file and use your browser's Print → Save as PDF option for a professional invoice copy.
                     </p>
                   </td>
                 </tr>
               </table>
-              ` : ''}
 
               <p style="margin: 24px 0 0; color: #374151; font-size: 16px;">
                 If you have any questions, please don't hesitate to contact us.
@@ -557,15 +523,13 @@ Deno.serve(async (req) => {
         htmlContent: emailHtml,
       }
 
-      // Add PDF attachment if generated
-      if (pdfBase64) {
-        brevoPayload.attachment = [
-          {
-            content: pdfBase64,
-            name: `Invoice-${invoice.invoice_number}.pdf`,
-          },
-        ]
-      }
+      // Add HTML invoice attachment
+      brevoPayload.attachment = [
+        {
+          content: htmlBase64,
+          name: `Invoice-${invoice.invoice_number}.html`,
+        },
+      ]
 
       const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -626,7 +590,7 @@ Deno.serve(async (req) => {
           recipient_email: body.recipient_email,
           sent_at: new Date().toISOString(),
           verification_url: verificationUrl,
-          pdf_attached: !!pdfBase64
+          attachment_included: true
         }
       })
 
@@ -646,9 +610,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Invoice sent successfully${pdfBase64 ? ' with PDF attachment' : ''}`,
+        message: 'Invoice sent successfully with attachment',
         recipient: body.recipient_email,
-        pdf_attached: !!pdfBase64
+        attachment_included: true
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

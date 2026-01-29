@@ -46,22 +46,43 @@ export function useAdminUsers(search?: string) {
   const query = useQuery({
     queryKey: ['admin-users', search],
     queryFn: async () => {
-      let q = supabase
+      // Fetch profiles
+      let profilesQuery = supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (search) {
-        q = q.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+        profilesQuery = profilesQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
       }
 
-      const { data, error } = await q;
-      if (error) throw error;
-      return data;
+      const { data: profiles, error: profilesError } = await profilesQuery;
+      if (profilesError) throw profilesError;
+      
+      if (!profiles || profiles.length === 0) return [];
+
+      // Fetch roles for all users
+      const userIds = profiles.map(p => p.id);
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      if (rolesError) throw rolesError;
+
+      // Merge roles with profiles
+      const rolesMap = new Map<string, string[]>();
+      roles?.forEach(r => {
+        const existing = rolesMap.get(r.user_id) || [];
+        existing.push(r.role);
+        rolesMap.set(r.user_id, existing);
+      });
+
+      return profiles.map(profile => ({
+        ...profile,
+        user_roles: rolesMap.get(profile.id)?.map(role => ({ role })) || []
+      }));
     },
     refetchOnWindowFocus: true,
     refetchInterval: 60000, // 1 minute
