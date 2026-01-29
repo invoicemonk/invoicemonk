@@ -28,6 +28,7 @@ import Clients from "./pages/app/Clients";
 import ClientDetail from "./pages/app/ClientDetail";
 import ClientEdit from "./pages/app/ClientEdit";
 import Reports from "./pages/app/Reports";
+import Analytics from "./pages/app/Analytics";
 import AuditLogs from "./pages/app/AuditLogs";
 import BusinessProfile from "./pages/app/BusinessProfile";
 import Billing from "./pages/app/Billing";
@@ -115,6 +116,7 @@ const App = () => (
               <Route path="/clients/:id" element={<ClientDetail />} />
               <Route path="/clients/:id/edit" element={<ClientEdit />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
               <Route path="/business-profile" element={<BusinessProfile />} />
               <Route path="/billing" element={<Billing />} />

@@ -11,6 +11,10 @@ export interface UserPreferences {
   email_overdue_alerts: boolean;
   browser_notifications: boolean;
   reminder_days_before: number;
+  reminder_schedule: number[];
+  overdue_reminder_enabled: boolean;
+  overdue_reminder_schedule: number[];
+  reminder_email_template: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,6 +27,10 @@ const DEFAULT_PREFERENCES: Omit<UserPreferences, 'user_id' | 'created_at' | 'upd
   email_overdue_alerts: true,
   browser_notifications: false,
   reminder_days_before: 3,
+  reminder_schedule: [],
+  overdue_reminder_enabled: false,
+  overdue_reminder_schedule: [],
+  reminder_email_template: null,
 };
 
 // Fetch user preferences

@@ -890,7 +890,11 @@ export type Database = {
           email_overdue_alerts: boolean
           email_payment_received: boolean
           email_payment_reminders: boolean
+          overdue_reminder_enabled: boolean | null
+          overdue_reminder_schedule: Json | null
           reminder_days_before: number
+          reminder_email_template: string | null
+          reminder_schedule: Json | null
           updated_at: string
           user_id: string
         }
@@ -901,7 +905,11 @@ export type Database = {
           email_overdue_alerts?: boolean
           email_payment_received?: boolean
           email_payment_reminders?: boolean
+          overdue_reminder_enabled?: boolean | null
+          overdue_reminder_schedule?: Json | null
           reminder_days_before?: number
+          reminder_email_template?: string | null
+          reminder_schedule?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -912,7 +920,11 @@ export type Database = {
           email_overdue_alerts?: boolean
           email_payment_received?: boolean
           email_payment_reminders?: boolean
+          overdue_reminder_enabled?: boolean | null
+          overdue_reminder_schedule?: Json | null
           reminder_days_before?: number
+          reminder_email_template?: string | null
+          reminder_schedule?: Json | null
           updated_at?: string
           user_id?: string
         }
