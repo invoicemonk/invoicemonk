@@ -129,15 +129,19 @@ export function useUserBusiness() {
       // First check if user is a member of any business
       const { data: membership, error: memberError } = await supabase
         .from('business_members')
-        .select('business_id, role, businesses(*)')
+        .select(`
+          business_id,
+          role,
+          business:businesses(*)
+        `)
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
 
       if (memberError) throw memberError;
 
-      if (membership?.businesses) {
-        return membership.businesses as Business;
+      if (membership?.business) {
+        return membership.business as Business;
       }
 
       // If no membership, check if user owns a business directly
