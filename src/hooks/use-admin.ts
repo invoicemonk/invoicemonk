@@ -63,6 +63,8 @@ export function useAdminUsers(search?: string) {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // 1 minute
   });
 
   // Log admin data access
@@ -94,6 +96,8 @@ export function useAdminBusinesses(search?: string) {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // 1 minute
   });
 
   useAdminViewLogger('businesses', query.data, search);
@@ -123,6 +127,8 @@ export function useAdminInvoices(search?: string) {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // 30 seconds
   });
 
   useAdminViewLogger('invoices', query.data, search);
@@ -148,6 +154,8 @@ export function useAdminAuditLogs(search?: string, eventType?: AuditEventType | 
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // 30 seconds
   });
 }
 
@@ -165,6 +173,8 @@ export function useAdminExportManifests() {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 120000, // 2 minutes
   });
 }
 
@@ -217,6 +227,8 @@ export function useAdminStats() {
         recentEventCounts: eventCounts,
       };
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // 1 minute
   });
 }
 

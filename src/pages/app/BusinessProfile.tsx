@@ -12,7 +12,9 @@ import {
   Loader2,
   Upload,
   X,
-  ImageIcon
+  ImageIcon,
+  Lock,
+  Coins
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,7 +73,15 @@ export default function BusinessProfile() {
     postalCode: '',
     country: '',
     invoicePrefix: 'INV',
+    defaultCurrency: 'NGN',
   });
+
+  const currencies = [
+    { value: 'NGN', label: 'Nigerian Naira (₦)' },
+    { value: 'USD', label: 'US Dollar ($)' },
+    { value: 'GBP', label: 'British Pound (£)' },
+    { value: 'EUR', label: 'Euro (€)' },
+  ];
 
   // Load business data into form when it arrives
   useEffect(() => {
@@ -91,6 +101,7 @@ export default function BusinessProfile() {
         postalCode: addressData?.postal_code || '',
         country: addressData?.country || '',
         invoicePrefix: business.invoice_prefix || 'INV',
+        defaultCurrency: business.default_currency || 'NGN',
       });
     }
   }, [business]);
@@ -113,6 +124,7 @@ export default function BusinessProfile() {
       contact_phone: formData.phone || null,
       address: Object.values(addressData).some(Boolean) ? addressData : null,
       invoice_prefix: formData.invoicePrefix || 'INV',
+      default_currency: formData.defaultCurrency || 'NGN',
     };
 
     if (business) {
@@ -498,7 +510,7 @@ export default function BusinessProfile() {
               Customize how your invoices are generated
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="invoicePrefix">Invoice Prefix</Label>
@@ -522,6 +534,60 @@ export default function BusinessProfile() {
                 <p className="text-xs text-muted-foreground">
                   Invoice numbers are sequential and cannot be modified
                 </p>
+              </div>
+            </div>
+
+            {/* Default Currency Section */}
+            <div className="border-t pt-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="defaultCurrency" className="flex items-center gap-2">
+                    <Coins className="h-4 w-4" />
+                    Default Currency
+                    {business?.currency_locked && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Locked
+                      </Badge>
+                    )}
+                  </Label>
+                  
+                  {business?.currency_locked ? (
+                    <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border">
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">
+                        {currencies.find(c => c.value === formData.defaultCurrency)?.label || formData.defaultCurrency}
+                      </span>
+                    </div>
+                  ) : (
+                    <Select 
+                      value={formData.defaultCurrency}
+                      onValueChange={(value) => setFormData({ ...formData, defaultCurrency: value })}
+                    >
+                      <SelectTrigger id="defaultCurrency">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground">
+                    {business?.currency_locked ? (
+                      <>
+                        Currency was locked on {business.currency_locked_at ? new Date(business.currency_locked_at).toLocaleDateString() : 'first invoice'}. 
+                        Once you issue your first invoice, currency cannot be changed.
+                      </>
+                    ) : (
+                      'Select your default currency for invoices. This will be locked after you issue your first invoice.'
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
