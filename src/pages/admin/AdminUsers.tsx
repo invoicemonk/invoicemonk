@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -32,10 +33,18 @@ import {
 import { useAdminUsers } from '@/hooks/use-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
+import { ChangeRoleDialog } from '@/components/admin/ChangeRoleDialog';
 
 export default function AdminUsers() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: users, isLoading } = useAdminUsers(searchQuery || undefined);
+
+  // Dialog/Sheet state
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
 
   const getInitials = (name: string | null, email: string) => {
     if (name) {
@@ -52,6 +61,21 @@ export default function AdminUsers() {
     const variant = role === 'platform_admin' ? 'destructive' : 
                     role === 'business_admin' ? 'default' : 'outline';
     return <Badge variant={variant}>{role}</Badge>;
+  };
+
+  // Handlers
+  const handleViewDetails = (user: any) => {
+    setSelectedUser(user);
+    setDetailsOpen(true);
+  };
+
+  const handleViewAuditTrail = (user: any) => {
+    navigate(`/admin/audit-logs?user_id=${user.id}`);
+  };
+
+  const handleChangeRole = (user: any) => {
+    setSelectedUser(user);
+    setRoleDialogOpen(true);
   };
 
   return (
@@ -184,15 +208,15 @@ export default function AdminUsers() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(user)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewAuditTrail(user)}>
                             <Shield className="mr-2 h-4 w-4" />
                             View Audit Trail
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleChangeRole(user)}>
                             <UserCog className="mr-2 h-4 w-4" />
                             Change Role
                           </DropdownMenuItem>
@@ -206,6 +230,18 @@ export default function AdminUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialogs & Sheets */}
+      <UserDetailSheet 
+        user={selectedUser} 
+        open={detailsOpen} 
+        onOpenChange={setDetailsOpen} 
+      />
+      <ChangeRoleDialog 
+        user={selectedUser} 
+        open={roleDialogOpen} 
+        onOpenChange={setRoleDialogOpen} 
+      />
     </div>
   );
 }

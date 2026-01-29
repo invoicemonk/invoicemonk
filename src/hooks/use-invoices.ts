@@ -78,22 +78,38 @@ export function useCreateInvoice() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Generate invoice number (get next number from business or user)
-      const { data: existingInvoices, error: countError } = await supabase
+      // Generate invoice number scoped to either business_id or user_id
+      const isBusinessInvoice = !!invoice.business_id;
+      
+      // Query for highest existing invoice number within the correct scope
+      let query = supabase
         .from('invoices')
         .select('invoice_number')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(100); // Get more to find highest number reliably
+      
+      if (isBusinessInvoice) {
+        query = query.eq('business_id', invoice.business_id);
+      } else {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data: existingInvoices, error: countError } = await query;
 
       if (countError) throw countError;
 
+      // Find the highest invoice number
       let nextNumber = 1;
       if (existingInvoices && existingInvoices.length > 0) {
-        const lastNumber = existingInvoices[0].invoice_number;
-        const match = lastNumber.match(/\d+$/);
-        if (match) {
-          nextNumber = parseInt(match[0], 10) + 1;
+        const numbers = existingInvoices
+          .map(inv => {
+            const match = inv.invoice_number.match(/\d+$/);
+            return match ? parseInt(match[0], 10) : 0;
+          })
+          .filter(n => !isNaN(n));
+        
+        if (numbers.length > 0) {
+          nextNumber = Math.max(...numbers) + 1;
         }
       }
 
@@ -101,7 +117,6 @@ export function useCreateInvoice() {
 
       // Create the invoice
       // Note: invoice_owner_check constraint requires either user_id OR business_id, not both
-      const isBusinessInvoice = !!invoice.business_id;
       const { data: createdInvoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({

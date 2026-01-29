@@ -31,10 +31,19 @@ import {
 import { useAdminBusinesses } from '@/hooks/use-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { BusinessDetailSheet } from '@/components/admin/BusinessDetailSheet';
+import { MembersDialog } from '@/components/admin/MembersDialog';
+import { SubscriptionDialog } from '@/components/admin/SubscriptionDialog';
 
 export default function AdminBusinesses() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: businesses, isLoading } = useAdminBusinesses(searchQuery || undefined);
+
+  // Dialog/Sheet state
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
 
   const getSubscriptionBadge = (subscriptions: any[]) => {
     if (!subscriptions || subscriptions.length === 0) {
@@ -51,6 +60,22 @@ export default function AdminBusinesses() {
         )}
       </div>
     );
+  };
+
+  // Handlers
+  const handleViewDetails = (business: any) => {
+    setSelectedBusiness(business);
+    setDetailsOpen(true);
+  };
+
+  const handleViewMembers = (business: any) => {
+    setSelectedBusiness(business);
+    setMembersOpen(true);
+  };
+
+  const handleManageSubscription = (business: any) => {
+    setSelectedBusiness(business);
+    setSubscriptionOpen(true);
   };
 
   return (
@@ -168,15 +193,15 @@ export default function AdminBusinesses() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(business)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewMembers(business)}>
                             <Users className="mr-2 h-4 w-4" />
                             View Members
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleManageSubscription(business)}>
                             <CreditCard className="mr-2 h-4 w-4" />
                             Manage Subscription
                           </DropdownMenuItem>
@@ -190,6 +215,23 @@ export default function AdminBusinesses() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialogs & Sheets */}
+      <BusinessDetailSheet 
+        business={selectedBusiness} 
+        open={detailsOpen} 
+        onOpenChange={setDetailsOpen} 
+      />
+      <MembersDialog 
+        business={selectedBusiness} 
+        open={membersOpen} 
+        onOpenChange={setMembersOpen} 
+      />
+      <SubscriptionDialog 
+        business={selectedBusiness} 
+        open={subscriptionOpen} 
+        onOpenChange={setSubscriptionOpen} 
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// @deno-types="https://esm.sh/jspdf@2.5.1"
+import { jsPDF } from 'https://esm.sh/jspdf@2.5.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -326,14 +328,249 @@ Deno.serve(async (req) => {
       ? `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(verificationUrl)}&format=png`
       : null
 
-    // Generate printable HTML for PDF
+    // Generate printable HTML for PDF (kept for fallback)
     const printableHtml = generatePrintableHtml(invoice, items, issuerSnapshot, recipientSnapshot, verificationUrl)
     
-    // Attach the HTML as an HTML file (can be opened and printed as PDF by recipient)
-    // This avoids the need for external PDF generation APIs
-    console.log('Preparing invoice HTML attachment...')
-    const htmlBase64 = btoa(unescape(encodeURIComponent(printableHtml)))
-    console.log('HTML attachment prepared, size:', htmlBase64.length)
+    // Generate PDF using jsPDF (completely free, no API key needed)
+    let attachmentName = `Invoice-${invoice.invoice_number}.pdf`
+    let attachmentContent = ''
+
+    console.log('Generating PDF using jsPDF...')
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 15
+      const contentWidth = pageWidth - (margin * 2)
+      let y = margin
+      
+      // Header - Business name
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(businessName, margin, y)
+      
+      // Invoice title on right
+      doc.setFontSize(24)
+      doc.text('INVOICE', pageWidth - margin, y, { align: 'right' })
+      
+      y += 8
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      if (issuerAddress) {
+        doc.text(issuerAddress, margin, y)
+        y += 4
+      }
+      if (issuerEmail) {
+        doc.text(issuerEmail, margin, y)
+        y += 4
+      }
+      if (issuerPhone) {
+        doc.text(issuerPhone, margin, y)
+        y += 4
+      }
+      
+      // Invoice number and status on right side
+      doc.setFontSize(11)
+      doc.text(`#${invoice.invoice_number}`, pageWidth - margin, y - 12, { align: 'right' })
+      doc.setFontSize(9)
+      doc.text((invoice.status as string).toUpperCase(), pageWidth - margin, y - 8, { align: 'right' })
+      
+      y += 10
+      
+      // Divider line
+      doc.setDrawColor(26, 26, 26)
+      doc.setLineWidth(0.5)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 10
+      
+      // Bill To section
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(100)
+      doc.text('BILL TO', margin, y)
+      
+      doc.text('INVOICE DETAILS', pageWidth / 2, y)
+      y += 5
+      
+      doc.setTextColor(0)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text(clientName, margin, y)
+      
+      // Invoice details on right
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      const clientEmail = recipientSnapshot?.email || invoice.clients?.email || ''
+      const clientAddress = formatAddressCompact(recipientSnapshot?.address)
+      
+      y += 5
+      if (clientAddress) {
+        doc.text(clientAddress, margin, y)
+        y += 4
+      }
+      if (clientEmail) {
+        doc.text(clientEmail, margin, y)
+      }
+      
+      // Details box on right side
+      const detailsX = pageWidth / 2
+      let detailsY = y - 10
+      doc.text(`Invoice Date: ${formatDate(invoice.issue_date as string)}`, detailsX, detailsY)
+      detailsY += 5
+      doc.text(`Due Date: ${formatDate(invoice.due_date as string)}`, detailsX, detailsY)
+      detailsY += 5
+      doc.text(`Currency: ${invoice.currency}`, detailsX, detailsY)
+      detailsY += 7
+      doc.setFont('helvetica', 'bold')
+      const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
+      doc.text(`Amount Due: ${formatCurrency(balanceDue, invoice.currency as string)}`, detailsX, detailsY)
+      
+      y += 15
+      
+      // Items table header
+      doc.setFillColor(248, 249, 250)
+      doc.rect(margin, y, contentWidth, 8, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(100)
+      
+      const colWidths = { desc: contentWidth * 0.5, qty: contentWidth * 0.12, rate: contentWidth * 0.18, amount: contentWidth * 0.2 }
+      const colX = { 
+        desc: margin + 2, 
+        qty: margin + colWidths.desc, 
+        rate: margin + colWidths.desc + colWidths.qty,
+        amount: margin + colWidths.desc + colWidths.qty + colWidths.rate
+      }
+      
+      y += 5
+      doc.text('DESCRIPTION', colX.desc, y)
+      doc.text('QTY', colX.qty, y, { align: 'center' })
+      doc.text('RATE', colX.rate, y, { align: 'right' })
+      doc.text('AMOUNT', pageWidth - margin - 2, y, { align: 'right' })
+      
+      y += 6
+      doc.setTextColor(0)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      
+      // Items rows
+      for (const item of items) {
+        if (y > 260) {
+          doc.addPage()
+          y = margin
+        }
+        
+        doc.text(item.description.substring(0, 40), colX.desc, y)
+        doc.text(String(item.quantity), colX.qty + colWidths.qty / 2, y, { align: 'center' })
+        doc.text(formatCurrency(item.unit_price, invoice.currency as string), colX.rate + colWidths.rate - 2, y, { align: 'right' })
+        doc.text(formatCurrency(item.amount, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
+        
+        y += 6
+      }
+      
+      // Divider
+      doc.setDrawColor(200)
+      doc.setLineWidth(0.2)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 8
+      
+      // Totals section (right-aligned)
+      const totalsX = pageWidth - margin - 60
+      
+      doc.setFont('helvetica', 'normal')
+      doc.text('Subtotal:', totalsX, y)
+      doc.text(formatCurrency(invoice.subtotal as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
+      y += 5
+      
+      if ((invoice.tax_amount as number) > 0) {
+        doc.text('Tax:', totalsX, y)
+        doc.text(formatCurrency(invoice.tax_amount as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
+        y += 5
+      }
+      
+      if ((invoice.discount_amount as number) > 0) {
+        doc.text('Discount:', totalsX, y)
+        doc.text(`-${formatCurrency(invoice.discount_amount as number, invoice.currency as string)}`, pageWidth - margin - 2, y, { align: 'right' })
+        y += 5
+      }
+      
+      // Total with bold
+      y += 2
+      doc.setDrawColor(26)
+      doc.setLineWidth(0.5)
+      doc.line(totalsX - 5, y, pageWidth - margin, y)
+      y += 6
+      
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text('Total:', totalsX, y)
+      doc.text(formatCurrency(invoice.total_amount as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
+      
+      // Balance due if partially paid
+      if ((invoice.amount_paid as number) > 0) {
+        y += 6
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.setTextColor(5, 150, 105)
+        doc.text('Paid:', totalsX, y)
+        doc.text(`-${formatCurrency(invoice.amount_paid as number, invoice.currency as string)}`, pageWidth - margin - 2, y, { align: 'right' })
+        
+        y += 6
+        doc.setTextColor(0)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Balance Due:', totalsX, y)
+        doc.text(formatCurrency(balanceDue, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
+      }
+      
+      y += 15
+      
+      // Notes section
+      if (invoice.notes || invoice.terms) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(100)
+        
+        if (invoice.notes) {
+          doc.text('NOTES:', margin, y)
+          y += 4
+          doc.setTextColor(60)
+          const noteLines = doc.splitTextToSize(invoice.notes as string, contentWidth)
+          doc.text(noteLines, margin, y)
+          y += noteLines.length * 4 + 4
+        }
+        
+        if (invoice.terms) {
+          doc.setTextColor(100)
+          doc.text('TERMS:', margin, y)
+          y += 4
+          doc.setTextColor(60)
+          const termLines = doc.splitTextToSize(invoice.terms as string, contentWidth)
+          doc.text(termLines, margin, y)
+        }
+      }
+      
+      // Footer
+      const footerY = doc.internal.pageSize.getHeight() - 10
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text(`${businessName}${issuerEmail ? ` • ${issuerEmail}` : ''}`, margin, footerY)
+      if (invoice.verification_id) {
+        doc.text(`Verification: ${(invoice.verification_id as string).substring(0, 8)}...`, pageWidth - margin, footerY, { align: 'right' })
+      }
+      
+      // Convert to base64
+      const pdfOutput = doc.output('arraybuffer')
+      const uint8Array = new Uint8Array(pdfOutput)
+      attachmentContent = btoa(String.fromCharCode(...uint8Array))
+      
+      console.log('PDF generated successfully with jsPDF, size:', attachmentContent.length)
+    } catch (pdfError) {
+      console.error('jsPDF generation failed, falling back to HTML:', pdfError)
+      // Fall back to HTML attachment
+      attachmentName = `Invoice-${invoice.invoice_number}.html`
+      attachmentContent = btoa(unescape(encodeURIComponent(printableHtml)))
+      console.log('HTML attachment prepared as fallback, size:', attachmentContent.length)
+    }
 
     // Build enhanced email HTML with branded header and clean footer
     const emailHtml = `
@@ -523,11 +760,11 @@ Deno.serve(async (req) => {
         htmlContent: emailHtml,
       }
 
-      // Add HTML invoice attachment
+      // Add invoice attachment (PDF if generated, otherwise HTML fallback)
       brevoPayload.attachment = [
         {
-          content: htmlBase64,
-          name: `Invoice-${invoice.invoice_number}.html`,
+          content: attachmentContent,
+          name: attachmentName,
         },
       ]
 

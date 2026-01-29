@@ -6,7 +6,6 @@ import {
   Eye,
   Lock,
   Shield,
-  ExternalLink,
   AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,10 +23,15 @@ import {
 import { useAdminInvoices } from '@/hooks/use-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { InvoiceViewSheet } from '@/components/admin/InvoiceViewSheet';
 
 export default function AdminInvoices() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: invoices, isLoading } = useAdminInvoices(searchQuery || undefined);
+
+  // Sheet state
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [viewOpen, setViewOpen] = useState(false);
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', {
@@ -49,6 +53,12 @@ export default function AdminInvoices() {
     };
     const config = variants[status] || { variant: 'outline', label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  // Handler
+  const handleViewInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setViewOpen(true);
   };
 
   return (
@@ -174,7 +184,11 @@ export default function AdminInvoices() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleViewInvoice(invoice)}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -202,6 +216,13 @@ export default function AdminInvoices() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Sheet */}
+      <InvoiceViewSheet 
+        invoice={selectedInvoice} 
+        open={viewOpen} 
+        onOpenChange={setViewOpen} 
+      />
     </div>
   );
 }
