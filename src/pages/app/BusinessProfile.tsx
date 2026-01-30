@@ -14,7 +14,8 @@ import {
   X,
   ImageIcon,
   Lock,
-  Coins
+  Coins,
+  AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -303,11 +304,13 @@ export default function BusinessProfile() {
                   className="hidden"
                   id="logo-upload"
                 />
+                
                 <Button
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingLogo || !business}
                   className="w-full sm:w-auto"
+                  title={!business ? 'Save your business profile first to enable logo upload' : undefined}
                 >
                   {isUploadingLogo ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -316,10 +319,17 @@ export default function BusinessProfile() {
                   )}
                   {isUploadingLogo ? 'Uploading...' : business?.logo_url ? 'Replace Logo' : 'Upload Logo'}
                 </Button>
+
                 <p className="text-xs text-muted-foreground">
                   Your logo will appear on generated invoices and PDF exports.
-                  {!business && ' Save your business profile first to upload a logo.'}
                 </p>
+                
+                {!business && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 rounded-md">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>Fill in your business details and click "Save Changes" to enable logo upload.</span>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
