@@ -64,8 +64,9 @@ import AdminTemplates from "./pages/admin/AdminTemplates";
 // Public verification
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
 
-// Legal pages
+// Legal and Documentation pages
 import SLA from "./pages/legal/SLA";
+import { APIDocumentation } from "./pages/docs";
 
 const queryClient = new QueryClient();
 
@@ -158,8 +159,9 @@ const App = () => (
             {/* Public Verification Portal (Phase 7) - No auth required */}
             <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
             
-            {/* Legal pages - No auth required */}
+            {/* Legal and Documentation pages - No auth required */}
             <Route path="/legal/sla" element={<SLA />} />
+            <Route path="/docs/api" element={<APIDocumentation />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

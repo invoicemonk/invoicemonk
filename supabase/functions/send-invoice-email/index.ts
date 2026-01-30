@@ -1,6 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// @deno-types="https://esm.sh/jspdf@2.5.1"
-import { jsPDF } from 'https://esm.sh/jspdf@2.5.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,7 +53,15 @@ interface InvoiceItem {
   discount_percent: number
 }
 
-// Helper: Format currency
+interface TemplateSnapshot {
+  id?: string
+  name?: string
+  watermark_required?: boolean
+  supports_branding?: boolean
+  tier_required?: string
+}
+
+// Helper: Format currency with proper locale
 const formatCurrency = (amount: number, currency: string): string => {
   const localeMap: Record<string, string> = {
     'NGN': 'en-NG', 'USD': 'en-US', 'EUR': 'de-DE', 'GBP': 'en-GB',
@@ -70,7 +76,7 @@ const formatCurrency = (amount: number, currency: string): string => {
 const formatDate = (date: string | null): string => {
   if (!date) return 'Not specified'
   return new Date(date).toLocaleDateString('en-US', { 
-    year: 'numeric', month: 'long', day: 'numeric' 
+    year: 'numeric', month: 'short', day: 'numeric' 
   })
 }
 
@@ -86,131 +92,389 @@ const formatAddressCompact = (address: IssuerSnapshot['address'] | RecipientSnap
   return parts.join(', ')
 }
 
-// Helper: Generate print-ready HTML for PDF (will be converted via html2pdf service)
-const generatePrintableHtml = (
+// Professional HTML template matching generate-pdf output
+const generateProfessionalHtml = (
   invoice: Record<string, unknown>,
   items: InvoiceItem[],
   issuerSnapshot: IssuerSnapshot | null,
   recipientSnapshot: RecipientSnapshot | null,
-  verificationUrl: string | null
+  verificationUrl: string | null,
+  showWatermark: boolean,
+  canUseBranding: boolean
 ): string => {
-  const businessName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'
-  const clientName = recipientSnapshot?.name || 'Client'
-  const clientAddress = formatAddressCompact(recipientSnapshot?.address)
-  const clientEmail = recipientSnapshot?.email || ''
+  const currency = invoice.currency as string
+  const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
+  
+  // Issuer info
+  const issuerName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk User'
   const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
   const issuerEmail = issuerSnapshot?.contact_email || ''
   const issuerPhone = issuerSnapshot?.contact_phone || ''
-  const currency = invoice.currency as string
-  const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
-  const summary = invoice.summary as string | null
-
+  const issuerLogoUrl = canUseBranding && issuerSnapshot?.logo_url ? issuerSnapshot.logo_url : null
+  
+  // Recipient info
+  const recipientName = recipientSnapshot?.name || 'Client'
+  const recipientEmail = recipientSnapshot?.email || ''
+  const recipientAddress = formatAddressCompact(recipientSnapshot?.address)
+  
+  // Status colors
+  const statusColors: Record<string, { bg: string; color: string }> = {
+    'issued': { bg: '#dbeafe', color: '#1d4ed8' },
+    'sent': { bg: '#e0e7ff', color: '#4338ca' },
+    'viewed': { bg: '#fef3c7', color: '#d97706' },
+    'paid': { bg: '#d1fae5', color: '#059669' },
+    'voided': { bg: '#fee2e2', color: '#dc2626' },
+    'credited': { bg: '#fce7f3', color: '#db2777' }
+  }
+  const statusStyle = statusColors[invoice.status as string] || statusColors['issued']
+  
+  // Generate items HTML
   const itemsHtml = items.map(item => `
     <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.description}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.quantity}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(item.unit_price, currency)}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(item.amount, currency)}</td>
+      <td>${item.description}</td>
+      <td class="right">${item.quantity}</td>
+      <td class="right">${formatCurrency(item.unit_price, currency)}</td>
+      <td class="right">${formatCurrency(item.amount, currency)}</td>
     </tr>
   `).join('')
+  
+  // QR code
+  const qrCodeHtml = verificationUrl 
+    ? `<img src="https://api.qrserver.com/v1/create-qr-code/?size=50x50&data=${encodeURIComponent(verificationUrl)}&format=svg" alt="QR Code" style="width: 50px; height: 50px;" />`
+    : ''
+  
+  // Verification info
+  const verificationLine = invoice.verification_id 
+    ? `Verification: ${(invoice.verification_id as string).substring(0, 8)}...` 
+    : ''
+  const hashLine = invoice.invoice_hash 
+    ? `Hash: ${(invoice.invoice_hash as string).substring(0, 12)}...` 
+    : ''
+  
+  // Watermark
+  const watermarkHtml = showWatermark ? `<div class="watermark">INVOICEMONK</div>` : ''
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
+  <title>Invoice ${invoice.invoice_number}</title>
   <style>
+    @page { size: A4; margin: 12mm 15mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-break { page-break-inside: avoid; }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 20px; }
-    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
-    .brand { font-size: 18px; font-weight: bold; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      color: #1a1a1a; 
+      font-size: 11px; 
+      line-height: 1.35; 
+    }
+    .container { max-width: 100%; padding: 0; }
+    
+    /* Header - Compact two-column */
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: flex-start;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
     .invoice-meta { text-align: right; }
-    .invoice-title { font-size: 24px; font-weight: bold; }
-    .status { display: inline-block; background: #dbeafe; color: #1d4ed8; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
-    .parties { display: flex; gap: 30px; margin-bottom: 20px; }
+    .invoice-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a; }
+    .invoice-number { font-size: 12px; color: #666; margin-top: 2px; }
+    .status { 
+      display: inline-block; 
+      padding: 2px 8px; 
+      border-radius: 3px; 
+      font-size: 9px; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      margin-top: 4px;
+    }
+    
+    /* Two-column layout for parties */
+    .parties { 
+      display: flex; 
+      gap: 24px; 
+      margin-bottom: 16px;
+    }
     .party { flex: 1; }
-    .party-label { font-size: 10px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
-    .party-name { font-size: 14px; font-weight: bold; }
-    .summary-box { background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; }
-    .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
-    .summary-row.total { font-size: 14px; font-weight: bold; border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 5px; }
-    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-    th { background: #f8f9fa; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd; }
-    th.right { text-align: right; }
-    .totals { width: 250px; margin-left: auto; margin-top: 10px; }
-    .total-row { display: flex; justify-content: space-between; padding: 4px 0; }
-    .total-row.grand { font-size: 14px; font-weight: bold; border-top: 2px solid #1a1a1a; padding-top: 8px; margin-top: 5px; }
-    .balance-box { background: #fef3c7; padding: 6px 10px; border-radius: 4px; }
-    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #888; display: flex; justify-content: space-between; }
-    .notes { background: #fafafa; padding: 10px; border-radius: 4px; margin-top: 15px; }
-    .notes-label { font-size: 9px; color: #666; text-transform: uppercase; font-weight: bold; }
+    .party-label { 
+      font-size: 9px; 
+      font-weight: 600; 
+      color: #666; 
+      text-transform: uppercase; 
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .party-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .party-details { font-size: 10px; color: #444; line-height: 1.4; }
+    
+    /* Invoice summary box */
+    .summary-box {
+      background: #f8f9fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+    }
+    .summary-row { 
+      display: flex; 
+      justify-content: space-between; 
+      font-size: 10px; 
+      color: #444;
+      padding: 2px 0;
+    }
+    .summary-row.amount-due {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+      padding-top: 6px;
+      margin-top: 4px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    /* Table - Compact styling */
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-bottom: 12px;
+      font-size: 10px;
+    }
+    th { 
+      background: #f8f9fa; 
+      padding: 6px 8px; 
+      text-align: left; 
+      font-weight: 600; 
+      font-size: 9px; 
+      text-transform: uppercase; 
+      color: #666;
+      border-bottom: 1px solid #d1d5db;
+    }
+    td { 
+      padding: 6px 8px; 
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    th.right, td.right { text-align: right; }
+    tr:last-child td { border-bottom: 1px solid #d1d5db; }
+    
+    /* Totals - Right-aligned, compact */
+    .totals-wrapper { 
+      display: flex; 
+      justify-content: flex-end; 
+      margin-bottom: 16px;
+    }
+    .totals { width: 220px; }
+    .total-row { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 3px 0; 
+      font-size: 10px;
+      color: #444;
+    }
+    .total-row.grand { 
+      font-size: 13px; 
+      font-weight: 700; 
+      color: #1a1a1a;
+      border-top: 2px solid #1a1a1a; 
+      padding-top: 6px; 
+      margin-top: 4px; 
+    }
+    .total-row.paid { color: #059669; }
+    .total-row.balance { 
+      font-weight: 600; 
+      background: #fef3c7;
+      padding: 4px 6px;
+      margin: 4px -6px 0;
+      border-radius: 3px;
+    }
+    
+    /* Notes section - compact */
+    .notes-section { 
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-radius: 4px;
+    }
+    .notes-label { 
+      font-size: 9px; 
+      font-weight: 600; 
+      color: #666; 
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .notes-content { font-size: 10px; color: #444; }
+    
+    /* Footer - Single compact line */
+    .footer { 
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb; 
+      font-size: 8px; 
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-left { }
+    .footer-right { text-align: right; }
+    
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 60px;
+      color: rgba(0,0,0,0.04);
+      font-weight: 700;
+      z-index: -1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <div class="brand">${businessName}</div>
-      <div style="font-size: 10px; color: #666; margin-top: 4px;">${issuerAddress}</div>
-      <div style="font-size: 10px; color: #666;">${issuerEmail}${issuerPhone ? ' • ' + issuerPhone : ''}</div>
-    </div>
-    <div class="invoice-meta">
-      <div class="invoice-title">INVOICE</div>
-      <div style="color: #666; margin-top: 3px;">${invoice.invoice_number}</div>
-      <div class="status">${(invoice.status as string || 'ISSUED').toUpperCase()}</div>
-    </div>
-  </div>
-
-  <div class="parties">
-    <div class="party">
-      <div class="party-label">Bill To</div>
-      <div class="party-name">${clientName}</div>
-      ${clientAddress ? `<div style="font-size: 11px; color: #444; margin-top: 3px;">${clientAddress}</div>` : ''}
-      ${clientEmail ? `<div style="font-size: 11px; color: #444;">${clientEmail}</div>` : ''}
-    </div>
-    <div class="party">
-      <div class="summary-box">
-        <div class="summary-row"><span>Invoice Date</span><span>${formatDate(invoice.issue_date as string)}</span></div>
-        <div class="summary-row"><span>Due Date</span><span>${formatDate(invoice.due_date as string)}</span></div>
-        <div class="summary-row"><span>Currency</span><span>${currency}</span></div>
-        <div class="summary-row total"><span>Amount Due</span><span>${formatCurrency(balanceDue, currency)}</span></div>
+  ${watermarkHtml}
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
+        <div>
+          <div class="brand">${canUseBranding ? issuerName : 'INVOICEMONK'}</div>
+          ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
+          ${canUseBranding && issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+        </div>
+      </div>
+      <div class="invoice-meta">
+        <div class="invoice-title">INVOICE</div>
+        <div class="invoice-number">${invoice.invoice_number}</div>
+        <div class="status" style="background: ${statusStyle.bg}; color: ${statusStyle.color};">${(invoice.status as string).toUpperCase()}</div>
       </div>
     </div>
-  </div>
 
-  ${summary ? `<div style="background: #f9fafb; padding: 10px; border-left: 3px solid #e5e7eb; margin-bottom: 15px; font-style: italic; color: #666;">${summary}</div>` : ''}
-
-  <table>
-    <thead>
-      <tr>
-        <th>Description</th>
-        <th class="right">Qty</th>
-        <th class="right">Unit Price</th>
-        <th class="right">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemsHtml}
-    </tbody>
-  </table>
-
-  <div class="totals">
-    <div class="total-row"><span>Subtotal</span><span>${formatCurrency(invoice.subtotal as number, currency)}</span></div>
-    ${(invoice.tax_amount as number) > 0 ? `<div class="total-row"><span>Tax</span><span>${formatCurrency(invoice.tax_amount as number, currency)}</span></div>` : ''}
-    ${(invoice.discount_amount as number) > 0 ? `<div class="total-row"><span>Discount</span><span style="color: #059669;">-${formatCurrency(invoice.discount_amount as number, currency)}</span></div>` : ''}
-    <div class="total-row grand"><span>Total</span><span>${formatCurrency(invoice.total_amount as number, currency)}</span></div>
-    ${(invoice.amount_paid as number) > 0 ? `<div class="total-row" style="color: #059669;"><span>Paid</span><span>-${formatCurrency(invoice.amount_paid as number, currency)}</span></div>` : ''}
-    <div class="total-row balance-box"><span>Balance Due</span><span>${formatCurrency(balanceDue, currency)}</span></div>
-  </div>
-
-  ${invoice.notes ? `<div class="notes"><div class="notes-label">Notes</div><div style="font-size: 10px; color: #444; margin-top: 4px;">${invoice.notes}</div></div>` : ''}
-
-  <div class="footer">
-    <div>
-      <div>${businessName} • ${issuerAddress}</div>
-      <div style="margin-top: 3px;">© ${new Date().getFullYear()} Invoicemonk LTD. All Rights Reserved.</div>
+    <!-- Two-column: Bill To + Invoice Summary -->
+    <div class="parties">
+      <div class="party">
+        <div class="party-label">Bill To</div>
+        <div class="party-name">${recipientName}</div>
+        <div class="party-details">
+          ${recipientAddress ? `${recipientAddress}<br>` : ''}
+          ${recipientEmail ? `${recipientEmail}` : ''}
+        </div>
+      </div>
+      <div class="party">
+        <div class="summary-box">
+          <div class="summary-row">
+            <span>Invoice Date</span>
+            <span>${formatDate(invoice.issue_date as string)}</span>
+          </div>
+          <div class="summary-row">
+            <span>Due Date</span>
+            <span>${formatDate(invoice.due_date as string)}</span>
+          </div>
+          <div class="summary-row">
+            <span>Currency</span>
+            <span>${currency}</span>
+          </div>
+          <div class="summary-row amount-due">
+            <span>Amount Due</span>
+            <span>${formatCurrency(balanceDue, currency)}</span>
+          </div>
+        </div>
+      </div>
     </div>
-    <div style="text-align: right;">
-      ${invoice.verification_id ? `<div>Verification: ${(invoice.verification_id as string).substring(0, 8)}...</div>` : ''}
-      ${invoice.invoice_hash ? `<div>Hash: ${(invoice.invoice_hash as string).substring(0, 12)}...</div>` : ''}
+
+    <!-- Items Table -->
+    <table class="no-break">
+      <thead>
+        <tr>
+          <th style="width: 55%;">Description</th>
+          <th class="right" style="width: 10%;">Qty</th>
+          <th class="right" style="width: 17%;">Rate</th>
+          <th class="right" style="width: 18%;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="totals-wrapper no-break">
+      <div class="totals">
+        <div class="total-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(invoice.subtotal as number, currency)}</span>
+        </div>
+        ${(invoice.tax_amount as number) > 0 ? `
+        <div class="total-row">
+          <span>Tax</span>
+          <span>${formatCurrency(invoice.tax_amount as number, currency)}</span>
+        </div>
+        ` : ''}
+        ${(invoice.discount_amount as number) > 0 ? `
+        <div class="total-row">
+          <span>Discount</span>
+          <span>-${formatCurrency(invoice.discount_amount as number, currency)}</span>
+        </div>
+        ` : ''}
+        <div class="total-row grand">
+          <span>Total</span>
+          <span>${formatCurrency(invoice.total_amount as number, currency)}</span>
+        </div>
+        ${(invoice.amount_paid as number) > 0 ? `
+        <div class="total-row paid">
+          <span>Paid</span>
+          <span>-${formatCurrency(invoice.amount_paid as number, currency)}</span>
+        </div>
+        <div class="total-row balance">
+          <span>Balance Due</span>
+          <span>${formatCurrency(balanceDue, currency)}</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+
+    ${invoice.notes || invoice.terms ? `
+    <!-- Notes/Terms -->
+    <div class="notes-section no-break">
+      ${invoice.notes ? `
+      <div class="notes-label">Notes</div>
+      <div class="notes-content">${invoice.notes}</div>
+      ` : ''}
+      ${invoice.notes && invoice.terms ? '<div style="height: 8px;"></div>' : ''}
+      ${invoice.terms ? `
+      <div class="notes-label">Terms</div>
+      <div class="notes-content">${invoice.terms}</div>
+      ` : ''}
+    </div>
+    ` : ''}
+
+    <!-- Footer with QR Code -->
+    <div class="footer">
+      <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
+        ${verificationUrl && qrCodeHtml ? `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          ${qrCodeHtml}
+          <span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span>
+        </div>
+        ` : ''}
+      </div>
+      <div class="footer-right">
+        ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
+        <br>
+        ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}
+        ${showWatermark ? '<br>Upgrade to remove branding' : ''}
+      </div>
     </div>
   </div>
 </body>
@@ -302,20 +566,46 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Parse snapshots for email content
+    // Parse snapshots
     const issuerSnapshot = invoice.issuer_snapshot as IssuerSnapshot | null
     const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null
+    const templateSnapshot = invoice.template_snapshot as TemplateSnapshot | null
     const items = (invoice.invoice_items || []) as InvoiceItem[]
     
     const businessName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'
     const clientName = recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer'
     const invoiceSummary = invoice.summary as string | null
 
-    // Format issuer address for header
+    // Format issuer address for email
     const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
     const issuerLogoUrl = issuerSnapshot?.logo_url || null
+
+    // Get user's subscription tier for watermark/branding logic
+    const { data: tierResult, error: tierError } = await supabase.rpc('check_tier_limit', {
+      _user_id: userId,
+      _feature: 'remove_watermark'
+    })
+
+    if (tierError) {
+      console.error('Tier check error:', tierError)
+    }
+
+    const tierData = typeof tierResult === 'object' && tierResult !== null ? tierResult : { allowed: false, tier: 'starter' }
+    const canRemoveWatermark = tierData.allowed === true
+
+    // Check branding permission
+    const { data: brandingResult } = await supabase.rpc('check_tier_limit', {
+      _user_id: userId,
+      _feature: 'custom_branding'
+    })
+    const brandingData = typeof brandingResult === 'object' && brandingResult !== null ? brandingResult : { allowed: false }
+    const canUseBranding = brandingData.allowed === true && templateSnapshot?.supports_branding !== false
+
+    // Determine watermark
+    const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
+    const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
     // Verification URL
     const appUrl = Deno.env.get('APP_URL') || 'https://id-preview--af0fa778-97c6-4e74-8769-9640f7e7d956.lovable.app'
@@ -323,254 +613,74 @@ Deno.serve(async (req) => {
       ? `${appUrl}/verify/invoice/${invoice.verification_id}`
       : null
     
-    // Generate QR code for email
+    // QR code for email body
     const qrCodeUrl = verificationUrl 
       ? `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(verificationUrl)}&format=png`
       : null
 
-    // Generate printable HTML for PDF (kept for fallback)
-    const printableHtml = generatePrintableHtml(invoice, items, issuerSnapshot, recipientSnapshot, verificationUrl)
+    // Generate professional HTML (matching generate-pdf output)
+    console.log('Generating professional HTML invoice attachment...')
+    const professionalHtml = generateProfessionalHtml(
+      invoice,
+      items,
+      issuerSnapshot,
+      recipientSnapshot,
+      verificationUrl,
+      showWatermark,
+      canUseBranding
+    )
     
-    // Generate PDF using jsPDF (completely free, no API key needed)
-    let attachmentName = `Invoice-${invoice.invoice_number}.pdf`
-    let attachmentContent = ''
+    // Convert HTML to PDF using PDFShift API
+    const pdfshiftApiKey = Deno.env.get('PDFSHIFT_API_KEY')
+    let attachmentContent: string
+    let attachmentName: string
+    let attachmentType: 'pdf' | 'html' = 'html'
 
-    console.log('Generating PDF using jsPDF...')
-    try {
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const margin = 15
-      const contentWidth = pageWidth - (margin * 2)
-      let y = margin
-      
-      // Header - Business name
-      doc.setFontSize(20)
-      doc.setFont('helvetica', 'bold')
-      doc.text(businessName, margin, y)
-      
-      // Invoice title on right
-      doc.setFontSize(24)
-      doc.text('INVOICE', pageWidth - margin, y, { align: 'right' })
-      
-      y += 8
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      if (issuerAddress) {
-        doc.text(issuerAddress, margin, y)
-        y += 4
-      }
-      if (issuerEmail) {
-        doc.text(issuerEmail, margin, y)
-        y += 4
-      }
-      if (issuerPhone) {
-        doc.text(issuerPhone, margin, y)
-        y += 4
-      }
-      
-      // Invoice number and status on right side
-      doc.setFontSize(11)
-      doc.text(`#${invoice.invoice_number}`, pageWidth - margin, y - 12, { align: 'right' })
-      doc.setFontSize(9)
-      doc.text((invoice.status as string).toUpperCase(), pageWidth - margin, y - 8, { align: 'right' })
-      
-      y += 10
-      
-      // Divider line
-      doc.setDrawColor(26, 26, 26)
-      doc.setLineWidth(0.5)
-      doc.line(margin, y, pageWidth - margin, y)
-      y += 10
-      
-      // Bill To section
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(100)
-      doc.text('BILL TO', margin, y)
-      
-      doc.text('INVOICE DETAILS', pageWidth / 2, y)
-      y += 5
-      
-      doc.setTextColor(0)
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'bold')
-      doc.text(clientName, margin, y)
-      
-      // Invoice details on right
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      const clientEmail = recipientSnapshot?.email || invoice.clients?.email || ''
-      const clientAddress = formatAddressCompact(recipientSnapshot?.address)
-      
-      y += 5
-      if (clientAddress) {
-        doc.text(clientAddress, margin, y)
-        y += 4
-      }
-      if (clientEmail) {
-        doc.text(clientEmail, margin, y)
-      }
-      
-      // Details box on right side
-      const detailsX = pageWidth / 2
-      let detailsY = y - 10
-      doc.text(`Invoice Date: ${formatDate(invoice.issue_date as string)}`, detailsX, detailsY)
-      detailsY += 5
-      doc.text(`Due Date: ${formatDate(invoice.due_date as string)}`, detailsX, detailsY)
-      detailsY += 5
-      doc.text(`Currency: ${invoice.currency}`, detailsX, detailsY)
-      detailsY += 7
-      doc.setFont('helvetica', 'bold')
-      const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
-      doc.text(`Amount Due: ${formatCurrency(balanceDue, invoice.currency as string)}`, detailsX, detailsY)
-      
-      y += 15
-      
-      // Items table header
-      doc.setFillColor(248, 249, 250)
-      doc.rect(margin, y, contentWidth, 8, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.setTextColor(100)
-      
-      const colWidths = { desc: contentWidth * 0.5, qty: contentWidth * 0.12, rate: contentWidth * 0.18, amount: contentWidth * 0.2 }
-      const colX = { 
-        desc: margin + 2, 
-        qty: margin + colWidths.desc, 
-        rate: margin + colWidths.desc + colWidths.qty,
-        amount: margin + colWidths.desc + colWidths.qty + colWidths.rate
-      }
-      
-      y += 5
-      doc.text('DESCRIPTION', colX.desc, y)
-      doc.text('QTY', colX.qty, y, { align: 'center' })
-      doc.text('RATE', colX.rate, y, { align: 'right' })
-      doc.text('AMOUNT', pageWidth - margin - 2, y, { align: 'right' })
-      
-      y += 6
-      doc.setTextColor(0)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      
-      // Items rows
-      for (const item of items) {
-        if (y > 260) {
-          doc.addPage()
-          y = margin
+    if (pdfshiftApiKey) {
+      console.log('Converting HTML to PDF via PDFShift...')
+      try {
+        const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(`api:${pdfshiftApiKey}`)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: professionalHtml,
+            format: 'A4',
+            margin: '10mm',
+          }),
+        })
+
+        if (pdfResponse.ok) {
+          const pdfBuffer = await pdfResponse.arrayBuffer()
+          // Convert to base64
+          const pdfBytes = new Uint8Array(pdfBuffer)
+          let binary = ''
+          for (let i = 0; i < pdfBytes.byteLength; i++) {
+            binary += String.fromCharCode(pdfBytes[i])
+          }
+          attachmentContent = btoa(binary)
+          attachmentName = `Invoice-${invoice.invoice_number}.pdf`
+          attachmentType = 'pdf'
+          console.log('PDF generated successfully, size:', attachmentContent.length)
+        } else {
+          const errorText = await pdfResponse.text()
+          console.error('PDFShift error:', pdfResponse.status, errorText)
+          throw new Error('PDF generation failed')
         }
-        
-        doc.text(item.description.substring(0, 40), colX.desc, y)
-        doc.text(String(item.quantity), colX.qty + colWidths.qty / 2, y, { align: 'center' })
-        doc.text(formatCurrency(item.unit_price, invoice.currency as string), colX.rate + colWidths.rate - 2, y, { align: 'right' })
-        doc.text(formatCurrency(item.amount, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
-        
-        y += 6
+      } catch (pdfError) {
+        console.error('PDF generation error, falling back to HTML:', pdfError)
+        // Fallback to HTML
+        attachmentContent = btoa(unescape(encodeURIComponent(professionalHtml)))
+        attachmentName = `Invoice-${invoice.invoice_number}.html`
       }
-      
-      // Divider
-      doc.setDrawColor(200)
-      doc.setLineWidth(0.2)
-      doc.line(margin, y, pageWidth - margin, y)
-      y += 8
-      
-      // Totals section (right-aligned)
-      const totalsX = pageWidth - margin - 60
-      
-      doc.setFont('helvetica', 'normal')
-      doc.text('Subtotal:', totalsX, y)
-      doc.text(formatCurrency(invoice.subtotal as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
-      y += 5
-      
-      if ((invoice.tax_amount as number) > 0) {
-        doc.text('Tax:', totalsX, y)
-        doc.text(formatCurrency(invoice.tax_amount as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
-        y += 5
-      }
-      
-      if ((invoice.discount_amount as number) > 0) {
-        doc.text('Discount:', totalsX, y)
-        doc.text(`-${formatCurrency(invoice.discount_amount as number, invoice.currency as string)}`, pageWidth - margin - 2, y, { align: 'right' })
-        y += 5
-      }
-      
-      // Total with bold
-      y += 2
-      doc.setDrawColor(26)
-      doc.setLineWidth(0.5)
-      doc.line(totalsX - 5, y, pageWidth - margin, y)
-      y += 6
-      
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(12)
-      doc.text('Total:', totalsX, y)
-      doc.text(formatCurrency(invoice.total_amount as number, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
-      
-      // Balance due if partially paid
-      if ((invoice.amount_paid as number) > 0) {
-        y += 6
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(10)
-        doc.setTextColor(5, 150, 105)
-        doc.text('Paid:', totalsX, y)
-        doc.text(`-${formatCurrency(invoice.amount_paid as number, invoice.currency as string)}`, pageWidth - margin - 2, y, { align: 'right' })
-        
-        y += 6
-        doc.setTextColor(0)
-        doc.setFont('helvetica', 'bold')
-        doc.text('Balance Due:', totalsX, y)
-        doc.text(formatCurrency(balanceDue, invoice.currency as string), pageWidth - margin - 2, y, { align: 'right' })
-      }
-      
-      y += 15
-      
-      // Notes section
-      if (invoice.notes || invoice.terms) {
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.setTextColor(100)
-        
-        if (invoice.notes) {
-          doc.text('NOTES:', margin, y)
-          y += 4
-          doc.setTextColor(60)
-          const noteLines = doc.splitTextToSize(invoice.notes as string, contentWidth)
-          doc.text(noteLines, margin, y)
-          y += noteLines.length * 4 + 4
-        }
-        
-        if (invoice.terms) {
-          doc.setTextColor(100)
-          doc.text('TERMS:', margin, y)
-          y += 4
-          doc.setTextColor(60)
-          const termLines = doc.splitTextToSize(invoice.terms as string, contentWidth)
-          doc.text(termLines, margin, y)
-        }
-      }
-      
-      // Footer
-      const footerY = doc.internal.pageSize.getHeight() - 10
-      doc.setFontSize(8)
-      doc.setTextColor(150)
-      doc.text(`${businessName}${issuerEmail ? ` • ${issuerEmail}` : ''}`, margin, footerY)
-      if (invoice.verification_id) {
-        doc.text(`Verification: ${(invoice.verification_id as string).substring(0, 8)}...`, pageWidth - margin, footerY, { align: 'right' })
-      }
-      
-      // Convert to base64
-      const pdfOutput = doc.output('arraybuffer')
-      const uint8Array = new Uint8Array(pdfOutput)
-      attachmentContent = btoa(String.fromCharCode(...uint8Array))
-      
-      console.log('PDF generated successfully with jsPDF, size:', attachmentContent.length)
-    } catch (pdfError) {
-      console.error('jsPDF generation failed, falling back to HTML:', pdfError)
-      // Fall back to HTML attachment
+    } else {
+      console.log('PDFSHIFT_API_KEY not configured, using HTML attachment')
+      attachmentContent = btoa(unescape(encodeURIComponent(professionalHtml)))
       attachmentName = `Invoice-${invoice.invoice_number}.html`
-      attachmentContent = btoa(unescape(encodeURIComponent(printableHtml)))
-      console.log('HTML attachment prepared as fallback, size:', attachmentContent.length)
     }
+    console.log(`Attachment prepared: ${attachmentName}, type: ${attachmentType}`)
 
     // Build enhanced email HTML with branded header and clean footer
     const emailHtml = `
@@ -693,7 +803,7 @@ Deno.serve(async (req) => {
                 <tr>
                   <td>
                     <p style="margin: 0; color: #166534; font-size: 14px;">
-                      📎 <strong>Invoice Attached:</strong> Open the attached HTML file and use your browser's Print → Save as PDF option for a professional invoice copy.
+                      📎 <strong>Invoice Attached:</strong> Please find your professional invoice ${attachmentType === 'pdf' ? 'PDF' : 'document'} attached to this email.
                     </p>
                   </td>
                 </tr>
@@ -741,7 +851,7 @@ Deno.serve(async (req) => {
 </html>
 `
 
-    // Send email via Brevo API with PDF attachment
+    // Send email via Brevo API with HTML attachment
     console.log('Sending email via Brevo API to:', body.recipient_email)
 
     try {
@@ -758,15 +868,13 @@ Deno.serve(async (req) => {
         ],
         subject: `Invoice ${invoice.invoice_number} from ${businessName}`,
         htmlContent: emailHtml,
+        attachment: [
+          {
+            content: attachmentContent,
+            name: attachmentName,
+          },
+        ],
       }
-
-      // Add invoice attachment (PDF if generated, otherwise HTML fallback)
-      brevoPayload.attachment = [
-        {
-          content: attachmentContent,
-          name: attachmentName,
-        },
-      ]
 
       const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -827,7 +935,9 @@ Deno.serve(async (req) => {
           recipient_email: body.recipient_email,
           sent_at: new Date().toISOString(),
           verification_url: verificationUrl,
-          attachment_included: true
+          attachment_type: attachmentType,
+          watermark_shown: showWatermark,
+          branding_used: canUseBranding
         }
       })
 
@@ -847,9 +957,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Invoice sent successfully with attachment',
+        message: `Invoice sent successfully with ${attachmentType.toUpperCase()} attachment`,
         recipient: body.recipient_email,
-        attachment_included: true
+        attachment_type: attachmentType
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
