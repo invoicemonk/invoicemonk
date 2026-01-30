@@ -149,6 +149,7 @@ export default function InvoiceNew() {
         contact_email: currentBusiness.contact_email,
         contact_phone: currentBusiness.contact_phone,
         jurisdiction: currentBusiness.jurisdiction,
+        logo_url: currentBusiness.logo_url,
       } : null,
       recipient_snapshot: selectedClient ? {
         name: selectedClient.name,

@@ -22,6 +22,11 @@ interface VerificationResponse {
     issue_date: string | null
     issued_at: string | null
     issuer_name: string
+    issuer_identity?: {
+      contact_email?: string
+      contact_phone?: string
+      legal_name?: string
+    }
     payment_status: string
     total_amount: number
     currency: string
@@ -183,6 +188,11 @@ Deno.serve(async (req) => {
         issue_date: invoice.issue_date,
         issued_at: invoice.issued_at,
         issuer_name: issuerName,
+        issuer_identity: snapshot ? {
+          contact_email: snapshot.contact_email,
+          contact_phone: snapshot.contact_phone,
+          legal_name: snapshot.legal_name || snapshot.name
+        } : undefined,
         payment_status: paymentStatus,
         total_amount: invoice.total_amount,
         currency: invoice.currency,

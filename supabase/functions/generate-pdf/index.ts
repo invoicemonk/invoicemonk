@@ -6,7 +6,8 @@ const corsHeaders = {
 }
 
 interface GeneratePdfRequest {
-  invoice_id: string
+  invoice_id?: string
+  verification_id?: string // For public access via verification page
   app_url?: string // Optional: client-provided base URL for verification links
 }
 
@@ -55,75 +56,157 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate authorization
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Create Supabase client with user's auth context
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Verify user token
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token)
-    
-    if (claimsError || !claimsData?.user) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Check for verification_id in query params (public access)
+    const url = new URL(req.url)
+    const verificationIdParam = url.searchParams.get('verification_id')
+
+    let invoice: Record<string, unknown> | null = null
+    let userId: string | null = null
+    let isPublicAccess = false
+
+    if (verificationIdParam) {
+      // Public access via verification_id - use service role
+      isPublicAccess = true
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+      
+      const { data: invoiceData, error: invoiceError } = await supabaseAdmin
+        .from('invoices')
+        .select(`
+          *,
+          clients (*),
+          invoice_items (*)
+        `)
+        .eq('verification_id', verificationIdParam)
+        .single()
+
+      if (invoiceError || !invoiceData) {
+        console.error('Invoice fetch error:', invoiceError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invoice not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Only allow public access to issued invoices
+      if (invoiceData.status === 'draft') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'This invoice is not yet issued' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      invoice = invoiceData
+      userId = invoiceData.user_id
+    } else {
+      // Authenticated access via invoice_id
+      const authHeader = req.headers.get('Authorization')
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      })
+
+      // Verify user token
+      const token = authHeader.replace('Bearer ', '')
+      const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token)
+      
+      if (claimsError || !claimsData?.user) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid authentication token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      userId = claimsData.user.id
+
+      // Parse request body
+      const body: GeneratePdfRequest = await req.json()
+      
+      if (!body.invoice_id) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invoice ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Fetch invoice with all related data
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          clients (*),
+          invoice_items (*)
+        `)
+        .eq('id', body.invoice_id)
+        .single()
+
+      if (invoiceError || !invoiceData) {
+        console.error('Invoice fetch error:', invoiceError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invoice not found or access denied' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Check if invoice is issued (only issued invoices can be downloaded as PDF)
+      if (invoiceData.status === 'draft') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Cannot generate PDF for draft invoices. Please issue the invoice first.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      invoice = invoiceData
     }
 
-    const userId = claimsData.user.id
-
-    // Parse request body
-    const body: GeneratePdfRequest = await req.json()
-    
-    if (!body.invoice_id) {
+    // At this point invoice is guaranteed to not be null
+    if (!invoice) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invoice ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Fetch invoice with all related data
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        clients (*),
-        invoice_items (*)
-      `)
-      .eq('id', body.invoice_id)
-      .single()
-
-    if (invoiceError || !invoice) {
-      console.error('Invoice fetch error:', invoiceError)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invoice not found or access denied' }),
+        JSON.stringify({ success: false, error: 'Invoice not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Check if invoice is issued (only issued invoices can be downloaded as PDF)
-    if (invoice.status === 'draft') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Cannot generate PDF for draft invoices. Please issue the invoice first.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Cast invoice to proper typed object to avoid TS errors
+    const inv = invoice as {
+      id: string
+      invoice_number: string
+      status: string
+      currency: string
+      total_amount: number
+      amount_paid: number
+      subtotal: number
+      tax_amount: number
+      discount_amount: number
+      issue_date: string | null
+      due_date: string | null
+      notes: string | null
+      terms: string | null
+      verification_id: string | null
+      invoice_hash: string | null
+      business_id: string | null
+      user_id: string | null
+      issuer_snapshot: IssuerSnapshot | null
+      recipient_snapshot: RecipientSnapshot | null
+      template_snapshot: TemplateSnapshot | null
+      clients?: { name?: string; email?: string; address?: Record<string, unknown> } | null
+      invoice_items?: InvoiceItem[]
     }
 
+    // Create a service client for tier checks
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
     // Get user's subscription tier
-    const { data: tierResult, error: tierError } = await supabase.rpc('check_tier_limit', {
+    const { data: tierResult, error: tierError } = await supabaseAdmin.rpc('check_tier_limit', {
       _user_id: userId,
       _feature: 'remove_watermark'
     })
@@ -138,16 +221,16 @@ Deno.serve(async (req) => {
     const canRemoveWatermark = tierData.allowed === true
 
     // Parse snapshots (use snapshots for issued invoices, not live data)
-    const issuerSnapshot = invoice.issuer_snapshot as IssuerSnapshot | null
-    const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null
-    const templateSnapshot = invoice.template_snapshot as TemplateSnapshot | null
+    const issuerSnapshot = inv.issuer_snapshot
+    const recipientSnapshot = inv.recipient_snapshot
+    const templateSnapshot = inv.template_snapshot
 
     // Determine if watermark should be applied
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
     // Check branding permission
-    const { data: brandingResult } = await supabase.rpc('check_tier_limit', {
+    const { data: brandingResult } = await supabaseAdmin.rpc('check_tier_limit', {
       _user_id: userId,
       _feature: 'custom_branding'
     })
@@ -198,18 +281,18 @@ Deno.serve(async (req) => {
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
     
-    const recipientName = recipientSnapshot?.name || invoice.clients?.name || 'Client'
-    const recipientEmail = recipientSnapshot?.email || invoice.clients?.email || ''
-    const recipientAddress = formatAddressCompact(recipientSnapshot?.address || invoice.clients?.address as Record<string, unknown>)
+    const recipientName = recipientSnapshot?.name || inv.clients?.name || 'Client'
+    const recipientEmail = recipientSnapshot?.email || inv.clients?.email || ''
+    const recipientAddress = formatAddressCompact(recipientSnapshot?.address || inv.clients?.address)
 
     // Generate compact line items HTML
-    const items = (invoice.invoice_items || []) as InvoiceItem[]
+    const items = (inv.invoice_items || []) as InvoiceItem[]
     const itemsHtml = items.map(item => `
       <tr>
         <td>${item.description}</td>
         <td class="right">${item.quantity}</td>
-        <td class="right">${formatCurrency(item.unit_price, invoice.currency)}</td>
-        <td class="right">${formatCurrency(item.amount, invoice.currency)}</td>
+        <td class="right">${formatCurrency(item.unit_price, inv.currency)}</td>
+        <td class="right">${formatCurrency(item.amount, inv.currency)}</td>
       </tr>
     `).join('')
 
@@ -222,10 +305,10 @@ Deno.serve(async (req) => {
       'voided': { bg: '#fee2e2', color: '#dc2626' },
       'credited': { bg: '#fce7f3', color: '#db2777' }
     }
-    const statusStyle = statusColors[invoice.status] || statusColors['issued']
+    const statusStyle = statusColors[inv.status] || statusColors['issued']
 
     // Calculate balance due
-    const balanceDue = invoice.total_amount - (invoice.amount_paid || 0)
+    const balanceDue = inv.total_amount - (inv.amount_paid || 0)
 
     // Watermark HTML (subtle, doesn't take space)
     const watermarkHtml = showWatermark ? `
@@ -233,15 +316,28 @@ Deno.serve(async (req) => {
     ` : ''
 
     // QR Code generation - SVG-based for better quality
-    // Prefer client-provided app_url, then env, then fallback
-    const appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
-    const verificationUrl = invoice.verification_id 
-      ? `${appUrl}/verify/invoice/${invoice.verification_id}` 
+    // Prefer env, then fallback
+    const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    const verificationUrl = inv.verification_id 
+      ? `${appUrl}/verify/invoice/${inv.verification_id}` 
       : null
     
     // ALWAYS show business logo if available (regardless of tier)
     // Branding tier only affects watermark and "Powered by InvoiceMonk" text
-    const issuerLogoUrl = issuerSnapshot?.logo_url || null
+    let issuerLogoUrl = issuerSnapshot?.logo_url || null
+
+    // Defensive fallback: If no logo in snapshot, try to fetch from business table
+    if (!issuerLogoUrl && inv.business_id) {
+      const { data: business } = await supabaseAdmin
+        .from('businesses')
+        .select('logo_url')
+        .eq('id', inv.business_id)
+        .single()
+      issuerLogoUrl = business?.logo_url || null
+      if (issuerLogoUrl) {
+        console.log('Logo fetched from business table as fallback')
+      }
+    }
 
     // Generate QR code data for SVG (simplified matrix representation)
     const generateQRCodeSVG = (data: string, size: number = 60): string => {
@@ -255,11 +351,11 @@ Deno.serve(async (req) => {
     const qrCodeHtml = verificationUrl ? generateQRCodeSVG(verificationUrl, 50) : ''
 
     // Compact footer line
-    const verificationLine = invoice.verification_id 
-      ? `Verification: ${invoice.verification_id.substring(0, 8)}...` 
+    const verificationLine = inv.verification_id 
+      ? `Verification: ${inv.verification_id.substring(0, 8)}...` 
       : ''
-    const hashLine = invoice.invoice_hash 
-      ? `Hash: ${invoice.invoice_hash.substring(0, 12)}...` 
+    const hashLine = inv.invoice_hash 
+      ? `Hash: ${inv.invoice_hash.substring(0, 12)}...` 
       : ''
 
     // Generate compact HTML document
@@ -465,8 +561,8 @@ Deno.serve(async (req) => {
       </div>
       <div class="invoice-meta">
         <div class="invoice-title">INVOICE</div>
-        <div class="invoice-number">${invoice.invoice_number}</div>
-        <div class="status" style="background: ${statusStyle.bg}; color: ${statusStyle.color};">${invoice.status.toUpperCase()}</div>
+        <div class="invoice-number">${inv.invoice_number}</div>
+        <div class="status" style="background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div>
       </div>
     </div>
 
@@ -484,19 +580,19 @@ Deno.serve(async (req) => {
         <div class="summary-box">
           <div class="summary-row">
             <span>Invoice Date</span>
-            <span>${formatDate(invoice.issue_date)}</span>
+            <span>${formatDate(inv.issue_date)}</span>
           </div>
           <div class="summary-row">
             <span>Due Date</span>
-            <span>${formatDate(invoice.due_date)}</span>
+            <span>${formatDate(inv.due_date)}</span>
           </div>
           <div class="summary-row">
             <span>Currency</span>
-            <span>${invoice.currency}</span>
+            <span>${inv.currency}</span>
           </div>
           <div class="summary-row amount-due">
             <span>Amount Due</span>
-            <span>${formatCurrency(balanceDue, invoice.currency)}</span>
+            <span>${formatCurrency(balanceDue, inv.currency)}</span>
           </div>
         </div>
       </div>
@@ -522,48 +618,48 @@ Deno.serve(async (req) => {
       <div class="totals">
         <div class="total-row">
           <span>Subtotal</span>
-          <span>${formatCurrency(invoice.subtotal, invoice.currency)}</span>
+          <span>${formatCurrency(inv.subtotal, inv.currency)}</span>
         </div>
-        ${invoice.tax_amount > 0 ? `
+        ${inv.tax_amount > 0 ? `
         <div class="total-row">
           <span>Tax</span>
-          <span>${formatCurrency(invoice.tax_amount, invoice.currency)}</span>
+          <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
         </div>
         ` : ''}
-        ${invoice.discount_amount > 0 ? `
+        ${inv.discount_amount > 0 ? `
         <div class="total-row">
           <span>Discount</span>
-          <span>-${formatCurrency(invoice.discount_amount, invoice.currency)}</span>
+          <span>-${formatCurrency(inv.discount_amount, inv.currency)}</span>
         </div>
         ` : ''}
         <div class="total-row grand">
           <span>Total</span>
-          <span>${formatCurrency(invoice.total_amount, invoice.currency)}</span>
+          <span>${formatCurrency(inv.total_amount, inv.currency)}</span>
         </div>
-        ${invoice.amount_paid > 0 ? `
+        ${inv.amount_paid > 0 ? `
         <div class="total-row paid">
           <span>Paid</span>
-          <span>-${formatCurrency(invoice.amount_paid, invoice.currency)}</span>
+          <span>-${formatCurrency(inv.amount_paid, inv.currency)}</span>
         </div>
         <div class="total-row balance">
           <span>Balance Due</span>
-          <span>${formatCurrency(balanceDue, invoice.currency)}</span>
+          <span>${formatCurrency(balanceDue, inv.currency)}</span>
         </div>
         ` : ''}
       </div>
     </div>
 
-    ${invoice.notes || invoice.terms ? `
+    ${inv.notes || inv.terms ? `
     <!-- Notes/Terms -->
     <div class="notes-section no-break">
-      ${invoice.notes ? `
+      ${inv.notes ? `
       <div class="notes-label">Notes</div>
-      <div class="notes-content">${invoice.notes}</div>
+      <div class="notes-content">${inv.notes}</div>
       ` : ''}
-      ${invoice.notes && invoice.terms ? '<div style="height: 8px;"></div>' : ''}
-      ${invoice.terms ? `
+      ${inv.notes && inv.terms ? '<div style="height: 8px;"></div>' : ''}
+      ${inv.terms ? `
       <div class="notes-label">Terms</div>
-      <div class="notes-content">${invoice.terms}</div>
+      <div class="notes-content">${inv.terms}</div>
       ` : ''}
     </div>
     ` : ''}
@@ -589,21 +685,23 @@ Deno.serve(async (req) => {
 </body>
 </html>`
 
-    // Log PDF export event for compliance
-    await supabase.rpc('log_audit_event', {
-      _event_type: 'DATA_EXPORTED',
-      _entity_type: 'invoice',
-      _entity_id: body.invoice_id,
-      _user_id: userId,
-      _business_id: invoice.business_id,
-      _metadata: { 
-        export_type: 'pdf',
-        invoice_number: invoice.invoice_number,
-        tier: userTier,
-        watermark_shown: showWatermark,
-        branding_used: canUseBranding
-      }
-    })
+    // Log PDF export event for compliance (skip for public access to avoid permission issues)
+    if (!isPublicAccess) {
+      await supabaseAdmin.rpc('log_audit_event', {
+        _event_type: 'DATA_EXPORTED',
+        _entity_type: 'invoice',
+        _entity_id: inv.id,
+        _user_id: userId,
+        _business_id: inv.business_id,
+        _metadata: { 
+          export_type: 'pdf',
+          invoice_number: inv.invoice_number,
+          tier: userTier,
+          watermark_shown: showWatermark,
+          branding_used: canUseBranding
+        }
+      })
+    }
 
     // Return HTML (frontend will use browser print/PDF functionality)
     return new Response(html, {
@@ -611,7 +709,7 @@ Deno.serve(async (req) => {
       headers: { 
         ...corsHeaders, 
         'Content-Type': 'text/html; charset=utf-8',
-        'X-Invoice-Number': invoice.invoice_number,
+        'X-Invoice-Number': inv.invoice_number,
         'X-Watermark-Applied': showWatermark.toString(),
         'X-User-Tier': userTier
       }

@@ -101,7 +101,8 @@ const generateProfessionalHtml = (
   recipientSnapshot: RecipientSnapshot | null,
   verificationUrl: string | null,
   showWatermark: boolean,
-  canUseBranding: boolean
+  canUseBranding: boolean,
+  issuerLogoUrlParam: string | null = null
 ): string => {
   const currency = invoice.currency as string
   const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
@@ -111,8 +112,8 @@ const generateProfessionalHtml = (
   const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
   const issuerEmail = issuerSnapshot?.contact_email || ''
   const issuerPhone = issuerSnapshot?.contact_phone || ''
-  // ALWAYS show logo if available (regardless of branding tier)
-  const issuerLogoUrl = issuerSnapshot?.logo_url || null
+  // Use the passed logo URL (which may be from snapshot or fallback from business table)
+  const issuerLogoUrl = issuerLogoUrlParam || issuerSnapshot?.logo_url || null
   
   // Recipient info
   const recipientName = recipientSnapshot?.name || 'Client'
@@ -583,7 +584,20 @@ Deno.serve(async (req) => {
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
     // ALWAYS show logo if available (regardless of branding tier)
-    const issuerLogoUrl = issuerSnapshot?.logo_url || null
+    let issuerLogoUrl = issuerSnapshot?.logo_url || null
+
+    // Defensive fallback: If no logo in snapshot, try to fetch from business table
+    if (!issuerLogoUrl && invoice.business_id) {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('logo_url')
+        .eq('id', invoice.business_id)
+        .single()
+      issuerLogoUrl = business?.logo_url || null
+      if (issuerLogoUrl) {
+        console.log('Logo fetched from business table as fallback')
+      }
+    }
 
     // Get user's subscription tier for watermark/branding logic
     const { data: tierResult, error: tierError } = await supabase.rpc('check_tier_limit', {
@@ -611,7 +625,12 @@ Deno.serve(async (req) => {
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
     // Verification URL - prefer client-provided app_url, then env, then fallback
-    const appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    // Prevent Lovable preview URLs from being used in emails
+    let appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    if (appUrl.includes('lovableproject.com') || appUrl.includes('lovable.app')) {
+      console.warn('Lovable preview URL detected in app_url, using production fallback')
+      appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    }
     const verificationUrl = invoice.verification_id 
       ? `${appUrl}/verify/invoice/${invoice.verification_id}`
       : null
@@ -630,7 +649,8 @@ Deno.serve(async (req) => {
       recipientSnapshot,
       verificationUrl,
       showWatermark,
-      canUseBranding
+      canUseBranding,
+      issuerLogoUrl
     )
     
     // Convert HTML to PDF using PDFShift API
@@ -768,6 +788,33 @@ Deno.serve(async (req) => {
               </table>
 
               ${verificationUrl ? `
+              <!-- Primary CTA: View Invoice Online -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="text-align: center; padding: 8px 0;">
+                    <a href="${verificationUrl}" 
+                       style="display: inline-block; 
+                              background-color: #1a1a1a; 
+                              color: #ffffff; 
+                              padding: 16px 32px; 
+                              border-radius: 8px; 
+                              text-decoration: none; 
+                              font-weight: 600; 
+                              font-size: 16px;
+                              box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      View Invoice Online →
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; padding-top: 8px;">
+                    <span style="color: #6b7280; font-size: 12px;">
+                      View full invoice details and payment options
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
               <!-- Verification Section with QR Code -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bfdbfe;">
                 <tr>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -16,12 +17,14 @@ import {
   User,
   MapPin,
   Phone,
-  Mail
+  Mail,
+  Download
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import invoicemonkLogo from "@/assets/invoicemonk-logo.png";
 
 interface IssuerIdentity {
@@ -63,6 +66,7 @@ interface VerificationResponse {
 
 const VerifyInvoice = () => {
   const { verificationId } = useParams<{ verificationId: string }>();
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { data, isLoading, error } = useQuery<VerificationResponse>({
     queryKey: ['verify-invoice', verificationId],
@@ -105,6 +109,60 @@ const VerifyInvoice = () => {
       address.country
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!verificationId) return;
+    
+    setDownloadingPdf(true);
+    try {
+      const response = await fetch(
+        `https://skcxogeaerudoadluexz.supabase.co/functions/v1/generate-pdf?verification_id=${verificationId}`
+      );
+      
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      
+      const html = await response.text();
+      
+      // Open HTML in new window for printing
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        
+        // Auto-trigger print dialog after content loads
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+        
+        toast.success('Invoice opened for printing/download');
+      } else {
+        // Fallback: download as HTML file
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Invoice-${data?.invoice?.invoice_number || 'download'}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        toast.success('Invoice downloaded. Open and print to save as PDF.');
+      }
+    } catch (error) {
+      console.error('PDF download error:', error);
+      toast.error('Failed to download invoice');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleContactBusiness = (email: string) => {
+    const subject = encodeURIComponent(`Regarding Invoice ${data?.invoice?.invoice_number}`);
+    window.location.href = `mailto:${email}?subject=${subject}`;
+  };
+
+  const handlePayNow = () => {
+    toast.info('Please refer to the invoice for payment instructions');
   };
 
   return (
@@ -377,6 +435,50 @@ const VerifyInvoice = () => {
                           }
                         </p>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Customer Actions Card */}
+                <Card className="mb-6">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold text-lg mb-4 text-center">
+                      What would you like to do?
+                    </h3>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {/* Download Invoice */}
+                      <Button 
+                        variant="outline"
+                        onClick={handleDownloadPdf}
+                        disabled={downloadingPdf}
+                      >
+                        {downloadingPdf ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Download Invoice
+                      </Button>
+                      
+                      {/* Pay Now - only if unpaid */}
+                      {data.invoice.payment_status !== 'Paid' && 
+                       data.invoice.payment_status !== 'Voided' && (
+                        <Button onClick={handlePayNow}>
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Pay Now
+                        </Button>
+                      )}
+                      
+                      {/* Contact Business */}
+                      {data.invoice.issuer_identity?.contact_email && (
+                        <Button 
+                          variant="outline"
+                          onClick={() => handleContactBusiness(data.invoice!.issuer_identity!.contact_email!)}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contact Business
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

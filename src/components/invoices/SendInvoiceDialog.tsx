@@ -19,6 +19,21 @@ interface SendInvoiceDialogProps {
   };
 }
 
+// Determine the correct app URL for email links
+// Never use Lovable preview/project URLs in emails - use production URL
+const getProductionUrl = (): string => {
+  const hostname = window.location.hostname;
+  
+  // If on Lovable preview domains, use production URL
+  if (hostname.includes('lovableproject.com') || 
+      hostname.includes('lovable.app')) {
+    return 'https://app.invoicemonk.com';
+  }
+  
+  // Otherwise use current origin (for custom domains)
+  return window.location.origin;
+};
+
 export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDialogProps) {
   const [sending, setSending] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(
@@ -57,7 +72,7 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
           invoice_id: invoice.id,
           recipient_email: recipientEmail,
           custom_message: customMessage || undefined,
-          app_url: window.location.origin // Pass current domain for correct QR/verification links
+          app_url: getProductionUrl() // Use production URL for verification links
         }
       });
 

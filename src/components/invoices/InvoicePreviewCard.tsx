@@ -82,7 +82,12 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
   const isImmutable = invoice.status !== 'draft';
   
   // For drafts, use live business data if no snapshot exists
-  const displayIssuer = issuerSnapshot || (business ? {
+  // If snapshot exists but logo_url is missing, fall back to live business logo
+  const displayIssuer = issuerSnapshot ? {
+    ...issuerSnapshot,
+    // Always prefer snapshot logo, but fall back to live business logo if missing
+    logo_url: issuerSnapshot.logo_url || business?.logo_url,
+  } : (business ? {
     legal_name: business.legal_name,
     name: business.name,
     tax_id: business.tax_id,
