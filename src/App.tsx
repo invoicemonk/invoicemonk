@@ -61,8 +61,9 @@ import AdminSystem from "./pages/admin/AdminSystem";
 import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
 
-// Public verification
+// Public pages
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
+import InvoiceView from "./pages/public/InvoiceView";
 
 // Legal and Documentation pages
 import SLA from "./pages/legal/SLA";
@@ -156,7 +157,8 @@ const App = () => (
               <Route path="/admin/system" element={<AdminSystem />} />
             </Route>
 
-            {/* Public Verification Portal (Phase 7) - No auth required */}
+            {/* Public Pages - No auth required */}
+            <Route path="/invoice/view/:verificationId" element={<InvoiceView />} />
             <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
             
             {/* Legal and Documentation pages - No auth required */}

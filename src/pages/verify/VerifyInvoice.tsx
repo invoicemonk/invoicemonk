@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import invoicemonkLogo from "@/assets/invoicemonk-logo.png";
+import InvoicemonkCTA from "@/components/public/InvoicemonkCTA";
 
 interface IssuerIdentity {
   legal_name: string | null;
@@ -518,6 +519,11 @@ const VerifyInvoice = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Registration CTA */}
+            <div className="mt-8">
+              <InvoicemonkCTA variant="compact" />
+            </div>
           </motion.div>
         )}
 

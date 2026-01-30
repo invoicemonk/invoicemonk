@@ -624,13 +624,18 @@ Deno.serve(async (req) => {
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
-    // Verification URL - prefer client-provided app_url, then env, then fallback
+    // URLs - prefer client-provided app_url, then env, then fallback
     // Prevent Lovable preview URLs from being used in emails
     let appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
     if (appUrl.includes('lovableproject.com') || appUrl.includes('lovable.app')) {
       console.warn('Lovable preview URL detected in app_url, using production fallback')
       appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
     }
+    
+    // Separate URLs for viewing invoice vs verifying authenticity
+    const viewInvoiceUrl = invoice.verification_id 
+      ? `${appUrl}/invoice/view/${invoice.verification_id}`
+      : null
     const verificationUrl = invoice.verification_id 
       ? `${appUrl}/verify/invoice/${invoice.verification_id}`
       : null
@@ -787,12 +792,12 @@ Deno.serve(async (req) => {
                 </tr>
               </table>
 
-              ${verificationUrl ? `
+              ${viewInvoiceUrl ? `
               <!-- Primary CTA: View Invoice Online -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
                 <tr>
                   <td style="text-align: center; padding: 8px 0;">
-                    <a href="${verificationUrl}" 
+                    <a href="${viewInvoiceUrl}"
                        style="display: inline-block; 
                               background-color: #1a1a1a; 
                               color: #ffffff; 
@@ -809,12 +814,15 @@ Deno.serve(async (req) => {
                 <tr>
                   <td style="text-align: center; padding-top: 8px;">
                     <span style="color: #6b7280; font-size: 12px;">
-                      View full invoice details and payment options
+                      View full invoice details, line items, and download options
                     </span>
                   </td>
                 </tr>
               </table>
 
+              ` : ''}
+
+              ${verificationUrl ? `
               <!-- Verification Section with QR Code -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bfdbfe;">
                 <tr>
