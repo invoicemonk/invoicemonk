@@ -64,6 +64,9 @@ import AdminTemplates from "./pages/admin/AdminTemplates";
 // Public verification
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
 
+// Legal pages
+import SLA from "./pages/legal/SLA";
+
 const queryClient = new QueryClient();
 
 // Root redirect component
@@ -154,6 +157,9 @@ const App = () => (
 
             {/* Public Verification Portal (Phase 7) - No auth required */}
             <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
+            
+            {/* Legal pages - No auth required */}
+            <Route path="/legal/sla" element={<SLA />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

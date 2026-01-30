@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Settings, 
   Shield,
   AlertTriangle,
   Bell,
   Power,
   Lock,
   Eye,
-  ToggleLeft
+  ToggleLeft,
+  Download,
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -42,6 +46,64 @@ const featureFlags: FeatureFlag[] = [
 export default function AdminSystem() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [flags, setFlags] = useState(featureFlags);
+  const [isGenerating, setIsGenerating] = useState<{ b2b: boolean; b2c: boolean }>({ b2b: false, b2c: false });
+
+  const generateComplianceSample = async (sampleType: 'b2b' | 'b2c') => {
+    setIsGenerating(prev => ({ ...prev, [sampleType]: true }));
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Authentication required', variant: 'destructive' });
+        return;
+      }
+
+      const response = await fetch(
+        `https://skcxogeaerudoadluexz.supabase.co/functions/v1/generate-compliance-samples`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sample_type: sampleType }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate sample');
+      }
+
+      const htmlContent = await response.text();
+      const filename = sampleType === 'b2b' 
+        ? 'invoicemonk_b2b_b2g_invoice_sample.html'
+        : 'invoicemonk_b2c_invoice_sample.html';
+      
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Sample Generated',
+        description: `${sampleType.toUpperCase()} compliance sample downloaded`
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Generation Failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsGenerating(prev => ({ ...prev, [sampleType]: false }));
+    }
+  };
 
   const handleFlagToggle = (id: string) => {
     setFlags(prev => 
@@ -190,6 +252,59 @@ export default function AdminSystem() {
               {category !== 'experimental' && <Separator className="my-4" />}
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Compliance Samples */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Compliance Samples
+          </CardTitle>
+          <CardDescription>
+            Generate sample invoices for regulatory submission and compliance review
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These samples demonstrate InvoiceMonk's invoice format, tax calculations, 
+              and compliance fields for B2B/B2G and B2C transactions.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => generateComplianceSample('b2b')}
+                disabled={isGenerating.b2b}
+              >
+                {isGenerating.b2b ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download B2B/B2G Sample
+              </Button>
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => generateComplianceSample('b2c')}
+                disabled={isGenerating.b2c}
+              >
+                {isGenerating.b2c ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download B2C Sample
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Samples are generated using production rendering pipeline with placeholder data.
+              Government e-invoicing fields show "not_submitted" status.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
