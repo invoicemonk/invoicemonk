@@ -9,6 +9,7 @@ interface SendInvoiceRequest {
   invoice_id: string
   recipient_email: string
   custom_message?: string
+  app_url?: string // Optional: client-provided base URL for verification links
 }
 
 interface IssuerSnapshot {
@@ -110,7 +111,8 @@ const generateProfessionalHtml = (
   const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
   const issuerEmail = issuerSnapshot?.contact_email || ''
   const issuerPhone = issuerSnapshot?.contact_phone || ''
-  const issuerLogoUrl = canUseBranding && issuerSnapshot?.logo_url ? issuerSnapshot.logo_url : null
+  // ALWAYS show logo if available (regardless of branding tier)
+  const issuerLogoUrl = issuerSnapshot?.logo_url || null
   
   // Recipient info
   const recipientName = recipientSnapshot?.name || 'Client'
@@ -349,9 +351,9 @@ const generateProfessionalHtml = (
       <div style="display: flex; align-items: center; gap: 12px;">
         ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
         <div>
-          <div class="brand">${canUseBranding ? issuerName : 'INVOICEMONK'}</div>
+          <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
-          ${canUseBranding && issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+          ${issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
         </div>
       </div>
       <div class="invoice-meta">
@@ -580,6 +582,7 @@ Deno.serve(async (req) => {
     const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
+    // ALWAYS show logo if available (regardless of branding tier)
     const issuerLogoUrl = issuerSnapshot?.logo_url || null
 
     // Get user's subscription tier for watermark/branding logic
@@ -607,8 +610,8 @@ Deno.serve(async (req) => {
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
 
-    // Verification URL
-    const appUrl = Deno.env.get('APP_URL') || 'https://id-preview--af0fa778-97c6-4e74-8769-9640f7e7d956.lovable.app'
+    // Verification URL - prefer client-provided app_url, then env, then fallback
+    const appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
     const verificationUrl = invoice.verification_id 
       ? `${appUrl}/verify/invoice/${invoice.verification_id}`
       : null

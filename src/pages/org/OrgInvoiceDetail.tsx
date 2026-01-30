@@ -21,6 +21,7 @@ import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -63,6 +64,7 @@ export default function OrgInvoiceDetail() {
   const recordPayment = useRecordPayment();
   const downloadPdf = useDownloadInvoicePdf();
   const { isStarter } = useSubscription();
+  const { currentOrg } = useOrganization();
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -474,13 +476,22 @@ export default function OrgInvoiceDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invoice Preview Dialog */}
+      {/* Invoice Preview Dialog - pass business for draft logo display */}
       {invoice && (
         <InvoicePreviewDialog
           open={previewOpen}
           onOpenChange={setPreviewOpen}
           invoice={invoice}
           showWatermark={isStarter}
+          business={currentOrg ? {
+            name: currentOrg.name,
+            legal_name: currentOrg.legal_name,
+            tax_id: currentOrg.tax_id,
+            address: currentOrg.address as { street?: string; city?: string; state?: string; postal_code?: string; country?: string } | null,
+            contact_email: currentOrg.contact_email,
+            contact_phone: currentOrg.contact_phone,
+            logo_url: currentOrg.logo_url,
+          } : undefined}
         />
       )}
 

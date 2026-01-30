@@ -843,6 +843,7 @@ export default function InvoiceNew() {
           address: currentBusiness.address as { street?: string; city?: string; state?: string; postal_code?: string; country?: string } | null,
           contact_email: currentBusiness.contact_email,
           contact_phone: currentBusiness.contact_phone,
+          logo_url: currentBusiness.logo_url,
         } : null}
       />
     </motion.div>

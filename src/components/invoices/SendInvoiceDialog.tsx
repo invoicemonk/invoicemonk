@@ -56,7 +56,8 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
         body: {
           invoice_id: invoice.id,
           recipient_email: recipientEmail,
-          custom_message: customMessage || undefined
+          custom_message: customMessage || undefined,
+          app_url: window.location.origin // Pass current domain for correct QR/verification links
         }
       });
 

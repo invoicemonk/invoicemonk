@@ -113,8 +113,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // TIER ENFORCEMENT: Check issuer's subscription tier
-    // Verification portal is only available for Professional+ invoices
+    // Query issuer tier for logging/analytics only (no blocking)
     const { data: subscription } = await supabase
       .from('subscriptions')
       .select('tier')
@@ -125,18 +124,8 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     const issuerTier = subscription?.tier || 'starter'
-
-    if (issuerTier === 'starter') {
-      const response: VerificationResponse = {
-        verified: false,
-        error: 'Verification portal is not available for invoices issued on the Free tier. The issuer must upgrade to Professional to enable public verification.',
-        upgrade_required: true
-      }
-      return new Response(JSON.stringify(response), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    // Note: We no longer block Starter tier - verification is now available for all tiers
+    // This enables universal verification as a trust/marketing feature
 
     // USE SNAPSHOT DATA - Not live data
     // This ensures verification matches the invoice as it was at issuance time

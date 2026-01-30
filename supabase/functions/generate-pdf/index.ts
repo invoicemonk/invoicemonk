@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface GeneratePdfRequest {
   invoice_id: string
+  app_url?: string // Optional: client-provided base URL for verification links
 }
 
 interface InvoiceItem {
@@ -232,13 +233,15 @@ Deno.serve(async (req) => {
     ` : ''
 
     // QR Code generation - SVG-based for better quality
-    const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    // Prefer client-provided app_url, then env, then fallback
+    const appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
     const verificationUrl = invoice.verification_id 
       ? `${appUrl}/verify/invoice/${invoice.verification_id}` 
       : null
     
-    // Get business logo URL if branding is allowed
-    const issuerLogoUrl = canUseBranding && issuerSnapshot?.logo_url ? issuerSnapshot.logo_url : null
+    // ALWAYS show business logo if available (regardless of tier)
+    // Branding tier only affects watermark and "Powered by InvoiceMonk" text
+    const issuerLogoUrl = issuerSnapshot?.logo_url || null
 
     // Generate QR code data for SVG (simplified matrix representation)
     const generateQRCodeSVG = (data: string, size: number = 60): string => {
@@ -455,9 +458,9 @@ Deno.serve(async (req) => {
       <div style="display: flex; align-items: center; gap: 12px;">
         ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
         <div>
-          <div class="brand">${canUseBranding ? issuerName : 'INVOICEMONK'}</div>
+          <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
-          ${canUseBranding && issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+          ${issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
         </div>
       </div>
       <div class="invoice-meta">

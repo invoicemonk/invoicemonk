@@ -639,7 +639,7 @@ export default function InvoiceDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invoice Preview Dialog */}
+      {/* Invoice Preview Dialog - for issued invoices, logo comes from issuer_snapshot */}
       {invoice && (
         <InvoicePreviewDialog
           open={previewOpen}

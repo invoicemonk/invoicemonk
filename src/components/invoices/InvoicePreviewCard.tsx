@@ -24,6 +24,7 @@ interface IssuerSnapshot {
   jurisdiction?: string;
   contact_email?: string;
   contact_phone?: string;
+  logo_url?: string;
 }
 
 interface RecipientSnapshot {
@@ -88,6 +89,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
     address: business.address,
     contact_email: business.contact_email,
     contact_phone: business.contact_phone,
+    logo_url: business.logo_url,
   } : null);
 
   const formatAddress = (address?: { street?: string; city?: string; state?: string; postal_code?: string; country?: string }) => {
@@ -111,9 +113,9 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
               {/* Business Logo */}
-              {business?.logo_url && (
+              {displayIssuer?.logo_url && (
                 <img 
-                  src={business.logo_url} 
+                  src={displayIssuer.logo_url} 
                   alt="Business Logo" 
                   className="h-16 w-auto max-w-[120px] object-contain"
                 />

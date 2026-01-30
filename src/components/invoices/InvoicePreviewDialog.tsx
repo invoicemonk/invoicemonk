@@ -23,6 +23,7 @@ interface Business {
   } | null;
   contact_email?: string | null;
   contact_phone?: string | null;
+  logo_url?: string | null;
 }
 
 interface InvoicePreviewDialogProps {
