@@ -185,6 +185,13 @@ export const gaEvents = {
     trackEvent('subscription_viewed', { current_plan: currentPlan }),
   upgradeClicked: (fromPlan: string, toPlan: string) => 
     trackEvent('upgrade_clicked', { from_plan: fromPlan, to_plan: toPlan }),
+  
+  // Error events
+  pageNotFound: (path: string, referrer?: string) => 
+    trackEvent('page_not_found', { 
+      page_path: path, 
+      referrer: referrer || 'direct' 
+    }),
 };
 
 /**

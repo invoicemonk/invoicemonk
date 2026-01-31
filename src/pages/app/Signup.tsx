@@ -192,11 +192,21 @@ const Signup = () => {
             />
             <Label htmlFor="accept-terms" className="text-sm text-muted-foreground leading-relaxed">
               I agree to the{' '}
-              <a href="/terms" className="text-primary hover:underline">
+              <a 
+                href="https://invoicemonk.com/terms-of-service" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="/privacy" className="text-primary hover:underline">
+              <a 
+                href="https://invoicemonk.com/privacy-policy" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
                 Privacy Policy
               </a>
             </Label>
