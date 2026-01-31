@@ -1,8 +1,71 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Validation utilities (inline to avoid Deno import issues)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateUUID(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!UUID_REGEX.test(value)) {
+    return `${fieldName} must be a valid UUID`;
+  }
+  return null;
+}
+
+function validateEmail(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(value) || value.length > 254) {
+    return `${fieldName} must be a valid email address`;
+  }
+  return null;
+}
+
+function validateString(value: unknown, fieldName: string, maxLength = 1000): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null; // Optional field
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (value.length > maxLength) {
+    return `${fieldName} must be at most ${maxLength} characters`;
+  }
+  return null;
+}
+
+function sanitizeString(value: string): string {
+  return value.replace(/<[^>]*>/g, '').replace(/[<>]/g, '').trim();
+}
+
+// CORS configuration
+const ALLOWED_ORIGINS = [
+  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
+  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
+  'https://app.invoicemonk.com',
+  'https://invoicemonk.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
 }
 
 interface SendInvoiceRequest {
@@ -485,6 +548,8 @@ const generateProfessionalHtml = (
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -524,12 +589,32 @@ Deno.serve(async (req) => {
     // Parse request body
     const body: SendInvoiceRequest = await req.json()
     
-    if (!body.invoice_id || !body.recipient_email) {
+    // Validate inputs
+    const invoiceIdError = validateUUID(body.invoice_id, 'invoice_id');
+    if (invoiceIdError) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invoice ID and recipient email are required' }),
+        JSON.stringify({ success: false, error: invoiceIdError }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    const emailError = validateEmail(body.recipient_email, 'recipient_email');
+    if (emailError) {
+      return new Response(
+        JSON.stringify({ success: false, error: emailError }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate and sanitize custom_message if provided
+    const customMessageError = validateString(body.custom_message, 'custom_message', 2000);
+    if (customMessageError) {
+      return new Response(
+        JSON.stringify({ success: false, error: customMessageError }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const sanitizedCustomMessage = body.custom_message ? sanitizeString(body.custom_message) : null;
 
     // Get Brevo API key
     const brevoApiKey = Deno.env.get('BREVO_API_KEY')

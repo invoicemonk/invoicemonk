@@ -1,8 +1,54 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Validation utilities
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateUUID(value: unknown, fieldName: string, required = true): string | null {
+  if (value === null || value === undefined || value === '') {
+    return required ? `${fieldName} is required` : null;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!UUID_REGEX.test(value)) {
+    return `${fieldName} must be a valid UUID`;
+  }
+  return null;
+}
+
+function validateDate(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null; // Optional
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(value) || isNaN(new Date(value).getTime())) {
+    return `${fieldName} must be a valid date (YYYY-MM-DD)`;
+  }
+  return null;
+}
+
+// CORS configuration
+const ALLOWED_ORIGINS = [
+  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
+  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
+  'https://app.invoicemonk.com',
+  'https://invoicemonk.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
 }
 
 interface ExportRecordsRequest {
@@ -60,6 +106,8 @@ function getClientIP(req: Request): string | null {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })

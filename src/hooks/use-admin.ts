@@ -353,6 +353,7 @@ export function useAdminUpdateSubscription() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-businesses'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
       toast.success('Subscription updated successfully');
     },
     onError: (error) => {

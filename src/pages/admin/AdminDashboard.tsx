@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAdminStats } from '@/hooks/use-admin';
+import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import {
@@ -27,6 +28,9 @@ import {
 
 export default function AdminDashboard() {
   const { data: stats, isLoading } = useAdminStats();
+  
+  // Enable realtime updates for subscription changes
+  useRealtimeAdminStats();
 
   const statCards = [
     {

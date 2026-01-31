@@ -1,12 +1,78 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Validation utilities
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateUUID(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!UUID_REGEX.test(value)) {
+    return `${fieldName} must be a valid UUID`;
+  }
+  return null;
+}
+
+function validateAmount(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined) {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return `${fieldName} must be a valid number`;
+  }
+  if (value <= 0) {
+    return `${fieldName} must be positive`;
+  }
+  if (value > 999999999.99) {
+    return `${fieldName} exceeds maximum allowed value (999,999,999.99)`;
+  }
+  return null;
+}
+
+function validateString(value: unknown, fieldName: string, maxLength = 1000): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null; // Optional field
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (value.length > maxLength) {
+    return `${fieldName} must be at most ${maxLength} characters`;
+  }
+  return null;
+}
+
+function sanitizeString(value: string): string {
+  return value.replace(/<[^>]*>/g, '').replace(/[<>]/g, '').trim();
+}
+
+// CORS configuration
+const ALLOWED_ORIGINS = [
+  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
+  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
+  'https://app.invoicemonk.com',
+  'https://invoicemonk.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
 }
 
 // Helper function to create notification
 async function createNotification(
+  // deno-lint-ignore no-explicit-any
   supabase: any,
   userId: string,
   type: string,
@@ -53,6 +119,8 @@ interface RecordPaymentResponse {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -96,18 +164,58 @@ Deno.serve(async (req) => {
     // Parse request body
     const body: RecordPaymentRequest = await req.json()
     
-    if (!body.invoice_id) {
+    // Validate invoice_id (UUID format)
+    const invoiceIdError = validateUUID(body.invoice_id, 'invoice_id');
+    if (invoiceIdError) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invoice ID is required' } as RecordPaymentResponse),
+        JSON.stringify({ success: false, error: invoiceIdError } as RecordPaymentResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (!body.amount || body.amount <= 0) {
+    // Validate amount (positive number with max limit)
+    const amountError = validateAmount(body.amount, 'amount');
+    if (amountError) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Valid payment amount is required' } as RecordPaymentResponse),
+        JSON.stringify({ success: false, error: amountError } as RecordPaymentResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Validate optional string fields
+    const paymentMethodError = validateString(body.payment_method, 'payment_method', 100);
+    if (paymentMethodError) {
+      return new Response(
+        JSON.stringify({ success: false, error: paymentMethodError } as RecordPaymentResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const paymentRefError = validateString(body.payment_reference, 'payment_reference', 255);
+    if (paymentRefError) {
+      return new Response(
+        JSON.stringify({ success: false, error: paymentRefError } as RecordPaymentResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const notesError = validateString(body.notes, 'notes', 1000);
+    if (notesError) {
+      return new Response(
+        JSON.stringify({ success: false, error: notesError } as RecordPaymentResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate payment_date format if provided
+    if (body.payment_date) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(body.payment_date) || isNaN(new Date(body.payment_date).getTime())) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'payment_date must be a valid date (YYYY-MM-DD)' } as RecordPaymentResponse),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Fetch the invoice to validate ownership and status
@@ -142,16 +250,16 @@ Deno.serve(async (req) => {
       amount_paid: invoice.amount_paid
     }
 
-    // Create payment record
+    // Create payment record with sanitized inputs
     const { data: payment, error: paymentError } = await supabaseUser
       .from('payments')
       .insert({
         invoice_id: body.invoice_id,
         amount: body.amount,
-        payment_method: body.payment_method || null,
-        payment_reference: body.payment_reference || null,
+        payment_method: body.payment_method ? sanitizeString(body.payment_method) : null,
+        payment_reference: body.payment_reference ? sanitizeString(body.payment_reference) : null,
         payment_date: body.payment_date || new Date().toISOString().split('T')[0],
-        notes: body.notes || null,
+        notes: body.notes ? sanitizeString(body.notes) : null,
         recorded_by: userId
       })
       .select()
@@ -243,6 +351,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Record payment error:', error)
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ 
         success: false, 

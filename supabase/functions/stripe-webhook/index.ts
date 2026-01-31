@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// Stripe webhook needs permissive CORS for Stripe's servers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
@@ -31,16 +32,35 @@ serve(async (req) => {
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
 
-    // For now, skip signature verification in development
-    // In production, you should add STRIPE_WEBHOOK_SECRET and verify
+    // SECURITY: Enforce signature verification
     let event: Stripe.Event;
     
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    if (webhookSecret && signature) {
+    
+    if (!webhookSecret) {
+      console.error("CRITICAL: STRIPE_WEBHOOK_SECRET is not configured. Rejecting webhook.");
+      return new Response(
+        JSON.stringify({ error: "Webhook signature verification not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!signature) {
+      console.error("Missing stripe-signature header");
+      return new Response(
+        JSON.stringify({ error: "Missing stripe-signature header" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } else {
-      event = JSON.parse(body);
-      console.log("Warning: Webhook signature verification skipped");
+    } catch (err) {
+      console.error("Webhook signature verification failed:", err);
+      return new Response(
+        JSON.stringify({ error: "Webhook signature verification failed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log("Received webhook event:", event.type);
@@ -230,6 +250,7 @@ serve(async (req) => {
 });
 
 async function doUpdateSubscription(
+  // deno-lint-ignore no-explicit-any
   supabase: any,
   subscription: Stripe.Subscription,
   userId: string

@@ -15,7 +15,7 @@ const VerifyEmail = () => {
     if (user?.email_confirmed_at) {
       setIsVerified(true);
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/select-plan');
       }, 2000);
     }
   }, [user, navigate]);
@@ -53,7 +53,7 @@ const VerifyEmail = () => {
                 </div>
                 <h1 className="text-2xl font-bold text-foreground">Email verified!</h1>
                 <p className="text-muted-foreground">
-                  Your email has been verified. Redirecting you to your dashboard...
+                  Your email has been verified. Redirecting you to select a plan...
                 </p>
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
               </motion.div>

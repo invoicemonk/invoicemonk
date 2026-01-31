@@ -1,8 +1,50 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Validation utilities (inline to avoid Deno import issues)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateUUID(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!UUID_REGEX.test(value)) {
+    return `${fieldName} must be a valid UUID`;
+  }
+  return null;
+}
+
+// CORS configuration - public endpoint allows broader access for PDF viewing
+const ALLOWED_ORIGINS = [
+  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
+  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
+  'https://app.invoicemonk.com',
+  'https://invoicemonk.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(req: Request, isPublicAccess: boolean): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  
+  // For public access (verification_id), allow broader access
+  if (isPublicAccess) {
+    return {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    };
+  }
+  
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
 }
 
 interface GeneratePdfRequest {
@@ -50,6 +92,13 @@ interface TemplateSnapshot {
 }
 
 Deno.serve(async (req) => {
+  // Check for verification_id in query params to determine access type
+  const url = new URL(req.url)
+  const verificationIdParam = url.searchParams.get('verification_id')
+  const isPublicAccess = !!verificationIdParam
+  
+  const corsHeaders = getCorsHeaders(req, isPublicAccess);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -60,17 +109,20 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Check for verification_id in query params (public access)
-    const url = new URL(req.url)
-    const verificationIdParam = url.searchParams.get('verification_id')
-
     let invoice: Record<string, unknown> | null = null
     let userId: string | null = null
-    let isPublicAccess = false
 
     if (verificationIdParam) {
+      // Validate verification_id format
+      const verificationError = validateUUID(verificationIdParam, 'verification_id');
+      if (verificationError) {
+        return new Response(
+          JSON.stringify({ success: false, error: verificationError }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       // Public access via verification_id - use service role
-      isPublicAccess = true
       const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
       
       const { data: invoiceData, error: invoiceError } = await supabaseAdmin
@@ -131,9 +183,11 @@ Deno.serve(async (req) => {
       // Parse request body
       const body: GeneratePdfRequest = await req.json()
       
-      if (!body.invoice_id) {
+      // Validate invoice_id format
+      const invoiceIdError = validateUUID(body.invoice_id, 'invoice_id');
+      if (invoiceIdError) {
         return new Response(
-          JSON.stringify({ success: false, error: 'Invoice ID is required' }),
+          JSON.stringify({ success: false, error: invoiceIdError }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

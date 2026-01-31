@@ -1,8 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Validation utilities
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateUUID(value: unknown, fieldName: string): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!UUID_REGEX.test(value)) {
+    return `${fieldName} must be a valid UUID`;
+  }
+  return null;
+}
+
+// Public endpoint CORS - allows broader access for verification portal
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 interface IssuerSnapshot {
@@ -47,10 +64,12 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const verification_id = url.searchParams.get('verification_id')
 
-    if (!verification_id) {
+    // Validate verification_id
+    const verificationError = validateUUID(verification_id, 'verification_id');
+    if (verificationError) {
       const response: VerificationResponse = {
         verified: false,
-        error: 'Verification ID is required'
+        error: verificationError
       }
       return new Response(JSON.stringify(response), {
         status: 400,

@@ -2,12 +2,60 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Validation utilities
+const VALID_TIERS = ['starter_paid', 'professional', 'business'] as const;
+const VALID_BILLING_PERIODS = ['monthly', 'yearly'] as const;
+
+function validateEnum<T extends string>(value: unknown, fieldName: string, allowedValues: readonly T[]): string | null {
+  if (value === null || value === undefined || value === '') {
+    return `${fieldName} is required`;
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (!allowedValues.includes(value as T)) {
+    return `${fieldName} must be one of: ${allowedValues.join(', ')}`;
+  }
+  return null;
+}
+
+function validateString(value: unknown, fieldName: string, maxLength = 100): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null; // Optional field
+  }
+  if (typeof value !== 'string') {
+    return `${fieldName} must be a string`;
+  }
+  if (value.length > maxLength) {
+    return `${fieldName} must be at most ${maxLength} characters`;
+  }
+  return null;
+}
+
+// CORS configuration
+const ALLOWED_ORIGINS = [
+  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
+  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
+  'https://app.invoicemonk.com',
+  'https://invoicemonk.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+}
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,20 +68,65 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("No authorization header");
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
 
     if (userError || !user) {
-      throw new Error("Unauthorized");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
     }
 
     const { tier, billingPeriod = "monthly", countryCode } = await req.json();
 
-    if (!tier || tier === "starter") {
-      throw new Error("Cannot create checkout for starter tier");
+    // Validate tier
+    const tierError = validateEnum(tier, 'tier', VALID_TIERS);
+    if (tierError) {
+      return new Response(
+        JSON.stringify({ error: tierError }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Validate billingPeriod
+    const billingError = validateEnum(billingPeriod, 'billingPeriod', VALID_BILLING_PERIODS);
+    if (billingError) {
+      return new Response(
+        JSON.stringify({ error: billingError }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Validate countryCode if provided (ISO 3166-1 alpha-2)
+    if (countryCode) {
+      const countryError = validateString(countryCode, 'countryCode', 3);
+      if (countryError) {
+        return new Response(
+          JSON.stringify({ error: countryError }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      // Additional validation: must be 2 uppercase letters
+      if (!/^[A-Z]{2}$/.test(countryCode.toUpperCase())) {
+        return new Response(
+          JSON.stringify({ error: "countryCode must be a valid 2-letter country code" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+    }
+
+    if (tier === "starter") {
+      return new Response(
+        JSON.stringify({ error: "Cannot create checkout for starter tier" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
 
     // Get user's profile
@@ -55,7 +148,7 @@ serve(async (req) => {
     const businessData = businessMember?.businesses as { jurisdiction?: string } | null;
     
     // Determine region: use provided countryCode, business jurisdiction, or default
-    const region = countryCode || businessData?.jurisdiction || "US";
+    const region = countryCode?.toUpperCase() || businessData?.jurisdiction || "US";
 
     // Get pricing for this region and tier
     const { data: pricing, error: pricingError } = await supabaseClient
@@ -78,12 +171,18 @@ serve(async (req) => {
     }
 
     if (!finalPricing) {
-      throw new Error(`Pricing not found for tier: ${tier}`);
+      return new Response(
+        JSON.stringify({ error: `Pricing not found for tier: ${tier}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
-      throw new Error("Stripe secret key not configured");
+      return new Response(
+        JSON.stringify({ error: "Stripe secret key not configured" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
     }
 
     const stripe = new Stripe(stripeKey, {
@@ -175,7 +274,7 @@ serve(async (req) => {
     }
 
     // Get the app URL for redirects
-    const appUrl = Deno.env.get("APP_URL") || "https://id-preview--0f48e9a6-b42f-4f54-83c7-22ababefed5e.lovable.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://id-preview--d2127126-79b5-4329-9bbf-46c900eb564d.lovable.app";
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
@@ -215,6 +314,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error creating checkout session:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ error: message }),
       {
