@@ -33,6 +33,9 @@ import Analytics from "./pages/app/Analytics";
 import AuditLogs from "./pages/app/AuditLogs";
 import BusinessProfile from "./pages/app/BusinessProfile";
 import Billing from "./pages/app/Billing";
+import PlanSelection from "./pages/app/PlanSelection";
+import CheckoutSuccess from "./pages/app/CheckoutSuccess";
+import CheckoutCancel from "./pages/app/CheckoutCancel";
 import Settings from "./pages/app/Settings";
 import Notifications from "./pages/app/Notifications";
 
@@ -112,6 +115,11 @@ const App = () => (
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Plan selection and checkout routes */}
+            <Route path="/select-plan" element={<ProtectedRoute><PlanSelection /></ProtectedRoute>} />
+            <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
+            <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancel /></ProtectedRoute>} />
             
             {/* Legacy route redirects */}
             <Route path="/auth" element={<Login />} />

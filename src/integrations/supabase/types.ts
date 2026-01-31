@@ -679,6 +679,48 @@ export type Database = {
           },
         ]
       }
+      pricing_regions: {
+        Row: {
+          country_code: string
+          created_at: string | null
+          currency: string
+          id: string
+          is_default: boolean | null
+          monthly_price: number
+          stripe_price_id_monthly: string | null
+          stripe_price_id_yearly: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string | null
+          yearly_price: number | null
+        }
+        Insert: {
+          country_code: string
+          created_at?: string | null
+          currency: string
+          id?: string
+          is_default?: boolean | null
+          monthly_price: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+          yearly_price?: number | null
+        }
+        Update: {
+          country_code?: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          is_default?: boolean | null
+          monthly_price?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string | null
+          yearly_price?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_closed_at: string | null
@@ -750,12 +792,14 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          billing_currency: string | null
           business_id: string | null
           cancelled_at: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
           id: string
+          pricing_region: string | null
           priority_support: boolean | null
           sla_response_hours: number | null
           status: Database["public"]["Enums"]["subscription_status"]
@@ -766,12 +810,14 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          billing_currency?: string | null
           business_id?: string | null
           cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          pricing_region?: string | null
           priority_support?: boolean | null
           sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -782,12 +828,14 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          billing_currency?: string | null
           business_id?: string | null
           cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          pricing_region?: string | null
           priority_support?: boolean | null
           sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
