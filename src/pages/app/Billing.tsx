@@ -8,7 +8,8 @@ import {
   Shield,
   ExternalLink,
   Loader2,
-  Sparkles
+  Sparkles,
+  Star
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,41 @@ import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { gaEvents } from '@/hooks/use-google-analytics';
 
-const planFeatures = {
+// Feature lists by tier - different for Nigeria vs International
+const planFeaturesNigeria = {
+  starter: [
+    '5 invoices per month',
+    'Clean invoice layout',
+    'Subtle Invoicemonk branding',
+    'View invoice online',
+    '7-year data retention',
+  ],
+  starter_paid: [
+    'Unlimited invoices',
+    'PDF export',
+    'Branded invoices',
+    'Basic compliance fields',
+    '7-year retention',
+  ],
+  professional: [
+    'Everything in Starter',
+    'Full audit trail',
+    'Immutable invoice hashes',
+    'Public invoice verification',
+    'Compliance-ready exports',
+    'Priority support',
+  ],
+  business: [
+    'Everything in Professional',
+    'Multi-user accounts',
+    'Roles & permissions',
+    'Bulk invoicing',
+    'SLA support',
+    'API access (coming soon)',
+  ],
+};
+
+const planFeaturesInternational = {
   starter: [
     '5 invoices per month',
     'Basic compliance features',
@@ -48,13 +83,16 @@ const planFeatures = {
 
 const planIcons = {
   starter: Zap,
+  starter_paid: Star,
   professional: Shield,
   business: Building2,
 };
 
+type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
+
 export default function Billing() {
   const { tier, subscription } = useSubscription();
-  const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
+  const { pricingByTier, formatPrice, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, openCustomerPortal, isLoading: checkoutLoading } = useCheckout();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
@@ -63,9 +101,10 @@ export default function Billing() {
     gaEvents.subscriptionViewed(tier);
   }, [tier]);
 
-  const handleUpgrade = async (newTier: 'professional' | 'business') => {
+  const handleUpgrade = async (newTier: TierKey) => {
+    if (newTier === 'starter') return;
     setLoadingTier(newTier);
-    await createCheckoutSession(newTier, isYearly ? 'yearly' : 'monthly');
+    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly');
     setLoadingTier(null);
   };
 
@@ -73,8 +112,40 @@ export default function Billing() {
     await openCustomerPortal();
   };
 
-  const tiers: Array<'starter' | 'professional' | 'business'> = ['starter', 'professional', 'business'];
+  // Nigeria sees 4 tiers, International sees 3 tiers
+  const tiers: TierKey[] = isNigeria && hasStarterPaidTier
+    ? ['starter', 'starter_paid', 'professional', 'business']
+    : ['starter', 'professional', 'business'];
+  
+  const planFeatures = isNigeria ? planFeaturesNigeria : planFeaturesInternational;
   const hasPaidSubscription = subscription?.stripe_subscription_id != null;
+
+  const getTierDisplayName = (t: TierKey) => {
+    if (t === 'starter') return 'Free';
+    if (t === 'starter_paid') return 'Starter';
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+
+  const getTierDescription = (t: TierKey) => {
+    switch (t) {
+      case 'starter': return 'For individuals getting started';
+      case 'starter_paid': return 'For solo businesses ready to grow';
+      case 'professional': return 'For growing businesses';
+      case 'business': return 'For enterprises with advanced needs';
+      default: return '';
+    }
+  };
+
+  // Determine if a tier is an upgrade from current
+  const isUpgrade = (targetTier: TierKey): boolean => {
+    const tierOrder: Record<TierKey, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+    return tierOrder[targetTier] > tierOrder[tier as TierKey];
+  };
+
+  const isDowngrade = (targetTier: TierKey): boolean => {
+    const tierOrder: Record<TierKey, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+    return tierOrder[targetTier] < tierOrder[tier as TierKey];
+  };
 
   return (
     <motion.div
@@ -100,13 +171,11 @@ export default function Billing() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold capitalize">{tier}</h3>
+                <h3 className="text-xl font-bold">{getTierDisplayName(tier as TierKey)}</h3>
                 <Badge>Current</Badge>
               </div>
               <p className="text-muted-foreground">
-                {tier === 'starter' && 'For individuals getting started'}
-                {tier === 'professional' && 'For growing businesses'}
-                {tier === 'business' && 'For enterprises with advanced needs'}
+                {getTierDescription(tier as TierKey)}
               </p>
               {subscription?.current_period_end && tier !== 'starter' && (
                 <p className="text-sm text-muted-foreground mt-2">
@@ -115,9 +184,9 @@ export default function Billing() {
               )}
             </div>
             <div className="text-right">
-              {pricingByTier[tier] && (
+              {pricingByTier[tier as TierKey] && (
                 <div className="text-2xl font-bold">
-                  {formatPrice(pricingByTier[tier]!.monthly_price)}
+                  {formatPrice(pricingByTier[tier as TierKey]!.monthly_price)}
                   <span className="text-sm font-normal text-muted-foreground">/month</span>
                 </div>
               )}
@@ -159,17 +228,16 @@ export default function Billing() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Available Plans</h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className={`grid gap-4 ${tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {tiers.map((planTier) => {
             const isCurrent = planTier === tier;
-            const isUpgrade = !isCurrent && 
-              (tier === 'starter' || 
-               (tier === 'professional' && planTier === 'business'));
-            const isDowngrade = !isCurrent && !isUpgrade && planTier !== tier;
+            const isUpgradeTier = isUpgrade(planTier);
+            const isDowngradeTier = isDowngrade(planTier);
             const Icon = planIcons[planTier];
             const isRecommended = planTier === 'professional';
             const pricing = pricingByTier[planTier];
             const isLoadingThis = loadingTier === planTier;
+            const features = planFeatures[planTier as keyof typeof planFeatures] || [];
 
             const price = pricing 
               ? (isYearly && pricing.yearly_price 
@@ -191,12 +259,10 @@ export default function Billing() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Icon className="h-5 w-5" />
-                    {planTier.charAt(0).toUpperCase() + planTier.slice(1)}
+                    {getTierDisplayName(planTier)}
                   </CardTitle>
                   <CardDescription>
-                    {planTier === 'starter' && 'For individuals getting started'}
-                    {planTier === 'professional' && 'For growing businesses'}
-                    {planTier === 'business' && 'For enterprises with advanced needs'}
+                    {getTierDescription(planTier)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -215,7 +281,7 @@ export default function Billing() {
                   <Separator />
                   
                   <ul className="space-y-2">
-                    {planFeatures[planTier].map((feature, index) => (
+                    {features.map((feature, index) => (
                       <li key={index} className="flex items-center gap-2 text-sm">
                         <Check className="h-4 w-4 text-primary shrink-0" />
                         {feature}
@@ -227,11 +293,11 @@ export default function Billing() {
                     <Button className="w-full" variant="secondary" disabled>
                       Current Plan
                     </Button>
-                  ) : isUpgrade ? (
+                  ) : isUpgradeTier ? (
                     <Button 
                       className="w-full" 
                       variant={isRecommended ? 'default' : 'outline'}
-                      onClick={() => handleUpgrade(planTier as 'professional' | 'business')}
+                      onClick={() => handleUpgrade(planTier)}
                       disabled={checkoutLoading || !!loadingTier}
                     >
                       {isLoadingThis ? (
@@ -240,7 +306,7 @@ export default function Billing() {
                         'Upgrade'
                       )}
                     </Button>
-                  ) : isDowngrade ? (
+                  ) : isDowngradeTier ? (
                     <Button 
                       className="w-full" 
                       variant="outline"

@@ -1157,7 +1157,11 @@ export type Database = {
         | "voided"
         | "credited"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
-      subscription_tier: "starter" | "professional" | "business"
+      subscription_tier:
+        | "starter"
+        | "starter_paid"
+        | "professional"
+        | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1329,7 +1333,12 @@ export const Constants = {
         "credited",
       ],
       subscription_status: ["active", "cancelled", "past_due", "trialing"],
-      subscription_tier: ["starter", "professional", "business"],
+      subscription_tier: [
+        "starter",
+        "starter_paid",
+        "professional",
+        "business",
+      ],
     },
   },
 } as const

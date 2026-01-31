@@ -27,8 +27,9 @@ export interface TemplateWithAccess extends InvoiceTemplate {
 // Tier order for comparison
 const TIER_ORDER: Record<SubscriptionTier, number> = {
   starter: 0,
-  professional: 1,
-  business: 2,
+  starter_paid: 1,
+  professional: 2,
+  business: 3,
 };
 
 export function useInvoiceTemplates() {

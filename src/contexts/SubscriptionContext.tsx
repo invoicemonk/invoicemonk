@@ -12,8 +12,11 @@ interface SubscriptionContextType {
   getLimit: (feature: string) => TierLimit | undefined;
   checkTierLimit: (feature: string) => Promise<TierCheckResult>;
   isStarter: boolean;
+  isStarterPaid: boolean;
   isProfessional: boolean;
   isBusiness: boolean;
+  isFree: boolean;
+  isPaid: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);

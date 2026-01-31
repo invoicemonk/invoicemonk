@@ -310,10 +310,9 @@ Deno.serve(async (req) => {
     // Calculate balance due
     const balanceDue = inv.total_amount - (inv.amount_paid || 0)
 
-    // Watermark HTML (subtle, doesn't take space)
-    const watermarkHtml = showWatermark ? `
-      <div class="watermark">INVOICEMONK</div>
-    ` : ''
+    // Subtle footer branding - no aggressive watermark
+    // Free/Starter users get professional-looking invoices with subtle footer badge
+    // Professional+ users get completely clean invoices
 
     // QR Code generation - SVG-based for better quality
     // Prefer env, then fallback
@@ -531,23 +530,22 @@ Deno.serve(async (req) => {
     .footer-left { }
     .footer-right { text-align: right; }
     
-    /* Watermark */
-    .watermark {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-45deg);
-      font-size: 60px;
-      color: rgba(0,0,0,0.04);
-      font-weight: 700;
-      z-index: -1;
-      white-space: nowrap;
-      pointer-events: none;
+    /* Subtle footer branding for free/starter tiers */
+    .footer-branding {
+      text-align: center;
+      font-size: 8px;
+      color: #aaa;
+      padding: 10px 0 0;
+      margin-top: 16px;
+      border-top: 1px solid #eee;
+    }
+    .footer-branding a {
+      color: #888;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-  ${watermarkHtml}
   <div class="container">
     <!-- Header -->
     <div class="header">
@@ -678,9 +676,13 @@ Deno.serve(async (req) => {
         ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
         <br>
         ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}
-        ${showWatermark ? '<br>Upgrade to remove branding' : ''}
       </div>
     </div>
+    ${showWatermark ? `
+    <div class="footer-branding">
+      Generated with <a href="https://invoicemonk.com">Invoicemonk</a> – Smart invoicing for modern businesses
+    </div>
+    ` : ''}
   </div>
 </body>
 </html>`

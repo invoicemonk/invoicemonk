@@ -8,7 +8,8 @@ import {
   Building2, 
   Loader2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Star
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,41 @@ import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
 import logoImage from '@/assets/invoicemonk-logo.png';
 
-const planFeatures = {
+// Feature lists by tier - different for Nigeria vs International
+const planFeaturesNigeria = {
+  starter: [
+    '5 invoices per month',
+    'Clean invoice layout',
+    'Subtle Invoicemonk branding',
+    'View invoice online',
+    '7-year data retention',
+  ],
+  starter_paid: [
+    'Unlimited invoices',
+    'PDF export',
+    'Branded invoices',
+    'Basic compliance fields',
+    '7-year retention',
+  ],
+  professional: [
+    'Everything in Starter',
+    'Full audit trail',
+    'Immutable invoice hashes',
+    'Public invoice verification',
+    'Compliance-ready exports',
+    'Priority support',
+  ],
+  business: [
+    'Everything in Professional',
+    'Multi-user accounts',
+    'Roles & permissions',
+    'Bulk invoicing',
+    'SLA support',
+    'API access (coming soon)',
+  ],
+};
+
+const planFeaturesInternational = {
   starter: [
     '5 invoices per month',
     'Basic compliance features',
@@ -48,20 +83,23 @@ const planFeatures = {
 
 const planIcons = {
   starter: Zap,
+  starter_paid: Star,
   professional: Shield,
   business: Building2,
 };
+
+type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export default function PlanSelection() {
   const navigate = useNavigate();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   
-  const { pricingByTier, formatPrice, currency, countryCode, isLoading: pricingLoading } = useRegionalPricing();
+  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { tier: currentTier } = useSubscription();
 
-  const handleSelectPlan = async (tier: 'starter' | 'professional' | 'business') => {
+  const handleSelectPlan = async (tier: TierKey) => {
     if (tier === 'starter') {
       // Free plan - just go to dashboard
       navigate('/dashboard');
@@ -69,7 +107,7 @@ export default function PlanSelection() {
     }
 
     setLoadingTier(tier);
-    await createCheckoutSession(tier, isYearly ? 'yearly' : 'monthly', countryCode);
+    await createCheckoutSession(tier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', countryCode);
     setLoadingTier(null);
   };
 
@@ -77,7 +115,12 @@ export default function PlanSelection() {
     navigate('/dashboard');
   };
 
-  const tiers: Array<'starter' | 'professional' | 'business'> = ['starter', 'professional', 'business'];
+  // Nigeria sees 4 tiers, International sees 3 tiers
+  const tiers: TierKey[] = isNigeria && hasStarterPaidTier
+    ? ['starter', 'starter_paid', 'professional', 'business']
+    : ['starter', 'professional', 'business'];
+
+  const planFeatures = isNigeria ? planFeaturesNigeria : planFeaturesInternational;
 
   if (pricingLoading) {
     return (
@@ -131,19 +174,36 @@ export default function PlanSelection() {
         </motion.div>
 
         {/* Plan Cards */}
-        <div className="grid gap-6 md:grid-cols-3 mb-8">
+        <div className={`grid gap-6 mb-8 ${tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {tiers.map((tier, index) => {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
             const isRecommended = tier === 'professional';
             const isCurrent = tier === currentTier;
             const isLoadingThis = loadingTier === tier;
+            const features = planFeatures[tier as keyof typeof planFeatures] || [];
             
             const price = pricing 
               ? (isYearly && pricing.yearly_price 
                   ? pricing.yearly_price / 12 // Show monthly equivalent
                   : pricing.monthly_price)
               : 0;
+
+            const getTierDisplayName = (t: TierKey) => {
+              if (t === 'starter') return 'Free';
+              if (t === 'starter_paid') return 'Starter';
+              return t.charAt(0).toUpperCase() + t.slice(1);
+            };
+
+            const getTierDescription = (t: TierKey) => {
+              switch (t) {
+                case 'starter': return 'For individuals getting started';
+                case 'starter_paid': return 'For solo businesses ready to grow';
+                case 'professional': return 'For growing businesses';
+                case 'business': return 'For enterprises with advanced needs';
+                default: return '';
+              }
+            };
 
             return (
               <motion.div
@@ -166,21 +226,19 @@ export default function PlanSelection() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Icon className="h-5 w-5" />
-                      {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                      {getTierDisplayName(tier)}
                     </CardTitle>
                     <CardDescription>
-                      {tier === 'starter' && 'For individuals getting started'}
-                      {tier === 'professional' && 'For growing businesses'}
-                      {tier === 'business' && 'For enterprises with advanced needs'}
+                      {getTierDescription(tier)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
                     <div className="mb-4">
                       <span className="text-4xl font-bold">{formatPrice(price)}</span>
                       <span className="text-muted-foreground">/month</span>
-                      {isYearly && tier !== 'starter' && (
+                      {isYearly && tier !== 'starter' && pricing?.yearly_price && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Billed {formatPrice(pricing?.yearly_price || 0)} yearly
+                          Billed {formatPrice(pricing.yearly_price)} yearly
                         </p>
                       )}
                     </div>
@@ -188,7 +246,7 @@ export default function PlanSelection() {
                     <Separator className="mb-4" />
                     
                     <ul className="space-y-3 flex-1">
-                      {planFeatures[tier].map((feature, featureIndex) => (
+                      {features.map((feature, featureIndex) => (
                         <li key={featureIndex} className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                           {feature}

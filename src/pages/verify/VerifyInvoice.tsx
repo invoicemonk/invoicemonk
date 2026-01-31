@@ -62,6 +62,7 @@ interface VerificationResponse {
     tax_schema_version?: string;
     identity_snapshot_date?: string;
   };
+  issuer_tier?: string;
   error?: string;
 }
 
@@ -483,6 +484,23 @@ const VerifyInvoice = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Tier-Aware Upgrade Banner - Only for starter tier invoices */}
+                {data.issuer_tier === 'starter' && (
+                  <Card className="mb-6 bg-muted/30 border-dashed">
+                    <CardContent className="py-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        This invoice was created on Invoicemonk.
+                      </p>
+                      <p className="text-sm font-medium mt-1">
+                        Audit-grade verification and compliance reports are available on the Professional plan.
+                      </p>
+                      <Button variant="link" asChild className="mt-2">
+                        <Link to="/signup">Learn more about Invoicemonk</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Trust Footer */}
                 <div className="text-center pt-6 pb-4">

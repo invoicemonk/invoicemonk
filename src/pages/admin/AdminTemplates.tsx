@@ -80,7 +80,7 @@ export default function AdminTemplates() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    tier_required: 'starter' as 'starter' | 'professional' | 'business',
+    tier_required: 'starter' as 'starter' | 'starter_paid' | 'professional' | 'business',
     supports_branding: false,
     watermark_required: true,
     is_active: true,
@@ -331,7 +331,7 @@ export default function AdminTemplates() {
               <Label>Required Tier</Label>
               <Select
                 value={formData.tier_required}
-                onValueChange={(value: 'starter' | 'professional' | 'business') => 
+                onValueChange={(value: 'starter' | 'starter_paid' | 'professional' | 'business') => 
                   setFormData({ ...formData, tier_required: value })
                 }
               >
@@ -339,7 +339,8 @@ export default function AdminTemplates() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="starter">Starter (Free)</SelectItem>
+                  <SelectItem value="starter">Free</SelectItem>
+                  <SelectItem value="starter_paid">Starter (Paid)</SelectItem>
                   <SelectItem value="professional">Professional</SelectItem>
                   <SelectItem value="business">Business</SelectItem>
                 </SelectContent>

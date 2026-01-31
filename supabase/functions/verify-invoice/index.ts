@@ -32,6 +32,7 @@ interface VerificationResponse {
     currency: string
     integrity_valid: boolean
   }
+  issuer_tier?: string
   error?: string
   upgrade_required?: boolean
 }
@@ -197,7 +198,8 @@ Deno.serve(async (req) => {
         total_amount: invoice.total_amount,
         currency: invoice.currency,
         integrity_valid: integrityValid
-      }
+      },
+      issuer_tier: issuerTier
     }
 
     // Log the verification event (for audit purposes)

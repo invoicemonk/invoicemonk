@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 type BillingPeriod = 'monthly' | 'yearly';
-type Tier = 'professional' | 'business';
+type Tier = 'starter_paid' | 'professional' | 'business';
 
 interface UseCheckoutOptions {
   onSuccess?: () => void;

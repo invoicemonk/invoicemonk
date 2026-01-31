@@ -6,7 +6,7 @@ export interface RegionalPrice {
   id: string;
   country_code: string;
   currency: string;
-  tier: 'starter' | 'professional' | 'business';
+  tier: 'starter' | 'starter_paid' | 'professional' | 'business';
   monthly_price: number;
   yearly_price: number | null;
   stripe_price_id_monthly: string | null;
@@ -16,6 +16,7 @@ export interface RegionalPrice {
 
 interface PricingByTier {
   starter: RegionalPrice | null;
+  starter_paid: RegionalPrice | null;
   professional: RegionalPrice | null;
   business: RegionalPrice | null;
 }
@@ -77,9 +78,14 @@ export function useRegionalPricing() {
 
   const pricingByTier: PricingByTier = {
     starter: pricing.find(p => p.tier === 'starter') || null,
+    starter_paid: pricing.find(p => p.tier === 'starter_paid') || null,
     professional: pricing.find(p => p.tier === 'professional') || null,
     business: pricing.find(p => p.tier === 'business') || null,
   };
+
+  // Nigeria-specific: Check if starter_paid tier is available (Nigeria only)
+  const hasStarterPaidTier = !!pricingByTier.starter_paid;
+  const isNigeria = countryCode === 'NG';
 
   const formatPrice = (amount: number, showCurrency = true): string => {
     // Amount is stored in smallest unit (kobo/cents)
@@ -108,5 +114,7 @@ export function useRegionalPricing() {
     error,
     formatPrice,
     getCurrencySymbol,
+    hasStarterPaidTier,
+    isNigeria,
   };
 }

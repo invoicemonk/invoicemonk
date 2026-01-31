@@ -55,6 +55,7 @@ interface ViewInvoiceResponse {
     items: InvoiceItem[]
     verification_id: string
   }
+  issuer_tier?: string
   error?: string
 }
 
@@ -90,6 +91,7 @@ Deno.serve(async (req) => {
       .from('invoices')
       .select(`
         id,
+        user_id,
         invoice_number,
         issue_date,
         due_date,
@@ -160,6 +162,18 @@ Deno.serve(async (req) => {
       (a: InvoiceItem, b: InvoiceItem) => a.sort_order - b.sort_order
     )
 
+    // Get issuer's subscription tier
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('tier')
+      .eq('user_id', invoice.user_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const issuerTier = subscription?.tier || 'starter'
+
     // Log the view event (for analytics)
     try {
       await supabase.rpc('log_audit_event', {
@@ -195,7 +209,8 @@ Deno.serve(async (req) => {
         recipient_snapshot: invoice.recipient_snapshot as RecipientSnapshot | null,
         items: sortedItems,
         verification_id: invoice.verification_id
-      }
+      },
+      issuer_tier: issuerTier
     }
 
     return new Response(JSON.stringify(response), {

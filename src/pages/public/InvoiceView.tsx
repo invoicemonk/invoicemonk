@@ -82,6 +82,7 @@ interface InvoiceViewResponse {
     items: InvoiceItem[];
     verification_id: string;
   };
+  issuer_tier?: string;
   error?: string;
 }
 

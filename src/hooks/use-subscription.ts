@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type SubscriptionTier = 'starter' | 'professional' | 'business';
+export type SubscriptionTier = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export interface TierLimit {
   id: string;
@@ -36,8 +36,9 @@ export interface TierCheckResult {
 // Tier order for comparison
 const TIER_ORDER: Record<SubscriptionTier, number> = {
   starter: 0,
-  professional: 1,
-  business: 2,
+  starter_paid: 1,
+  professional: 2,
+  business: 3,
 };
 
 export function useSubscription() {
@@ -166,8 +167,12 @@ export function useSubscription() {
     checkTierLimit,
     // Quick access helpers
     isStarter: tier === 'starter',
+    isStarterPaid: tier === 'starter_paid',
     isProfessional: tier === 'professional' || tier === 'business',
     isBusiness: tier === 'business',
+    // For display purposes, treat starter and starter_paid as "free tier" category
+    isFree: tier === 'starter',
+    isPaid: tier !== 'starter',
   };
 }
 
