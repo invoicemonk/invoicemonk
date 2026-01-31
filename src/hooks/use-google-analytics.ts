@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// Replace with your GA4 Measurement ID
-const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';
+// GA4 Measurement ID
+const GA_MEASUREMENT_ID = 'G-TG0HV25RME';
 
 // Declare gtag on window
 declare global {
