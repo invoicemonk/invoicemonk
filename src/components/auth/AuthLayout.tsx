@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
 import { Check, ArrowLeft, Shield, FileCheck, Zap, Clock } from 'lucide-react';
 import logo from '@/assets/logo-red.png';
 
@@ -48,9 +47,9 @@ export const AuthLayout = ({ children, variant = 'login' }: AuthLayoutProps) => 
         </a>
 
         {/* Logo */}
-        <Link to="/" className="mb-8 lg:mb-12">
+        <a href={MARKETING_URL} className="mb-8 lg:mb-12">
           <img src={logo} alt="Invoicemonk" className="h-10 brightness-0 invert" />
-        </Link>
+        </a>
 
         {/* Main content - hidden on mobile, shown on desktop */}
         <div className="hidden lg:flex flex-col flex-1">
