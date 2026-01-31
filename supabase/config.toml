@@ -3,6 +3,9 @@ project_id = "skcxogeaerudoadluexz"
 [functions.view-invoice]
 verify_jwt = false
 
+[functions.verify-invoice]
+verify_jwt = false
+
 [functions.create-checkout-session]
 verify_jwt = false
 
