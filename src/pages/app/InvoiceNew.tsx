@@ -54,6 +54,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { Tables } from '@/integrations/supabase/types';
+import { gaEvents } from '@/hooks/use-google-analytics';
 
 interface InvoiceItem {
   id: string;
@@ -272,7 +273,7 @@ export default function InvoiceNew() {
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
     const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
 
-    await createInvoice.mutateAsync({
+    const invoice = await createInvoice.mutateAsync({
       invoice: {
         business_id: currentBusiness.id,
         client_id: selectedClientId,
@@ -296,6 +297,10 @@ export default function InvoiceNew() {
       })),
     });
 
+    if (invoice) {
+      // Track invoice created as draft
+      gaEvents.invoiceCreated(invoice.id);
+    }
     navigate('/invoices');
   };
 
@@ -362,6 +367,8 @@ export default function InvoiceNew() {
     });
 
     if (invoice) {
+      // Track invoice issued event
+      gaEvents.invoiceIssued(invoice.id, calculateTotal());
       // Then issue it
       await issueInvoice.mutateAsync(invoice.id);
       navigate('/invoices');
@@ -731,7 +738,10 @@ export default function InvoiceNew() {
                 <Button
                   variant="ghost"
                   className="w-full"
-                  onClick={() => setIsPreviewOpen(true)}
+                  onClick={() => {
+                    gaEvents.invoicePreviewed();
+                    setIsPreviewOpen(true);
+                  }}
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview as Recipient

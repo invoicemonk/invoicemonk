@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
+import { gaEvents } from '@/hooks/use-google-analytics';
 
 interface SendInvoiceDialogProps {
   open: boolean;
@@ -80,6 +81,8 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
         throw new Error(response.error.message || 'Failed to send invoice');
       }
 
+      // Track invoice sent event
+      gaEvents.invoiceSent(invoice.id);
       toast.success('Invoice sent successfully!');
       onOpenChange(false);
     } catch (error: any) {

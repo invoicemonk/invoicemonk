@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, Shield } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { gaEvents } from '@/hooks/use-google-analytics';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -52,6 +53,8 @@ const Login = () => {
         variant: 'destructive',
       });
     } else {
+      // Track successful login
+      gaEvents.loginSuccess();
       toast({
         title: 'Welcome back!',
         description: 'You have successfully logged in.',

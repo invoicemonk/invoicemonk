@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Shield, FileCheck } from 'lucide-react';
+import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 
 const signupSchema = z.object({
@@ -37,6 +38,9 @@ const Signup = () => {
   useEffect(() => {
     if (user) {
       navigate('/dashboard', { replace: true });
+    } else {
+      // Track signup page view
+      gaEvents.signupStarted();
     }
   }, [user, navigate]);
 
@@ -61,6 +65,8 @@ const Signup = () => {
         variant: 'destructive',
       });
     } else {
+      // Track successful signup
+      gaEvents.signupCompleted();
       toast({
         title: 'Account created!',
         description: 'Please check your email to verify your account.',

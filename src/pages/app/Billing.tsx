@@ -19,6 +19,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { gaEvents } from '@/hooks/use-google-analytics';
+import { useEffect } from 'react';
 
 const plans = [
   {
@@ -67,6 +69,11 @@ const plans = [
 export default function Billing() {
   const { tier } = useSubscription();
   const currentPlan = plans.find(p => p.id === tier) || plans[0];
+
+  // Track billing page view
+  useEffect(() => {
+    gaEvents.subscriptionViewed(tier);
+  }, [tier]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {

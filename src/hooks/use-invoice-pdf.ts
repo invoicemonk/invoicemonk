@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { gaEvents } from '@/hooks/use-google-analytics';
 
 interface GeneratePdfParams {
   invoiceId: string;
@@ -32,7 +33,10 @@ export function useDownloadInvoicePdf() {
 
       return { html, invoiceNumber, watermarkApplied, userTier };
     },
-    onSuccess: ({ html, invoiceNumber, watermarkApplied, userTier }) => {
+    onSuccess: ({ html, invoiceNumber, watermarkApplied, userTier }, variables) => {
+      // Track PDF download event
+      gaEvents.pdfDownloaded(variables.invoiceId);
+      
       // Open HTML in new window for printing
       const printWindow = window.open('', '_blank');
       if (printWindow) {

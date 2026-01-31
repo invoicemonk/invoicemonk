@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useClients, useCreateClient, type Client } from '@/hooks/use-clients';
 import { useNavigate } from 'react-router-dom';
+import { gaEvents } from '@/hooks/use-google-analytics';
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -60,6 +61,9 @@ export default function Clients() {
       email: newClient.email || null,
       phone: newClient.phone || null,
     });
+    
+    // Track client created event
+    gaEvents.clientCreated();
     
     setIsAddDialogOpen(false);
     setNewClient({ name: '', email: '', phone: '' });
