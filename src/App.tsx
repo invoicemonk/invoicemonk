@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import NotFound from "./pages/NotFound";
 
 // App pages (authentication)
@@ -86,6 +87,12 @@ function RootRedirect() {
   return <Navigate to={user ? "/dashboard" : "/login"} replace />;
 }
 
+// Analytics wrapper to track page views
+function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  useGoogleAnalytics();
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -94,6 +101,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AnalyticsProvider>
             <Routes>
             {/* Root redirect - authenticated users go to dashboard, others to login */}
             <Route path="/" element={<RootRedirect />} />
@@ -168,6 +176,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+            </AnalyticsProvider>
         </BrowserRouter>
       </TooltipProvider>
     </SubscriptionProvider>
