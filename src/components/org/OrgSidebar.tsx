@@ -106,8 +106,8 @@ export function OrgSidebar() {
                   tooltip="Back to Personal Dashboard"
                 >
                   <Link to="/dashboard" className="text-muted-foreground hover:text-foreground">
-                    <ArrowLeft className="h-4 w-4" />
-                    <span>Personal Dashboard</span>
+                    <ArrowLeft className="h-4 w-4 shrink-0" />
+                    <span className="group-data-[collapsible=icon]:hidden">Personal Dashboard</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -129,8 +129,8 @@ export function OrgSidebar() {
                     tooltip={item.title}
                   >
                     <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -154,8 +154,8 @@ export function OrgSidebar() {
                       tooltip={item.title}
                     >
                       <Link to={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -190,8 +190,8 @@ export function OrgSidebar() {
             !isCollapsed && "w-full justify-start"
           )}
         >
-          <LogOut className="h-4 w-4" />
-          {!isCollapsed && <span className="ml-2">Log out</span>}
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="group-data-[collapsible=icon]:hidden ml-2">Log out</span>
         </Button>
       </SidebarFooter>
     </Sidebar>

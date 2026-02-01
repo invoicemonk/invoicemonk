@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams } from 'react-router-dom';
-import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2, User, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgClients, useCreateClient, useUpdateClient, useDeleteClient } from '@/hooks/use-clients';
+import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { toast } from 'sonner';
 
 interface ClientFormData {
@@ -20,6 +22,9 @@ interface ClientFormData {
   phone: string;
   tax_id: string;
   notes: string;
+  client_type: 'individual' | 'company';
+  cac_number: string;
+  contact_person: string;
 }
 
 const initialFormData: ClientFormData = {
@@ -27,7 +32,10 @@ const initialFormData: ClientFormData = {
   email: '',
   phone: '',
   tax_id: '',
-  notes: ''
+  notes: '',
+  client_type: 'company',
+  cac_number: '',
+  contact_person: ''
 };
 
 export default function OrgClients() {
@@ -37,6 +45,9 @@ export default function OrgClients() {
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
+
+  // Get jurisdiction config based on org's jurisdiction
+  const jurisdictionConfig = getJurisdictionConfig(currentOrg?.jurisdiction || 'NG');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -59,7 +70,10 @@ export default function OrgClients() {
           email: client.email || '',
           phone: client.phone || '',
           tax_id: client.tax_id || '',
-          notes: client.notes || ''
+          notes: client.notes || '',
+          client_type: (client.client_type as 'individual' | 'company') || 'company',
+          cac_number: client.cac_number || '',
+          contact_person: client.contact_person || ''
         });
         setEditingClient(clientId);
       }
@@ -85,7 +99,10 @@ export default function OrgClients() {
             email: formData.email || null,
             phone: formData.phone || null,
             tax_id: formData.tax_id || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            client_type: formData.client_type,
+            cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
+            contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null
           }
         });
         toast.success('Client updated');
@@ -96,6 +113,9 @@ export default function OrgClients() {
           phone: formData.phone || null,
           tax_id: formData.tax_id || null,
           notes: formData.notes || null,
+          client_type: formData.client_type,
+          cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
+          contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null,
           business_id: orgId
         });
         toast.success('Client created');
@@ -223,39 +243,111 @@ export default function OrgClients() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Client Type */}
+            <div className="space-y-3">
+              <Label>Client Type</Label>
+              <RadioGroup
+                value={formData.client_type}
+                onValueChange={(v) => setFormData({ ...formData, client_type: v as 'individual' | 'company' })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="company" id="org-company" />
+                  <Label htmlFor="org-company" className="flex items-center gap-1.5 cursor-pointer">
+                    <Building2 className="h-4 w-4" />
+                    Company
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="individual" id="org-individual" />
+                  <Label htmlFor="org-individual" className="flex items-center gap-1.5 cursor-pointer">
+                    <User className="h-4 w-4" />
+                    Individual
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Name */}
             <div className="space-y-2">
-              <Label>Name *</Label>
+              <Label>{formData.client_type === 'company' ? 'Company Name' : 'Full Name'} *</Label>
               <Input 
                 value={formData.name} 
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Client name"
+                placeholder={formData.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input 
-                type="email"
-                value={formData.email} 
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="client@example.com"
-              />
+
+            {/* Contact Person (for companies) */}
+            {formData.client_type === 'company' && (
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input 
+                  value={formData.contact_person} 
+                  onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                  placeholder="Jane Smith"
+                />
+              </div>
+            )}
+
+            {/* Contact Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input 
+                  type="email"
+                  value={formData.email} 
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="client@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input 
+                  value={formData.phone} 
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder={`${jurisdictionConfig.phonePrefix} ...`}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input 
-                value={formData.phone} 
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+234..."
-              />
+
+            {/* Tax & Compliance */}
+            <div className="space-y-4 pt-2 border-t">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Info className="h-4 w-4 text-muted-foreground" />
+                Tax & Compliance
+              </div>
+              
+              <div className="space-y-2">
+                <Label>{jurisdictionConfig.clientTaxIdLabel}</Label>
+                <Input 
+                  value={formData.tax_id} 
+                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                  placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {jurisdictionConfig.clientTaxIdHint}
+                </p>
+              </div>
+
+              {formData.client_type === 'company' && jurisdictionConfig.showClientReg && (
+                <div className="space-y-2">
+                  <Label>{jurisdictionConfig.clientRegLabel}</Label>
+                  <Input 
+                    value={formData.cac_number} 
+                    onChange={(e) => setFormData({ ...formData, cac_number: e.target.value })}
+                    placeholder={jurisdictionConfig.clientRegPlaceholder}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {jurisdictionConfig.clientRegHint}
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Tax ID</Label>
-              <Input 
-                value={formData.tax_id} 
-                onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                placeholder="Tax identification number"
-              />
-            </div>
+
+            {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea 

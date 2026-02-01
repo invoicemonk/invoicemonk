@@ -1,15 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Restrict CORS to known application origins only
-const ALLOWED_ORIGINS = [
-  'https://id-preview--083179fa-7151-46d5-911e-87c00e5b8c8d.lovable.app',
-  'https://app.invoicemonk.com',
-  'https://invoicemonk.com',
-];
+// Dynamic CORS configuration - allows any Lovable preview domain + production
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return (
+    origin.endsWith('.lovable.app') ||
+    origin.endsWith('.lovableproject.com') ||
+    origin === 'https://app.invoicemonk.com' ||
+    origin === 'https://invoicemonk.com' ||
+    origin.startsWith('http://localhost:')
+  );
+}
 
 function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin');
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const origin = req.headers.get('Origin') || '';
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,

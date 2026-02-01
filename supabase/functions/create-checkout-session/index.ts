@@ -32,19 +32,21 @@ function validateString(value: unknown, fieldName: string, maxLength = 100): str
   return null;
 }
 
-// CORS configuration
-const ALLOWED_ORIGINS = [
-  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
-  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
-  'https://app.invoicemonk.com',
-  'https://invoicemonk.com',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
+// Dynamic CORS configuration - allows any Lovable preview domain + production
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return (
+    origin.endsWith('.lovable.app') ||
+    origin.endsWith('.lovableproject.com') ||
+    origin === 'https://app.invoicemonk.com' ||
+    origin === 'https://invoicemonk.com' ||
+    origin.startsWith('http://localhost:')
+  );
+}
 
 function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin');
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const origin = req.headers.get('Origin') || '';
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,

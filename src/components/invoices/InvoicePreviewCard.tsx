@@ -14,6 +14,8 @@ interface IssuerSnapshot {
   legal_name?: string;
   name?: string;
   tax_id?: string;
+  vat_registration_number?: string;
+  is_vat_registered?: boolean;
   address?: {
     street?: string;
     city?: string;
@@ -45,6 +47,9 @@ interface Business {
   name: string;
   legal_name?: string | null;
   tax_id?: string | null;
+  vat_registration_number?: string | null;
+  is_vat_registered?: boolean | null;
+  jurisdiction?: string;
   address?: {
     street?: string;
     city?: string;
@@ -81,16 +86,26 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
   const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null;
   const isImmutable = invoice.status !== 'draft';
   
+  // Determine if this is a Nigerian invoice (for VAT display)
+  const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG' || business?.jurisdiction === 'NG';
+  const isVatRegistered = issuerSnapshot?.is_vat_registered || business?.is_vat_registered;
+  
   // For drafts, use live business data if no snapshot exists
   // If snapshot exists but logo_url is missing, fall back to live business logo
   const displayIssuer = issuerSnapshot ? {
     ...issuerSnapshot,
     // Always prefer snapshot logo, but fall back to live business logo if missing
     logo_url: issuerSnapshot.logo_url || business?.logo_url,
+    vat_registration_number: issuerSnapshot.vat_registration_number || business?.vat_registration_number,
+    is_vat_registered: issuerSnapshot.is_vat_registered ?? business?.is_vat_registered,
+    jurisdiction: issuerSnapshot.jurisdiction || business?.jurisdiction,
   } : (business ? {
     legal_name: business.legal_name,
     name: business.name,
     tax_id: business.tax_id,
+    vat_registration_number: business.vat_registration_number,
+    is_vat_registered: business.is_vat_registered,
+    jurisdiction: business.jurisdiction,
     address: business.address,
     contact_email: business.contact_email,
     contact_phone: business.contact_phone,
@@ -101,6 +116,20 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
     if (!address) return null;
     const parts = [address.street, address.city, address.state, address.postal_code, address.country].filter(Boolean);
     return parts.join(', ');
+  };
+
+  // Check if all items have the same tax rate (for simplified VAT display)
+  const taxRates = invoice.invoice_items?.map(item => item.tax_rate) || [];
+  const uniqueTaxRates = [...new Set(taxRates)];
+  const uniformTaxRate = uniqueTaxRates.length === 1 ? uniqueTaxRates[0] : null;
+  const isStandardNigerianVat = isNigerianInvoice && uniformTaxRate === 7.5;
+
+  // Helper to format tax label for Nigerian VAT compliance
+  const getTaxLabel = (taxRate: number) => {
+    if (isNigerianInvoice && taxRate === 7.5) {
+      return 'VAT @ 7.5%';
+    }
+    return `Tax: ${taxRate}%`;
   };
 
   return (
@@ -164,8 +193,19 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                 <p className="font-semibold text-lg">
                   {displayIssuer?.legal_name || displayIssuer?.name || 'Your Business'}
                 </p>
+                {/* TIN - Always show for Nigerian businesses */}
                 {displayIssuer?.tax_id && (
-                  <p className="text-sm text-muted-foreground font-mono">{displayIssuer.tax_id}</p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">TIN:</span>{' '}
+                    <span className="font-mono">{displayIssuer.tax_id}</span>
+                  </p>
+                )}
+                {/* VAT Registration Number - Show for VAT-registered Nigerian businesses */}
+                {displayIssuer?.is_vat_registered && displayIssuer?.vat_registration_number && (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">VAT Reg:</span>{' '}
+                    <span className="font-mono">{displayIssuer.vat_registration_number}</span>
+                  </p>
                 )}
                 {displayIssuer?.address && (
                   <p className="text-sm text-muted-foreground">{formatAddress(displayIssuer.address)}</p>
@@ -186,9 +226,13 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                 <p className="font-semibold text-lg">
                   {recipientSnapshot?.name || invoice.clients?.name || 'Client'}
                 </p>
+                {/* Customer TIN - Important for B2B transactions */}
                 {(recipientSnapshot?.tax_id || invoice.clients?.tax_id) && (
-                  <p className="text-sm text-muted-foreground font-mono">
-                    {recipientSnapshot?.tax_id || invoice.clients?.tax_id}
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">TIN:</span>{' '}
+                    <span className="font-mono">
+                      {recipientSnapshot?.tax_id || invoice.clients?.tax_id}
+                    </span>
                   </p>
                 )}
                 {recipientSnapshot?.address && (
@@ -218,6 +262,9 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                   <th className="text-left py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
                   <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Qty</th>
                   <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit Price</th>
+                  {isNigerianInvoice && (
+                    <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">VAT</th>
+                  )}
                   <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
                 </tr>
               </thead>
@@ -227,7 +274,8 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                     <tr key={item.id} className="border-b border-border/50">
                       <td className="py-4 pr-4">
                         <p className="font-medium">{item.description}</p>
-                        {item.tax_rate > 0 && (
+                        {/* Show tax rate under description for non-Nigerian invoices */}
+                        {!isNigerianInvoice && item.tax_rate > 0 && (
                           <p className="text-xs text-muted-foreground">Tax: {item.tax_rate}%</p>
                         )}
                       </td>
@@ -235,6 +283,11 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                       <td className="py-4 text-right tabular-nums">
                         {formatCurrency(Number(item.unit_price), invoice.currency)}
                       </td>
+                      {isNigerianInvoice && (
+                        <td className="py-4 text-right tabular-nums text-muted-foreground">
+                          {item.tax_rate === 7.5 ? '7.5%' : item.tax_rate === 0 ? 'Exempt' : `${item.tax_rate}%`}
+                        </td>
+                      )}
                       <td className="py-4 text-right tabular-nums font-medium">
                         {formatCurrency(Number(item.amount), invoice.currency)}
                       </td>
@@ -242,7 +295,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={isNigerianInvoice ? 5 : 4} className="py-8 text-center text-muted-foreground">
                       No line items
                     </td>
                   </tr>
@@ -253,9 +306,11 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
 
           {/* Totals */}
           <div className="flex justify-end">
-            <div className="w-64 space-y-2">
+            <div className="w-72 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">
+                  {isNigerianInvoice ? 'Subtotal (excl. VAT)' : 'Subtotal'}
+                </span>
                 <span className="tabular-nums">{formatCurrency(Number(invoice.subtotal), invoice.currency)}</span>
               </div>
               {Number(invoice.discount_amount) > 0 && (
@@ -267,12 +322,14 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
+                <span className="text-muted-foreground">
+                  {isStandardNigerianVat ? 'VAT @ 7.5%' : isNigerianInvoice ? 'VAT' : 'Tax'}
+                </span>
                 <span className="tabular-nums">{formatCurrency(Number(invoice.tax_amount), invoice.currency)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
+                <span>{isNigerianInvoice ? 'Total (incl. VAT)' : 'Total'}</span>
                 <span className="tabular-nums">{formatCurrency(Number(invoice.total_amount), invoice.currency)}</span>
               </div>
               {Number(invoice.amount_paid) > 0 && (

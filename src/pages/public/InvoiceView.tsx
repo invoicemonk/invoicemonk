@@ -48,6 +48,10 @@ interface IssuerIdentity {
   legal_name?: string;
   name?: string;
   tax_id?: string;
+  cac_number?: string;
+  vat_registration_number?: string;
+  is_vat_registered?: boolean;
+  jurisdiction?: string;
   address?: Record<string, string>;
   contact_email?: string;
   contact_phone?: string;
@@ -58,6 +62,7 @@ interface RecipientIdentity {
   name?: string;
   email?: string;
   tax_id?: string;
+  cac_number?: string;
   address?: Record<string, string>;
   phone?: string;
 }
@@ -302,6 +307,32 @@ const InvoiceView = () => {
                           {invoice.issuer_snapshot.contact_phone}
                         </p>
                       )}
+                      {/* Tax Identification */}
+                      {invoice.issuer_snapshot?.tax_id && (
+                        <p className="text-sm text-muted-foreground mt-1 font-mono">
+                          TIN: {invoice.issuer_snapshot.tax_id}
+                        </p>
+                      )}
+                      {/* CAC/Registration Number */}
+                      {invoice.issuer_snapshot?.cac_number && (
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {invoice.issuer_snapshot?.jurisdiction === 'NG' ? 'CAC' : 
+                           invoice.issuer_snapshot?.jurisdiction === 'GB' ? 'Co. No' :
+                           invoice.issuer_snapshot?.jurisdiction === 'DE' ? 'HRB' :
+                           invoice.issuer_snapshot?.jurisdiction === 'FR' ? 'SIRET' : 'Reg No'}: {invoice.issuer_snapshot.cac_number}
+                        </p>
+                      )}
+                      {invoice.issuer_snapshot?.vat_registration_number && (
+                        <p className="text-sm text-muted-foreground font-mono">
+                          VAT Reg: {invoice.issuer_snapshot.vat_registration_number}
+                        </p>
+                      )}
+                      {/* VAT Invoice Badge */}
+                      {invoice.issuer_snapshot?.is_vat_registered && (
+                        <Badge variant="secondary" className="mt-2">
+                          VAT Invoice
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
@@ -344,6 +375,18 @@ const InvoiceView = () => {
                   {formatAddress(invoice.recipient_snapshot?.address) && (
                     <p className="text-sm text-muted-foreground mt-1">
                       {formatAddress(invoice.recipient_snapshot?.address)}
+                    </p>
+                  )}
+                  {/* Client Tax ID */}
+                  {invoice.recipient_snapshot?.tax_id && (
+                    <p className="text-sm text-muted-foreground mt-2 font-mono">
+                      TIN: {invoice.recipient_snapshot.tax_id}
+                    </p>
+                  )}
+                  {/* Client CAC Number (for Nigerian companies) */}
+                  {invoice.recipient_snapshot?.cac_number && (
+                    <p className="text-sm text-muted-foreground font-mono">
+                      CAC: {invoice.recipient_snapshot.cac_number}
                     </p>
                   )}
                 </CardContent>

@@ -8,7 +8,10 @@ import {
   Mail,
   Phone,
   FileText,
-  Loader2
+  Loader2,
+  Building2,
+  User,
+  Info
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
@@ -32,13 +36,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useClients, useCreateClient, type Client } from '@/hooks/use-clients';
+import { useUserBusiness } from '@/hooks/use-business';
+import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
 
 export default function Clients() {
   const navigate = useNavigate();
   const { data: clients = [], isLoading, error } = useClients();
+  const { data: business } = useUserBusiness();
   const createClient = useCreateClient();
+  
+  // Get jurisdiction config based on user's business
+  const jurisdictionConfig = getJurisdictionConfig(business?.jurisdiction || 'NG');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -46,6 +56,10 @@ export default function Clients() {
     name: '',
     email: '',
     phone: '',
+    tax_id: '',
+    client_type: 'company' as 'individual' | 'company',
+    cac_number: '',
+    contact_person: '',
   });
 
   const filteredClients = clients.filter(client => 
@@ -60,13 +74,25 @@ export default function Clients() {
       name: newClient.name,
       email: newClient.email || null,
       phone: newClient.phone || null,
+      tax_id: newClient.tax_id || null,
+      client_type: newClient.client_type,
+      cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
+      contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
     });
     
     // Track client created event
     gaEvents.clientCreated();
     
     setIsAddDialogOpen(false);
-    setNewClient({ name: '', email: '', phone: '' });
+    setNewClient({ 
+      name: '', 
+      email: '', 
+      phone: '', 
+      tax_id: '', 
+      client_type: 'company',
+      cac_number: '',
+      contact_person: '',
+    });
   };
 
   const getInitials = (name: string) => {
@@ -94,42 +120,125 @@ export default function Clients() {
               Add Client
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Client</DialogTitle>
               <DialogDescription>
-                Add a new client to your database. You can create invoices for them later.
+                Add a new client to your database for compliance-ready invoicing.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Client Type */}
+              <div className="space-y-3">
+                <Label>Client Type</Label>
+                <RadioGroup
+                  value={newClient.client_type}
+                  onValueChange={(v) => setNewClient({ ...newClient, client_type: v as 'individual' | 'company' })}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="company" id="company" />
+                    <Label htmlFor="company" className="flex items-center gap-1.5 cursor-pointer">
+                      <Building2 className="h-4 w-4" />
+                      Company
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="individual" id="individual" />
+                    <Label htmlFor="individual" className="flex items-center gap-1.5 cursor-pointer">
+                      <User className="h-4 w-4" />
+                      Individual
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Name */}
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name">
+                  {newClient.client_type === 'company' ? 'Company Name' : 'Full Name'} *
+                </Label>
                 <Input
                   id="name"
-                  placeholder="John Doe or Company Name"
+                  placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={newClient.email}
-                  onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                />
+
+              {/* Contact Person (for companies) */}
+              {newClient.client_type === 'company' && (
+                <div className="space-y-2">
+                  <Label htmlFor="contact_person">Contact Person</Label>
+                  <Input
+                    id="contact_person"
+                    placeholder="Jane Smith"
+                    value={newClient.contact_person}
+                    onChange={(e) => setNewClient({ ...newClient, contact_person: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {/* Contact Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="client@example.com"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder={`${jurisdictionConfig.phonePrefix} ...`}
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+234 800 000 0000"
-                  value={newClient.phone}
-                  onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-                />
+
+              {/* Tax & Compliance */}
+              <div className="space-y-4 pt-2 border-t">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  Tax & Compliance
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="tax_id">{jurisdictionConfig.clientTaxIdLabel}</Label>
+                  <Input
+                    id="tax_id"
+                    placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
+                    value={newClient.tax_id}
+                    onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {jurisdictionConfig.clientTaxIdHint}
+                  </p>
+                </div>
+
+                {newClient.client_type === 'company' && jurisdictionConfig.showClientReg && (
+                  <div className="space-y-2">
+                    <Label htmlFor="cac_number">{jurisdictionConfig.clientRegLabel}</Label>
+                    <Input
+                      id="cac_number"
+                      placeholder={jurisdictionConfig.clientRegPlaceholder}
+                      value={newClient.cac_number}
+                      onChange={(e) => setNewClient({ ...newClient, cac_number: e.target.value })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {jurisdictionConfig.clientRegHint}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

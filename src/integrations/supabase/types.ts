@@ -120,6 +120,7 @@ export type Database = {
       businesses: {
         Row: {
           address: Json | null
+          cac_number: string | null
           compliance_status: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -130,6 +131,7 @@ export type Database = {
           default_currency: string | null
           id: string
           invoice_prefix: string | null
+          is_vat_registered: boolean | null
           jurisdiction: string
           legal_name: string | null
           logo_url: string | null
@@ -137,9 +139,11 @@ export type Database = {
           next_invoice_number: number | null
           tax_id: string | null
           updated_at: string
+          vat_registration_number: string | null
         }
         Insert: {
           address?: Json | null
+          cac_number?: string | null
           compliance_status?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -150,6 +154,7 @@ export type Database = {
           default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
+          is_vat_registered?: boolean | null
           jurisdiction?: string
           legal_name?: string | null
           logo_url?: string | null
@@ -157,9 +162,11 @@ export type Database = {
           next_invoice_number?: number | null
           tax_id?: string | null
           updated_at?: string
+          vat_registration_number?: string | null
         }
         Update: {
           address?: Json | null
+          cac_number?: string | null
           compliance_status?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -170,6 +177,7 @@ export type Database = {
           default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
+          is_vat_registered?: boolean | null
           jurisdiction?: string
           legal_name?: string | null
           logo_url?: string | null
@@ -177,6 +185,7 @@ export type Database = {
           next_invoice_number?: number | null
           tax_id?: string | null
           updated_at?: string
+          vat_registration_number?: string | null
         }
         Relationships: []
       }
@@ -184,6 +193,9 @@ export type Database = {
         Row: {
           address: Json | null
           business_id: string | null
+          cac_number: string | null
+          client_type: string | null
+          contact_person: string | null
           created_at: string
           email: string | null
           id: string
@@ -197,6 +209,9 @@ export type Database = {
         Insert: {
           address?: Json | null
           business_id?: string | null
+          cac_number?: string | null
+          client_type?: string | null
+          contact_person?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -210,6 +225,9 @@ export type Database = {
         Update: {
           address?: Json | null
           business_id?: string | null
+          cac_number?: string | null
+          client_type?: string | null
+          contact_person?: string | null
           created_at?: string
           email?: string | null
           id?: string

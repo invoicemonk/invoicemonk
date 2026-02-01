@@ -38,6 +38,10 @@ interface IssuerSnapshot {
   name?: string
   legal_name?: string
   tax_id?: string
+  cac_number?: string
+  vat_registration_number?: string
+  is_vat_registered?: boolean
+  jurisdiction?: string
   address?: Record<string, string>
   contact_email?: string
   contact_phone?: string
@@ -49,6 +53,7 @@ interface RecipientSnapshot {
   email?: string
   phone?: string
   tax_id?: string
+  cac_number?: string
   address?: Record<string, string>
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { 
   Plus, 
   Trash2, 
@@ -12,7 +12,9 @@ import {
   Loader2,
   Lock,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Info,
+  Building2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +23,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -48,6 +53,7 @@ import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
 import { useInvoiceLimitCheck, useSubscription } from '@/hooks/use-subscription';
 import { useBusinessCurrency } from '@/hooks/use-business-currency';
 import { useUserOrganizations } from '@/hooks/use-organization';
+import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
@@ -58,6 +64,7 @@ interface InvoiceItem {
   quantity: number;
   unitPrice: number;
   taxRate: number;
+  isVatExempt?: boolean;
 }
 
 export default function InvoiceEdit() {
@@ -77,6 +84,18 @@ export default function InvoiceEdit() {
   const createClient = useCreateClient();
   const updateInvoice = useUpdateInvoice();
   const issueInvoice = useIssueInvoice();
+
+  // Nigerian VAT compliance
+  const isNigerianBusiness = currentBusiness?.jurisdiction === 'NG';
+  const isVatRegistered = (currentBusiness as any)?.is_vat_registered || false;
+  const isNigerianVatRegistered = isNigerianBusiness && isVatRegistered;
+  const { data: activeTaxSchema } = useActiveTaxSchema(currentBusiness?.jurisdiction || '');
+  const defaultVatRate = isNigerianVatRegistered && activeTaxSchema?.rates?.vat 
+    ? Number(activeTaxSchema.rates.vat) 
+    : 0;
+
+  // B2B Transaction state
+  const [isB2BTransaction, setIsB2BTransaction] = useState(false);
 
   // Currency lock state
   const isCurrencyLocked = businessCurrency?.currency_locked || false;
@@ -100,6 +119,11 @@ export default function InvoiceEdit() {
     phone: '',
   });
 
+  // Get selected client for B2B validation
+  const selectedClient = clients?.find(c => c.id === selectedClientId);
+  const clientHasTin = !!selectedClient?.tax_id;
+  const showTinWarning = isNigerianBusiness && isB2BTransaction && selectedClientId && !clientHasTin;
+
   // Initialize form with invoice data
   useEffect(() => {
     if (invoice && !isInitialized) {
@@ -119,13 +143,21 @@ export default function InvoiceEdit() {
           quantity: item.quantity,
           unitPrice: Number(item.unit_price),
           taxRate: item.tax_rate,
+          isVatExempt: item.tax_rate === 0 && isNigerianVatRegistered,
         })));
       } else {
-        setItems([{ id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: 0 }]);
+        setItems([{ 
+          id: '1', 
+          description: '', 
+          quantity: 1, 
+          unitPrice: 0, 
+          taxRate: defaultVatRate,
+          isVatExempt: false
+        }]);
       }
       setIsInitialized(true);
     }
-  }, [invoice, isInitialized]);
+  }, [invoice, isInitialized, isNigerianVatRegistered, defaultVatRate]);
 
   // Redirect if not a draft
   useEffect(() => {
@@ -142,7 +174,14 @@ export default function InvoiceEdit() {
   const addItem = () => {
     setItems([
       ...items,
-      { id: Date.now().toString(), description: '', quantity: 1, unitPrice: 0, taxRate: 0 }
+      { 
+        id: Date.now().toString(), 
+        description: '', 
+        quantity: 1, 
+        unitPrice: 0, 
+        taxRate: defaultVatRate,
+        isVatExempt: false
+      }
     ]);
   };
 
@@ -152,10 +191,22 @@ export default function InvoiceEdit() {
     }
   };
 
-  const updateItem = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
-    setItems(items.map(item => 
-      item.id === itemId ? { ...item, [field]: value } : item
-    ));
+  const updateItem = (itemId: string, field: keyof InvoiceItem, value: string | number | boolean) => {
+    setItems(items.map(item => {
+      if (item.id !== itemId) return item;
+      
+      // Handle VAT exempt toggle
+      if (field === 'isVatExempt') {
+        const isExempt = value as boolean;
+        return { 
+          ...item, 
+          isVatExempt: isExempt,
+          taxRate: isExempt ? 0 : defaultVatRate
+        };
+      }
+      
+      return { ...item, [field]: value };
+    }));
   };
 
   const calculateSubtotal = () => {
@@ -194,6 +245,15 @@ export default function InvoiceEdit() {
       toast({
         title: 'Line items required',
         description: 'Please add at least one line item with a description and price.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    // B2B validation for Nigerian businesses
+    if (isNigerianBusiness && isB2BTransaction && !clientHasTin) {
+      toast({
+        title: 'Client TIN required',
+        description: 'B2B transactions require the client\'s Tax Identification Number for compliance.',
         variant: 'destructive',
       });
       return false;
@@ -388,6 +448,19 @@ export default function InvoiceEdit() {
         </Card>
       )}
 
+      {/* Nigerian VAT Tax Schema Info */}
+      {isNigerianVatRegistered && activeTaxSchema && (
+        <Alert className="border-blue-500/50 bg-blue-500/5">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-blue-700 dark:text-blue-400">
+            Tax Schema: {activeTaxSchema.name} ({activeTaxSchema.rates?.vat}%)
+          </AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            Items are automatically taxed at the current Nigerian VAT rate. Toggle "VAT Exempt" for goods/services exempt from VAT.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
         <div className="lg:col-span-2 space-y-6">
@@ -427,6 +500,44 @@ export default function InvoiceEdit() {
                   + Create new client
                 </Button>
               </div>
+
+              {/* B2B Transaction Toggle - Only for Nigerian businesses */}
+              {isNigerianBusiness && selectedClientId && (
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="b2b-toggle" className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        B2B Transaction
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        This is a business-to-business transaction
+                      </p>
+                    </div>
+                    <Switch 
+                      id="b2b-toggle"
+                      checked={isB2BTransaction}
+                      onCheckedChange={setIsB2BTransaction}
+                    />
+                  </div>
+
+                  {/* TIN Warning */}
+                  {showTinWarning && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Client TIN Required</AlertTitle>
+                      <AlertDescription className="flex items-center justify-between">
+                        <span>B2B transactions require the client's Tax ID for compliance.</span>
+                        <Button variant="outline" size="sm" asChild className="ml-2">
+                          <Link to={`/clients/${selectedClientId}/edit`}>
+                            Edit Client
+                          </Link>
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -573,16 +684,35 @@ export default function InvoiceEdit() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Tax Rate (%)</Label>
+                          <Label>
+                            {isNigerianVatRegistered ? 'VAT Rate (%)' : 'Tax Rate (%)'}
+                          </Label>
                           <Input
                             type="number"
                             min="0"
                             max="100"
                             value={item.taxRate}
                             onChange={(e) => updateItem(item.id, 'taxRate', parseFloat(e.target.value) || 0)}
+                            disabled={isNigerianVatRegistered && !item.isVatExempt}
                           />
                         </div>
                       </div>
+                      {/* VAT Exempt toggle for Nigerian businesses */}
+                      {isNigerianVatRegistered && (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`vat-exempt-${item.id}`}
+                            checked={item.isVatExempt || false}
+                            onCheckedChange={(checked) => updateItem(item.id, 'isVatExempt', checked as boolean)}
+                          />
+                          <label 
+                            htmlFor={`vat-exempt-${item.id}`}
+                            className="text-sm text-muted-foreground cursor-pointer"
+                          >
+                            VAT Exempt (for goods/services exempt from VAT)
+                          </label>
+                        </div>
+                      )}
                     </div>
                     {items.length > 1 && (
                       <Button
@@ -597,6 +727,11 @@ export default function InvoiceEdit() {
                   </div>
                   <div className="text-right text-sm text-muted-foreground">
                     Line total: {formatCurrency(item.quantity * item.unitPrice)}
+                    {item.taxRate > 0 && (
+                      <span className="ml-2">
+                        ({isNigerianVatRegistered ? 'VAT' : 'Tax'}: {formatCurrency(item.quantity * item.unitPrice * item.taxRate / 100)})
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -651,16 +786,20 @@ export default function InvoiceEdit() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">
+                    {isNigerianVatRegistered ? 'Subtotal (excl. VAT)' : 'Subtotal'}
+                  </span>
                   <span>{formatCurrency(calculateSubtotal())}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax</span>
+                  <span className="text-muted-foreground">
+                    {isNigerianVatRegistered ? `VAT @ ${defaultVatRate}%` : 'Tax'}
+                  </span>
                   <span>{formatCurrency(calculateTax())}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
-                  <span>Total</span>
+                  <span>{isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>
                   <span>{formatCurrency(calculateTotal())}</span>
                 </div>
               </div>
@@ -684,7 +823,7 @@ export default function InvoiceEdit() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || isAtInvoiceLimit}
+                  disabled={isLoading || !isEmailVerified || isAtInvoiceLimit || showTinWarning}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -16,18 +16,20 @@ function validateUUID(value: unknown, fieldName: string): string | null {
   return null;
 }
 
-// CORS configuration - public endpoint allows broader access for PDF viewing
-const ALLOWED_ORIGINS = [
-  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
-  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
-  'https://app.invoicemonk.com',
-  'https://invoicemonk.com',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
+// Dynamic CORS configuration - allows any Lovable preview domain + production
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return (
+    origin.endsWith('.lovable.app') ||
+    origin.endsWith('.lovableproject.com') ||
+    origin === 'https://app.invoicemonk.com' ||
+    origin === 'https://invoicemonk.com' ||
+    origin.startsWith('http://localhost:')
+  );
+}
 
 function getCorsHeaders(req: Request, isPublicAccess: boolean): Record<string, string> {
-  const origin = req.headers.get('Origin');
+  const origin = req.headers.get('Origin') || '';
   
   // For public access (verification_id), allow broader access
   if (isPublicAccess) {
@@ -38,7 +40,7 @@ function getCorsHeaders(req: Request, isPublicAccess: boolean): Record<string, s
     };
   }
   
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -68,8 +70,11 @@ interface IssuerSnapshot {
   legal_name?: string
   name?: string
   tax_id?: string
-  address?: Record<string, unknown>
+  cac_number?: string
+  vat_registration_number?: string
+  is_vat_registered?: boolean
   jurisdiction?: string
+  address?: Record<string, unknown>
   contact_email?: string
   contact_phone?: string
   logo_url?: string
@@ -79,6 +84,9 @@ interface RecipientSnapshot {
   name?: string
   email?: string
   tax_id?: string
+  cac_number?: string
+  client_type?: string
+  contact_person?: string
   address?: Record<string, unknown>
   phone?: string
 }
@@ -279,6 +287,10 @@ Deno.serve(async (req) => {
     const recipientSnapshot = inv.recipient_snapshot
     const templateSnapshot = inv.template_snapshot
 
+    // Determine if this is a Nigerian VAT invoice
+    const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG'
+    const isNigerianVatRegistered = isNigerianInvoice && issuerSnapshot?.is_vat_registered === true
+
     // Determine if watermark should be applied
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
@@ -331,21 +343,38 @@ Deno.serve(async (req) => {
     // Get issuer and recipient data from snapshots
     const issuerName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk User'
     const issuerTaxId = issuerSnapshot?.tax_id || ''
+    const issuerCacNumber = issuerSnapshot?.cac_number || ''
+    const issuerVatRegNumber = issuerSnapshot?.vat_registration_number || ''
     const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
     const issuerEmail = issuerSnapshot?.contact_email || ''
     const issuerPhone = issuerSnapshot?.contact_phone || ''
     
     const recipientName = recipientSnapshot?.name || inv.clients?.name || 'Client'
     const recipientEmail = recipientSnapshot?.email || inv.clients?.email || ''
+    const recipientTaxId = recipientSnapshot?.tax_id || ''
+    const recipientCacNumber = recipientSnapshot?.cac_number || ''
     const recipientAddress = formatAddressCompact(recipientSnapshot?.address || inv.clients?.address)
+    
+    // Helper to get CAC display label based on jurisdiction
+    const getCacLabel = (jurisdiction: string | undefined): string => {
+      switch (jurisdiction) {
+        case 'NG': return 'CAC'
+        case 'GB': return 'Co. No'
+        case 'DE': return 'HRB'
+        case 'FR': return 'SIRET'
+        default: return 'Reg No'
+      }
+    }
+    const issuerCacLabel = getCacLabel(issuerSnapshot?.jurisdiction)
 
-    // Generate compact line items HTML
+    // Generate compact line items HTML with VAT-specific labels for Nigerian invoices
     const items = (inv.invoice_items || []) as InvoiceItem[]
     const itemsHtml = items.map(item => `
       <tr>
         <td>${item.description}</td>
         <td class="right">${item.quantity}</td>
         <td class="right">${formatCurrency(item.unit_price, inv.currency)}</td>
+        ${isNigerianVatRegistered ? `<td class="right">${item.tax_rate === 0 ? 'Exempt' : item.tax_rate + '%'}</td>` : ''}
         <td class="right">${formatCurrency(item.amount, inv.currency)}</td>
       </tr>
     `).join('')
@@ -443,6 +472,7 @@ Deno.serve(async (req) => {
     }
     .brand { font-size: 18px; font-weight: 700; color: #1a1a1a; }
     .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
+    .brand-tin { font-size: 9px; color: #444; margin-top: 2px; font-weight: 500; }
     .invoice-meta { text-align: right; }
     .invoice-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a; }
     .invoice-number { font-size: 12px; color: #666; margin-top: 2px; }
@@ -473,6 +503,7 @@ Deno.serve(async (req) => {
     }
     .party-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
     .party-details { font-size: 10px; color: #444; line-height: 1.4; }
+    .party-tin { font-size: 10px; color: #333; font-weight: 500; margin-top: 4px; }
     
     /* Invoice summary box */
     .summary-box {
@@ -529,7 +560,7 @@ Deno.serve(async (req) => {
       justify-content: flex-end; 
       margin-bottom: 16px;
     }
-    .totals { width: 220px; }
+    .totals { width: 240px; }
     .total-row { 
       display: flex; 
       justify-content: space-between; 
@@ -609,6 +640,9 @@ Deno.serve(async (req) => {
           <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
           ${issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+          ${issuerTaxId ? `<div class="brand-tin">TIN: ${issuerTaxId}</div>` : ''}
+          ${issuerCacNumber ? `<div class="brand-tin">${issuerCacLabel}: ${issuerCacNumber}</div>` : ''}
+          ${issuerVatRegNumber ? `<div class="brand-tin">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
         </div>
       </div>
       <div class="invoice-meta">
@@ -627,6 +661,8 @@ Deno.serve(async (req) => {
           ${recipientAddress ? `${recipientAddress}<br>` : ''}
           ${recipientEmail ? `${recipientEmail}` : ''}
         </div>
+        ${recipientTaxId ? `<div class="party-tin">TIN: ${recipientTaxId}</div>` : ''}
+        ${recipientCacNumber ? `<div class="party-tin">CAC: ${recipientCacNumber}</div>` : ''}
       </div>
       <div class="party">
         <div class="summary-box">
@@ -654,9 +690,10 @@ Deno.serve(async (req) => {
     <table class="no-break">
       <thead>
         <tr>
-          <th style="width: 55%;">Description</th>
+          <th style="width: ${isNigerianVatRegistered ? '45%' : '55%'};">Description</th>
           <th class="right" style="width: 10%;">Qty</th>
           <th class="right" style="width: 17%;">Rate</th>
+          ${isNigerianVatRegistered ? '<th class="right" style="width: 10%;">VAT</th>' : ''}
           <th class="right" style="width: 18%;">Amount</th>
         </tr>
       </thead>
@@ -669,12 +706,12 @@ Deno.serve(async (req) => {
     <div class="totals-wrapper no-break">
       <div class="totals">
         <div class="total-row">
-          <span>Subtotal</span>
+          <span>${isNigerianVatRegistered ? 'Subtotal (excl. VAT)' : 'Subtotal'}</span>
           <span>${formatCurrency(inv.subtotal, inv.currency)}</span>
         </div>
         ${inv.tax_amount > 0 ? `
         <div class="total-row">
-          <span>Tax</span>
+          <span>${isNigerianVatRegistered ? 'VAT @ 7.5%' : 'Tax'}</span>
           <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
         </div>
         ` : ''}
@@ -685,7 +722,7 @@ Deno.serve(async (req) => {
         </div>
         ` : ''}
         <div class="total-row grand">
-          <span>Total</span>
+          <span>${isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>
           <span>${formatCurrency(inv.total_amount, inv.currency)}</span>
         </div>
         ${inv.amount_paid > 0 ? `

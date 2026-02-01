@@ -47,19 +47,21 @@ function sanitizeString(value: string): string {
   return value.replace(/<[^>]*>/g, '').replace(/[<>]/g, '').trim();
 }
 
-// CORS configuration
-const ALLOWED_ORIGINS = [
-  'https://id-preview--7df4a13e-b3ac-46ce-9c9d-c2c7e2d1e664.lovable.app',
-  'https://id-preview--dbde34c4-8152-4610-a259-5ddd5a28472b.lovable.app',
-  'https://app.invoicemonk.com',
-  'https://invoicemonk.com',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
+// Dynamic CORS configuration - allows any Lovable preview domain + production
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return (
+    origin.endsWith('.lovable.app') ||
+    origin.endsWith('.lovableproject.com') ||
+    origin === 'https://app.invoicemonk.com' ||
+    origin === 'https://invoicemonk.com' ||
+    origin.startsWith('http://localhost:')
+  );
+}
 
 function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin');
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const origin = req.headers.get('Origin') || '';
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -82,6 +84,9 @@ interface IssuerSnapshot {
   contact_phone?: string
   logo_url?: string
   tax_id?: string
+  vat_registration_number?: string
+  is_vat_registered?: boolean
+  jurisdiction?: string
   address?: {
     line1?: string
     street?: string
@@ -96,6 +101,8 @@ interface RecipientSnapshot {
   name?: string
   email?: string
   phone?: string
+  tax_id?: string
+  cac_number?: string
   address?: {
     line1?: string
     street?: string
@@ -175,6 +182,10 @@ const generateProfessionalHtml = (
   const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
   const issuerEmail = issuerSnapshot?.contact_email || ''
   const issuerPhone = issuerSnapshot?.contact_phone || ''
+  const issuerTaxId = issuerSnapshot?.tax_id || ''
+  const issuerVatRegNumber = issuerSnapshot?.vat_registration_number || ''
+  const issuerIsVatRegistered = issuerSnapshot?.is_vat_registered || false
+  const issuerJurisdiction = issuerSnapshot?.jurisdiction || ''
   // Use the passed logo URL (which may be from snapshot or fallback from business table)
   const issuerLogoUrl = issuerLogoUrlParam || issuerSnapshot?.logo_url || null
   
@@ -182,6 +193,8 @@ const generateProfessionalHtml = (
   const recipientName = recipientSnapshot?.name || 'Client'
   const recipientEmail = recipientSnapshot?.email || ''
   const recipientAddress = formatAddressCompact(recipientSnapshot?.address)
+  const recipientTaxId = recipientSnapshot?.tax_id || ''
+  const recipientCacNumber = recipientSnapshot?.cac_number || ''
   
   // Status colors
   const statusColors: Record<string, { bg: string; color: string }> = {
@@ -418,6 +431,9 @@ const generateProfessionalHtml = (
           <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
           ${issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
+          ${issuerTaxId ? `<div class="brand-sub" style="font-family: monospace;">TIN: ${issuerTaxId}</div>` : ''}
+          ${issuerVatRegNumber ? `<div class="brand-sub" style="font-family: monospace;">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
+          ${issuerIsVatRegistered ? `<div style="margin-top: 4px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: 600;">VAT INVOICE</span></div>` : ''}
         </div>
       </div>
       <div class="invoice-meta">
@@ -434,7 +450,9 @@ const generateProfessionalHtml = (
         <div class="party-name">${recipientName}</div>
         <div class="party-details">
           ${recipientAddress ? `${recipientAddress}<br>` : ''}
-          ${recipientEmail ? `${recipientEmail}` : ''}
+          ${recipientEmail ? `${recipientEmail}<br>` : ''}
+          ${recipientTaxId ? `<span style="font-family: monospace;">TIN: ${recipientTaxId}</span><br>` : ''}
+          ${recipientCacNumber ? `<span style="font-family: monospace;">CAC: ${recipientCacNumber}</span>` : ''}
         </div>
       </div>
       <div class="party">

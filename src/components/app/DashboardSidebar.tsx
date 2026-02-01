@@ -100,8 +100,8 @@ export function DashboardSidebar() {
                   >
                     <Link to={item.url} className="flex items-center justify-between w-full">
                       <span className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
                       {item.showBadge && unreadCount > 0 && !isCollapsed && (
                         <Badge variant="destructive" className="h-5 px-1.5 text-xs">
@@ -130,8 +130,8 @@ export function DashboardSidebar() {
                     tooltip={item.title}
                   >
                     <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -165,8 +165,8 @@ export function DashboardSidebar() {
             !isCollapsed && "w-full justify-start"
           )}
         >
-          <LogOut className="h-4 w-4" />
-          {!isCollapsed && <span className="ml-2">Log out</span>}
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="group-data-[collapsible=icon]:hidden ml-2">Log out</span>
         </Button>
       </SidebarFooter>
     </Sidebar>

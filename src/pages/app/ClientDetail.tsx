@@ -147,9 +147,29 @@ export default function ClientDetail() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                {client.client_type === 'individual' ? (
+                  <>
+                    <Building2 className="h-4 w-4" />
+                    Individual
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="h-4 w-4" />
+                    Company
+                  </>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {client.contact_person && (
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    <span className="text-muted-foreground">Contact:</span> {client.contact_person}
+                  </span>
+                </div>
+              )}
               {client.email && (
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-muted-foreground" />
@@ -168,11 +188,34 @@ export default function ClientDetail() {
                   <span>{formatAddress(client.address as Record<string, unknown>)}</span>
                 </div>
               )}
-              {!client.email && !client.phone && !client.address && (
+              {!client.email && !client.phone && !client.address && !client.contact_person && (
                 <p className="text-muted-foreground text-sm">No contact information available</p>
               )}
             </CardContent>
           </Card>
+
+          {/* Tax & Compliance Card */}
+          {(client.tax_id || client.cac_number) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Tax & Compliance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {client.tax_id && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">TIN</p>
+                    <p className="font-mono text-sm">{client.tax_id}</p>
+                  </div>
+                )}
+                {client.cac_number && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">CAC Number</p>
+                    <p className="font-mono text-sm">{client.cac_number}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {client.notes && (
             <Card>

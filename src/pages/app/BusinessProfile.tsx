@@ -15,7 +15,8 @@ import {
   ImageIcon,
   Lock,
   Coins,
-  AlertCircle
+  AlertCircle,
+  Receipt
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,8 @@ import {
 } from '@/components/ui/select';
 import { useUserBusiness, useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
+import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
+import { Switch } from '@/components/ui/switch';
 
 const jurisdictions = [
   { value: 'NG', label: 'Nigeria' },
@@ -66,6 +69,7 @@ export default function BusinessProfile() {
     legalName: '',
     jurisdiction: 'NG',
     taxId: '',
+    cacNumber: '',
     email: '',
     phone: '',
     street: '',
@@ -75,7 +79,12 @@ export default function BusinessProfile() {
     country: '',
     invoicePrefix: 'INV',
     defaultCurrency: 'NGN',
+    isVatRegistered: false,
+    vatRegistrationNumber: '',
   });
+
+  // Get jurisdiction-specific configuration
+  const jurisdictionConfig = getJurisdictionConfig(formData.jurisdiction);
 
   const currencies = [
     { value: 'NGN', label: 'Nigerian Naira (₦)' },
@@ -88,12 +97,19 @@ export default function BusinessProfile() {
   useEffect(() => {
     if (business) {
       const addressData = business.address as AddressData | null;
+      // Cast to include new fields
+      const businessExtended = business as typeof business & { 
+        is_vat_registered?: boolean; 
+        vat_registration_number?: string;
+        cac_number?: string;
+      };
 
       setFormData({
         name: business.name || '',
         legalName: business.legal_name || '',
         jurisdiction: business.jurisdiction || 'NG',
         taxId: business.tax_id || '',
+        cacNumber: businessExtended.cac_number || '',
         email: business.contact_email || '',
         phone: business.contact_phone || '',
         street: addressData?.street || '',
@@ -103,6 +119,8 @@ export default function BusinessProfile() {
         country: addressData?.country || '',
         invoicePrefix: business.invoice_prefix || 'INV',
         defaultCurrency: business.default_currency || 'NGN',
+        isVatRegistered: businessExtended.is_vat_registered || false,
+        vatRegistrationNumber: businessExtended.vat_registration_number || '',
       });
     }
   }, [business]);
@@ -121,20 +139,26 @@ export default function BusinessProfile() {
       legal_name: formData.legalName || null,
       jurisdiction: formData.jurisdiction,
       tax_id: formData.taxId || null,
+      cac_number: jurisdictionConfig.showCac ? (formData.cacNumber || null) : null,
       contact_email: formData.email || null,
       contact_phone: formData.phone || null,
       address: Object.values(addressData).some(Boolean) ? addressData : null,
       invoice_prefix: formData.invoicePrefix || 'INV',
       default_currency: formData.defaultCurrency || 'NGN',
+      // VAT fields - only save if jurisdiction supports VAT
+      is_vat_registered: jurisdictionConfig.showVat ? formData.isVatRegistered : false,
+      vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 
+        ? formData.vatRegistrationNumber || null 
+        : null,
     };
 
     if (business) {
       await updateBusiness.mutateAsync({
         businessId: business.id,
-        updates: businessData,
+        updates: businessData as any, // Cast needed until types regenerate
       });
     } else {
-      await createBusiness.mutateAsync(businessData);
+      await createBusiness.mutateAsync(businessData as any);
     }
   };
 
@@ -167,6 +191,11 @@ export default function BusinessProfile() {
       email: formData.email,
       addressCity: formData.city,
       addressCountry: formData.country,
+      // Jurisdiction-specific requirements
+      jurisdiction: formData.jurisdiction,
+      isVatRegistered: formData.isVatRegistered,
+      vatRegistrationNumber: formData.vatRegistrationNumber,
+      cacNumber: formData.cacNumber,
     });
   }, [formData]);
 
@@ -388,14 +417,85 @@ export default function BusinessProfile() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID / VAT Number</Label>
+              <Label htmlFor="taxId">
+                {jurisdictionConfig.taxIdLabel} <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="taxId"
-                placeholder="Enter your tax identification number"
+                placeholder={jurisdictionConfig.taxIdPlaceholder}
                 value={formData.taxId}
                 onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                {jurisdictionConfig.taxIdHint}
+              </p>
             </div>
+
+            {/* CAC/Registration Number - Only for jurisdictions that have it */}
+            {jurisdictionConfig.showCac && (
+              <div className="space-y-2">
+                <Label htmlFor="cacNumber">
+                  {jurisdictionConfig.cacLabel}
+                </Label>
+                <Input
+                  id="cacNumber"
+                  placeholder={jurisdictionConfig.cacPlaceholder}
+                  value={formData.cacNumber}
+                  onChange={(e) => setFormData({ ...formData, cacNumber: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {jurisdictionConfig.cacHint}
+                </p>
+              </div>
+            )}
+
+            {/* VAT Registration Section - For jurisdictions with VAT */}
+            {jurisdictionConfig.showVat && (
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="vatRegistered" className="flex items-center gap-2">
+                      <Receipt className="h-4 w-4" />
+                      {formData.jurisdiction === 'CA' ? 'GST/HST Registered' : 'VAT Registered'}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.jurisdiction === 'NG' 
+                        ? 'Toggle on if your business is registered for VAT with FIRS'
+                        : formData.jurisdiction === 'CA'
+                        ? 'Toggle on if your business is registered for GST/HST'
+                        : 'Toggle on if your business is registered for VAT'
+                      }
+                    </p>
+                  </div>
+                  <Switch
+                    id="vatRegistered"
+                    checked={formData.isVatRegistered}
+                    onCheckedChange={(checked) => setFormData({ 
+                      ...formData, 
+                      isVatRegistered: checked,
+                      vatRegistrationNumber: checked ? formData.vatRegistrationNumber : ''
+                    })}
+                  />
+                </div>
+
+                {formData.isVatRegistered && (
+                  <div className="space-y-2">
+                    <Label htmlFor="vatRegNumber">
+                      {jurisdictionConfig.vatLabel} <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="vatRegNumber"
+                      placeholder={jurisdictionConfig.vatPlaceholder}
+                      value={formData.vatRegistrationNumber}
+                      onChange={(e) => setFormData({ ...formData, vatRegistrationNumber: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {jurisdictionConfig.vatHint || 'This will appear on all invoices.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
