@@ -32,6 +32,14 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Success - Green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
     --border: 30 15% 90%;
     --input: 30 15% 90%;
     --ring: 0 100% 42%;
@@ -79,6 +87,14 @@
 
     --destructive: 0 70% 45%;
     --destructive-foreground: 0 0% 100%;
+
+    /* Warning - Amber (dark mode) */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Success - Green (dark mode) */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
 
     --border: 220 15% 20%;
     --input: 220 15% 20%;

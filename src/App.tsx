@@ -48,6 +48,13 @@ import AccountingIncome from "./pages/app/accounting/AccountingIncome";
 import AccountingExpenses from "./pages/app/accounting/AccountingExpenses";
 import AccountingResult from "./pages/app/accounting/AccountingResult";
 
+// Expenses page (standalone entry point)
+import Expenses from "./pages/app/Expenses";
+
+// Support pages
+import Support from "./pages/app/Support";
+import SupportTicket from "./pages/app/SupportTicket";
+
 // Organization pages (to be deprecated, keeping for backward compatibility)
 import { OrgLayout } from "./components/org/OrgLayout";
 import OrgDashboard from "./pages/org/OrgDashboard";
@@ -73,6 +80,7 @@ import AdminCountryModules from "./pages/admin/AdminCountryModules";
 import AdminSystem from "./pages/admin/AdminSystem";
 import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
+import AdminSupport from "./pages/admin/AdminSupport";
 
 // Public pages
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
@@ -160,6 +168,13 @@ const App = () => (
             <Route path="/b/:businessId/accounting/income" element={<AccountingIncome />} />
             <Route path="/b/:businessId/accounting/expenses" element={<AccountingExpenses />} />
             <Route path="/b/:businessId/accounting/result" element={<AccountingResult />} />
+            
+            {/* Expenses standalone entry point */}
+            <Route path="/b/:businessId/expenses" element={<Expenses />} />
+            
+            {/* Support routes */}
+            <Route path="/b/:businessId/support" element={<Support />} />
+            <Route path="/b/:businessId/support/:ticketId" element={<SupportTicket />} />
           </Route>
 
           {/* User-level settings (not business-scoped) */}
@@ -187,6 +202,7 @@ const App = () => (
           <Route path="/accounting/income" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           <Route path="/accounting/expenses" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           <Route path="/accounting/result" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
 
           {/* LEGACY: Organization routes (keeping for backward compatibility) */}
           <Route element={<ProtectedRoute><OrgLayout /></ProtectedRoute>}>
@@ -213,6 +229,7 @@ const App = () => (
             <Route path="/admin/country-modules" element={<AdminCountryModules />} />
             <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
             <Route path="/admin/templates" element={<AdminTemplates />} />
+            <Route path="/admin/support" element={<AdminSupport />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

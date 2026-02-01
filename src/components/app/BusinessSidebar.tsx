@@ -16,7 +16,9 @@ import {
   UserPlus,
   ArrowUpRight,
   ChevronDown,
-  User
+  User,
+  Receipt,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -63,6 +65,7 @@ export function BusinessSidebar() {
     { title: 'Credit Notes', url: `${baseUrl}/credit-notes`, icon: FileX },
     { title: 'Clients', url: `${baseUrl}/clients`, icon: Users },
     { title: 'Accounting', url: `${baseUrl}/accounting`, icon: Calculator },
+    { title: 'Expenses', url: `${baseUrl}/expenses`, icon: Receipt },
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },
     { title: 'Analytics', url: `${baseUrl}/analytics`, icon: PieChart },
     { title: 'Notifications', url: `${baseUrl}/notifications`, icon: Bell, showBadge: true },
@@ -76,6 +79,7 @@ export function BusinessSidebar() {
   const settingsNavItems = [
     { title: 'Business Settings', url: `${baseUrl}/settings`, icon: Settings },
     { title: 'Billing', url: `${baseUrl}/billing`, icon: CreditCard },
+    { title: 'Contact Support', url: `${baseUrl}/support`, icon: MessageCircle },
   ];
 
   const isActive = (path: string) => {

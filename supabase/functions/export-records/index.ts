@@ -54,7 +54,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 }
 
 interface ExportRecordsRequest {
-  export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients'
+  export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients' | 'expenses'
   business_id?: string
   date_from?: string
   date_to?: string
@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const validExportTypes = ['invoices', 'audit_logs', 'payments', 'clients']
+    const validExportTypes = ['invoices', 'audit_logs', 'payments', 'clients', 'expenses']
     if (!validExportTypes.includes(body.export_type)) {
       return new Response(
         JSON.stringify({ 
@@ -365,6 +365,41 @@ Deno.serve(async (req) => {
         data = clients || []
         columns = ['name', 'email', 'phone', 'tax_id', 'address', 'notes', 'created_at', 'updated_at']
         filename = `clients_export_${generatedAt.split('T')[0]}`
+        break
+      }
+
+      case 'expenses': {
+        let query = supabaseUser
+          .from('expenses')
+          .select('category, description, amount, currency, expense_date, vendor, notes, created_at')
+        
+        if (body.business_id) {
+          query = query.eq('business_id', body.business_id)
+        }
+        if (body.date_from) {
+          query = query.gte('expense_date', body.date_from)
+        }
+        if (body.date_to) {
+          query = query.lte('expense_date', body.date_to)
+        }
+
+        const { data: expenses, error } = await query.order('expense_date', { ascending: false })
+        
+        if (error) throw error
+        
+        data = (expenses || []).map(exp => ({
+          expense_date: exp.expense_date,
+          category: exp.category,
+          description: exp.description || '',
+          vendor: exp.vendor || '',
+          amount: exp.amount,
+          currency: exp.currency,
+          notes: exp.notes || '',
+          created_at: exp.created_at
+        }))
+        
+        columns = ['expense_date', 'category', 'description', 'vendor', 'amount', 'currency', 'notes', 'created_at']
+        filename = `expenses_export_${generatedAt.split('T')[0]}`
         break
       }
     }

@@ -28,6 +28,7 @@ export interface CreateExpenseInput {
   expenseDate?: string;
   vendor?: string;
   notes?: string;
+  receiptUrl?: string;
 }
 
 export interface UpdateExpenseInput {
@@ -38,6 +39,7 @@ export interface UpdateExpenseInput {
   expenseDate?: string;
   vendor?: string;
   notes?: string;
+  receiptUrl?: string;
 }
 
 // Expense categories
@@ -165,6 +167,7 @@ export function useCreateExpense() {
           expense_date: input.expenseDate || new Date().toISOString().split('T')[0],
           vendor: input.vendor || null,
           notes: input.notes || null,
+          receipt_url: input.receiptUrl || null,
         })
         .select()
         .single();
@@ -206,6 +209,7 @@ export function useUpdateExpense() {
       if (updates.expenseDate !== undefined) updateData.expense_date = updates.expenseDate;
       if (updates.vendor !== undefined) updateData.vendor = updates.vendor;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
+      if (updates.receiptUrl !== undefined) updateData.receipt_url = updates.receiptUrl;
 
       const { data, error } = await supabase
         .from('expenses')

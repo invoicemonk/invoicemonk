@@ -1,40 +1,42 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
 
-const tabs = [
-  { 
-    label: 'Overview', 
-    href: '/accounting', 
-    icon: LayoutDashboard,
-    description: 'How your business is doing' 
-  },
-  { 
-    label: 'Money In', 
-    href: '/accounting/income', 
-    icon: TrendingUp,
-    description: 'Revenue from invoices' 
-  },
-  { 
-    label: 'Money Out', 
-    href: '/accounting/expenses', 
-    icon: TrendingDown,
-    description: 'Track your expenses' 
-  },
-  { 
-    label: 'Result', 
-    href: '/accounting/result', 
-    icon: Calculator,
-    description: 'What\'s left' 
-  },
-];
-
 export function AccountingNavTabs() {
+  const { businessId } = useParams<{ businessId: string }>();
+  const baseUrl = `/b/${businessId}`;
+
+  const tabs = [
+    { 
+      label: 'Overview', 
+      href: `${baseUrl}/accounting`, 
+      icon: LayoutDashboard,
+      description: 'How your business is doing' 
+    },
+    { 
+      label: 'Money In', 
+      href: `${baseUrl}/accounting/income`, 
+      icon: TrendingUp,
+      description: 'Revenue from invoices' 
+    },
+    { 
+      label: 'Money Out', 
+      href: `${baseUrl}/accounting/expenses`, 
+      icon: TrendingDown,
+      description: 'Track your expenses' 
+    },
+    { 
+      label: 'Result', 
+      href: `${baseUrl}/accounting/result`, 
+      icon: Calculator,
+      description: 'What\'s left' 
+    },
+  ];
   const location = useLocation();
 
   const isActive = (href: string) => {
-    if (href === '/accounting') {
-      return location.pathname === '/accounting';
+    if (href === `${baseUrl}/accounting`) {
+      return location.pathname === `${baseUrl}/accounting`;
     }
     return location.pathname.startsWith(href);
   };

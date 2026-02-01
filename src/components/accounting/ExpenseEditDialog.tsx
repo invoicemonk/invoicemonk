@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +14,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -23,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateExpense, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useUpdateExpense, EXPENSE_CATEGORIES, Expense } from '@/hooks/use-expenses';
 import { ReceiptUpload } from './ReceiptUpload';
 
 const expenseSchema = z.object({
@@ -40,13 +38,14 @@ const expenseSchema = z.object({
 type ExpenseFormData = z.infer<typeof expenseSchema>;
 
 interface Props {
+  expense: Expense;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export function ExpenseForm({ onSuccess }: Props) {
-  const [open, setOpen] = useState(false);
-  const createExpense = useCreateExpense();
-  const { data: business } = useUserBusiness();
+export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Props) {
+  const updateExpense = useUpdateExpense();
 
   const {
     register,
@@ -58,50 +57,58 @@ export function ExpenseForm({ onSuccess }: Props) {
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category: '',
-      description: '',
-      amount: 0,
-      vendor: '',
-      expenseDate: new Date().toISOString().split('T')[0],
-      notes: '',
-      receiptUrl: null,
+      category: expense.category,
+      description: expense.description || '',
+      amount: expense.amount,
+      vendor: expense.vendor || '',
+      expenseDate: expense.expenseDate,
+      notes: expense.notes || '',
+      receiptUrl: expense.receiptUrl || null,
     },
   });
 
   const category = watch('category');
   const receiptUrl = watch('receiptUrl');
 
+  // Reset form when expense changes
+  useEffect(() => {
+    reset({
+      category: expense.category,
+      description: expense.description || '',
+      amount: expense.amount,
+      vendor: expense.vendor || '',
+      expenseDate: expense.expenseDate,
+      notes: expense.notes || '',
+      receiptUrl: expense.receiptUrl || null,
+    });
+  }, [expense, reset]);
+
   const onSubmit = async (data: ExpenseFormData) => {
-    await createExpense.mutateAsync({
-      category: data.category,
-      description: data.description,
-      amount: data.amount,
-      vendor: data.vendor,
-      expenseDate: data.expenseDate,
-      notes: data.notes,
-      currency: business?.default_currency || 'NGN',
-      receiptUrl: data.receiptUrl || undefined,
+    await updateExpense.mutateAsync({
+      id: expense.id,
+      updates: {
+        category: data.category,
+        description: data.description,
+        amount: data.amount,
+        vendor: data.vendor,
+        expenseDate: data.expenseDate,
+        notes: data.notes,
+        receiptUrl: data.receiptUrl || undefined,
+      },
     });
     
-    reset();
-    setOpen(false);
+    onOpenChange(false);
     onSuccess?.();
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Expense
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>Add Expense</DialogTitle>
+            <DialogTitle>Edit Expense</DialogTitle>
             <DialogDescription>
-              Record a business expense. All fields marked with * are required.
+              Update the expense details. All fields marked with * are required.
             </DialogDescription>
           </DialogHeader>
           
@@ -188,12 +195,12 @@ export function ExpenseForm({ onSuccess }: Props) {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createExpense.isPending}>
-              {createExpense.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Save Expense
+            <Button type="submit" disabled={updateExpense.isPending}>
+              {updateExpense.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
             </Button>
           </DialogFooter>
         </form>

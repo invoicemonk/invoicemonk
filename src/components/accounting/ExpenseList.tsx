@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { Trash2, MoreHorizontal, Edit } from 'lucide-react';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Expense, useDeleteExpense, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
+import { ExpenseEditDialog } from './ExpenseEditDialog';
 
 interface Props {
   expenses: Expense[];
@@ -70,28 +73,7 @@ const getCategoryColor = (value: string): string => {
   return colors[value] || colors.other;
 };
 
-export function ExpenseList({ expenses, isLoading }: Props) {
-  const deleteExpense = useDeleteExpense();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  if (expenses.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">No expenses recorded yet.</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Click "Add Expense" to start tracking your business expenses.
-        </p>
-      </div>
-    );
-  }
-
+function LoadingSkeleton() {
   return (
     <div className="border rounded-lg">
       <Table>
@@ -106,65 +88,129 @@ export function ExpenseList({ expenses, isLoading }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {expenses.map((expense) => (
-            <TableRow key={expense.id}>
-              <TableCell className="font-medium">
-                {format(new Date(expense.expenseDate), 'MMM d, yyyy')}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className={getCategoryColor(expense.category)}>
-                  {getCategoryLabel(expense.category)}
-                </Badge>
-              </TableCell>
-              <TableCell className="max-w-[200px] truncate">
-                {expense.description || '-'}
-              </TableCell>
-              <TableCell className="max-w-[150px] truncate">
-                {expense.vendor || '-'}
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                {formatCurrency(expense.amount, expense.currency)}
-              </TableCell>
-              <TableCell>
-                <AlertDialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete expense?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete this expense record.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteExpense.mutate(expense.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </TableCell>
+          {[...Array(5)].map((_, i) => (
+            <TableRow key={i}>
+              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+              <TableCell><Skeleton className="h-8 w-8" /></TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+export function ExpenseList({ expenses, isLoading }: Props) {
+  const deleteExpense = useDeleteExpense();
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  if (isLoading) {
+    return <LoadingSkeleton />;
+  }
+
+  if (expenses.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">No expenses match your filters.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Try adjusting your search or category filter.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Vendor</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {expenses.map((expense) => (
+              <TableRow key={expense.id} className="cursor-pointer hover:bg-muted/50">
+                <TableCell className="font-medium">
+                  {format(new Date(expense.expenseDate), 'MMM d, yyyy')}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className={getCategoryColor(expense.category)}>
+                    {getCategoryLabel(expense.category)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate">
+                  {expense.description || '-'}
+                </TableCell>
+                <TableCell className="max-w-[150px] truncate">
+                  {expense.vendor || '-'}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(expense.amount, expense.currency)}
+                </TableCell>
+                <TableCell>
+                  <AlertDialog>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditingExpense(expense)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete expense?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete this expense record.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteExpense.mutate(expense.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Edit Dialog */}
+      {editingExpense && (
+        <ExpenseEditDialog
+          expense={editingExpense}
+          open={!!editingExpense}
+          onOpenChange={(open) => !open && setEditingExpense(null)}
+        />
+      )}
+    </>
   );
 }

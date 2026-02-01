@@ -11,7 +11,8 @@ import {
   LogOut,
   ShieldAlert,
   ArrowLeft,
-  Clock
+  Clock,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,7 @@ const mainNavItems = [
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Businesses', url: '/admin/businesses', icon: Building2 },
   { title: 'Invoices', url: '/admin/invoices', icon: FileText },
+  { title: 'Support Tickets', url: '/admin/support', icon: MessageCircle },
   { title: 'Audit Logs', url: '/admin/audit-logs', icon: History },
 ];
 

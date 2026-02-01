@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ExportParams {
-  export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients';
+  export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients' | 'expenses';
   business_id?: string;
   date_from?: string;
   date_to?: string;
