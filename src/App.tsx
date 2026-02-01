@@ -39,6 +39,12 @@ import CheckoutCancel from "./pages/app/CheckoutCancel";
 import Settings from "./pages/app/Settings";
 import Notifications from "./pages/app/Notifications";
 
+// Accounting pages
+import AccountingOverview from "./pages/app/accounting/AccountingOverview";
+import AccountingIncome from "./pages/app/accounting/AccountingIncome";
+import AccountingExpenses from "./pages/app/accounting/AccountingExpenses";
+import AccountingResult from "./pages/app/accounting/AccountingResult";
+
 // Organization pages
 import { OrgLayout } from "./components/org/OrgLayout";
 import OrgDashboard from "./pages/org/OrgDashboard";
@@ -143,6 +149,12 @@ const App = () => (
               <Route path="/billing" element={<Billing />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/notifications" element={<Notifications />} />
+              
+              {/* Accounting routes */}
+              <Route path="/accounting" element={<AccountingOverview />} />
+              <Route path="/accounting/income" element={<AccountingIncome />} />
+              <Route path="/accounting/expenses" element={<AccountingExpenses />} />
+              <Route path="/accounting/result" element={<AccountingResult />} />
             </Route>
 
             {/* Organization routes (Phase 5) */}

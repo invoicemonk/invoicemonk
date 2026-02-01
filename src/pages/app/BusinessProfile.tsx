@@ -81,6 +81,7 @@ export default function BusinessProfile() {
     defaultCurrency: 'NGN',
     isVatRegistered: false,
     vatRegistrationNumber: '',
+    businessType: '',
   });
 
   // Get jurisdiction-specific configuration
@@ -102,6 +103,7 @@ export default function BusinessProfile() {
         is_vat_registered?: boolean; 
         vat_registration_number?: string;
         cac_number?: string;
+        business_type?: string;
       };
 
       setFormData({
@@ -121,6 +123,7 @@ export default function BusinessProfile() {
         defaultCurrency: business.default_currency || 'NGN',
         isVatRegistered: businessExtended.is_vat_registered || false,
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
+        businessType: businessExtended.business_type || '',
       });
     }
   }, [business]);
@@ -150,6 +153,8 @@ export default function BusinessProfile() {
       vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 
         ? formData.vatRegistrationNumber || null 
         : null,
+      // Business type
+      business_type: formData.businessType || null,
     };
 
     if (business) {
@@ -449,7 +454,28 @@ export default function BusinessProfile() {
               </div>
             )}
 
-            {/* VAT Registration Section - For jurisdictions with VAT */}
+            {/* Business Type */}
+            <div className="space-y-2">
+              <Label htmlFor="businessType">Business Type</Label>
+              <Select 
+                value={formData.businessType}
+                onValueChange={(value) => setFormData({ ...formData, businessType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="freelancer">Freelancer / Solo</SelectItem>
+                  <SelectItem value="sme">Small Business / SME</SelectItem>
+                  <SelectItem value="agency">Agency / Studio</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Helps tailor insights to your business model
+              </p>
+            </div>
+
             {jurisdictionConfig.showVat && (
               <div className="border-t pt-4 space-y-4">
                 <div className="flex items-center justify-between">

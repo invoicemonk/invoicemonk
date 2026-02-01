@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_preferences: {
+        Row: {
+          account_id: string
+          account_type: string
+          created_at: string
+          default_accounting_period: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          account_type: string
+          created_at?: string
+          default_accounting_period?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_type?: string
+          created_at?: string
+          default_accounting_period?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           actor_id: string | null
@@ -120,6 +150,7 @@ export type Database = {
       businesses: {
         Row: {
           address: Json | null
+          business_type: string | null
           cac_number: string | null
           compliance_status: string | null
           contact_email: string | null
@@ -143,6 +174,7 @@ export type Database = {
         }
         Insert: {
           address?: Json | null
+          business_type?: string | null
           cac_number?: string | null
           compliance_status?: string | null
           contact_email?: string | null
@@ -166,6 +198,7 @@ export type Database = {
         }
         Update: {
           address?: Json | null
+          business_type?: string | null
           cac_number?: string | null
           compliance_status?: string | null
           contact_email?: string | null
@@ -307,6 +340,62 @@ export type Database = {
             columns: ["original_invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          business_id: string | null
+          category: string
+          created_at: string
+          currency: string
+          description: string | null
+          expense_date: string
+          id: string
+          notes: string | null
+          receipt_url: string | null
+          updated_at: string
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          business_id?: string | null
+          category: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_url?: string | null
+          updated_at?: string
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_url?: string | null
+          updated_at?: string
+          user_id?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]

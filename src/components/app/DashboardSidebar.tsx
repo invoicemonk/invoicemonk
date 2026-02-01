@@ -12,7 +12,8 @@ import {
   Shield,
   FileX,
   Bell,
-  PieChart
+  PieChart,
+  Calculator
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ const mainNavItems = [
   { title: 'Invoices', url: '/invoices', icon: FileText },
   { title: 'Credit Notes', url: '/credit-notes', icon: FileX },
   { title: 'Clients', url: '/clients', icon: Users },
+  { title: 'Accounting', url: '/accounting', icon: Calculator },
   { title: 'Reports', url: '/reports', icon: BarChart3 },
   { title: 'Analytics', url: '/analytics', icon: PieChart },
   { title: 'Notifications', url: '/notifications', icon: Bell, showBadge: true },
