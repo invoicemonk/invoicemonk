@@ -1,19 +1,33 @@
-import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, FileText } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useInvoiceLimitCheck } from '@/hooks/use-subscription';
+import { useBusiness, TierCheckResult } from '@/contexts/BusinessContext';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
 
 interface InvoiceLimitBannerProps {
   className?: string;
 }
 
 export function InvoiceLimitBanner({ className }: InvoiceLimitBannerProps) {
-  const { data: limitCheck, isLoading } = useInvoiceLimitCheck();
+  const { businessId } = useParams<{ businessId: string }>();
+  const { currentBusiness, checkTierLimit } = useBusiness();
+
+  // Use React Query to manage the async tier limit check
+  const { data: limitCheck, isLoading } = useQuery({
+    queryKey: ['invoice-limit-check', currentBusiness?.id],
+    queryFn: () => checkTierLimit('invoices_per_month'),
+    enabled: !!currentBusiness?.id,
+    staleTime: 1 * 60 * 1000, // 1 minute - check more frequently
+  });
 
   // Don't show for unlimited tiers or while loading
-  if (isLoading || !limitCheck || limitCheck.limit_type === 'unlimited') {
+  if (isLoading) {
+    return null;
+  }
+
+  if (!limitCheck || limitCheck.limit_type === 'unlimited') {
     return null;
   }
 
@@ -25,6 +39,9 @@ export function InvoiceLimitBanner({ className }: InvoiceLimitBannerProps) {
   if (!isAtLimit && !isNearLimit) {
     return null;
   }
+
+  // Build the correct billing URL based on context
+  const billingUrl = businessId ? `/b/${businessId}/billing` : '/billing';
 
   return (
     <div className={cn(
@@ -83,7 +100,7 @@ export function InvoiceLimitBanner({ className }: InvoiceLimitBannerProps) {
           asChild
           className="shrink-0"
         >
-          <Link to="/billing">
+          <Link to={billingUrl}>
             Upgrade
             <ArrowRight className="h-3 w-3 ml-1" />
           </Link>

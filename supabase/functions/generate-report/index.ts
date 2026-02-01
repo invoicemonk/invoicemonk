@@ -27,6 +27,7 @@ interface ReportRequest {
   report_type: 'revenue-summary' | 'invoice-register' | 'tax-report' | 'audit-export'
   year: number
   format?: 'json' | 'csv'
+  business_id?: string
 }
 
 interface RevenueSummary {
@@ -122,11 +123,59 @@ Deno.serve(async (req) => {
       })
     }
 
-    // TIER ENFORCEMENT: Check if user has reports access
-    const { data: tierCheck } = await supabase.rpc('check_tier_limit', {
-      _user_id: user.id,
+    // Parse request body first to get business_id
+    const body: ReportRequest = await req.json()
+    const { report_type, year, format = 'json', business_id: requestBusinessId } = body
+
+    if (!report_type || !year) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'report_type and year are required' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Get user's business (prefer from request, fall back to first membership)
+    let businessId = requestBusinessId
+    if (!businessId) {
+      const { data: businessMember } = await supabase
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+      businessId = businessMember?.business_id
+    }
+
+    // Verify user has access to this business
+    if (businessId) {
+      const { data: membership } = await supabase
+        .from('business_members')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .maybeSingle()
+      
+      if (!membership) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'You do not have access to this business' 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
+    // TIER ENFORCEMENT: Check if business has reports access (using business-level check)
+    const { data: tierCheck } = await supabase.rpc('check_tier_limit_business', {
+      _business_id: businessId,
       _feature: 'reports_enabled'
     })
+
+    console.log('Tier check result:', tierCheck)
 
     if (!tierCheck?.allowed) {
       const response: ReportResponse = {
@@ -139,30 +188,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
-
-    // Parse request body
-    const body: ReportRequest = await req.json()
-    const { report_type, year, format = 'json' } = body
-
-    if (!report_type || !year) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'report_type and year are required' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Get user's business
-    const { data: businessMember } = await supabase
-      .from('business_members')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    const businessId = businessMember?.business_id
 
     // Date range for the year
     const startDate = `${year}-01-01`

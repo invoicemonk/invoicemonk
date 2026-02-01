@@ -16,13 +16,14 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
   const createCheckoutSession = async (
     tier: Tier,
     billingPeriod: BillingPeriod = 'monthly',
+    businessId?: string,
     countryCode?: string
   ) => {
     setIsLoading(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { tier, billingPeriod, countryCode },
+        body: { tier, billingPeriod, countryCode, businessId },
       });
 
       if (error) {

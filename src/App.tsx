@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import NotFound from "./pages/NotFound";
@@ -16,8 +15,11 @@ import VerifyEmail from "./pages/app/VerifyEmail";
 import ForgotPassword from "./pages/app/ForgotPassword";
 import ResetPassword from "./pages/app/ResetPassword";
 
-// Dashboard pages
+// Dashboard pages (legacy - for backward compatibility)
 import { DashboardLayout } from "./components/app/DashboardLayout";
+import { BusinessLayout } from "./components/app/BusinessLayout";
+import { BusinessRedirect } from "./components/app/BusinessRedirect";
+import { LegacyRouteRedirect } from "./components/app/LegacyRouteRedirect";
 import Dashboard from "./pages/app/Dashboard";
 import Invoices from "./pages/app/Invoices";
 import InvoiceNew from "./pages/app/InvoiceNew";
@@ -38,6 +40,7 @@ import CheckoutSuccess from "./pages/app/CheckoutSuccess";
 import CheckoutCancel from "./pages/app/CheckoutCancel";
 import Settings from "./pages/app/Settings";
 import Notifications from "./pages/app/Notifications";
+import Team from "./pages/app/Team";
 
 // Accounting pages
 import AccountingOverview from "./pages/app/accounting/AccountingOverview";
@@ -45,7 +48,7 @@ import AccountingIncome from "./pages/app/accounting/AccountingIncome";
 import AccountingExpenses from "./pages/app/accounting/AccountingExpenses";
 import AccountingResult from "./pages/app/accounting/AccountingResult";
 
-// Organization pages
+// Organization pages (to be deprecated, keeping for backward compatibility)
 import { OrgLayout } from "./components/org/OrgLayout";
 import OrgDashboard from "./pages/org/OrgDashboard";
 import OrgInvoices from "./pages/org/OrgInvoices";
@@ -105,101 +108,128 @@ function AnalyticsProvider({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <SubscriptionProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AnalyticsProvider>
-            <Routes>
-            {/* Root redirect - authenticated users go to dashboard, others to login */}
-            <Route path="/" element={<RootRedirect />} />
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AnalyticsProvider>
+          <Routes>
+          {/* Root redirect - authenticated users go to dashboard, others to login */}
+          <Route path="/" element={<RootRedirect />} />
+          
+          {/* Authentication routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
+          {/* Plan selection and checkout routes */}
+          <Route path="/select-plan" element={<ProtectedRoute><PlanSelection /></ProtectedRoute>} />
+          <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
+          <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancel /></ProtectedRoute>} />
+          
+          {/* Legacy route redirects */}
+          <Route path="/auth" element={<Login />} />
+          
+          {/* Dashboard redirect - redirects to user's default business */}
+          <Route path="/dashboard" element={<ProtectedRoute><BusinessRedirect /></ProtectedRoute>} />
+          
+          {/* NEW: Business-scoped routes (unified architecture) */}
+          <Route element={<ProtectedRoute><BusinessLayout /></ProtectedRoute>}>
+            <Route path="/b/:businessId/dashboard" element={<Dashboard />} />
+            <Route path="/b/:businessId/invoices" element={<Invoices />} />
+            <Route path="/b/:businessId/invoices/new" element={<InvoiceNew />} />
+            <Route path="/b/:businessId/invoices/:id" element={<InvoiceDetail />} />
+            <Route path="/b/:businessId/invoices/:id/edit" element={<InvoiceEdit />} />
+            <Route path="/b/:businessId/credit-notes" element={<CreditNotes />} />
+            <Route path="/b/:businessId/credit-notes/:id" element={<CreditNoteDetail />} />
+            <Route path="/b/:businessId/clients" element={<Clients />} />
+            <Route path="/b/:businessId/clients/:id" element={<ClientDetail />} />
+            <Route path="/b/:businessId/clients/:id/edit" element={<ClientEdit />} />
+            <Route path="/b/:businessId/reports" element={<Reports />} />
+            <Route path="/b/:businessId/analytics" element={<Analytics />} />
+            <Route path="/b/:businessId/audit-logs" element={<AuditLogs />} />
+            <Route path="/b/:businessId/team" element={<Team />} />
+            <Route path="/b/:businessId/settings" element={<BusinessProfile />} />
+            <Route path="/b/:businessId/billing" element={<Billing />} />
+            <Route path="/b/:businessId/notifications" element={<Notifications />} />
             
-            {/* Authentication routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* Plan selection and checkout routes */}
-            <Route path="/select-plan" element={<ProtectedRoute><PlanSelection /></ProtectedRoute>} />
-            <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
-            <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancel /></ProtectedRoute>} />
-            
-            {/* Legacy route redirects */}
-            <Route path="/auth" element={<Login />} />
-            
-            {/* Protected Dashboard routes */}
-            <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/invoices/new" element={<InvoiceNew />} />
-              <Route path="/invoices/:id" element={<InvoiceDetail />} />
-              <Route path="/invoices/:id/edit" element={<InvoiceEdit />} />
-              <Route path="/credit-notes" element={<CreditNotes />} />
-              <Route path="/credit-notes/:id" element={<CreditNoteDetail />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/clients/:id" element={<ClientDetail />} />
-              <Route path="/clients/:id/edit" element={<ClientEdit />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/audit-logs" element={<AuditLogs />} />
-              <Route path="/business-profile" element={<BusinessProfile />} />
-              <Route path="/billing" element={<Billing />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/notifications" element={<Notifications />} />
-              
-              {/* Accounting routes */}
-              <Route path="/accounting" element={<AccountingOverview />} />
-              <Route path="/accounting/income" element={<AccountingIncome />} />
-              <Route path="/accounting/expenses" element={<AccountingExpenses />} />
-              <Route path="/accounting/result" element={<AccountingResult />} />
-            </Route>
+            {/* Accounting routes */}
+            <Route path="/b/:businessId/accounting" element={<AccountingOverview />} />
+            <Route path="/b/:businessId/accounting/income" element={<AccountingIncome />} />
+            <Route path="/b/:businessId/accounting/expenses" element={<AccountingExpenses />} />
+            <Route path="/b/:businessId/accounting/result" element={<AccountingResult />} />
+          </Route>
 
-            {/* Organization routes (Phase 5) */}
-            <Route element={<ProtectedRoute><OrgLayout /></ProtectedRoute>}>
-              <Route path="/org/:orgId/dashboard" element={<OrgDashboard />} />
-              <Route path="/org/:orgId/invoices" element={<OrgInvoices />} />
-              <Route path="/org/:orgId/invoices/new" element={<OrgInvoiceNew />} />
-              <Route path="/org/:orgId/invoices/:id" element={<OrgInvoiceDetail />} />
-              <Route path="/org/:orgId/invoices/:id/edit" element={<OrgInvoiceEdit />} />
-              <Route path="/org/:orgId/clients" element={<OrgClients />} />
-              <Route path="/org/:orgId/reports" element={<OrgReports />} />
-              <Route path="/org/:orgId/team" element={<OrgTeam />} />
-              <Route path="/org/:orgId/audit-logs" element={<OrgAuditLogs />} />
-              <Route path="/org/:orgId/settings" element={<OrgSettings />} />
-            </Route>
+          {/* User-level settings (not business-scoped) */}
+          <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+            <Route path="/settings" element={<Settings />} />
+          </Route>
 
-            {/* Platform Admin routes (Phase 6) - Protected + AdminLayout handles admin role check */}
-            <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/businesses" element={<AdminBusinesses />} />
-              <Route path="/admin/invoices" element={<AdminInvoices />} />
-              <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
-              <Route path="/admin/billing" element={<AdminBilling />} />
-              <Route path="/admin/country-modules" element={<AdminCountryModules />} />
-              <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
-              <Route path="/admin/templates" element={<AdminTemplates />} />
-              <Route path="/admin/system" element={<AdminSystem />} />
-            </Route>
+          {/* LEGACY: Old dashboard routes - redirect to business-scoped routes */}
+          <Route path="/invoices" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/invoices/new" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/invoices/:id" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/invoices/:id/edit" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/credit-notes" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/credit-notes/:id" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/clients" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/clients/:id" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/clients/:id/edit" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/billing" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          
+          {/* Accounting routes */}
+          <Route path="/accounting" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/accounting/income" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/accounting/expenses" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/accounting/result" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
 
-            {/* Public Pages - No auth required */}
-            <Route path="/invoice/view/:verificationId" element={<InvoiceView />} />
-            <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
-            
-            {/* Legal and Documentation pages - No auth required */}
-            <Route path="/legal/sla" element={<SLA />} />
-            <Route path="/docs/api" element={<APIDocumentation />} />
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-            </AnalyticsProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </SubscriptionProvider>
+          {/* LEGACY: Organization routes (keeping for backward compatibility) */}
+          <Route element={<ProtectedRoute><OrgLayout /></ProtectedRoute>}>
+            <Route path="/org/:orgId/dashboard" element={<OrgDashboard />} />
+            <Route path="/org/:orgId/invoices" element={<OrgInvoices />} />
+            <Route path="/org/:orgId/invoices/new" element={<OrgInvoiceNew />} />
+            <Route path="/org/:orgId/invoices/:id" element={<OrgInvoiceDetail />} />
+            <Route path="/org/:orgId/invoices/:id/edit" element={<OrgInvoiceEdit />} />
+            <Route path="/org/:orgId/clients" element={<OrgClients />} />
+            <Route path="/org/:orgId/reports" element={<OrgReports />} />
+            <Route path="/org/:orgId/team" element={<OrgTeam />} />
+            <Route path="/org/:orgId/audit-logs" element={<OrgAuditLogs />} />
+            <Route path="/org/:orgId/settings" element={<OrgSettings />} />
+          </Route>
+
+          {/* Platform Admin routes (Phase 6) - Protected + AdminLayout handles admin role check */}
+          <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/businesses" element={<AdminBusinesses />} />
+            <Route path="/admin/invoices" element={<AdminInvoices />} />
+            <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
+            <Route path="/admin/billing" element={<AdminBilling />} />
+            <Route path="/admin/country-modules" element={<AdminCountryModules />} />
+            <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
+            <Route path="/admin/templates" element={<AdminTemplates />} />
+            <Route path="/admin/system" element={<AdminSystem />} />
+          </Route>
+
+          {/* Public Pages - No auth required */}
+          <Route path="/invoice/view/:verificationId" element={<InvoiceView />} />
+          <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
+          
+          {/* Legal and Documentation pages - No auth required */}
+          <Route path="/legal/sla" element={<SLA />} />
+          <Route path="/docs/api" element={<APIDocumentation />} />
+          
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+          </AnalyticsProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </AuthProvider>
 </QueryClientProvider>
 );

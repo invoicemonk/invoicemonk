@@ -1,23 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  BarChart3, 
-  History, 
-  Building2, 
-  CreditCard, 
   Settings,
   LogOut,
   Shield,
-  FileX,
-  Bell,
-  PieChart,
-  Calculator
+  ChevronDown,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sidebar,
   SidebarContent,
@@ -31,26 +28,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Badge } from '@/components/ui/badge';
-import { OrganizationSwitcher } from '@/components/app/OrganizationSwitcher';
-import { useUnreadCount } from '@/hooks/use-notifications';
 import logo from '@/assets/invoicemonk-logo.png';
-
-const mainNavItems = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Invoices', url: '/invoices', icon: FileText },
-  { title: 'Credit Notes', url: '/credit-notes', icon: FileX },
-  { title: 'Clients', url: '/clients', icon: Users },
-  { title: 'Accounting', url: '/accounting', icon: Calculator },
-  { title: 'Reports', url: '/reports', icon: BarChart3 },
-  { title: 'Analytics', url: '/analytics', icon: PieChart },
-  { title: 'Notifications', url: '/notifications', icon: Bell, showBadge: true },
-  { title: 'Audit Logs', url: '/audit-logs', icon: History },
-];
+import logoIcon from '@/assets/invoicemonk-icon.png';
+import { BusinessSwitcher } from './BusinessSwitcher';
 
 const settingsNavItems = [
-  { title: 'Business Profile', url: '/business-profile', icon: Building2 },
-  { title: 'Billing', url: '/billing', icon: CreditCard },
   { title: 'Settings', url: '/settings', icon: Settings },
 ];
 
@@ -59,12 +41,8 @@ export function DashboardSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
-  const { data: unreadCount = 0 } = useUnreadCount();
 
   const isActive = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
-    }
     return location.pathname.startsWith(path);
   };
 
@@ -73,7 +51,7 @@ export function DashboardSidebar() {
       <SidebarHeader className="border-b border-border/50 p-4">
         <Link to="/dashboard" className="flex items-center gap-2">
           <img 
-            src={logo} 
+            src={isCollapsed ? logoIcon : logo} 
             alt="Invoicemonk" 
             className={cn(
               "object-contain transition-all",
@@ -81,40 +59,15 @@ export function DashboardSidebar() {
             )} 
           />
         </Link>
-        <div className="mt-3">
-          <OrganizationSwitcher collapsed={isCollapsed} />
-        </div>
       </SidebarHeader>
 
       <SidebarContent className="px-2">
         <SidebarGroup>
           <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
-            Main
+            Your Businesses
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <Link to={item.url} className="flex items-center justify-between w-full">
-                      <span className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                      </span>
-                      {item.showBadge && unreadCount > 0 && !isCollapsed && (
-                        <Badge variant="destructive" className="h-5 px-1.5 text-xs">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <BusinessSwitcher collapsed={isCollapsed} />
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -151,25 +104,45 @@ export function DashboardSidebar() {
           </div>
         )}
         
-        {profile && !isCollapsed && (
-          <div className="mb-3 px-2 py-1.5 rounded-lg bg-muted/50">
-            <p className="text-sm font-medium truncate">{profile.full_name || 'User'}</p>
-            <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
-          </div>
+        {profile && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-2 rounded-lg transition-colors w-full text-left",
+                  isCollapsed 
+                    ? "p-2 justify-center bg-muted hover:bg-accent" 
+                    : "px-2 py-1.5 bg-muted/50 hover:bg-muted"
+                )}
+              >
+                {isCollapsed ? (
+                  <User className="h-4 w-4" />
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{profile.full_name || 'User'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Account Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-        
-        <Button
-          variant="ghost"
-          size={isCollapsed ? "icon" : "default"}
-          onClick={signOut}
-          className={cn(
-            "text-muted-foreground hover:text-foreground",
-            !isCollapsed && "w-full justify-start"
-          )}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          <span className="group-data-[collapsible=icon]:hidden ml-2">Log out</span>
-        </Button>
       </SidebarFooter>
     </Sidebar>
   );

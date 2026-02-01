@@ -77,20 +77,34 @@ serve(async (req) => {
 
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           const userId = session.metadata?.user_id || subscription.metadata?.user_id;
+          const businessId = session.metadata?.business_id || subscription.metadata?.business_id;
           const tier = session.metadata?.tier || subscription.metadata?.tier || "professional";
           const pricingRegion = subscription.metadata?.pricing_region;
           const billingCurrency = subscription.metadata?.billing_currency;
 
-          if (!userId) {
-            console.error("No user_id in metadata");
+          if (!businessId) {
+            console.error("No business_id in metadata - falling back to user_id lookup");
+            // Fallback: try to find business by user_id
+            if (userId) {
+              const { data: userBusiness } = await supabase
+                .from("business_members")
+                .select("business_id, businesses(is_default)")
+                .eq("user_id", userId)
+                .limit(10);
+              
+              const defaultBusiness = userBusiness?.find((m: any) => m.businesses?.is_default) || userBusiness?.[0];
+              if (defaultBusiness) {
+                await updateSubscriptionByBusiness(supabase, subscription, defaultBusiness.business_id, tier, pricingRegion, billingCurrency, session.customer as string);
+              }
+            }
             break;
           }
 
-          // Check if user has existing subscription
+          // Check if business has existing subscription
           const { data: existingSub } = await supabase
             .from("subscriptions")
             .select("id")
-            .eq("user_id", userId)
+            .eq("business_id", businessId)
             .maybeSingle();
 
           if (existingSub) {
@@ -110,13 +124,13 @@ serve(async (req) => {
               })
               .eq("id", existingSub.id);
 
-            console.log("Updated subscription for user:", userId);
+            console.log("Updated subscription for business:", businessId);
           } else {
-            // Create new subscription
+            // Create new subscription for business
             await supabase
               .from("subscriptions")
               .insert({
-                user_id: userId,
+                business_id: businessId,
                 tier,
                 status: "active",
                 stripe_customer_id: session.customer as string,
@@ -127,7 +141,7 @@ serve(async (req) => {
                 billing_currency: billingCurrency,
               });
 
-            console.log("Created subscription for user:", userId);
+            console.log("Created subscription for business:", businessId);
           }
 
           // Log audit event
@@ -135,6 +149,7 @@ serve(async (req) => {
             _event_type: "SUBSCRIPTION_CHANGED",
             _entity_type: "subscription",
             _user_id: userId,
+            _business_id: businessId,
             _metadata: { tier, action: "upgraded", stripe_subscription_id: subscriptionId },
           });
         }
@@ -145,20 +160,38 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription updated:", subscription.id);
 
+        const businessId = subscription.metadata?.business_id;
         const userId = subscription.metadata?.user_id;
-        if (!userId) {
-          // Try to find by stripe_subscription_id
+        
+        if (businessId) {
+          await doUpdateSubscriptionByBusiness(supabase, subscription, businessId);
+        } else if (userId) {
+          // Fallback: find business by user_id
           const { data: sub } = await supabase
             .from("subscriptions")
-            .select("user_id")
+            .select("business_id")
             .eq("stripe_subscription_id", subscription.id)
             .maybeSingle();
 
-          if (sub) {
-            await doUpdateSubscription(supabase, subscription, sub.user_id);
+          if (sub?.business_id) {
+            await doUpdateSubscriptionByBusiness(supabase, subscription, sub.business_id);
+          } else {
+            // Legacy: update by user_id
+            await doUpdateSubscription(supabase, subscription, userId);
           }
         } else {
-          await doUpdateSubscription(supabase, subscription, userId);
+          // Find by stripe_subscription_id
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select("business_id, user_id")
+            .eq("stripe_subscription_id", subscription.id)
+            .maybeSingle();
+
+          if (sub?.business_id) {
+            await doUpdateSubscriptionByBusiness(supabase, subscription, sub.business_id);
+          } else if (sub?.user_id) {
+            await doUpdateSubscription(supabase, subscription, sub.user_id);
+          }
         }
         break;
       }
@@ -274,4 +307,80 @@ async function doUpdateSubscription(
     .eq("user_id", userId);
 
   console.log("Updated subscription for user:", userId, "tier:", tier, "status:", status);
+}
+
+async function doUpdateSubscriptionByBusiness(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  subscription: Stripe.Subscription,
+  businessId: string
+) {
+  const tier = subscription.metadata?.tier || "professional";
+  const status = subscription.status === "active" ? "active" 
+    : subscription.status === "past_due" ? "past_due"
+    : subscription.status === "canceled" ? "cancelled"
+    : subscription.status === "trialing" ? "trialing"
+    : "active";
+
+  await supabase
+    .from("subscriptions")
+    .update({
+      tier,
+      status,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("business_id", businessId);
+
+  console.log("Updated subscription for business:", businessId, "tier:", tier, "status:", status);
+}
+
+async function updateSubscriptionByBusiness(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  subscription: Stripe.Subscription,
+  businessId: string,
+  tier: string,
+  pricingRegion: string | undefined,
+  billingCurrency: string | undefined,
+  stripeCustomerId: string
+) {
+  const { data: existingSub } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (existingSub) {
+    await supabase
+      .from("subscriptions")
+      .update({
+        tier,
+        status: "active",
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: subscription.id,
+        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        pricing_region: pricingRegion,
+        billing_currency: billingCurrency,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existingSub.id);
+  } else {
+    await supabase
+      .from("subscriptions")
+      .insert({
+        business_id: businessId,
+        tier,
+        status: "active",
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: subscription.id,
+        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        pricing_region: pricingRegion,
+        billing_currency: billingCurrency,
+      });
+  }
+  console.log("Updated subscription for business:", businessId);
 }

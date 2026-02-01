@@ -22,7 +22,7 @@ import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
 import { useInvoicePayments } from '@/hooks/use-payments';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useBusiness } from '@/contexts/BusinessContext';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -66,7 +66,7 @@ export default function InvoiceDetail() {
   const voidInvoice = useVoidInvoice();
   const recordPayment = useRecordPayment();
   const downloadPdf = useDownloadInvoicePdf();
-  const { isStarter } = useSubscription();
+  const { isStarter } = useBusiness();
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);

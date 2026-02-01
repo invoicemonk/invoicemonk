@@ -31,6 +31,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import logo from '@/assets/invoicemonk-logo.png';
+import logoIcon from '@/assets/invoicemonk-icon.png';
 
 const mainNavItems = [
   { title: 'Overview', url: '/admin', icon: LayoutDashboard },
@@ -69,7 +70,7 @@ export function AdminSidebar() {
       <SidebarHeader className="border-b border-destructive/20 p-4">
         <Link to="/admin" className="flex items-center gap-2">
           <img 
-            src={logo} 
+            src={isCollapsed ? logoIcon : logo} 
             alt="Invoicemonk" 
             className={cn(
               "object-contain transition-all",

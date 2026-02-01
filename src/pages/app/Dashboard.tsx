@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserOrganizations } from '@/hooks/use-organization';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard, useRevenueTrend, type DateRange } from '@/hooks/use-dashboard-stats';
 import { useRealtimeInvoices } from '@/hooks/use-realtime-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -116,8 +116,7 @@ function getDateRangeFromPreset(preset: DateRangePreset): DateRange | undefined 
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
-  const { data: organizations } = useUserOrganizations();
-  const currentBusiness = organizations?.[0]?.business;
+  const { currentBusiness } = useBusiness();
   const isEmailVerified = user?.email_confirmed_at;
   
   // Date range filter state

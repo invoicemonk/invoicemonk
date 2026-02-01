@@ -9,6 +9,7 @@ interface ReportRequest {
   report_type: ReportType;
   year: number;
   format?: ReportFormat;
+  business_id?: string;
 }
 
 interface RevenueSummary {

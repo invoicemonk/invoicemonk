@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useBusiness, type SubscriptionTier as BusinessTier } from '@/contexts/BusinessContext';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { gaEvents } from '@/hooks/use-google-analytics';
@@ -91,7 +91,7 @@ const planIcons = {
 type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export default function Billing() {
-  const { tier, subscription } = useSubscription();
+  const { tier, subscription, currentBusiness, loading: businessLoading } = useBusiness();
   const { pricingByTier, formatPrice, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, openCustomerPortal, isLoading: checkoutLoading } = useCheckout();
   const [isYearly, setIsYearly] = useState(false);
@@ -104,7 +104,8 @@ export default function Billing() {
   const handleUpgrade = async (newTier: TierKey) => {
     if (newTier === 'starter') return;
     setLoadingTier(newTier);
-    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly');
+    // Pass businessId to checkout
+    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id);
     setLoadingTier(null);
   };
 
@@ -164,7 +165,7 @@ export default function Billing() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Current Plan
+            Current Plan {currentBusiness && <span className="text-muted-foreground font-normal text-sm">for {currentBusiness.name}</span>}
           </CardTitle>
         </CardHeader>
         <CardContent>

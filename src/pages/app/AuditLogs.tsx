@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuditLogs } from '@/hooks/use-audit-logs';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
 
@@ -92,7 +92,7 @@ export default function AuditLogs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [eventFilter, setEventFilter] = useState<string>('all');
   
-  const { canAccess, isLoading: subscriptionLoading } = useSubscription();
+  const { canAccess, loading: subscriptionLoading } = useBusiness();
   const hasAuditAccess = canAccess('audit_logs_visible');
   
   const { data: auditLogs, isLoading: logsLoading } = useAuditLogs({ limit: 200 });

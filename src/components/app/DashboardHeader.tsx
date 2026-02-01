@@ -40,7 +40,7 @@ export function DashboardHeader() {
       <Breadcrumb className="flex-1">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard">Home</BreadcrumbLink>
+            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
           </BreadcrumbItem>
           {isSubPage && parentTitle && (
             <>

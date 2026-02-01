@@ -10,13 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { NotificationItem } from './NotificationItem';
 import { useNotifications, useUnreadCount, useMarkAllAsRead } from '@/hooks/use-notifications';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 export function NotificationDropdown() {
   const [open, setOpen] = useState(false);
+  const { businessId } = useParams<{ businessId: string }>();
   const { data: notifications = [], isLoading } = useNotifications(20);
   const { data: unreadCount = 0 } = useUnreadCount();
   const markAllAsRead = useMarkAllAsRead();
+  
+  const notificationsUrl = businessId ? `/b/${businessId}/notifications` : '/notifications';
 
   const handleMarkAllAsRead = () => {
     markAllAsRead.mutate();
@@ -77,7 +80,7 @@ export function NotificationDropdown() {
         <Separator />
         <div className="p-2">
           <Link 
-            to="/notifications" 
+            to={notificationsUrl}
             onClick={() => setOpen(false)}
             className="block w-full text-center text-sm text-primary hover:underline py-2"
           >

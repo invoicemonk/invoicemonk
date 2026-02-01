@@ -36,19 +36,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useClients, useCreateClient, type Client } from '@/hooks/use-clients';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
 
 export default function Clients() {
   const navigate = useNavigate();
-  const { data: clients = [], isLoading, error } = useClients();
-  const { data: business } = useUserBusiness();
+  const { currentBusiness } = useBusiness();
+  const { data: clients = [], isLoading, error } = useClients(currentBusiness?.id);
   const createClient = useCreateClient();
   
-  // Get jurisdiction config based on user's business
-  const jurisdictionConfig = getJurisdictionConfig(business?.jurisdiction || 'NG');
+  // Get jurisdiction config based on current business
+  const jurisdictionConfig = getJurisdictionConfig(currentBusiness?.jurisdiction || 'NG');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -78,6 +78,7 @@ export default function Clients() {
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
+      business_id: currentBusiness?.id,
     });
     
     // Track client created event

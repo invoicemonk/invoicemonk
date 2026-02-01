@@ -48,12 +48,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useCreateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates, TemplateWithAccess } from '@/hooks/use-invoice-templates';
-import { useInvoiceLimitCheck, useSubscription } from '@/hooks/use-subscription';
 import { useBusinessCurrency } from '@/hooks/use-business-currency';
-import { useUserOrganizations } from '@/hooks/use-organization';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -76,12 +75,15 @@ export default function InvoiceNew() {
   const { user } = useAuth();
   const isEmailVerified = user?.email_confirmed_at;
 
-  const { data: clients, isLoading: clientsLoading } = useClients();
+  // Use BusinessContext for current business and subscription
+  const { 
+    currentBusiness, 
+    isStarter, 
+    checkTierLimit 
+  } = useBusiness();
+  
+  const { data: clients, isLoading: clientsLoading } = useClients(currentBusiness?.id);
   const { data: templates } = useInvoiceTemplates();
-  const { data: invoiceLimitCheck } = useInvoiceLimitCheck();
-  const { isStarter } = useSubscription();
-  const { data: organizations } = useUserOrganizations();
-  const currentBusiness = organizations?.[0]?.business;
   const { data: businessCurrency } = useBusinessCurrency(currentBusiness?.id);
   const createClient = useCreateClient();
   const createInvoice = useCreateInvoice();
@@ -387,11 +389,12 @@ export default function InvoiceNew() {
       return;
     }
 
-    // Check invoice limit before issuing
-    if (invoiceLimitCheck && !invoiceLimitCheck.allowed) {
+    // Check invoice limit before issuing using BusinessContext
+    const limitResult = await checkTierLimit('invoices_per_month');
+    if (!limitResult.allowed) {
       toast({
         title: 'Invoice limit reached',
-        description: `You have issued ${invoiceLimitCheck.current_count} of ${invoiceLimitCheck.limit_value} invoices this month. Upgrade to Professional for unlimited invoices.`,
+        description: `You have issued ${limitResult.current_count || 0} of ${limitResult.limit_value || 0} invoices this month. Upgrade to Professional for unlimited invoices.`,
         variant: 'destructive',
       });
       return;
@@ -439,8 +442,7 @@ export default function InvoiceNew() {
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
 
-  // Check if user is at invoice limit
-  const isAtInvoiceLimit = invoiceLimitCheck && !invoiceLimitCheck.allowed;
+  // Invoice limit is now checked dynamically at issue time using checkTierLimit
 
   return (
     <motion.div
@@ -903,16 +905,14 @@ export default function InvoiceNew() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || isAtInvoiceLimit || showTinWarning}
+                  disabled={isLoading || !isEmailVerified || showTinWarning}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : isAtInvoiceLimit ? (
-                    <Lock className="h-4 w-4 mr-2" />
                   ) : (
                     <Send className="h-4 w-4 mr-2" />
                   )}
-                  {isAtInvoiceLimit ? 'Limit Reached' : 'Issue Invoice'}
+                  Issue Invoice
                 </Button>
               </div>
 

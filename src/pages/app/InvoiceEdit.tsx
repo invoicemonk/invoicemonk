@@ -50,9 +50,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useInvoice, useUpdateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
-import { useInvoiceLimitCheck, useSubscription } from '@/hooks/use-subscription';
 import { useBusinessCurrency } from '@/hooks/use-business-currency';
-import { useUserOrganizations } from '@/hooks/use-organization';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -76,10 +75,7 @@ export default function InvoiceEdit() {
   const { data: invoice, isLoading: invoiceLoading } = useInvoice(id);
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: templates } = useInvoiceTemplates();
-  const { data: invoiceLimitCheck } = useInvoiceLimitCheck();
-  const { isStarter } = useSubscription();
-  const { data: organizations } = useUserOrganizations();
-  const currentBusiness = organizations?.[0]?.business;
+  const { currentBusiness, isStarter, checkTierLimit } = useBusiness();
   const { data: businessCurrency } = useBusinessCurrency(currentBusiness?.id);
   const createClient = useCreateClient();
   const updateInvoice = useUpdateInvoice();
@@ -321,10 +317,12 @@ export default function InvoiceEdit() {
       return;
     }
 
-    if (invoiceLimitCheck && !invoiceLimitCheck.allowed) {
+    // Check invoice limit using business-scoped tier limit
+    const limitResult = await checkTierLimit('invoices_per_month');
+    if (!limitResult.allowed) {
       toast({
         title: 'Invoice limit reached',
-        description: `You have issued ${invoiceLimitCheck.current_count} of ${invoiceLimitCheck.limit_value} invoices this month. Upgrade to Professional for unlimited invoices.`,
+        description: `You have issued ${limitResult.current_count} of ${limitResult.limit_value} invoices this month. Upgrade to Professional for unlimited invoices.`,
         variant: 'destructive',
       });
       return;
@@ -366,7 +364,6 @@ export default function InvoiceEdit() {
   };
 
   const isLoading = updateInvoice.isPending || issueInvoice.isPending;
-  const isAtInvoiceLimit = invoiceLimitCheck && !invoiceLimitCheck.allowed;
 
   if (invoiceLoading) {
     return (
@@ -823,16 +820,14 @@ export default function InvoiceEdit() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || isAtInvoiceLimit || showTinWarning}
+                  disabled={isLoading || !isEmailVerified || showTinWarning}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : isAtInvoiceLimit ? (
-                    <Lock className="h-4 w-4 mr-2" />
                   ) : (
                     <Send className="h-4 w-4 mr-2" />
                   )}
-                  {isAtInvoiceLimit ? 'Limit Reached' : 'Issue Invoice'}
+                  Issue Invoice
                 </Button>
               </div>
 

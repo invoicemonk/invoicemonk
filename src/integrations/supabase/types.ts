@@ -162,12 +162,14 @@ export type Database = {
           default_currency: string | null
           id: string
           invoice_prefix: string | null
+          is_default: boolean | null
           is_vat_registered: boolean | null
           jurisdiction: string
           legal_name: string | null
           logo_url: string | null
           name: string
           next_invoice_number: number | null
+          registration_status: string | null
           tax_id: string | null
           updated_at: string
           vat_registration_number: string | null
@@ -186,12 +188,14 @@ export type Database = {
           default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
+          is_default?: boolean | null
           is_vat_registered?: boolean | null
           jurisdiction?: string
           legal_name?: string | null
           logo_url?: string | null
           name: string
           next_invoice_number?: number | null
+          registration_status?: string | null
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
@@ -210,12 +214,14 @@ export type Database = {
           default_currency?: string | null
           id?: string
           invoice_prefix?: string | null
+          is_default?: boolean | null
           is_vat_registered?: boolean | null
           jurisdiction?: string
           legal_name?: string | null
           logo_url?: string | null
           name?: string
           next_invoice_number?: number | null
+          registration_status?: string | null
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
@@ -1116,6 +1122,10 @@ export type Database = {
     Functions: {
       check_tier_limit: {
         Args: { _feature: string; _user_id: string }
+        Returns: Json
+      }
+      check_tier_limit_business: {
+        Args: { _business_id: string; _feature: string }
         Returns: Json
       }
       close_account: {

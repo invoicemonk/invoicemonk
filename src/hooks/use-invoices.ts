@@ -13,22 +13,29 @@ export type InvoiceItem = Tables<'invoice_items'>;
 export type InvoiceInsert = TablesInsert<'invoices'>;
 export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
 
-// Fetch all invoices for the current user
-export function useInvoices() {
+// Fetch all invoices for a business (or fallback to user)
+export function useInvoices(businessId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['invoices', user?.id],
+    queryKey: ['invoices', businessId || user?.id],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('invoices')
         .select(`
           *,
           clients (*)
         `)
         .order('created_at', { ascending: false });
+
+      // If businessId is provided, filter by business
+      if (businessId) {
+        query = query.eq('business_id', businessId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Invoice[];

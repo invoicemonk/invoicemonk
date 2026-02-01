@@ -86,7 +86,7 @@ serve(async (req) => {
       );
     }
 
-    const { tier, billingPeriod = "monthly", countryCode } = await req.json();
+    const { tier, billingPeriod = "monthly", countryCode, businessId } = await req.json();
 
     // Validate tier
     const tierError = validateEnum(tier, 'tier', VALID_TIERS);
@@ -191,14 +191,38 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    // Check if customer exists in Stripe
-    const { data: subscription } = await supabaseClient
+    // Determine the business to bill (use provided businessId or user's default)
+    let targetBusinessId = businessId;
+    if (!targetBusinessId) {
+      // Get user's default business
+      const { data: businessMemberData } = await supabaseClient
+        .from("business_members")
+        .select("business_id, businesses(is_default)")
+        .eq("user_id", user.id)
+        .limit(10);
+
+      const defaultBusiness = businessMemberData?.find(
+        (m: any) => m.businesses?.is_default
+      ) || businessMemberData?.[0];
+      
+      targetBusinessId = defaultBusiness?.business_id;
+    }
+
+    if (!targetBusinessId) {
+      return new Response(
+        JSON.stringify({ error: "No business found. Please create a business first." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Check if business has existing subscription with stripe customer
+    const { data: existingSubscription } = await supabaseClient
       .from("subscriptions")
       .select("stripe_customer_id")
-      .eq("user_id", user.id)
+      .eq("business_id", targetBusinessId)
       .maybeSingle();
 
-    let customerId = subscription?.stripe_customer_id;
+    let customerId = existingSubscription?.stripe_customer_id;
 
     // If no customer, create one
     if (!customerId) {
@@ -278,7 +302,7 @@ serve(async (req) => {
     // Get the app URL for redirects
     const appUrl = Deno.env.get("APP_URL") || "https://id-preview--d2127126-79b5-4329-9bbf-46c900eb564d.lovable.app";
 
-    // Create checkout session
+    // Create checkout session with business_id in metadata
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
@@ -293,6 +317,7 @@ serve(async (req) => {
       subscription_data: {
         metadata: {
           user_id: user.id,
+          business_id: targetBusinessId,
           tier,
           pricing_region: finalPricing.country_code,
           billing_currency: finalPricing.currency,
@@ -300,6 +325,7 @@ serve(async (req) => {
       },
       metadata: {
         user_id: user.id,
+        business_id: targetBusinessId,
         tier,
       },
     });

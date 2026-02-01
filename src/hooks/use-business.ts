@@ -118,6 +118,7 @@ export function useDeleteBusinessLogo() {
 }
 
 // Fetch the current user's business (via business_members)
+// Prioritizes the default business
 export function useUserBusiness() {
   const { user } = useAuth();
 
@@ -126,8 +127,8 @@ export function useUserBusiness() {
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      // First check if user is a member of any business
-      const { data: membership, error: memberError } = await supabase
+      // First try to find user's default business
+      const { data: defaultMembership, error: defaultError } = await supabase
         .from('business_members')
         .select(`
           business_id,
@@ -135,13 +136,24 @@ export function useUserBusiness() {
           business:businesses(*)
         `)
         .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: true })
+        .limit(10);
 
-      if (memberError) throw memberError;
+      if (defaultError) throw defaultError;
 
-      if (membership?.business) {
-        return membership.business as Business;
+      // Find the default business first
+      const defaultBiz = defaultMembership?.find(m => {
+        const biz = m.business as unknown as Business & { is_default?: boolean };
+        return biz?.is_default === true;
+      });
+
+      if (defaultBiz?.business) {
+        return defaultBiz.business as Business;
+      }
+
+      // If no default, return the first membership
+      if (defaultMembership && defaultMembership.length > 0 && defaultMembership[0].business) {
+        return defaultMembership[0].business as Business;
       }
 
       // If no membership, check if user owns a business directly
@@ -149,12 +161,42 @@ export function useUserBusiness() {
         .from('businesses')
         .select('*')
         .eq('created_by', user.id)
+        .order('is_default', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
 
       if (ownedError) throw ownedError;
 
       return ownedBusiness as Business | null;
+    },
+    enabled: !!user,
+  });
+}
+
+// Fetch all businesses for the current user
+export function useUserBusinesses() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-businesses', user?.id],
+    queryFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('business_members')
+        .select(`
+          business_id,
+          role,
+          business:businesses(*)
+        `)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return (data || []).map(m => ({
+        ...m,
+        business: m.business as Business,
+      }));
     },
     enabled: !!user,
   });
@@ -175,6 +217,8 @@ export function useCreateBusiness() {
       contact_phone?: string | null;
       address?: Record<string, string | undefined> | null;
       invoice_prefix?: string | null;
+      business_type?: string | null;
+      is_default?: boolean;
     }) => {
 
       if (!user) throw new Error('Not authenticated');
@@ -185,6 +229,7 @@ export function useCreateBusiness() {
         .insert({
           ...business,
           created_by: user.id,
+          is_default: business.is_default ?? false,
         })
         .select()
         .single();
@@ -193,6 +238,8 @@ export function useCreateBusiness() {
 
       // Note: The database trigger `add_business_creator_as_owner` automatically
       // adds the creator as an owner in business_members, so we don't need to do it here.
+      // The database trigger `on_business_created_subscription` automatically creates
+      // a starter subscription for the new business.
 
       // Log audit event
       await supabase.rpc('log_audit_event', {
@@ -207,6 +254,7 @@ export function useCreateBusiness() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       toast({
         title: 'Business created',
         description: 'Your business profile has been created.',

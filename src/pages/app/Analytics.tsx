@@ -10,7 +10,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUserOrganizations } from '@/hooks/use-organization';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { 
   useRevenueByClient, 
   useStatusDistribution, 
@@ -51,11 +51,10 @@ export default function Analytics() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   
-  const { data: organizations } = useUserOrganizations();
-  // Get the first business the user belongs to (or undefined if none)
-  const defaultBusiness = organizations?.[0]?.business;
-  const businessId = defaultBusiness?.id;
-  const currency = defaultBusiness?.default_currency || 'NGN';
+  // Use BusinessContext instead of useUserOrganizations
+  const { currentBusiness } = useBusiness();
+  const businessId = currentBusiness?.id;
+  const currency = currentBusiness?.default_currency || 'NGN';
 
   const { data: revenueByClient, isLoading: clientLoading } = useRevenueByClient(
     businessId, 

@@ -8,19 +8,26 @@ export type Client = Tables<'clients'>;
 export type ClientInsert = TablesInsert<'clients'>;
 export type ClientUpdate = TablesUpdate<'clients'>;
 
-// Fetch all clients for the current user
-export function useClients() {
+// Fetch all clients for a business (or fallback to user)
+export function useClients(businessId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['clients', user?.id],
+    queryKey: ['clients', businessId || user?.id],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // If businessId is provided, filter by business; otherwise get all accessible clients
+      if (businessId) {
+        query = query.eq('business_id', businessId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Client[];
@@ -73,20 +80,21 @@ export function useClientInvoices(clientId: string | undefined) {
   });
 }
 
-// Create a new client
+// Create a new client (with optional businessId)
 export function useCreateClient() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (client: Omit<ClientInsert, 'user_id'>) => {
+    mutationFn: async (client: Omit<ClientInsert, 'user_id'> & { business_id?: string }) => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
         .from('clients')
         .insert({
           ...client,
-          user_id: user.id,
+          user_id: client.business_id ? null : user.id,
+          business_id: client.business_id || null,
         })
         .select()
         .single();
@@ -99,6 +107,7 @@ export function useCreateClient() {
         _entity_type: 'client',
         _entity_id: data.id,
         _user_id: user.id,
+        _business_id: client.business_id || null,
         _new_state: data,
       });
 

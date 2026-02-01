@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
 import { useGenerateReport, useReportStats, useAuditEventsCount, type ReportType } from '@/hooks/use-reports';
 
@@ -74,7 +74,7 @@ export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   
-  const { canAccess, isLoading } = useSubscription();
+  const { canAccess, loading: isLoading, currentBusiness } = useBusiness();
   const hasReportsAccess = canAccess('reports_enabled');
   
   const generateReport = useGenerateReport();
@@ -91,7 +91,8 @@ export default function Reports() {
       await generateReport.mutateAsync({
         report_type: reportId,
         year: parseInt(selectedYear),
-        format: 'json'
+        format: 'json',
+        business_id: currentBusiness?.id
       });
     } finally {
       setGeneratingReport(null);
@@ -104,7 +105,8 @@ export default function Reports() {
       await generateReport.mutateAsync({
         report_type: reportId,
         year: parseInt(selectedYear),
-        format: 'csv'
+        format: 'csv',
+        business_id: currentBusiness?.id
       });
     } finally {
       setGeneratingReport(null);
