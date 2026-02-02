@@ -107,7 +107,8 @@ export default function PlanSelection() {
     }
 
     setLoadingTier(tier);
-    await createCheckoutSession(tier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', countryCode);
+    // Pass undefined for businessId (not available during plan selection), and countryCode for regional pricing
+    await createCheckoutSession(tier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
     setLoadingTier(null);
   };
 
