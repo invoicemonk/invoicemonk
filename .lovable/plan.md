@@ -1,63 +1,55 @@
 
+# Plan: Fix Checkout Country Code Missing
 
-# Plan: Google Analytics Integration
+## Problem
+When upgrading to `starter_paid`, the `create-checkout-session` edge function fails with "Pricing not found for tier: starter_paid" because:
 
-## Overview
-Add Google Analytics 4 (GA4) tracking to monitor user activity, page views, and events across the application.
+1. The frontend doesn't pass `countryCode` to the checkout function
+2. The edge function defaults to "US" when region detection fails
+3. There's no `starter_paid` pricing for US (it's Nigeria-only)
 
-## What You'll Need
-Before implementation, you'll need a **GA4 Measurement ID** from Google Analytics:
-1. Go to [Google Analytics](https://analytics.google.com)
-2. Create a property for your app (or use existing)
-3. Get your Measurement ID (format: `G-XXXXXXXXXX`)
+## Solution
+Pass the detected country code from the frontend to the checkout session, ensuring the edge function uses the correct regional pricing.
 
-## Implementation
-
-### 1. Add GA4 Script to `index.html`
-
-Insert the Google Analytics gtag.js script in the document head with your Measurement ID.
-
-### 2. Create Analytics Hook
-
-Create `src/hooks/use-google-analytics.ts` to:
-- Track page views automatically on route changes
-- Provide helper functions for custom event tracking
-
-### 3. Initialize in App
-
-Add the analytics hook to your main `App.tsx` to start tracking page views across all routes.
-
-## Files to Modify/Create
+## Files to Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `index.html` | Modify | Add GA4 gtag.js script |
-| `src/hooks/use-google-analytics.ts` | Create | Hook for page view and event tracking |
-| `src/App.tsx` | Modify | Initialize analytics tracking |
+| `src/pages/app/Billing.tsx` | Modify | Pass countryCode from useRegionalPricing to checkout |
 
-## Features Included
+## Implementation Details
 
-- **Automatic Page View Tracking**: Every route change sends a page view event
-- **Custom Event Tracking**: Helper function to track button clicks, form submissions, etc.
-- **SPA Support**: Properly handles React Router navigation (not just initial page load)
+### Update Billing.tsx
 
-## Example Usage
+Modify the `handleUpgrade` function to pass the country code:
 
-Once implemented, you can track custom events like:
 ```typescript
-// Track invoice creation
-trackEvent('invoice_created', { invoice_id: '123', amount: 5000 });
+// Current (missing countryCode):
+await createCheckoutSession(newTier, billingPeriod, currentBusiness?.id);
 
-// Track subscription upgrade
-trackEvent('subscription_upgraded', { plan: 'professional' });
+// Fixed (with countryCode):
+await createCheckoutSession(newTier, billingPeriod, currentBusiness?.id, countryCode);
 ```
 
-## Privacy Considerations
+The `countryCode` is already available from `useRegionalPricing()` hook which returns the detected region based on the user's business jurisdiction.
 
-The implementation will respect user privacy:
-- No personally identifiable information (PII) sent to GA
-- Can easily add cookie consent integration later if needed
+## Why This Works
 
-## Estimated Effort
-~15 minutes implementation time
+1. `useRegionalPricing` already detects the user's region (NG for Nigeria)
+2. Passing this to the edge function ensures it uses the correct pricing table entry
+3. Avoids reliance on edge function's business lookup (which may have RLS issues)
 
+## Alternative Considered
+
+Adding default `starter_paid` pricing for US was considered but rejected because:
+- `starter_paid` is intentionally a Nigeria-only tier
+- International users shouldn't see this tier option at all
+- The frontend already correctly hides it for non-NG users
+
+## Testing
+
+After the fix:
+1. Log in as a Nigerian business user
+2. Go to Billing page
+3. Click "Upgrade" on Starter (starter_paid) plan
+4. Should redirect to Stripe Checkout without errors
