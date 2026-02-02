@@ -92,7 +92,7 @@ type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export default function Billing() {
   const { tier, subscription, currentBusiness, loading: businessLoading } = useBusiness();
-  const { pricingByTier, formatPrice, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
+  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, openCustomerPortal, isLoading: checkoutLoading } = useCheckout();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
@@ -104,8 +104,8 @@ export default function Billing() {
   const handleUpgrade = async (newTier: TierKey) => {
     if (newTier === 'starter') return;
     setLoadingTier(newTier);
-    // Pass businessId to checkout
-    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id);
+    // Pass businessId and countryCode to checkout for correct regional pricing
+    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id, countryCode);
     setLoadingTier(null);
   };
 
