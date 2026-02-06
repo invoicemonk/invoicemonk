@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams } from 'react-router-dom';
-import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2, User, Info } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2, User, Info, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +9,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgClients, useCreateClient, useUpdateClient, useDeleteClient } from '@/hooks/use-clients';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { toast } from 'sonner';
+
+interface AddressData {
+  street: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
 
 interface ClientFormData {
   name: string;
@@ -25,6 +34,7 @@ interface ClientFormData {
   client_type: 'individual' | 'company';
   cac_number: string;
   contact_person: string;
+  address: AddressData;
 }
 
 const initialFormData: ClientFormData = {
@@ -35,7 +45,8 @@ const initialFormData: ClientFormData = {
   notes: '',
   client_type: 'company',
   cac_number: '',
-  contact_person: ''
+  contact_person: '',
+  address: { street: '', city: '', state: '', postal_code: '', country: '' }
 };
 
 export default function OrgClients() {
@@ -55,6 +66,7 @@ export default function OrgClients() {
   const [editingClient, setEditingClient] = useState<string | null>(null);
   const [deletingClient, setDeletingClient] = useState<string | null>(null);
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
+  const [showAddress, setShowAddress] = useState(false);
 
   const filteredClients = clients?.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -65,6 +77,14 @@ export default function OrgClients() {
     if (clientId) {
       const client = clients?.find(c => c.id === clientId);
       if (client) {
+        const clientAddress = client.address as Record<string, string> | null;
+        const parsedAddress: AddressData = {
+          street: clientAddress?.street || '',
+          city: clientAddress?.city || '',
+          state: clientAddress?.state || '',
+          postal_code: clientAddress?.postal_code || '',
+          country: clientAddress?.country || ''
+        };
         setFormData({
           name: client.name,
           email: client.email || '',
@@ -73,13 +93,17 @@ export default function OrgClients() {
           notes: client.notes || '',
           client_type: (client.client_type as 'individual' | 'company') || 'company',
           cac_number: client.cac_number || '',
-          contact_person: client.contact_person || ''
+          contact_person: client.contact_person || '',
+          address: parsedAddress
         });
         setEditingClient(clientId);
+        // Show address section if client has address data
+        setShowAddress(!!clientAddress && Object.values(clientAddress).some(v => v));
       }
     } else {
       setFormData(initialFormData);
       setEditingClient(null);
+      setShowAddress(false);
     }
     setDialogOpen(true);
   };
@@ -89,6 +113,10 @@ export default function OrgClients() {
       toast.error('Client name is required');
       return;
     }
+
+    // Build address object only if any field is filled
+    const hasAddress = Object.values(formData.address).some(v => v.trim() !== '');
+    const addressData = hasAddress ? { ...formData.address } : null;
 
     try {
       if (editingClient) {
@@ -102,7 +130,8 @@ export default function OrgClients() {
             notes: formData.notes || null,
             client_type: formData.client_type,
             cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
-            contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null
+            contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null,
+            address: addressData
           }
         });
         toast.success('Client updated');
@@ -116,11 +145,13 @@ export default function OrgClients() {
           client_type: formData.client_type,
           cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
           contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null,
+          address: addressData,
           business_id: orgId
         });
         toast.success('Client created');
       }
       setDialogOpen(false);
+      setShowAddress(false);
       setFormData(initialFormData);
       setEditingClient(null);
     } catch (error) {
@@ -346,6 +377,80 @@ export default function OrgClients() {
                 </div>
               )}
             </div>
+
+            {/* Address Section */}
+            <Collapsible open={showAddress} onOpenChange={setShowAddress} className="space-y-2 pt-2 border-t">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    Address (Optional)
+                  </div>
+                  {showAddress ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Street Address</Label>
+                  <Input
+                    placeholder="123 Main Street"
+                    value={formData.address.street}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      address: { ...formData.address, street: e.target.value } 
+                    })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <Input
+                      placeholder="Lagos"
+                      value={formData.address.city}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        address: { ...formData.address, city: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>State / Region</Label>
+                    <Input
+                      placeholder="Lagos State"
+                      value={formData.address.state}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        address: { ...formData.address, state: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Postal Code</Label>
+                    <Input
+                      placeholder="100001"
+                      value={formData.address.postal_code}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        address: { ...formData.address, postal_code: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <Input
+                      placeholder="Nigeria"
+                      value={formData.address.country}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        address: { ...formData.address, country: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Notes */}
             <div className="space-y-2">

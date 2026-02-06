@@ -11,8 +11,12 @@ import {
   Loader2,
   Building2,
   User,
-  Info
+  Info,
+  MapPin,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +64,15 @@ export default function Clients() {
     client_type: 'company' as 'individual' | 'company',
     cac_number: '',
     contact_person: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: '',
+    },
   });
+  const [showAddress, setShowAddress] = useState(false);
 
   const filteredClients = clients.filter(client => 
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,6 +82,10 @@ export default function Clients() {
   const handleAddClient = async () => {
     if (!newClient.name) return;
     
+    // Build address object only if any field is filled
+    const hasAddress = Object.values(newClient.address).some(v => v.trim() !== '');
+    const addressData = hasAddress ? newClient.address : null;
+    
     await createClient.mutateAsync({
       name: newClient.name,
       email: newClient.email || null,
@@ -78,6 +94,7 @@ export default function Clients() {
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
+      address: addressData,
       business_id: currentBusiness?.id,
     });
     
@@ -85,6 +102,7 @@ export default function Clients() {
     gaEvents.clientCreated();
     
     setIsAddDialogOpen(false);
+    setShowAddress(false);
     setNewClient({ 
       name: '', 
       email: '', 
@@ -93,6 +111,7 @@ export default function Clients() {
       client_type: 'company',
       cac_number: '',
       contact_person: '',
+      address: { street: '', city: '', state: '', postal_code: '', country: '' },
     });
   };
 
@@ -225,7 +244,7 @@ export default function Clients() {
                   </p>
                 </div>
 
-                {newClient.client_type === 'company' && jurisdictionConfig.showClientReg && (
+              {newClient.client_type === 'company' && jurisdictionConfig.showClientReg && (
                   <div className="space-y-2">
                     <Label htmlFor="cac_number">{jurisdictionConfig.clientRegLabel}</Label>
                     <Input
@@ -241,6 +260,85 @@ export default function Clients() {
                   </div>
                 )}
               </div>
+
+              {/* Address Section */}
+              <Collapsible open={showAddress} onOpenChange={setShowAddress} className="space-y-2 pt-2 border-t">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      Address (Optional)
+                    </div>
+                    {showAddress ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="street">Street Address</Label>
+                    <Input
+                      id="street"
+                      placeholder="123 Main Street"
+                      value={newClient.address.street}
+                      onChange={(e) => setNewClient({ 
+                        ...newClient, 
+                        address: { ...newClient.address, street: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        placeholder="Lagos"
+                        value={newClient.address.city}
+                        onChange={(e) => setNewClient({ 
+                          ...newClient, 
+                          address: { ...newClient.address, city: e.target.value } 
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State / Region</Label>
+                      <Input
+                        id="state"
+                        placeholder="Lagos State"
+                        value={newClient.address.state}
+                        onChange={(e) => setNewClient({ 
+                          ...newClient, 
+                          address: { ...newClient.address, state: e.target.value } 
+                        })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="postal_code">Postal Code</Label>
+                      <Input
+                        id="postal_code"
+                        placeholder="100001"
+                        value={newClient.address.postal_code}
+                        onChange={(e) => setNewClient({ 
+                          ...newClient, 
+                          address: { ...newClient.address, postal_code: e.target.value } 
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input
+                        id="country"
+                        placeholder="Nigeria"
+                        value={newClient.address.country}
+                        onChange={(e) => setNewClient({ 
+                          ...newClient, 
+                          address: { ...newClient.address, country: e.target.value } 
+                        })}
+                      />
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
