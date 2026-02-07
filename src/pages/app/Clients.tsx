@@ -52,17 +52,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { getJurisdictionConfig, JURISDICTION_CONFIG } from '@/lib/jurisdiction-config';
 import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
-
-// Available countries for client location
-const COUNTRY_OPTIONS = [
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'OTHER', name: 'Other' },
-];
+import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -252,7 +242,7 @@ export default function Clients() {
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COUNTRY_OPTIONS.map(country => (
+                    {COUNTRY_OPTIONS_WITH_OTHER.map(country => (
                       <SelectItem key={country.code} value={country.code}>
                         {country.name}
                       </SelectItem>

@@ -38,15 +38,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
-
-const jurisdictions = [
-  { value: 'NG', label: 'Nigeria' },
-  { value: 'US', label: 'United States' },
-  { value: 'GB', label: 'United Kingdom' },
-  { value: 'CA', label: 'Canada' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'FR', label: 'France' },
-];
+import { COUNTRY_OPTIONS } from '@/lib/countries';
 
 interface AddressData {
   street?: string;
@@ -414,9 +406,9 @@ export default function BusinessProfile() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {jurisdictions.map((j) => (
-                    <SelectItem key={j.value} value={j.value}>
-                      {j.label}
+                  {COUNTRY_OPTIONS.map((j) => (
+                    <SelectItem key={j.code} value={j.code}>
+                      {j.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -624,9 +616,9 @@ export default function BusinessProfile() {
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
-                    {jurisdictions.map((j) => (
-                      <SelectItem key={j.value} value={j.label}>
-                        {j.label}
+                    {COUNTRY_OPTIONS.map((j) => (
+                      <SelectItem key={j.code} value={j.name}>
+                        {j.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

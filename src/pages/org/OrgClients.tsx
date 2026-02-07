@@ -17,17 +17,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgClients, useCreateClient, useUpdateClient, useDeleteClient } from '@/hooks/use-clients';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { toast } from 'sonner';
-
-// Available countries for client location
-const COUNTRY_OPTIONS = [
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'OTHER', name: 'Other' },
-];
+import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 
 interface AddressData {
   street: string;
@@ -133,7 +123,7 @@ export default function OrgClients() {
         });
         setEditingClient(clientId);
         // Try to detect client country from address
-        const detectedCountry = COUNTRY_OPTIONS.find(c => 
+        const detectedCountry = COUNTRY_OPTIONS_WITH_OTHER.find(c => 
           c.name.toLowerCase() === parsedAddress.country?.toLowerCase()
         )?.code || 'OTHER';
         setClientCountry(detectedCountry);
@@ -373,7 +363,7 @@ export default function OrgClients() {
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COUNTRY_OPTIONS.map(country => (
+                  {COUNTRY_OPTIONS_WITH_OTHER.map(country => (
                     <SelectItem key={country.code} value={country.code}>
                       {country.name}
                     </SelectItem>

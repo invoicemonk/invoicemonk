@@ -1,1 +1,13 @@
 project_id = "skcxogeaerudoadluexz"
+
+[functions.verify-invoice]
+verify_jwt = false
+
+[functions.view-invoice]
+verify_jwt = false
+
+[functions.verify-receipt]
+verify_jwt = false
+
+[functions.generate-receipt-pdf]
+verify_jwt = false

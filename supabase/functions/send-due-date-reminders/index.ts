@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { Resend } from 'https://esm.sh/resend@2.0.0'
 
 // Dynamic CORS configuration - allows any Lovable preview domain + production
 function isAllowedOrigin(origin: string | null): boolean {
@@ -24,6 +23,43 @@ function getCorsHeaders(req: Request): Record<string, string> {
   };
 }
 
+// Send email via Brevo (Sendinblue) API
+async function sendBrevoEmail(
+  brevoApiKey: string,
+  fromEmail: string,
+  fromName: string,
+  toEmail: string,
+  subject: string,
+  htmlContent: string
+): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': brevoApiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: toEmail }],
+        subject,
+        htmlContent,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Brevo API error (${response.status}):`, errorText)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error('Brevo email send error:', err)
+    return false
+  }
+}
+
 interface UserPreference {
   user_id: string
   email_payment_reminders: boolean
@@ -32,19 +68,6 @@ interface UserPreference {
   overdue_reminder_enabled: boolean
   overdue_reminder_schedule: number[] | null
   reminder_email_template: string | null
-}
-
-interface InvoiceWithRelations {
-  id: string
-  invoice_number: string
-  due_date: string
-  total_amount: number
-  currency: string
-  user_id: string
-  business_id: string
-  client_id: string
-  clients: { id: string; name: string; email: string } | null
-  businesses: { id: string; name: string; contact_email: string } | null
 }
 
 Deno.serve(async (req) => {
@@ -57,10 +80,10 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+    const smtpFrom = Deno.env.get('SMTP_FROM') || 'noreply@invoicemonk.com'
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
-    const resend = resendApiKey ? new Resend(resendApiKey) : null
 
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
@@ -115,8 +138,6 @@ Deno.serve(async (req) => {
         targetDate.setDate(targetDate.getDate() + daysOffset)
         const targetDateStr = targetDate.toISOString().split('T')[0]
 
-        // For pre-due reminders, find invoices due on target date
-        // For overdue reminders, find invoices that were due on target date (in the past)
         const { data: invoices, error: invoicesError } = await adminClient
           .from('invoices')
           .select(`
@@ -180,11 +201,9 @@ Deno.serve(async (req) => {
           const clientName = client?.name || 'Customer'
           const businessName = business?.name || 'Our Company'
 
-          // Send email to client
-          if (clientEmail && resend) {
+          // Send email to client via Brevo
+          if (clientEmail && brevoApiKey) {
             try {
-              const verificationUrl = `${supabaseUrl.replace('.supabase.co', '')}-preview--82ffc045-b041-402c-abe1-c53a60141b70.lovable.app/verify/${invoice.id}`
-              
               const subject = isOverdue
                 ? `Overdue: Invoice ${invoiceData.invoice_number} was due ${daysLabel} days ago`
                 : `Reminder: Invoice ${invoiceData.invoice_number} is due in ${daysLabel} days`
@@ -199,62 +218,64 @@ Deno.serve(async (req) => {
                    </div>`
                 : ''
 
-              await resend.emails.send({
-                from: `${businessName} <onboarding@resend.dev>`,
-                to: [clientEmail],
-                subject,
-                html: `
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  </head>
-                  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="background: ${isOverdue ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                      <h1 style="margin: 0; font-size: 24px;">${isOverdue ? 'Payment Overdue' : 'Payment Reminder'}</h1>
+              const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: ${isOverdue ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px;">${isOverdue ? 'Payment Overdue' : 'Payment Reminder'}</h1>
+                  </div>
+                  <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
+                    <p>Dear ${clientName},</p>
+                    <p>This is a ${isOverdue ? 'notice' : 'friendly reminder'} that invoice <strong>${invoiceData.invoice_number}</strong> is ${statusText}.</p>
+                    
+                    ${customMessage}
+                    
+                    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${isOverdue ? '#dc2626' : '#667eea'};">
+                      <table style="width: 100%;">
+                        <tr>
+                          <td style="padding: 5px 0; color: #666;">Invoice Number:</td>
+                          <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoiceData.invoice_number}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 5px 0; color: #666;">Amount Due:</td>
+                          <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: ${isOverdue ? '#dc2626' : '#667eea'};">${invoiceData.currency} ${Number(invoiceData.total_amount).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 5px 0; color: #666;">Due Date:</td>
+                          <td style="padding: 5px 0; text-align: right; font-weight: bold; ${isOverdue ? 'color: #dc2626;' : ''}">${invoiceData.due_date}</td>
+                        </tr>
+                      </table>
                     </div>
-                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
-                      <p>Dear ${clientName},</p>
-                      <p>This is a ${isOverdue ? 'notice' : 'friendly reminder'} that invoice <strong>${invoiceData.invoice_number}</strong> is ${statusText}.</p>
-                      
-                      ${customMessage}
-                      
-                      <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${isOverdue ? '#dc2626' : '#667eea'};">
-                        <table style="width: 100%;">
-                          <tr>
-                            <td style="padding: 5px 0; color: #666;">Invoice Number:</td>
-                            <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoiceData.invoice_number}</td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 5px 0; color: #666;">Amount Due:</td>
-                            <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: ${isOverdue ? '#dc2626' : '#667eea'};">${invoiceData.currency} ${Number(invoiceData.total_amount).toLocaleString()}</td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 5px 0; color: #666;">Due Date:</td>
-                            <td style="padding: 5px 0; text-align: right; font-weight: bold; ${isOverdue ? 'color: #dc2626;' : ''}">${invoiceData.due_date}</td>
-                          </tr>
-                        </table>
-                      </div>
-                      
-                      <div style="text-align: center; margin: 30px 0;">
-                        <a href="${verificationUrl}" style="display: inline-block; background: ${isOverdue ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: bold;">View Invoice</a>
-                      </div>
-                      
-                      <p style="color: #666; font-size: 14px;">${isOverdue ? 'Please arrange payment at your earliest convenience to avoid any further action.' : 'If you have already made this payment, please disregard this reminder.'}</p>
-                      
-                      <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                      <p style="color: #888; font-size: 12px; text-align: center;">
-                        This email was sent by ${businessName}
-                      </p>
-                    </div>
-                  </body>
-                  </html>
-                `,
-              })
+                    
+                    <p style="color: #666; font-size: 14px;">${isOverdue ? 'Please arrange payment at your earliest convenience to avoid any further action.' : 'If you have already made this payment, please disregard this reminder.'}</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+                    <p style="color: #888; font-size: 12px; text-align: center;">
+                      This email was sent by ${businessName}
+                    </p>
+                  </div>
+                </body>
+                </html>
+              `
 
-              console.log(`${isOverdue ? 'Overdue' : 'Reminder'} email sent to ${clientEmail} for invoice ${invoiceData.invoice_number}`)
-              totalEmailsSent++
+              const sent = await sendBrevoEmail(
+                brevoApiKey,
+                smtpFrom,
+                businessName,
+                clientEmail,
+                subject,
+                htmlContent
+              )
+
+              if (sent) {
+                console.log(`${isOverdue ? 'Overdue' : 'Reminder'} email sent to ${clientEmail} for invoice ${invoiceData.invoice_number}`)
+                totalEmailsSent++
+              }
             } catch (emailError) {
               console.error(`Failed to send email for invoice ${invoiceData.invoice_number}:`, emailError)
             }

@@ -51,6 +51,10 @@ import AccountingResult from "./pages/app/accounting/AccountingResult";
 // Expenses page (standalone entry point)
 import Expenses from "./pages/app/Expenses";
 
+// Receipts pages
+import Receipts from "./pages/app/Receipts";
+import ReceiptDetail from "./pages/app/ReceiptDetail";
+
 // Support pages
 import Support from "./pages/app/Support";
 import SupportTicket from "./pages/app/SupportTicket";
@@ -84,6 +88,7 @@ import AdminSupport from "./pages/admin/AdminSupport";
 
 // Public pages
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
+import VerifyReceipt from "./pages/verify/VerifyReceipt";
 import InvoiceView from "./pages/public/InvoiceView";
 
 // Legal and Documentation pages
@@ -155,6 +160,8 @@ const App = () => (
             <Route path="/b/:businessId/clients" element={<Clients />} />
             <Route path="/b/:businessId/clients/:id" element={<ClientDetail />} />
             <Route path="/b/:businessId/clients/:id/edit" element={<ClientEdit />} />
+            <Route path="/b/:businessId/receipts" element={<Receipts />} />
+            <Route path="/b/:businessId/receipts/:id" element={<ReceiptDetail />} />
             <Route path="/b/:businessId/reports" element={<Reports />} />
             <Route path="/b/:businessId/analytics" element={<Analytics />} />
             <Route path="/b/:businessId/audit-logs" element={<AuditLogs />} />
@@ -196,6 +203,7 @@ const App = () => (
           <Route path="/analytics" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           <Route path="/billing" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
+          <Route path="/receipts" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           
           {/* Accounting routes */}
           <Route path="/accounting" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
@@ -236,6 +244,7 @@ const App = () => (
           {/* Public Pages - No auth required */}
           <Route path="/invoice/view/:verificationId" element={<InvoiceView />} />
           <Route path="/verify/invoice/:verificationId" element={<VerifyInvoice />} />
+          <Route path="/verify/receipt/:verificationId" element={<VerifyReceipt />} />
           
           {/* Legal and Documentation pages - No auth required */}
           <Route path="/legal/sla" element={<SLA />} />

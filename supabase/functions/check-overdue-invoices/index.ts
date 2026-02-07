@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { Resend } from 'https://esm.sh/resend@2.0.0'
 
 // Dynamic CORS configuration - allows any Lovable preview domain + production
 function isAllowedOrigin(origin: string | null): boolean {
@@ -24,6 +23,43 @@ function getCorsHeaders(req: Request): Record<string, string> {
   };
 }
 
+// Send email via Brevo (Sendinblue) API
+async function sendBrevoEmail(
+  brevoApiKey: string,
+  fromEmail: string,
+  fromName: string,
+  toEmail: string,
+  subject: string,
+  htmlContent: string
+): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': brevoApiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: toEmail }],
+        subject,
+        htmlContent,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Brevo API error (${response.status}):`, errorText)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error('Brevo email send error:', err)
+    return false
+  }
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -35,10 +71,10 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+    const smtpFrom = Deno.env.get('SMTP_FROM') || 'noreply@invoicemonk.com'
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
-    const resend = resendApiKey ? new Resend(resendApiKey) : null
 
     // Find all overdue invoices (issued or sent, past due date, not paid/voided)
     const today = new Date().toISOString().split('T')[0]
@@ -137,7 +173,7 @@ Deno.serve(async (req) => {
       console.log(`Created ${notificationsToCreate.length} overdue notifications`)
 
       // Send emails to users who have email_overdue_alerts enabled
-      if (resend) {
+      if (brevoApiKey) {
         for (const invoice of overdueInvoices.filter(i => !alreadyNotifiedIds.has(i.id))) {
           const userPref = userPrefsMap.get(invoice.user_id)
           // Default to true if no preferences exist
@@ -151,67 +187,75 @@ Deno.serve(async (req) => {
                 const businessName = business?.name || 'InvoiceMonk'
                 const daysOverdue = Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
 
-                await resend.emails.send({
-                  from: `InvoiceMonk <onboarding@resend.dev>`,
-                  to: [profile.email],
-                  subject: `⚠️ Invoice ${invoice.invoice_number} is ${daysOverdue} day(s) overdue`,
-                  html: `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <meta charset="utf-8">
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    </head>
-                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                      <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                        <h1 style="margin: 0; font-size: 24px;">⚠️ Overdue Invoice Alert</h1>
+                const htmlContent = `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  </head>
+                  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                      <h1 style="margin: 0; font-size: 24px;">⚠️ Overdue Invoice Alert</h1>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
+                      <p>Hi ${profile.full_name || 'there'},</p>
+                      <p>This is to alert you that the following invoice is now <strong>${daysOverdue} day(s) overdue</strong>:</p>
+                      
+                      <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
+                        <table style="width: 100%;">
+                          <tr>
+                            <td style="padding: 5px 0; color: #666;">Invoice Number:</td>
+                            <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoice.invoice_number}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 5px 0; color: #666;">Business:</td>
+                            <td style="padding: 5px 0; text-align: right;">${businessName}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 5px 0; color: #666;">Amount:</td>
+                            <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: #dc2626;">${invoice.currency} ${Number(invoice.total_amount).toLocaleString()}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 5px 0; color: #666;">Due Date:</td>
+                            <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoice.due_date}</td>
+                          </tr>
+                        </table>
                       </div>
-                      <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
-                        <p>Hi ${profile.full_name || 'there'},</p>
-                        <p>This is to alert you that the following invoice is now <strong>${daysOverdue} day(s) overdue</strong>:</p>
-                        
-                        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
-                          <table style="width: 100%;">
-                            <tr>
-                              <td style="padding: 5px 0; color: #666;">Invoice Number:</td>
-                              <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoice.invoice_number}</td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 5px 0; color: #666;">Business:</td>
-                              <td style="padding: 5px 0; text-align: right;">${businessName}</td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 5px 0; color: #666;">Amount:</td>
-                              <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: #dc2626;">${invoice.currency} ${Number(invoice.total_amount).toLocaleString()}</td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 5px 0; color: #666;">Due Date:</td>
-                              <td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoice.due_date}</td>
-                            </tr>
-                          </table>
-                        </div>
-                        
-                        <p>Consider following up with your client to collect this payment.</p>
-                        
-                        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                        <p style="color: #888; font-size: 12px; text-align: center;">
-                          You can manage your email notification preferences in Settings.<br>
-                          This email was sent by InvoiceMonk.
-                        </p>
-                      </div>
-                    </body>
-                    </html>
-                  `,
-                })
+                      
+                      <p>Consider following up with your client to collect this payment.</p>
+                      
+                      <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+                      <p style="color: #888; font-size: 12px; text-align: center;">
+                        You can manage your email notification preferences in Settings.<br>
+                        This email was sent by InvoiceMonk.
+                      </p>
+                    </div>
+                  </body>
+                  </html>
+                `
 
-                console.log(`Overdue alert email sent to ${profile.email} for invoice ${invoice.invoice_number}`)
-                emailsSent++
+                const sent = await sendBrevoEmail(
+                  brevoApiKey,
+                  smtpFrom,
+                  'InvoiceMonk',
+                  profile.email,
+                  `⚠️ Invoice ${invoice.invoice_number} is ${daysOverdue} day(s) overdue`,
+                  htmlContent
+                )
+
+                if (sent) {
+                  console.log(`Overdue alert email sent to ${profile.email} for invoice ${invoice.invoice_number}`)
+                  emailsSent++
+                }
               } catch (emailError) {
                 console.error(`Failed to send overdue email for invoice ${invoice.invoice_number}:`, emailError)
               }
             }
           }
         }
+      } else {
+        console.log('BREVO_API_KEY not configured, skipping email notifications')
       }
     } else {
       console.log('All overdue invoices already notified in the last 24 hours')

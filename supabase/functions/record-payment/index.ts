@@ -116,8 +116,14 @@ interface RecordPaymentResponse {
     amount: number
     payment_date: string
   }
+  receipt?: {
+    id: string
+    receipt_number: string
+    verification_id: string
+  }
   invoice_status?: string
   error?: string
+  error_code?: string
 }
 
 Deno.serve(async (req) => {
@@ -223,7 +229,7 @@ Deno.serve(async (req) => {
     // Fetch the invoice to validate ownership and status
     const { data: invoice, error: invoiceError } = await supabaseUser
       .from('invoices')
-      .select('id, status, total_amount, amount_paid, user_id, business_id')
+      .select('id, status, total_amount, amount_paid, currency, user_id, business_id')
       .eq('id', body.invoice_id)
       .maybeSingle()
 
@@ -246,6 +252,45 @@ Deno.serve(async (req) => {
       )
     }
 
+    // OVERPAYMENT PREVENTION: Reject payments exceeding remaining balance
+    const remainingBalance = invoice.total_amount - (invoice.amount_paid || 0)
+    if (body.amount > remainingBalance) {
+      // Log rejected overpayment attempt
+      try {
+        await supabaseService.rpc('log_audit_event', {
+          _event_type: 'PAYMENT_RECORDED',
+          _entity_type: 'payment',
+          _user_id: userId,
+          _business_id: invoice.business_id,
+          _metadata: {
+            invoice_id: body.invoice_id,
+            rejected: true,
+            reason: 'OVERPAYMENT_NOT_ALLOWED',
+            attempted_amount: body.amount,
+            remaining_balance: remainingBalance,
+            total_amount: invoice.total_amount,
+            amount_paid: invoice.amount_paid
+          }
+        })
+      } catch (auditErr) {
+        console.error('Audit log error for rejected overpayment:', auditErr)
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Payment amount (${body.amount}) exceeds remaining balance (${remainingBalance}). Maximum payment allowed: ${remainingBalance}`,
+          error_code: 'OVERPAYMENT_NOT_ALLOWED'
+        } as RecordPaymentResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Determine if payment is backdated
+    const paymentDate = body.payment_date || new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toISOString().split('T')[0]
+    const isBackdated = paymentDate < todayStr
+
     // Get previous state for audit log
     const previousState = {
       status: invoice.status,
@@ -260,7 +305,7 @@ Deno.serve(async (req) => {
         amount: body.amount,
         payment_method: body.payment_method ? sanitizeString(body.payment_method) : null,
         payment_reference: body.payment_reference ? sanitizeString(body.payment_reference) : null,
-        payment_date: body.payment_date || new Date().toISOString().split('T')[0],
+        payment_date: paymentDate,
         notes: body.notes ? sanitizeString(body.notes) : null,
         recorded_by: userId
       })
@@ -294,7 +339,7 @@ Deno.serve(async (req) => {
       // Payment was recorded but invoice update failed - log but don't fail
     }
 
-    // Log audit event using service client
+    // Log audit event using service client (with backdated flagging)
     try {
       await supabaseService.rpc('log_audit_event', {
         _event_type: 'PAYMENT_RECORDED',
@@ -311,18 +356,25 @@ Deno.serve(async (req) => {
         _metadata: {
           invoice_id: body.invoice_id,
           payment_method: body.payment_method,
-          fully_paid: isFullyPaid
+          fully_paid: isFullyPaid,
+          ...(isBackdated ? { is_backdated: true, payment_date: paymentDate } : {})
         }
       })
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
     }
 
-    // Create notification for payment received
-    const formattedAmount = new Intl.NumberFormat('en-NG', { 
-      style: 'currency', 
-      currency: 'NGN' 
-    }).format(body.amount)
+    // Create notification for payment received (use invoice currency, not hardcoded NGN)
+    let formattedAmount: string
+    try {
+      formattedAmount = new Intl.NumberFormat('en', { 
+        style: 'currency', 
+        currency: invoice.currency || 'NGN'
+      }).format(body.amount)
+    } catch {
+      // Fallback if currency code is invalid for Intl
+      formattedAmount = `${invoice.currency || 'NGN'} ${Number(body.amount).toLocaleString()}`
+    }
     
     await createNotification(
       supabaseService,
@@ -335,6 +387,35 @@ Deno.serve(async (req) => {
       invoice.business_id
     )
 
+    // Create receipt for this payment
+    let receiptInfo: { id: string; receipt_number: string; verification_id: string } | undefined = undefined
+    try {
+      const { data: receiptId, error: receiptError } = await supabaseService
+        .rpc('create_receipt_from_payment', { _payment_id: payment.id })
+      
+      if (receiptError) {
+        console.error('Receipt creation error:', receiptError)
+      } else if (receiptId) {
+        // Fetch the created receipt for response
+        const { data: receiptData } = await supabaseService
+          .from('receipts')
+          .select('id, receipt_number, verification_id')
+          .eq('id', receiptId)
+          .single()
+        
+        if (receiptData) {
+          receiptInfo = {
+            id: receiptData.id,
+            receipt_number: receiptData.receipt_number,
+            verification_id: receiptData.verification_id
+          }
+        }
+      }
+    } catch (receiptErr) {
+      console.error('Receipt creation exception:', receiptErr)
+      // Don't fail the payment recording if receipt creation fails
+    }
+
     const response: RecordPaymentResponse = {
       success: true,
       payment: {
@@ -343,6 +424,7 @@ Deno.serve(async (req) => {
         amount: payment.amount,
         payment_date: payment.payment_date
       },
+      receipt: receiptInfo,
       invoice_status: newStatus
     }
 

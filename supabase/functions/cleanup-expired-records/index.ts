@@ -30,11 +30,14 @@ function getCorsHeaders(req: Request): Record<string, string> {
  * passed their retention_locked_until date. This ensures compliance with
  * data retention policies while maintaining audit trails.
  * 
+ * Authentication: Requires either:
+ * - CLEANUP_SECRET as Bearer token
+ * - Supabase service role key as Bearer token
+ * 
  * Records affected:
  * - Invoices (and their items)
  * - Payments
  * - Credit notes
- * - Audit logs
  * 
  * Note: This function requires service role access to bypass RLS.
  */
@@ -48,22 +51,29 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate authorization - require service role key for scheduled jobs
+    // Strict authentication: require Bearer token matching either CLEANUP_SECRET or service role key
     const authHeader = req.headers.get('Authorization')
-    const scheduledHeader = req.headers.get('X-Scheduled-Function')
     
-    // Allow either service role auth or scheduled function trigger
-    if (!authHeader?.startsWith('Bearer ') && !scheduledHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        JSON.stringify({ success: false, error: 'Unauthorized: Bearer token required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    if (token !== serviceRoleKey) {
+      console.error('Cleanup function called with invalid credentials')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized: Invalid credentials' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Create admin client with service role
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const now = new Date().toISOString()
@@ -102,7 +112,7 @@ Deno.serve(async (req) => {
         console.error('Error deleting invoice items:', itemsError)
         results.errors.push(`Invoice items deletion error: ${itemsError.message}`)
       } else {
-        results.invoice_items_deleted = invoiceIds.length // Approximate count
+        results.invoice_items_deleted = invoiceIds.length
       }
 
       // Step 3: Delete payments for expired invoices
@@ -143,24 +153,28 @@ Deno.serve(async (req) => {
 
     results.completed_at = new Date().toISOString()
 
-    // Log cleanup results (this creates an audit trail of the cleanup itself)
+    // Log cleanup results as RETENTION_CLEANUP audit event
     console.log('Retention cleanup completed:', results)
 
-    // If any records were deleted, log the cleanup action
     if (results.invoices_deleted > 0 || results.payments_deleted > 0 || results.credit_notes_deleted > 0) {
-      await supabase.rpc('log_audit_event', {
-        _event_type: 'DATA_EXPORTED', // Using DATA_EXPORTED as closest match for data operations
-        _entity_type: 'retention_cleanup',
-        _metadata: {
-          action: 'retention_cleanup',
-          invoices_deleted: results.invoices_deleted,
-          invoice_items_deleted: results.invoice_items_deleted,
-          payments_deleted: results.payments_deleted,
-          credit_notes_deleted: results.credit_notes_deleted,
-          cleanup_date: now,
-          errors: results.errors.length > 0 ? results.errors : null
-        }
-      })
+          try {
+        await supabase.rpc('log_audit_event', {
+          _event_type: 'RETENTION_CLEANUP',
+          _entity_type: 'retention_cleanup',
+          _metadata: {
+            action: 'retention_cleanup',
+            auth_method: 'service_role',
+            invoices_deleted: results.invoices_deleted,
+            invoice_items_deleted: results.invoice_items_deleted,
+            payments_deleted: results.payments_deleted,
+            credit_notes_deleted: results.credit_notes_deleted,
+            cleanup_date: now,
+            errors: results.errors.length > 0 ? results.errors : null
+          }
+        })
+      } catch (auditErr) {
+        console.error('Failed to log cleanup audit event:', auditErr)
+      }
     }
 
     return new Response(

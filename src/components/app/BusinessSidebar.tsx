@@ -63,6 +63,7 @@ export function BusinessSidebar() {
     { title: 'Dashboard', url: `${baseUrl}/dashboard`, icon: LayoutDashboard },
     { title: 'Invoices', url: `${baseUrl}/invoices`, icon: FileText },
     { title: 'Credit Notes', url: `${baseUrl}/credit-notes`, icon: FileX },
+    { title: 'Receipts', url: `${baseUrl}/receipts`, icon: Receipt },
     { title: 'Clients', url: `${baseUrl}/clients`, icon: Users },
     { title: 'Accounting', url: `${baseUrl}/accounting`, icon: Calculator },
     { title: 'Expenses', url: `${baseUrl}/expenses`, icon: Receipt },

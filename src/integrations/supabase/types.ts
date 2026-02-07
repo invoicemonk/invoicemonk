@@ -169,6 +169,7 @@ export type Database = {
           logo_url: string | null
           name: string
           next_invoice_number: number | null
+          next_receipt_number: number
           registration_status: string | null
           tax_id: string | null
           updated_at: string
@@ -195,6 +196,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           next_invoice_number?: number | null
+          next_receipt_number?: number
           registration_status?: string | null
           tax_id?: string | null
           updated_at?: string
@@ -221,6 +223,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           next_invoice_number?: number | null
+          next_receipt_number?: number
           registration_status?: string | null
           tax_id?: string | null
           updated_at?: string
@@ -876,6 +879,85 @@ export type Database = {
         }
         Relationships: []
       }
+      receipts: {
+        Row: {
+          amount: number
+          business_id: string
+          created_at: string
+          currency: string
+          id: string
+          invoice_id: string
+          invoice_snapshot: Json
+          issued_at: string
+          issuer_snapshot: Json
+          payer_snapshot: Json
+          payment_id: string
+          payment_snapshot: Json
+          receipt_hash: string
+          receipt_number: string
+          retention_locked_until: string
+          verification_id: string
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          created_at?: string
+          currency: string
+          id?: string
+          invoice_id: string
+          invoice_snapshot: Json
+          issued_at?: string
+          issuer_snapshot: Json
+          payer_snapshot: Json
+          payment_id: string
+          payment_snapshot: Json
+          receipt_hash: string
+          receipt_number: string
+          retention_locked_until: string
+          verification_id?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          invoice_id?: string
+          invoice_snapshot?: Json
+          issued_at?: string
+          issuer_snapshot?: Json
+          payer_snapshot?: Json
+          payment_id?: string
+          payment_snapshot?: Json
+          receipt_hash?: string
+          receipt_number?: string
+          retention_locked_until?: string
+          verification_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: true
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retention_policies: {
         Row: {
           created_at: string | null
@@ -913,8 +995,6 @@ export type Database = {
           current_period_start: string | null
           id: string
           pricing_region: string | null
-          priority_support: boolean | null
-          sla_response_hours: number | null
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -931,8 +1011,6 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
-          priority_support?: boolean | null
-          sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -949,8 +1027,6 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
-          priority_support?: boolean | null
-          sla_response_hours?: number | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -961,6 +1037,100 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "subscriptions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_messages: {
+        Row: {
+          attachments: string[] | null
+          created_at: string
+          id: string
+          is_admin: boolean
+          message: string
+          sender_id: string
+          ticket_id: string
+        }
+        Insert: {
+          attachments?: string[] | null
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message: string
+          sender_id: string
+          ticket_id: string
+        }
+        Update: {
+          attachments?: string[] | null
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+          sender_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          attachments: string[] | null
+          business_id: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          resolved_at: string | null
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          attachments?: string[] | null
+          business_id?: string | null
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          attachments?: string[] | null
+          business_id?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
@@ -1144,6 +1314,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_receipt_from_payment: {
+        Args: { _payment_id: string }
+        Returns: string
+      }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }
       has_business_role: {
         Args: {
@@ -1264,6 +1438,10 @@ export type Database = {
         | "SUBSCRIPTION_CHANGED"
         | "SETTINGS_UPDATED"
         | "ACCOUNT_CLOSED"
+        | "RECEIPT_ISSUED"
+        | "RECEIPT_VIEWED"
+        | "RECEIPT_EXPORTED"
+        | "RETENTION_CLEANUP"
       business_role: "owner" | "admin" | "member" | "auditor"
       invoice_status:
         | "draft"
@@ -1438,6 +1616,10 @@ export const Constants = {
         "SUBSCRIPTION_CHANGED",
         "SETTINGS_UPDATED",
         "ACCOUNT_CLOSED",
+        "RECEIPT_ISSUED",
+        "RECEIPT_VIEWED",
+        "RECEIPT_EXPORTED",
+        "RETENTION_CLEANUP",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       invoice_status: [
