@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -14,7 +14,8 @@ import {
   Info,
   MapPin,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Globe
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,11 +40,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useClients, useCreateClient, type Client } from '@/hooks/use-clients';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
+import { getJurisdictionConfig, JURISDICTION_CONFIG } from '@/lib/jurisdiction-config';
 import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
+
+// Available countries for client location
+const COUNTRY_OPTIONS = [
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'OTHER', name: 'Other' },
+];
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -51,8 +70,11 @@ export default function Clients() {
   const { data: clients = [], isLoading, error } = useClients(currentBusiness?.id);
   const createClient = useCreateClient();
   
-  // Get jurisdiction config based on current business
-  const jurisdictionConfig = getJurisdictionConfig(currentBusiness?.jurisdiction || 'NG');
+  // Default to business jurisdiction
+  const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || 'NG');
+  
+  // Get jurisdiction config based on selected client country
+  const jurisdictionConfig = getJurisdictionConfig(clientCountry);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -73,6 +95,26 @@ export default function Clients() {
     },
   });
   const [showAddress, setShowAddress] = useState(false);
+
+  // Reset client country when dialog opens
+  useEffect(() => {
+    if (isAddDialogOpen) {
+      setClientCountry(currentBusiness?.jurisdiction || 'NG');
+    }
+  }, [isAddDialogOpen, currentBusiness?.jurisdiction]);
+
+  // Auto-fill country name when client country changes
+  useEffect(() => {
+    if (clientCountry !== 'OTHER') {
+      setNewClient(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          country: jurisdictionConfig.countryName
+        }
+      }));
+    }
+  }, [clientCountry, jurisdictionConfig.countryName]);
 
   const filteredClients = clients.filter(client => 
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -199,6 +241,26 @@ export default function Clients() {
                 </div>
               )}
 
+              {/* Client Country */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  Client Location
+                </Label>
+                <Select value={clientCountry} onValueChange={setClientCountry}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRY_OPTIONS.map(country => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Contact Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -290,7 +352,7 @@ export default function Clients() {
                       <Label htmlFor="city">City</Label>
                       <Input
                         id="city"
-                        placeholder="Lagos"
+                        placeholder={jurisdictionConfig.cityPlaceholder}
                         value={newClient.address.city}
                         onChange={(e) => setNewClient({ 
                           ...newClient, 
@@ -299,10 +361,10 @@ export default function Clients() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="state">State / Region</Label>
+                      <Label htmlFor="state">{jurisdictionConfig.stateLabel}</Label>
                       <Input
                         id="state"
-                        placeholder="Lagos State"
+                        placeholder={jurisdictionConfig.statePlaceholder}
                         value={newClient.address.state}
                         onChange={(e) => setNewClient({ 
                           ...newClient, 
@@ -313,10 +375,10 @@ export default function Clients() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="postal_code">Postal Code</Label>
+                      <Label htmlFor="postal_code">{jurisdictionConfig.postalCodeLabel}</Label>
                       <Input
                         id="postal_code"
-                        placeholder="100001"
+                        placeholder={jurisdictionConfig.postalCodePlaceholder}
                         value={newClient.address.postal_code}
                         onChange={(e) => setNewClient({ 
                           ...newClient, 
@@ -328,12 +390,13 @@ export default function Clients() {
                       <Label htmlFor="country">Country</Label>
                       <Input
                         id="country"
-                        placeholder="Nigeria"
+                        placeholder={clientCountry === 'OTHER' ? 'Enter country' : jurisdictionConfig.countryName}
                         value={newClient.address.country}
                         onChange={(e) => setNewClient({ 
                           ...newClient, 
                           address: { ...newClient.address, country: e.target.value } 
                         })}
+                        disabled={clientCountry !== 'OTHER'}
                       />
                     </div>
                   </div>

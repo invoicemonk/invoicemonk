@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useParams } from 'react-router-dom';
-import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2, User, Info, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Building2, Loader2, MoreHorizontal, Pencil, Trash2, User, Info, MapPin, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgClients, useCreateClient, useUpdateClient, useDeleteClient } from '@/hooks/use-clients';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { toast } from 'sonner';
+
+// Available countries for client location
+const COUNTRY_OPTIONS = [
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'OTHER', name: 'Other' },
+];
 
 interface AddressData {
   street: string;
@@ -57,8 +69,11 @@ export default function OrgClients() {
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
 
-  // Get jurisdiction config based on org's jurisdiction
-  const jurisdictionConfig = getJurisdictionConfig(currentOrg?.jurisdiction || 'NG');
+  // Client country for form
+  const [clientCountry, setClientCountry] = useState(currentOrg?.jurisdiction || 'NG');
+
+  // Get jurisdiction config based on selected client country
+  const jurisdictionConfig = getJurisdictionConfig(clientCountry);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,6 +87,26 @@ export default function OrgClients() {
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Reset client country when dialog opens for new client
+  useEffect(() => {
+    if (dialogOpen && !editingClient) {
+      setClientCountry(currentOrg?.jurisdiction || 'NG');
+    }
+  }, [dialogOpen, editingClient, currentOrg?.jurisdiction]);
+
+  // Auto-fill country name when client country changes (for new clients)
+  useEffect(() => {
+    if (!editingClient && clientCountry !== 'OTHER') {
+      setFormData(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          country: jurisdictionConfig.countryName
+        }
+      }));
+    }
+  }, [clientCountry, jurisdictionConfig.countryName, editingClient]);
 
   const handleOpenDialog = (clientId?: string) => {
     if (clientId) {
@@ -97,6 +132,11 @@ export default function OrgClients() {
           address: parsedAddress
         });
         setEditingClient(clientId);
+        // Try to detect client country from address
+        const detectedCountry = COUNTRY_OPTIONS.find(c => 
+          c.name.toLowerCase() === parsedAddress.country?.toLowerCase()
+        )?.code || 'OTHER';
+        setClientCountry(detectedCountry);
         // Show address section if client has address data
         setShowAddress(!!clientAddress && Object.values(clientAddress).some(v => v));
       }
@@ -104,6 +144,7 @@ export default function OrgClients() {
       setFormData(initialFormData);
       setEditingClient(null);
       setShowAddress(false);
+      setClientCountry(currentOrg?.jurisdiction || 'NG');
     }
     setDialogOpen(true);
   };
@@ -321,6 +362,26 @@ export default function OrgClients() {
               </div>
             )}
 
+            {/* Client Country */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Client Location
+              </Label>
+              <Select value={clientCountry} onValueChange={setClientCountry}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_OPTIONS.map(country => (
+                    <SelectItem key={country.code} value={country.code}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Contact Details */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -405,7 +466,7 @@ export default function OrgClients() {
                   <div className="space-y-2">
                     <Label>City</Label>
                     <Input
-                      placeholder="Lagos"
+                      placeholder={jurisdictionConfig.cityPlaceholder}
                       value={formData.address.city}
                       onChange={(e) => setFormData({ 
                         ...formData, 
@@ -414,9 +475,9 @@ export default function OrgClients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>State / Region</Label>
+                    <Label>{jurisdictionConfig.stateLabel}</Label>
                     <Input
-                      placeholder="Lagos State"
+                      placeholder={jurisdictionConfig.statePlaceholder}
                       value={formData.address.state}
                       onChange={(e) => setFormData({ 
                         ...formData, 
@@ -427,9 +488,9 @@ export default function OrgClients() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Postal Code</Label>
+                    <Label>{jurisdictionConfig.postalCodeLabel}</Label>
                     <Input
-                      placeholder="100001"
+                      placeholder={jurisdictionConfig.postalCodePlaceholder}
                       value={formData.address.postal_code}
                       onChange={(e) => setFormData({ 
                         ...formData, 
@@ -440,12 +501,13 @@ export default function OrgClients() {
                   <div className="space-y-2">
                     <Label>Country</Label>
                     <Input
-                      placeholder="Nigeria"
+                      placeholder={clientCountry === 'OTHER' ? 'Enter country' : jurisdictionConfig.countryName}
                       value={formData.address.country}
                       onChange={(e) => setFormData({ 
                         ...formData, 
                         address: { ...formData.address, country: e.target.value } 
                       })}
+                      disabled={clientCountry !== 'OTHER'}
                     />
                   </div>
                 </div>
