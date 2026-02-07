@@ -28,6 +28,13 @@ export interface JurisdictionConfig {
   clientRegPlaceholder?: string;
   clientRegHint?: string;
   phonePrefix: string;
+  // Address placeholders
+  cityPlaceholder: string;
+  statePlaceholder: string;
+  stateLabel: string;
+  postalCodePlaceholder: string;
+  postalCodeLabel: string;
+  countryName: string;
 }
 
 export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
@@ -55,6 +62,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientRegPlaceholder: 'RC 123456',
     clientRegHint: 'Corporate Affairs Commission registration number',
     phonePrefix: '+234',
+    // Address
+    cityPlaceholder: 'Lagos',
+    statePlaceholder: 'Lagos State',
+    stateLabel: 'State',
+    postalCodePlaceholder: '100001',
+    postalCodeLabel: 'Postal Code',
+    countryName: 'Nigeria',
   },
   US: {
     name: 'United States',
@@ -73,6 +87,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientTaxIdHint: 'Employer ID or Social Security Number for 1099 reporting',
     showClientReg: false,
     phonePrefix: '+1',
+    // Address
+    cityPlaceholder: 'New York',
+    statePlaceholder: 'NY',
+    stateLabel: 'State',
+    postalCodePlaceholder: '10001',
+    postalCodeLabel: 'ZIP Code',
+    countryName: 'United States',
   },
   GB: {
     name: 'United Kingdom',
@@ -98,6 +119,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientRegPlaceholder: '12345678',
     clientRegHint: '8-character company registration number',
     phonePrefix: '+44',
+    // Address
+    cityPlaceholder: 'London',
+    statePlaceholder: 'Greater London',
+    stateLabel: 'County',
+    postalCodePlaceholder: 'SW1A 1AA',
+    postalCodeLabel: 'Postcode',
+    countryName: 'United Kingdom',
   },
   CA: {
     name: 'Canada',
@@ -116,6 +144,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientTaxIdHint: 'For CRA reporting requirements',
     showClientReg: false,
     phonePrefix: '+1',
+    // Address
+    cityPlaceholder: 'Toronto',
+    statePlaceholder: 'Ontario',
+    stateLabel: 'Province',
+    postalCodePlaceholder: 'M5V 1A1',
+    postalCodeLabel: 'Postal Code',
+    countryName: 'Canada',
   },
   DE: {
     name: 'Germany',
@@ -141,6 +176,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientRegPlaceholder: 'HRB 12345',
     clientRegHint: 'Commercial register entry',
     phonePrefix: '+49',
+    // Address
+    cityPlaceholder: 'Berlin',
+    statePlaceholder: 'Berlin',
+    stateLabel: 'Bundesland',
+    postalCodePlaceholder: '10115',
+    postalCodeLabel: 'PLZ',
+    countryName: 'Germany',
   },
   FR: {
     name: 'France',
@@ -166,6 +208,13 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     clientRegPlaceholder: '12345678901234',
     clientRegHint: '14-digit establishment identifier',
     phonePrefix: '+33',
+    // Address
+    cityPlaceholder: 'Paris',
+    statePlaceholder: 'Île-de-France',
+    stateLabel: 'Region',
+    postalCodePlaceholder: '75001',
+    postalCodeLabel: 'Code Postal',
+    countryName: 'France',
   },
 };
 
@@ -184,6 +233,13 @@ export const DEFAULT_JURISDICTION_CONFIG: JurisdictionConfig = {
   clientTaxIdHint: 'Tax identification number for compliance',
   showClientReg: false,
   phonePrefix: '+1',
+  // Address
+  cityPlaceholder: 'City',
+  statePlaceholder: 'State/Region',
+  stateLabel: 'State / Region',
+  postalCodePlaceholder: 'Postal Code',
+  postalCodeLabel: 'Postal Code',
+  countryName: '',
 };
 
 export function getJurisdictionConfig(jurisdiction: string): JurisdictionConfig {

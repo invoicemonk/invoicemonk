@@ -7,7 +7,8 @@ import {
   Save,
   Building2,
   User,
-  Info
+  Info,
+  Globe
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,9 +17,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClient, useUpdateClient, useClientInvoices } from '@/hooks/use-clients';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
+
+// Available countries for client location
+const COUNTRY_OPTIONS = [
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'OTHER', name: 'Other' },
+];
 
 interface Address {
   street?: string;
@@ -36,8 +49,11 @@ export default function ClientEdit() {
   const { currentBusiness: business } = useBusiness();
   const updateClient = useUpdateClient();
 
-  // Get jurisdiction config based on user's business
-  const jurisdictionConfig = getJurisdictionConfig(business?.jurisdiction || 'NG');
+  // Client country for dynamic placeholders
+  const [clientCountry, setClientCountry] = useState('NG');
+  
+  // Get jurisdiction config based on selected client country
+  const jurisdictionConfig = getJurisdictionConfig(clientCountry);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -77,8 +93,26 @@ export default function ClientEdit() {
           country: address.country || '',
         },
       });
+      // Try to detect client country from address
+      const detectedCountry = COUNTRY_OPTIONS.find(c => 
+        c.name.toLowerCase() === address.country?.toLowerCase()
+      )?.code || (business?.jurisdiction || 'NG');
+      setClientCountry(detectedCountry);
     }
-  }, [client]);
+  }, [client, business?.jurisdiction]);
+
+  // Auto-fill country name when client country changes
+  useEffect(() => {
+    if (clientCountry !== 'OTHER') {
+      setFormData(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          country: jurisdictionConfig.countryName
+        }
+      }));
+    }
+  }, [clientCountry, jurisdictionConfig.countryName]);
 
   // Check if client has any issued invoices (for edit lock)
   const hasIssuedInvoices = invoices?.some(inv => inv.status !== 'draft') || false;
@@ -203,6 +237,26 @@ export default function ClientEdit() {
               </RadioGroup>
             </div>
 
+            {/* Client Location */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Client Location
+              </Label>
+              <Select value={clientCountry} onValueChange={setClientCountry}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_OPTIONS.map(country => (
+                    <SelectItem key={country.code} value={country.code}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">
                 {formData.client_type === 'company' ? 'Company Name' : 'Full Name'} *
@@ -323,11 +377,11 @@ export default function ClientEdit() {
                     ...formData, 
                     address: { ...formData.address, city: e.target.value } 
                   })}
-                  placeholder="Lagos"
+                  placeholder={jurisdictionConfig.cityPlaceholder}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
+                <Label htmlFor="state">{jurisdictionConfig.stateLabel}</Label>
                 <Input
                   id="state"
                   value={formData.address.state}
@@ -335,14 +389,14 @@ export default function ClientEdit() {
                     ...formData, 
                     address: { ...formData.address, state: e.target.value } 
                   })}
-                  placeholder="Lagos"
+                  placeholder={jurisdictionConfig.statePlaceholder}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="postal_code">Postal Code</Label>
+                <Label htmlFor="postal_code">{jurisdictionConfig.postalCodeLabel}</Label>
                 <Input
                   id="postal_code"
                   value={formData.address.postal_code}
@@ -350,7 +404,7 @@ export default function ClientEdit() {
                     ...formData, 
                     address: { ...formData.address, postal_code: e.target.value } 
                   })}
-                  placeholder="100001"
+                  placeholder={jurisdictionConfig.postalCodePlaceholder}
                 />
               </div>
               <div className="space-y-2">
@@ -362,7 +416,8 @@ export default function ClientEdit() {
                     ...formData, 
                     address: { ...formData.address, country: e.target.value } 
                   })}
-                  placeholder="Nigeria"
+                  placeholder={clientCountry === 'OTHER' ? 'Enter country' : jurisdictionConfig.countryName}
+                  disabled={clientCountry !== 'OTHER'}
                 />
               </div>
             </div>
