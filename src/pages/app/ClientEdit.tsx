@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useClient, useUpdateClient, useClientInvoices } from '@/hooks/use-clients';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 
 interface Address {
@@ -33,7 +33,7 @@ export default function ClientEdit() {
   const navigate = useNavigate();
   const { data: client, isLoading: clientLoading } = useClient(id);
   const { data: invoices } = useClientInvoices(id);
-  const { data: business } = useUserBusiness();
+  const { currentBusiness: business } = useBusiness();
   const updateClient = useUpdateClient();
 
   // Get jurisdiction config based on user's business

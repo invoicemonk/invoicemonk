@@ -33,7 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUserBusiness, useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
+import { useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
@@ -57,7 +58,7 @@ interface AddressData {
 }
 
 export default function BusinessProfile() {
-  const { data: business, isLoading: isLoadingBusiness } = useUserBusiness();
+  const { currentBusiness: business, loading: isLoadingBusiness } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();

@@ -11,12 +11,12 @@ import { InsightCard } from '@/components/accounting/InsightCard';
 import { useAccountContext } from '@/hooks/use-account-context';
 import { useAccountingPreferences, useUpdateAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useAccountingStats } from '@/hooks/use-accounting-stats';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AccountingOverview() {
   const accountContext = useAccountContext();
-  const { data: business, isLoading: isLoadingBusiness } = useUserBusiness();
+  const { currentBusiness: business, loading: isLoadingBusiness } = useBusiness();
   const { data: preferences, isLoading: isLoadingPrefs } = useAccountingPreferences();
   const updatePreferences = useUpdateAccountingPreferences();
   

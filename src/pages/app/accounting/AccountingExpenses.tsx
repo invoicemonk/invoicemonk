@@ -13,7 +13,7 @@ import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -33,7 +33,7 @@ const getCategoryLabel = (value: string) => {
 
 export default function AccountingExpenses() {
   const { data: preferences } = useAccountingPreferences();
-  const { data: business } = useUserBusiness();
+  const { currentBusiness: business } = useBusiness();
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);

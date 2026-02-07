@@ -26,7 +26,7 @@ import { ExpenseEmptyState } from '@/components/accounting/ExpenseEmptyState';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useExportRecords } from '@/hooks/use-export';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,7 +49,7 @@ const getCategoryLabel = (value: string) => {
 
 export default function Expenses() {
   const { data: preferences } = useAccountingPreferences();
-  const { data: business } = useUserBusiness();
+  const { currentBusiness: business } = useBusiness();
   const { exportRecords, isExporting } = useExportRecords();
   
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
