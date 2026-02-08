@@ -22,12 +22,14 @@ import {
 } from '@/components/ui/table';
 import { useCreditNotes } from '@/hooks/use-credit-notes';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useState } from 'react';
 
 export default function CreditNotes() {
   const [searchQuery, setSearchQuery] = useState('');
   const { currentBusiness } = useBusiness();
-  const { data: creditNotes, isLoading, error } = useCreditNotes(currentBusiness?.id);
+  const { currentCurrencyAccount } = useCurrencyAccount();
+  const { data: creditNotes, isLoading, error } = useCreditNotes(currentBusiness?.id, currentCurrencyAccount?.id);
 
   const filteredCreditNotes = (creditNotes || []).filter(cn => {
     if (!searchQuery) return true;

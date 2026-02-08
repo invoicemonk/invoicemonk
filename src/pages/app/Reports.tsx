@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
 import { useGenerateReport, useReportStats, useAuditEventsCount, type ReportType } from '@/hooks/use-reports';
 
@@ -75,6 +76,7 @@ export default function Reports() {
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   
   const { canAccess, loading: isLoading, currentBusiness } = useBusiness();
+  const { currentCurrencyAccount } = useCurrencyAccount();
   const hasReportsAccess = canAccess('reports_enabled');
   
   const generateReport = useGenerateReport();
@@ -93,7 +95,8 @@ export default function Reports() {
         report_type: reportId,
         year: parseInt(selectedYear),
         format: 'json',
-        business_id: currentBusiness?.id
+        business_id: currentBusiness?.id,
+        currency_account_id: currentCurrencyAccount?.id,
       });
     } finally {
       setGeneratingReport(null);

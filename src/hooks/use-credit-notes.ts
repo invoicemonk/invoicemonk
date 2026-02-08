@@ -14,12 +14,12 @@ export type CreditNote = Tables<'credit_notes'> & {
   } | null;
 };
 
-// Fetch all credit notes for a specific business
-export function useCreditNotes(businessId?: string) {
+// Fetch all credit notes for a specific business, optionally filtered by currency account
+export function useCreditNotes(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['credit-notes', businessId, user?.id],
+    queryKey: ['credit-notes', businessId, currencyAccountId, user?.id],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
@@ -38,6 +38,11 @@ export function useCreditNotes(businessId?: string) {
 
       if (businessId) {
         query = query.eq('business_id', businessId);
+      }
+
+      // Filter by currency account if provided
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       const { data, error } = await query;

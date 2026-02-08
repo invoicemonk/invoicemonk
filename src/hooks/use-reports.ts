@@ -10,6 +10,7 @@ interface ReportRequest {
   year: number;
   format?: ReportFormat;
   business_id?: string;
+  currency_account_id?: string;
 }
 
 interface RevenueSummary {

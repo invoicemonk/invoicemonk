@@ -54,20 +54,27 @@ export interface Receipt {
   created_at: string;
 }
 
-// Fetch all receipts for current business
-export function useReceipts() {
+// Fetch all receipts for current business, optionally filtered by currency account
+export function useReceipts(currencyAccountId?: string) {
   const { currentBusiness } = useBusiness();
 
   return useQuery({
-    queryKey: ['receipts', currentBusiness?.id],
+    queryKey: ['receipts', currentBusiness?.id, currencyAccountId],
     queryFn: async () => {
       if (!currentBusiness?.id) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('receipts')
         .select('*')
         .eq('business_id', currentBusiness.id)
         .order('issued_at', { ascending: false });
+
+      // Filter by currency account if provided
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Receipt[];

@@ -45,6 +45,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { BusinessSwitcher } from './BusinessSwitcher';
+import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
 import { useUnreadCount } from '@/hooks/use-notifications';
 import logo from '@/assets/invoicemonk-logo.png';
 import logoIcon from '@/assets/invoicemonk-icon.png';
@@ -110,8 +111,9 @@ export function BusinessSidebar() {
             )} 
           />
         </Link>
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           <BusinessSwitcher collapsed={isCollapsed} />
+          <CurrencyAccountSwitcher collapsed={isCollapsed} />
         </div>
         {!isCollapsed && currentBusiness && (
           <div className="mt-2 flex items-center gap-2">

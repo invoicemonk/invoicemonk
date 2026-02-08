@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useCreateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates, TemplateWithAccess } from '@/hooks/use-invoice-templates';
@@ -82,6 +83,9 @@ export default function InvoiceNew() {
     isStarter, 
     checkTierLimit 
   } = useBusiness();
+  
+  // Currency account context
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   
   const { data: clients, isLoading: clientsLoading } = useClients(currentBusiness?.id);
   const { data: templates } = useInvoiceTemplates();
@@ -345,13 +349,15 @@ export default function InvoiceNew() {
     if (!validateForm()) return;
 
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
-    const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
+    // Use currency from active currency account
+    const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
     const invoice = await createInvoice.mutateAsync({
       invoice: {
         business_id: currentBusiness.id,
         client_id: selectedClientId,
         currency: effectiveCurrency,
+        currency_account_id: currentCurrencyAccount?.id || null,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
@@ -360,14 +366,9 @@ export default function InvoiceNew() {
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
-        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
-        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
-          primary_currency: primaryCurrency,
-          invoice_currency: effectiveCurrency,
-          rate_to_primary: exchangeRateToPrimary,
-          rate_date: new Date().toISOString().split('T')[0],
-          source: 'manual'
-        } : null,
+        // Legacy FX fields - null for new records created through currency accounts
+        exchange_rate_to_primary: null,
+        exchange_rate_snapshot: null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -421,7 +422,8 @@ export default function InvoiceNew() {
     if (!validateForm()) return;
 
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
-    const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
+    // Use currency from active currency account
+    const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
     // First create the invoice with template
     const invoice = await createInvoice.mutateAsync({
@@ -429,6 +431,7 @@ export default function InvoiceNew() {
         business_id: currentBusiness.id,
         client_id: selectedClientId,
         currency: effectiveCurrency,
+        currency_account_id: currentCurrencyAccount?.id || null,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
@@ -438,14 +441,9 @@ export default function InvoiceNew() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
-        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
-        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
-          primary_currency: primaryCurrency,
-          invoice_currency: effectiveCurrency,
-          rate_to_primary: exchangeRateToPrimary,
-          rate_date: new Date().toISOString().split('T')[0],
-          source: 'manual'
-        } : null,
+        // Legacy FX fields - null for new records created through currency accounts
+        exchange_rate_to_primary: null,
+        exchange_rate_snapshot: null,
       },
       items: validItems.map(item => ({
         description: item.description,
