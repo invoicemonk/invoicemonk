@@ -23,15 +23,14 @@ import { MoneyFlowCard } from '@/components/accounting/MoneyFlowCard';
 import { ExpenseForm } from '@/components/accounting/ExpenseForm';
 import { ExpenseList } from '@/components/accounting/ExpenseList';
 import { ExpenseEmptyState } from '@/components/accounting/ExpenseEmptyState';
-import { MultiCurrencyIndicator, ExcludedDataWarning } from '@/components/ui/multi-currency-indicator';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useExportRecords } from '@/hooks/use-export';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { aggregateAmounts, type CurrencyAmount } from '@/lib/currency-aggregation';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -52,6 +51,7 @@ const getCategoryLabel = (value: string) => {
 export default function Expenses() {
   const { data: preferences } = useAccountingPreferences();
   const { currentBusiness: business } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const { exportRecords, isExporting } = useExportRecords();
   
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
@@ -59,17 +59,25 @@ export default function Expenses() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(business?.id, dateRange);
-  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(business?.id, dateRange);
-
-  const currency = business?.default_currency || 'NGN';
+  
+  // Use currency account scoping
+  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    dateRange
+  );
+  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency,
+    dateRange
+  );
 
   // Filter expenses based on search and category
   const filteredExpenses = useMemo(() => {
     if (!expenses) return [];
     
     return expenses.filter((expense) => {
-      // Search filter
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery || 
         expense.description?.toLowerCase().includes(searchLower) ||
@@ -77,31 +85,15 @@ export default function Expenses() {
         expense.notes?.toLowerCase().includes(searchLower) ||
         getCategoryLabel(expense.category).toLowerCase().includes(searchLower);
       
-      // Category filter
       const matchesCategory = categoryFilter === 'all' || expense.category === categoryFilter;
       
       return matchesSearch && matchesCategory;
     });
   }, [expenses, searchQuery, categoryFilter]);
 
-  // Calculate totals with proper currency aggregation
-  const filteredAggregation = useMemo(() => {
-    const amounts: CurrencyAmount[] = filteredExpenses.map(e => ({
-      amount: e.amount,
-      currency: e.currency,
-      exchangeRateToPrimary: e.exchangeRateToPrimary,
-    }));
-    return aggregateAmounts(amounts, currency);
-  }, [filteredExpenses, currency]);
-
-  const allExpensesAggregation = useMemo(() => {
-    const amounts: CurrencyAmount[] = (expenses || []).map(e => ({
-      amount: e.amount,
-      currency: e.currency,
-      exchangeRateToPrimary: e.exchangeRateToPrimary,
-    }));
-    return aggregateAmounts(amounts, currency);
-  }, [expenses, currency]);
+  // Simple sum - single currency, no aggregation needed
+  const filteredTotal = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const allExpensesTotal = (expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
   const handleExport = async (format: 'csv' | 'json') => {
     await exportRecords({
@@ -130,7 +122,7 @@ export default function Expenses() {
             Expenses
           </h1>
           <p className="text-muted-foreground mt-1">
-            Track and manage your business expenses
+            Track and manage your business expenses in {activeCurrency}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -184,27 +176,15 @@ export default function Expenses() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <MoneyFlowCard
-            title={categoryFilter !== 'all' || searchQuery ? 'Filtered Expenses' : 'Total Expenses'}
-            amount={filteredAggregation.primaryTotal}
-            currency={currency}
-            count={filteredAggregation.convertedCount}
-            countLabel={`expenses in ${getPeriodLabel(period)}`}
-            icon={TrendingDown}
-            variant="warning"
-          />
-          <MultiCurrencyIndicator
-            hasMultipleCurrencies={filteredAggregation.hasMultipleCurrencies}
-            hasUnconvertibleAmounts={filteredAggregation.hasUnconvertibleAmounts}
-            excludedCount={filteredAggregation.excludedCount}
-            breakdown={Object.fromEntries(
-              Object.entries(filteredAggregation.breakdown).map(([k, v]) => [k, { total: v.total, count: v.count }])
-            )}
-            primaryCurrency={currency}
-            variant="card"
-          />
-        </div>
+        <MoneyFlowCard
+          title={categoryFilter !== 'all' || searchQuery ? 'Filtered Expenses' : 'Total Expenses'}
+          amount={filteredTotal}
+          currency={activeCurrency}
+          count={filteredExpenses.length}
+          countLabel={`expenses in ${getPeriodLabel(period)}`}
+          icon={TrendingDown}
+          variant="warning"
+        />
 
         {/* Category breakdown */}
         <Card>
@@ -212,9 +192,6 @@ export default function Expenses() {
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <PieChart className="h-4 w-4" />
               Expense Breakdown
-              {categoryData?.hasUnconvertibleAmounts && (
-                <ExcludedDataWarning count={categoryData.excludedCount} type="expenses" />
-              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -227,8 +204,8 @@ export default function Expenses() {
             ) : categoryData && categoryData.data.length > 0 ? (
               <div className="space-y-3">
                 {categoryData.data.slice(0, 5).map((item) => {
-                  const percentage = allExpensesAggregation.primaryTotal > 0 
-                    ? Math.round((item.amount / allExpensesAggregation.primaryTotal) * 100) 
+                  const percentage = allExpensesTotal > 0 
+                    ? Math.round((item.amount / allExpensesTotal) * 100) 
                     : 0;
                   
                   return (
@@ -238,7 +215,7 @@ export default function Expenses() {
                           {getCategoryLabel(item.category)}
                         </span>
                         <span className="font-medium">
-                          {formatCurrency(item.amount, currency)} ({percentage}%)
+                          {formatCurrency(item.amount, activeCurrency)} ({percentage}%)
                         </span>
                       </div>
                       <Progress value={percentage} className="h-2" />

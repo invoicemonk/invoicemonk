@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard, useRevenueTrend, type DateRange } from '@/hooks/use-dashboard-stats';
 import { useRealtimeInvoices } from '@/hooks/use-realtime-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +28,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
-import { MultiCurrencyIndicator, ExcludedDataWarning } from '@/components/ui/multi-currency-indicator';
 
 const container = {
   hidden: { opacity: 0 },
@@ -42,7 +42,6 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
-// Currency formatting utility
 function formatCurrency(amount: number, currency: string = 'USD'): string {
   try {
     return new Intl.NumberFormat('en-US', {
@@ -52,12 +51,10 @@ function formatCurrency(amount: number, currency: string = 'USD'): string {
       maximumFractionDigits: 2,
     }).format(amount);
   } catch {
-    // Fallback for invalid currency codes
     return `${currency} ${amount.toFixed(2)}`;
   }
 }
 
-// Status badge component
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     draft: 'secondary',
@@ -107,9 +104,7 @@ function getDateRangeFromPreset(preset: DateRangePreset): DateRange | undefined 
       return { start, end };
     }
     case 'all_time':
-      return undefined;
     case 'custom':
-      return undefined;
     default:
       return undefined;
   }
@@ -118,14 +113,13 @@ function getDateRangeFromPreset(preset: DateRangePreset): DateRange | undefined 
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const { currentBusiness } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const isEmailVerified = user?.email_confirmed_at;
   
-  // Date range filter state
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('all_time');
   const [customDateFrom, setCustomDateFrom] = useState<Date>();
   const [customDateTo, setCustomDateTo] = useState<Date>();
   
-  // Compute effective date range
   const dateRange = useMemo((): DateRange | undefined => {
     if (dateRangePreset === 'custom' && customDateFrom && customDateTo) {
       const start = new Date(customDateFrom);
@@ -137,20 +131,34 @@ export default function Dashboard() {
     return getDateRangeFromPreset(dateRangePreset);
   }, [dateRangePreset, customDateFrom, customDateTo]);
   
-  // Real-time subscriptions for instant updates
   useRealtimeInvoices(currentBusiness?.id, user?.id);
   const { refresh, isRefreshing } = useRefreshDashboard();
   
-  // Fetch real dashboard stats with date range
-  const { data: stats, isLoading: statsLoading } = useDashboardStats(currentBusiness?.id, dateRange);
-  const { data: recentInvoices, isLoading: invoicesLoading } = useRecentInvoices(currentBusiness?.id);
-  const { data: dueDateStats, isLoading: dueDateLoading } = useDueDateStats(currentBusiness?.id);
-  const { data: revenueTrend, isLoading: trendLoading } = useRevenueTrend(currentBusiness?.id, 12);
+  // All hooks now use currency account scoping
+  const { data: stats, isLoading: statsLoading } = useDashboardStats(
+    currentBusiness?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency,
+    dateRange
+  );
+  const { data: recentInvoices, isLoading: invoicesLoading } = useRecentInvoices(
+    currentBusiness?.id,
+    currentCurrencyAccount?.id
+  );
+  const { data: dueDateStats, isLoading: dueDateLoading } = useDueDateStats(
+    currentBusiness?.id,
+    currentCurrencyAccount?.id,
+    activeCurrency
+  );
+  const { data: revenueTrend, isLoading: trendLoading } = useRevenueTrend(
+    currentBusiness?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency,
+    12
+  );
   
-  // Server-derived compliance status
   const businessComplianceStatus = currentBusiness?.compliance_status || 'incomplete';
 
-  // Build stats cards with real data
   const statsCards = [
     {
       title: 'Total Revenue',
@@ -196,7 +204,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Date Range Filter */}
           <Select value={dateRangePreset} onValueChange={(v) => setDateRangePreset(v as DateRangePreset)}>
             <SelectTrigger className="w-[140px]">
               <CalendarIcon className="h-4 w-4 mr-2" />
@@ -212,7 +219,6 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
           
-          {/* Custom Date Range Popovers */}
           {dateRangePreset === 'custom' && (
             <>
               <Popover>
@@ -223,12 +229,7 @@ export default function Dashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={customDateFrom}
-                    onSelect={setCustomDateFrom}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={customDateFrom} onSelect={setCustomDateFrom} initialFocus />
                 </PopoverContent>
               </Popover>
               <Popover>
@@ -239,24 +240,13 @@ export default function Dashboard() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={customDateTo}
-                    onSelect={setCustomDateTo}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={customDateTo} onSelect={setCustomDateTo} initialFocus />
                 </PopoverContent>
               </Popover>
             </>
           )}
           
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={refresh}
-            disabled={isRefreshing}
-            title="Refresh dashboard"
-          >
+          <Button variant="outline" size="icon" onClick={refresh} disabled={isRefreshing} title="Refresh dashboard">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
           <Button asChild>
@@ -275,9 +265,7 @@ export default function Dashboard() {
             <CardContent className="flex items-center gap-4 py-4">
               <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
               <div className="flex-1">
-                <p className="font-medium text-amber-700 dark:text-amber-400">
-                  Email verification required
-                </p>
+                <p className="font-medium text-amber-700 dark:text-amber-400">Email verification required</p>
                 <p className="text-sm text-muted-foreground">
                   Please verify your email to issue invoices. Check your inbox for the verification link.
                 </p>
@@ -290,28 +278,12 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Multi-currency indicator */}
-      {!statsLoading && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
-        <motion.div variants={item}>
-          <MultiCurrencyIndicator
-            hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
-            hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
-            excludedCount={stats?.excludedFromRevenue || 0}
-            breakdown={stats?.revenueBreakdown}
-            primaryCurrency={stats?.currency || 'NGN'}
-            variant="card"
-          />
-        </motion.div>
-      )}
-
       {/* Stats Grid */}
       <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statsCards.map((stat) => (
           <Card key={stat.title} className="relative overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -320,9 +292,7 @@ export default function Dashboard() {
               ) : (
                 <div className="text-2xl font-bold">{stat.value}</div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.change}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
             </CardContent>
           </Card>
         ))}
@@ -335,12 +305,6 @@ export default function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Revenue Trend
-              {revenueTrend?.hasExcludedData && (
-                <ExcludedDataWarning 
-                  count={revenueTrend.excludedCount} 
-                  type="invoices" 
-                />
-              )}
             </CardTitle>
             <CardDescription>Monthly revenue over the past 12 months</CardDescription>
           </CardHeader>
@@ -354,35 +318,14 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenueTrend.data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="month" 
-                      tick={{ fontSize: 12 }} 
-                      tickLine={false}
-                      axisLine={false}
-                      className="text-muted-foreground"
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }} 
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => formatCurrency(value, stats?.currency).replace(/\.00$/, '')}
-                      width={80}
-                      className="text-muted-foreground"
-                    />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value, revenueTrend.currency).replace(/\.00$/, '')} width={80} className="text-muted-foreground" />
                     <Tooltip 
-                      formatter={(value: number) => [formatCurrency(value, stats?.currency), 'Revenue']}
+                      formatter={(value: number) => [formatCurrency(value, revenueTrend.currency), 'Revenue']}
                       labelFormatter={(label) => `Month: ${label}`}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--popover))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                     />
-                    <Bar 
-                      dataKey="revenue" 
-                      fill="hsl(var(--primary))" 
-                      radius={[4, 4, 0, 0]}
-                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -395,7 +338,7 @@ export default function Dashboard() {
         </Card>
       </motion.div>
 
-
+      {/* Due Date Alerts */}
       {(dueDateStats?.overdueCount > 0 || dueDateStats?.upcomingCount > 0) && (
         <motion.div variants={item}>
           <Card className={dueDateStats?.overdueCount > 0 ? "border-destructive/50" : "border-amber-500/50"}>
@@ -407,26 +350,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
-                {/* Overdue Section */}
                 <div className={`p-4 rounded-lg ${dueDateStats?.overdueCount > 0 ? 'bg-destructive/10' : 'bg-muted/50'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-muted-foreground">OVERDUE</span>
-                    {dueDateStats?.overdueCount > 0 && (
-                      <Badge variant="destructive" className="text-xs">
-                        {dueDateStats.overdueCount}
-                      </Badge>
-                    )}
+                    {dueDateStats?.overdueCount > 0 && <Badge variant="destructive" className="text-xs">{dueDateStats.overdueCount}</Badge>}
                   </div>
                   {dueDateLoading ? (
                     <Skeleton className="h-7 w-32" />
                   ) : dueDateStats?.overdueCount > 0 ? (
                     <>
-                      <p className="text-2xl font-bold text-destructive">
-                        {formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due
-                      </p>
+                      <p className="text-2xl font-bold text-destructive">{formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due</p>
                       <Button variant="outline" size="sm" className="mt-3" asChild>
                         <Link to="/invoices?status=overdue">View Overdue</Link>
                       </Button>
@@ -435,30 +369,17 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground">No overdue invoices</p>
                   )}
                 </div>
-
-                {/* Upcoming Section */}
                 <div className="p-4 rounded-lg bg-amber-500/10">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-muted-foreground">DUE THIS WEEK</span>
-                    {dueDateStats?.upcomingCount > 0 && (
-                      <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
-                        {dueDateStats.upcomingCount}
-                      </Badge>
-                    )}
+                    {dueDateStats?.upcomingCount > 0 && <Badge className="text-xs bg-amber-500">{dueDateStats.upcomingCount}</Badge>}
                   </div>
                   {dueDateLoading ? (
                     <Skeleton className="h-7 w-32" />
                   ) : dueDateStats?.upcomingCount > 0 ? (
                     <>
-                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
-                        {formatCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {dueDateStats.upcomingCount} invoice{dueDateStats.upcomingCount !== 1 ? 's' : ''} due soon
-                      </p>
-                      <Button variant="outline" size="sm" className="mt-3" asChild>
-                        <Link to="/invoices?status=outstanding">View Upcoming</Link>
-                      </Button>
+                      <p className="text-2xl font-bold text-amber-600">{formatCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{dueDateStats.upcomingCount} invoice{dueDateStats.upcomingCount !== 1 ? 's' : ''} due soon</p>
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">No invoices due this week</p>
@@ -470,111 +391,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Quick Actions & Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
-        <motion.div variants={item}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common tasks to get you started</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Link 
-                to="/invoices/new"
-                className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Create New Invoice</p>
-                    <p className="text-sm text-muted-foreground">Draft a compliance-ready invoice</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </Link>
-              
-              <Link 
-                to="/clients"
-                className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Add a Client</p>
-                    <p className="text-sm text-muted-foreground">Set up client billing details</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </Link>
-              
-              <Link 
-                to="/business-profile"
-                className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Shield className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Complete Business Profile</p>
-                    <p className="text-sm text-muted-foreground">Add your legal business details</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </Link>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Compliance Status */}
-        <motion.div variants={item}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Compliance Status
-              </CardTitle>
-              <CardDescription>Your audit-readiness overview</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Email Verified</span>
-                  <Badge variant={isEmailVerified ? "default" : "secondary"}>
-                    {isEmailVerified ? 'Complete' : 'Pending'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Business Profile</span>
-                  <Badge variant={businessComplianceStatus === 'complete' ? 'default' : 'secondary'}>
-                    {businessComplianceStatus === 'complete' ? 'Complete' : 'Incomplete'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Immutable Records</span>
-                  <Badge variant="default">Active</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Audit Trail</span>
-                  <Badge variant="default">Enabled</Badge>
-                </div>
-              </div>
-              
-              <div className="pt-3 border-t">
-                <p className="text-xs text-muted-foreground">
-                  All invoice actions are permanently recorded in an immutable audit log for regulatory compliance.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
       {/* Recent Invoices */}
       <motion.div variants={item}>
         <Card>
@@ -583,57 +399,67 @@ export default function Dashboard() {
               <CardTitle>Recent Invoices</CardTitle>
               <CardDescription>Your latest invoice activity</CardDescription>
             </div>
-            {recentInvoices && recentInvoices.length > 0 && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/invoices">View All</Link>
-              </Button>
-            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/invoices">View All <ArrowUpRight className="ml-1 h-3 w-3" /></Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {invoicesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16" />)}
               </div>
             ) : recentInvoices && recentInvoices.length > 0 ? (
               <div className="space-y-3">
                 {recentInvoices.map((invoice) => (
-                  <Link
-                    key={invoice.id}
-                    to={`/invoices/${invoice.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-lg bg-muted shrink-0">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                  <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-primary" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{invoice.invoice_number}</p>
-                        <p className="text-sm text-muted-foreground truncate">{invoice.client_name}</p>
+                      <div>
+                        <p className="font-medium">{invoice.invoice_number}</p>
+                        <p className="text-sm text-muted-foreground">{invoice.client_name}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right">
-                        <p className="font-medium">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
-                        <StatusBadge status={invoice.status} />
-                      </div>
-                      <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    <div className="text-right">
+                      <p className="font-medium">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
+                      <StatusBadge status={invoice.status} />
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 rounded-full bg-muted mb-4">
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="font-semibold mb-1">No invoices yet</h3>
-                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                  Create your first compliance-ready invoice to get started. All invoices are immutable once issued.
-                </p>
-                <Button asChild>
-                  <Link to="/invoices/new">Create Your First Invoice</Link>
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No invoices yet</p>
+                <Button className="mt-4" asChild>
+                  <Link to="/invoices/new">Create your first invoice</Link>
                 </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Compliance Footer */}
+      <motion.div variants={item}>
+        <Card className="bg-muted/30">
+          <CardContent className="flex items-center gap-3 py-4">
+            <Shield className={`h-5 w-5 ${businessComplianceStatus === 'complete' ? 'text-green-500' : 'text-amber-500'}`} />
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                {businessComplianceStatus === 'complete' ? 'Compliance Status: Complete' : 'Complete Your Business Profile'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {businessComplianceStatus === 'complete' 
+                  ? 'Your business profile meets compliance requirements'
+                  : 'Add your business details for tax-compliant invoices'}
+              </p>
+            </div>
+            {businessComplianceStatus !== 'complete' && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/business-profile">Complete Profile</Link>
+              </Button>
             )}
           </CardContent>
         </Card>

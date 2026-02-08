@@ -189,6 +189,24 @@ Deno.serve(async (req) => {
       issuedInvoice.business_id
     )
 
+    // Check if this is the first invoice for the business
+    // Count non-draft invoices for this business (excluding the current one)
+    const { count: invoiceCount, error: countError } = await supabaseService
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', issuedInvoice.business_id)
+      .neq('status', 'draft')
+
+    if (!countError && invoiceCount === 1) {
+      // This is the first invoice! Notify platform admins
+      await supabaseService.rpc('notify_admin_first_invoice_issued', {
+        _business_id: issuedInvoice.business_id,
+        _invoice_id: issuedInvoice.id,
+        _invoice_number: issuedInvoice.invoice_number
+      })
+      console.log('Admin notification created for first invoice milestone')
+    }
+
     const response: IssueInvoiceResponse = {
       success: true,
       invoice: {

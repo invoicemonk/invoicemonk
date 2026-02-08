@@ -142,16 +142,19 @@ export default function AdminSupport() {
     mutationFn: async ({ ticketId, message }: { ticketId: string; message: string }) => {
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('support_ticket_messages' as any)
         .insert({
           ticket_id: ticketId,
           sender_id: user.id,
           is_admin: true,
           message,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+      const messageData = data as any;
 
       // Update ticket status to in_progress if it was open
       await supabase
@@ -159,6 +162,22 @@ export default function AdminSupport() {
         .update({ status: 'in_progress' })
         .eq('id', ticketId)
         .eq('status', 'open');
+
+      // Trigger email notification to user (in-app notification created by DB trigger)
+      try {
+        await supabase.functions.invoke('send-support-notification', {
+          body: { 
+            type: 'admin_reply', 
+            ticket_id: ticketId,
+            message_id: messageData.id 
+          }
+        });
+      } catch (emailError) {
+        console.error('Failed to send support reply notification email:', emailError);
+        // Don't fail the mutation if email fails
+      }
+
+      return messageData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-ticket-messages'] });

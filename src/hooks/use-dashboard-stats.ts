@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { aggregateAmounts, type CurrencyAmount, type AggregationResult } from '@/lib/currency-aggregation';
 
 export interface DateRange {
   start: Date;
@@ -27,11 +26,6 @@ export function useRefreshDashboard() {
   return { refresh, isRefreshing };
 }
 
-export interface CurrencyBreakdownItem {
-  total: number;
-  count: number;
-}
-
 interface DashboardStats {
   totalRevenue: number;
   outstanding: number;
@@ -40,15 +34,6 @@ interface DashboardStats {
   currency: string;
   outstandingCount: number;
   paidThisMonthCount: number;
-  // Multi-currency fields
-  hasMultipleCurrencies: boolean;
-  hasUnconvertibleAmounts: boolean;
-  revenueBreakdown: Record<string, CurrencyBreakdownItem>;
-  outstandingBreakdown: Record<string, CurrencyBreakdownItem>;
-  paidThisMonthBreakdown: Record<string, CurrencyBreakdownItem>;
-  excludedFromRevenue: number;
-  excludedFromOutstanding: number;
-  excludedFromPaidThisMonth: number;
 }
 
 interface RecentInvoice {
@@ -62,19 +47,17 @@ interface RecentInvoice {
   created_at: string;
 }
 
-function buildBreakdown(result: AggregationResult): Record<string, CurrencyBreakdownItem> {
-  const breakdown: Record<string, CurrencyBreakdownItem> = {};
-  for (const [currency, data] of Object.entries(result.breakdown)) {
-    breakdown[currency] = { total: data.total, count: data.count };
-  }
-  return breakdown;
-}
-
-export function useDashboardStats(businessId: string | undefined, dateRange?: DateRange) {
+// Dashboard stats scoped by currency account - single currency, no aggregation needed
+export function useDashboardStats(
+  businessId: string | undefined, 
+  currencyAccountId: string | undefined,
+  currency: string,
+  dateRange?: DateRange
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard-stats', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['dashboard-stats', businessId, currencyAccountId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<DashboardStats> => {
@@ -84,29 +67,26 @@ export function useDashboardStats(businessId: string | undefined, dateRange?: Da
           outstanding: 0,
           paidThisMonth: 0,
           draftCount: 0,
-          currency: 'NGN',
+          currency,
           outstandingCount: 0,
           paidThisMonthCount: 0,
-          hasMultipleCurrencies: false,
-          hasUnconvertibleAmounts: false,
-          revenueBreakdown: {},
-          outstandingBreakdown: {},
-          paidThisMonthBreakdown: {},
-          excludedFromRevenue: 0,
-          excludedFromOutstanding: 0,
-          excludedFromPaidThisMonth: 0,
         };
       }
 
-      // Build query with exchange rate data
+      // Build query - strictly scoped by currency account
       let query = supabase
         .from('invoices')
-        .select('status, total_amount, currency, issued_at, amount_paid, exchange_rate_to_primary');
+        .select('status, total_amount, currency, issued_at, amount_paid');
 
       if (businessId) {
         query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       // Apply date range filter for issued invoices
@@ -122,21 +102,7 @@ export function useDashboardStats(businessId: string | undefined, dateRange?: Da
         throw error;
       }
 
-      // Get business currency
-      let defaultCurrency = 'NGN';
-      if (businessId) {
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('default_currency')
-          .eq('id', businessId)
-          .single();
-        
-        if (business?.default_currency) {
-          defaultCurrency = business.default_currency;
-        }
-      }
-
-      // Calculate stats with proper currency aggregation
+      // Calculate stats - all amounts are guaranteed same currency
       const now = new Date();
       const startOfMonth = dateRange?.start || new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = dateRange?.end || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -151,46 +117,20 @@ export function useDashboardStats(businessId: string | undefined, dateRange?: Da
         return issuedDate >= startOfMonth && issuedDate <= endOfMonth;
       });
 
-      // Build currency amounts for proper aggregation
-      const revenueAmounts: CurrencyAmount[] = paidInvoices.map(i => ({
-        amount: Number(i.total_amount) || 0,
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
-
-      const outstandingAmounts: CurrencyAmount[] = outstandingInvoices.map(i => ({
-        amount: (Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0),
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
-
-      const paidThisMonthAmounts: CurrencyAmount[] = paidThisMonthInvoices.map(i => ({
-        amount: Number(i.total_amount) || 0,
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
-
-      // Aggregate with proper currency handling
-      const revenueResult = aggregateAmounts(revenueAmounts, defaultCurrency);
-      const outstandingResult = aggregateAmounts(outstandingAmounts, defaultCurrency);
-      const paidThisMonthResult = aggregateAmounts(paidThisMonthAmounts, defaultCurrency);
+      // Simple sum - no currency conversion needed
+      const totalRevenue = paidInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      const outstanding = outstandingInvoices.reduce((sum, i) => 
+        sum + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
+      const paidThisMonth = paidThisMonthInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
 
       return {
-        totalRevenue: revenueResult.primaryTotal,
-        outstanding: outstandingResult.primaryTotal,
-        paidThisMonth: paidThisMonthResult.primaryTotal,
+        totalRevenue,
+        outstanding,
+        paidThisMonth,
         draftCount: draftInvoices.length,
-        currency: defaultCurrency,
+        currency,
         outstandingCount: outstandingInvoices.length,
         paidThisMonthCount: paidThisMonthInvoices.length,
-        hasMultipleCurrencies: revenueResult.hasMultipleCurrencies || outstandingResult.hasMultipleCurrencies,
-        hasUnconvertibleAmounts: revenueResult.hasUnconvertibleAmounts || outstandingResult.hasUnconvertibleAmounts || paidThisMonthResult.hasUnconvertibleAmounts,
-        revenueBreakdown: buildBreakdown(revenueResult),
-        outstandingBreakdown: buildBreakdown(outstandingResult),
-        paidThisMonthBreakdown: buildBreakdown(paidThisMonthResult),
-        excludedFromRevenue: revenueResult.excludedCount,
-        excludedFromOutstanding: outstandingResult.excludedCount,
-        excludedFromPaidThisMonth: paidThisMonthResult.excludedCount,
       };
     },
     enabled: !!user?.id,
@@ -205,42 +145,31 @@ interface RevenueTrendPoint {
 
 interface RevenueTrendResult {
   data: RevenueTrendPoint[];
-  hasExcludedData: boolean;
-  excludedCount: number;
   currency: string;
 }
 
-export function useRevenueTrend(businessId: string | undefined, months = 12) {
+export function useRevenueTrend(
+  businessId: string | undefined, 
+  currencyAccountId: string | undefined,
+  currency: string,
+  months = 12
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['revenue-trend', businessId, user?.id, months],
+    queryKey: ['revenue-trend', businessId, currencyAccountId, user?.id, months],
     refetchInterval: 60000,
     queryFn: async (): Promise<RevenueTrendResult> => {
-      if (!user?.id) return { data: [], hasExcludedData: false, excludedCount: 0, currency: 'NGN' };
+      if (!user?.id) return { data: [], currency };
 
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - months);
       startDate.setDate(1);
       startDate.setHours(0, 0, 0, 0);
 
-      // Get business currency first
-      let defaultCurrency = 'NGN';
-      if (businessId) {
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('default_currency')
-          .eq('id', businessId)
-          .single();
-        
-        if (business?.default_currency) {
-          defaultCurrency = business.default_currency;
-        }
-      }
-
       let query = supabase
         .from('invoices')
-        .select('total_amount, issued_at, currency, exchange_rate_to_primary')
+        .select('total_amount, issued_at, currency')
         .eq('status', 'paid')
         .gte('issued_at', startDate.toISOString());
 
@@ -248,6 +177,11 @@ export function useRevenueTrend(businessId: string | undefined, months = 12) {
         query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       const { data: invoices, error } = await query;
@@ -258,71 +192,58 @@ export function useRevenueTrend(businessId: string | undefined, months = 12) {
       }
 
       // Create buckets for each month
-      const monthBuckets: Map<string, { amounts: CurrencyAmount[] }> = new Map();
+      const monthBuckets: Map<string, { total: number; count: number }> = new Map();
       
       // Initialize all months
       for (let i = 0; i < months; i++) {
         const date = new Date();
         date.setMonth(date.getMonth() - (months - 1 - i));
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthBuckets.set(key, { amounts: [] });
+        monthBuckets.set(key, { total: 0, count: 0 });
       }
 
-      // Track excluded invoices
-      let totalExcluded = 0;
-
-      // Aggregate invoice data by month
+      // Aggregate invoice data by month - simple sum, no conversion
       (invoices || []).forEach(invoice => {
         if (!invoice.issued_at) return;
         const date = new Date(invoice.issued_at);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const bucket = monthBuckets.get(key);
         if (bucket) {
-          const currency = invoice.currency || defaultCurrency;
-          const canConvert = currency === defaultCurrency || 
-            (invoice.exchange_rate_to_primary && invoice.exchange_rate_to_primary > 0);
-          
-          if (canConvert) {
-            bucket.amounts.push({
-              amount: Number(invoice.total_amount) || 0,
-              currency,
-              exchangeRateToPrimary: invoice.exchange_rate_to_primary,
-            });
-          } else {
-            totalExcluded++;
-          }
+          bucket.total += Number(invoice.total_amount) || 0;
+          bucket.count += 1;
         }
       });
 
-      // Convert to array with proper aggregation
+      // Convert to array
       const trendData = Array.from(monthBuckets.entries()).map(([key, bucket]) => {
         const [year, month] = key.split('-');
         const date = new Date(parseInt(year), parseInt(month) - 1);
-        const aggregated = aggregateAmounts(bucket.amounts, defaultCurrency);
         
         return {
           month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          revenue: aggregated.primaryTotal,
-          invoiceCount: aggregated.convertedCount,
+          revenue: bucket.total,
+          invoiceCount: bucket.count,
         };
       });
 
       return {
         data: trendData,
-        hasExcludedData: totalExcluded > 0,
-        excludedCount: totalExcluded,
-        currency: defaultCurrency,
+        currency,
       };
     },
     enabled: !!user?.id,
   });
 }
 
-export function useRecentInvoices(businessId: string | undefined, limit = 5) {
+export function useRecentInvoices(
+  businessId: string | undefined, 
+  currencyAccountId: string | undefined,
+  limit = 5
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['recent-invoices', businessId, user?.id, limit],
+    queryKey: ['recent-invoices', businessId, currencyAccountId, user?.id, limit],
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<RecentInvoice[]> => {
@@ -347,6 +268,11 @@ export function useRecentInvoices(businessId: string | undefined, limit = 5) {
         query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       const { data, error } = await query;
@@ -377,19 +303,17 @@ interface DueDateStats {
   upcomingCount: number;
   upcomingAmount: number;
   currency: string;
-  hasMultipleCurrencies: boolean;
-  hasUnconvertibleAmounts: boolean;
-  overdueBreakdown: Record<string, CurrencyBreakdownItem>;
-  upcomingBreakdown: Record<string, CurrencyBreakdownItem>;
-  excludedOverdue: number;
-  excludedUpcoming: number;
 }
 
-export function useDueDateStats(businessId: string | undefined) {
+export function useDueDateStats(
+  businessId: string | undefined,
+  currencyAccountId: string | undefined,
+  currency: string
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['due-date-stats', businessId, user?.id],
+    queryKey: ['due-date-stats', businessId, currencyAccountId, user?.id],
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<DueDateStats> => {
@@ -399,20 +323,14 @@ export function useDueDateStats(businessId: string | undefined) {
           overdueAmount: 0,
           upcomingCount: 0,
           upcomingAmount: 0,
-          currency: 'NGN',
-          hasMultipleCurrencies: false,
-          hasUnconvertibleAmounts: false,
-          overdueBreakdown: {},
-          upcomingBreakdown: {},
-          excludedOverdue: 0,
-          excludedUpcoming: 0,
+          currency,
         };
       }
 
-      // Get outstanding invoices with due dates and exchange rates
+      // Get outstanding invoices with due dates - strictly scoped
       let query = supabase
         .from('invoices')
-        .select('id, due_date, total_amount, amount_paid, currency, status, exchange_rate_to_primary')
+        .select('id, due_date, total_amount, amount_paid, currency, status')
         .in('status', ['issued', 'sent', 'viewed'])
         .not('due_date', 'is', null);
 
@@ -422,25 +340,16 @@ export function useDueDateStats(businessId: string | undefined) {
         query = query.eq('user_id', user.id);
       }
 
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
+      }
+
       const { data: invoices, error } = await query;
 
       if (error) {
         console.error('Error fetching due date stats:', error);
         throw error;
-      }
-
-      // Get business currency
-      let defaultCurrency = 'NGN';
-      if (businessId) {
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('default_currency')
-          .eq('id', businessId)
-          .single();
-        
-        if (business?.default_currency) {
-          defaultCurrency = business.default_currency;
-        }
       }
 
       const today = new Date();
@@ -449,8 +358,10 @@ export function useDueDateStats(businessId: string | undefined) {
       const sevenDaysFromNow = new Date(today);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      const overdueAmounts: CurrencyAmount[] = [];
-      const upcomingAmounts: CurrencyAmount[] = [];
+      let overdueCount = 0;
+      let overdueAmount = 0;
+      let upcomingCount = 0;
+      let upcomingAmount = 0;
 
       (invoices || []).forEach(invoice => {
         if (!invoice.due_date) return;
@@ -459,34 +370,22 @@ export function useDueDateStats(businessId: string | undefined) {
         dueDate.setHours(0, 0, 0, 0);
         
         const outstanding = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
-        const currencyAmount: CurrencyAmount = {
-          amount: outstanding,
-          currency: invoice.currency || defaultCurrency,
-          exchangeRateToPrimary: invoice.exchange_rate_to_primary,
-        };
         
         if (dueDate < today) {
-          overdueAmounts.push(currencyAmount);
+          overdueCount++;
+          overdueAmount += outstanding;
         } else if (dueDate <= sevenDaysFromNow) {
-          upcomingAmounts.push(currencyAmount);
+          upcomingCount++;
+          upcomingAmount += outstanding;
         }
       });
 
-      const overdueResult = aggregateAmounts(overdueAmounts, defaultCurrency);
-      const upcomingResult = aggregateAmounts(upcomingAmounts, defaultCurrency);
-
       return {
-        overdueCount: overdueResult.totalCount,
-        overdueAmount: overdueResult.primaryTotal,
-        upcomingCount: upcomingResult.totalCount,
-        upcomingAmount: upcomingResult.primaryTotal,
-        currency: defaultCurrency,
-        hasMultipleCurrencies: overdueResult.hasMultipleCurrencies || upcomingResult.hasMultipleCurrencies,
-        hasUnconvertibleAmounts: overdueResult.hasUnconvertibleAmounts || upcomingResult.hasUnconvertibleAmounts,
-        overdueBreakdown: buildBreakdown(overdueResult),
-        upcomingBreakdown: buildBreakdown(upcomingResult),
-        excludedOverdue: overdueResult.excludedCount,
-        excludedUpcoming: upcomingResult.excludedCount,
+        overdueCount,
+        overdueAmount,
+        upcomingCount,
+        upcomingAmount,
+        currency,
       };
     },
     enabled: !!user?.id,

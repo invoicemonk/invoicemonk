@@ -8,23 +8,29 @@ import { AccountingDisclaimer } from '@/components/accounting/AccountingDisclaim
 import { JurisdictionBadge } from '@/components/accounting/JurisdictionBadge';
 import { MoneyFlowCard } from '@/components/accounting/MoneyFlowCard';
 import { InsightCard } from '@/components/accounting/InsightCard';
-import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 import { useAccountContext } from '@/hooks/use-account-context';
 import { useAccountingPreferences, useUpdateAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useAccountingStats } from '@/hooks/use-accounting-stats';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AccountingOverview() {
   const accountContext = useAccountContext();
   const { currentBusiness: business, loading: isLoadingBusiness } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const { data: preferences, isLoading: isLoadingPrefs } = useAccountingPreferences();
   const updatePreferences = useUpdateAccountingPreferences();
   
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(business?.id, business?.default_currency, dateRange);
+  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency, 
+    dateRange
+  );
 
   // Check for missing recommended fields
   const missingFields: ('country' | 'currency' | 'businessType')[] = [];
@@ -45,19 +51,12 @@ export default function AccountingOverview() {
       GBP: '£',
       EUR: '€',
     };
-    const currency = stats?.currency || 'NGN';
+    const currency = stats?.currency || activeCurrency;
     const symbol = symbols[currency] || currency;
     return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const isLoading = isLoadingBusiness || isLoadingPrefs || isLoadingStats;
-
-  // Build breakdown for indicator
-  const invoiceBreakdown = stats?.currencyBreakdown?.invoices 
-    ? Object.fromEntries(
-        Object.entries(stats.currencyBreakdown.invoices).map(([k, v]) => [k, { total: v.total, count: v.count }])
-      )
-    : undefined;
 
   return (
     <motion.div
@@ -75,7 +74,7 @@ export default function AccountingOverview() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">How Your Business is Doing</h1>
           <p className="text-muted-foreground mt-1">
-            {getPeriodLabel(period)} overview
+            {getPeriodLabel(period)} overview in {activeCurrency}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -87,18 +86,6 @@ export default function AccountingOverview() {
           />
         </div>
       </div>
-
-      {/* Multi-currency indicator */}
-      {!isLoading && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
-        <MultiCurrencyIndicator
-          hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
-          hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
-          excludedCount={(stats?.excludedInvoiceCount || 0) + (stats?.excludedExpenseCount || 0)}
-          breakdown={invoiceBreakdown}
-          primaryCurrency={stats?.currency || 'NGN'}
-          variant="card"
-        />
-      )}
 
       {/* Stats cards */}
       {isLoading ? (
@@ -112,7 +99,7 @@ export default function AccountingOverview() {
           <MoneyFlowCard
             title="Revenue"
             amount={stats?.revenue || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency}
             count={stats?.revenueCount}
             countLabel="invoices"
             icon={FileText}
@@ -121,7 +108,7 @@ export default function AccountingOverview() {
           <MoneyFlowCard
             title="Money In"
             amount={stats?.moneyIn || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency}
             count={stats?.moneyInCount}
             countLabel="paid"
             icon={TrendingUp}
@@ -130,7 +117,7 @@ export default function AccountingOverview() {
           <MoneyFlowCard
             title="Money Out"
             amount={stats?.moneyOut || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency}
             count={stats?.expenseCount}
             countLabel="expenses"
             icon={TrendingDown}
@@ -139,7 +126,7 @@ export default function AccountingOverview() {
           <MoneyFlowCard
             title="What's Left"
             amount={stats?.whatsLeft || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency}
             icon={Wallet}
             variant={stats?.whatsLeft && stats.whatsLeft >= 0 ? 'success' : 'danger'}
           />

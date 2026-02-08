@@ -229,6 +229,13 @@ serve(async (req) => {
             ? invoice.subscription
             : invoice.subscription.id;
 
+          // Get subscription details for admin notification
+          const { data: subData } = await supabase
+            .from("subscriptions")
+            .select("id, business_id, businesses(name)")
+            .eq("stripe_subscription_id", subscriptionId)
+            .maybeSingle();
+
           await supabase
             .from("subscriptions")
             .update({
@@ -236,6 +243,16 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("stripe_subscription_id", subscriptionId);
+
+          // Create admin notification for payment failure
+          if (subData?.id) {
+            const businessName = (subData.businesses as any)?.name || 'Unknown business';
+            await supabase.rpc('notify_admin_payment_failed', {
+              _subscription_id: subData.id,
+              _business_name: businessName
+            });
+            console.log("Admin notification created for payment failure");
+          }
         }
         break;
       }

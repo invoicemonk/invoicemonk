@@ -7,6 +7,7 @@ export interface Expense {
   id: string;
   userId: string;
   businessId: string | null;
+  currencyAccountId: string | null;
   category: string;
   description: string | null;
   amount: number;
@@ -17,33 +18,26 @@ export interface Expense {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  // Exchange rate fields for multi-currency support
-  exchangeRateToPrimary: number | null;
-  primaryCurrency: string | null;
 }
 
 export interface CreateExpenseInput {
   category: string;
   description?: string;
   amount: number;
-  currency?: string;
   expenseDate?: string;
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
-  exchangeRateToPrimary?: number;
 }
 
 export interface UpdateExpenseInput {
   category?: string;
   description?: string;
   amount?: number;
-  currency?: string;
   expenseDate?: string;
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
-  exchangeRateToPrimary?: number;
 }
 
 // Expense categories
@@ -63,11 +57,16 @@ export const EXPENSE_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-export function useExpenses(businessId?: string, dateRange?: { start: Date; end: Date }) {
+// Fetch expenses filtered by currency account
+export function useExpenses(
+  businessId?: string, 
+  currencyAccountId?: string,
+  dateRange?: { start: Date; end: Date }
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['expenses', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['expenses', businessId, currencyAccountId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<Expense[]> => {
       if (!user) throw new Error('Not authenticated');
 
@@ -81,6 +80,11 @@ export function useExpenses(businessId?: string, dateRange?: { start: Date; end:
         query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
+      }
+
+      // Filter by currency account - strict scoping
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       // Apply date range filter
@@ -97,6 +101,7 @@ export function useExpenses(businessId?: string, dateRange?: { start: Date; end:
         id: expense.id,
         userId: expense.user_id,
         businessId: expense.business_id,
+        currencyAccountId: expense.currency_account_id,
         category: expense.category,
         description: expense.description,
         amount: Number(expense.amount),
@@ -107,8 +112,6 @@ export function useExpenses(businessId?: string, dateRange?: { start: Date; end:
         notes: expense.notes,
         createdAt: expense.created_at,
         updatedAt: expense.updated_at,
-        exchangeRateToPrimary: expense.exchange_rate_to_primary,
-        primaryCurrency: expense.primary_currency,
       }));
     },
     enabled: !!user,
@@ -135,6 +138,7 @@ export function useExpense(expenseId: string) {
         id: data.id,
         userId: data.user_id,
         businessId: data.business_id,
+        currencyAccountId: data.currency_account_id,
         category: data.category,
         description: data.description,
         amount: Number(data.amount),
@@ -145,36 +149,40 @@ export function useExpense(expenseId: string) {
         notes: data.notes,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
-        exchangeRateToPrimary: data.exchange_rate_to_primary,
-        primaryCurrency: data.primary_currency,
       };
     },
     enabled: !!user && !!expenseId,
   });
 }
 
-export function useCreateExpense(businessId?: string, defaultCurrency?: string) {
+// Create expense with currency derived from currency account
+export function useCreateExpense(businessId?: string, currencyAccountId?: string, currency?: string) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (input: CreateExpenseInput) => {
       if (!user) throw new Error('Not authenticated');
+      if (!currencyAccountId) throw new Error('No currency account selected');
+      if (!currency) throw new Error('Currency not determined');
 
       const { data, error } = await supabase
         .from('expenses')
         .insert({
           user_id: user.id,
           business_id: businessId || null,
+          currency_account_id: currencyAccountId,
           category: input.category,
           description: input.description || null,
           amount: input.amount,
-          currency: input.currency || defaultCurrency || 'NGN',
+          currency: currency, // Derived from currency account
           expense_date: input.expenseDate || new Date().toISOString().split('T')[0],
           vendor: input.vendor || null,
           notes: input.notes || null,
           receipt_url: input.receiptUrl || null,
-          exchange_rate_to_primary: input.exchangeRateToPrimary || null,
+          // Legacy FX fields - null for new records
+          exchange_rate_to_primary: null,
+          primary_currency: null,
         })
         .select()
         .single();
@@ -185,6 +193,7 @@ export function useCreateExpense(businessId?: string, defaultCurrency?: string) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses-by-category'] });
       toast({
         title: 'Expense created',
         description: 'Your expense has been recorded.',
@@ -212,7 +221,7 @@ export function useUpdateExpense() {
       if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.amount !== undefined) updateData.amount = updates.amount;
-      if (updates.currency !== undefined) updateData.currency = updates.currency;
+      // Note: currency is immutable, derived from currency account
       if (updates.expenseDate !== undefined) updateData.expense_date = updates.expenseDate;
       if (updates.vendor !== undefined) updateData.vendor = updates.vendor;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
@@ -232,6 +241,7 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense', id] });
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses-by-category'] });
       toast({
         title: 'Expense updated',
         description: 'Your expense has been updated.',
@@ -265,6 +275,7 @@ export function useDeleteExpense() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses-by-category'] });
       toast({
         title: 'Expense deleted',
         description: 'Your expense has been removed.',

@@ -1,13 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { aggregateAmounts, type CurrencyAmount, type AggregationResult } from '@/lib/currency-aggregation';
-
-export interface CurrencyBreakdownItem {
-  total: number;
-  count: number;
-  hasAllRates: boolean;
-}
 
 export interface AccountingStats {
   // Revenue = Sum of invoices with status != 'draft' (issued)
@@ -30,18 +23,6 @@ export interface AccountingStats {
   whatsLeft: number;
   
   currency: string;
-  
-  // Multi-currency transparency
-  hasMultipleCurrencies: boolean;
-  hasUnconvertibleAmounts: boolean;
-  excludedInvoiceCount: number;
-  excludedExpenseCount: number;
-  
-  // Currency breakdown for multi-currency visibility
-  currencyBreakdown: {
-    invoices: Record<string, CurrencyBreakdownItem>;
-    expenses: Record<string, CurrencyBreakdownItem>;
-  };
 }
 
 export interface DateRange {
@@ -49,23 +30,17 @@ export interface DateRange {
   end: Date;
 }
 
-function buildBreakdown(result: AggregationResult): Record<string, CurrencyBreakdownItem> {
-  const breakdown: Record<string, CurrencyBreakdownItem> = {};
-  for (const [currency, data] of Object.entries(result.breakdown)) {
-    breakdown[currency] = { 
-      total: data.total, 
-      count: data.count,
-      hasAllRates: data.hasAllRates,
-    };
-  }
-  return breakdown;
-}
-
-export function useAccountingStats(businessId?: string, currency?: string, dateRange?: DateRange) {
+// Accounting stats strictly scoped by currency account - single currency, no aggregation
+export function useAccountingStats(
+  businessId?: string, 
+  currencyAccountId?: string,
+  currency?: string, 
+  dateRange?: DateRange
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['accounting-stats', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['accounting-stats', businessId, currencyAccountId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<AccountingStats> => {
       if (!user) {
         throw new Error('Not authenticated');
@@ -73,15 +48,20 @@ export function useAccountingStats(businessId?: string, currency?: string, dateR
 
       const defaultCurrency = currency || 'NGN';
 
-      // Fetch invoices with exchange rate data
+      // Fetch invoices - strictly scoped by currency account
       let invoiceQuery = supabase
         .from('invoices')
-        .select('status, total_amount, amount_paid, issued_at, currency, exchange_rate_to_primary');
+        .select('status, total_amount, amount_paid, issued_at, currency');
 
       if (businessId) {
         invoiceQuery = invoiceQuery.eq('business_id', businessId);
       } else {
         invoiceQuery = invoiceQuery.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        invoiceQuery = invoiceQuery.eq('currency_account_id', currencyAccountId);
       }
 
       // Filter by date range on issued_at
@@ -94,15 +74,20 @@ export function useAccountingStats(businessId?: string, currency?: string, dateR
       const { data: invoices, error: invoiceError } = await invoiceQuery;
       if (invoiceError) throw invoiceError;
 
-      // Fetch expenses with exchange rate data
+      // Fetch expenses - strictly scoped by currency account
       let expenseQuery = supabase
         .from('expenses')
-        .select('amount, expense_date, currency, exchange_rate_to_primary, primary_currency');
+        .select('amount, expense_date, currency');
 
       if (businessId) {
         expenseQuery = expenseQuery.eq('business_id', businessId);
       } else {
         expenseQuery = expenseQuery.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        expenseQuery = expenseQuery.eq('currency_account_id', currencyAccountId);
       }
 
       // Filter by date range on expense_date
@@ -115,67 +100,30 @@ export function useAccountingStats(businessId?: string, currency?: string, dateR
       const { data: expenses, error: expenseError } = await expenseQuery;
       if (expenseError) throw expenseError;
 
-      // Build currency amounts for proper aggregation
+      // Calculate stats - simple sums, no currency conversion needed
       const issuedInvoices = (invoices || []).filter(i => i.status !== 'draft');
       const paidInvoices = (invoices || []).filter(i => i.status === 'paid');
       const outstandingInvoices = (invoices || []).filter(i => ['issued', 'sent', 'viewed'].includes(i.status));
 
-      const revenueAmounts: CurrencyAmount[] = issuedInvoices.map(i => ({
-        amount: Number(i.total_amount) || 0,
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
+      const revenue = issuedInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      const moneyIn = paidInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      const outstanding = outstandingInvoices.reduce((sum, i) => 
+        sum + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
+      const moneyOut = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-      const moneyInAmounts: CurrencyAmount[] = paidInvoices.map(i => ({
-        amount: Number(i.total_amount) || 0,
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
-
-      const outstandingAmounts: CurrencyAmount[] = outstandingInvoices.map(i => ({
-        amount: (Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0),
-        currency: i.currency || defaultCurrency,
-        exchangeRateToPrimary: i.exchange_rate_to_primary,
-      }));
-
-      const expenseAmounts: CurrencyAmount[] = (expenses || []).map(e => ({
-        amount: Number(e.amount) || 0,
-        currency: e.currency || defaultCurrency,
-        exchangeRateToPrimary: e.exchange_rate_to_primary,
-      }));
-
-      // Aggregate with proper currency handling
-      const revenueResult = aggregateAmounts(revenueAmounts, defaultCurrency);
-      const moneyInResult = aggregateAmounts(moneyInAmounts, defaultCurrency);
-      const outstandingResult = aggregateAmounts(outstandingAmounts, defaultCurrency);
-      const expenseResult = aggregateAmounts(expenseAmounts, defaultCurrency);
-
-      // Calculate What's Left using properly converted totals
-      const whatsLeft = moneyInResult.primaryTotal - expenseResult.primaryTotal;
-
-      // Combine breakdowns
-      const invoiceBreakdown = buildBreakdown(revenueResult);
-      const expenseBreakdown = buildBreakdown(expenseResult);
+      const whatsLeft = moneyIn - moneyOut;
 
       return {
-        revenue: revenueResult.primaryTotal,
-        revenueCount: revenueResult.convertedCount,
-        moneyIn: moneyInResult.primaryTotal,
-        moneyInCount: moneyInResult.convertedCount,
-        outstanding: outstandingResult.primaryTotal,
-        outstandingCount: outstandingResult.convertedCount,
-        moneyOut: expenseResult.primaryTotal,
-        expenseCount: expenseResult.convertedCount,
+        revenue,
+        revenueCount: issuedInvoices.length,
+        moneyIn,
+        moneyInCount: paidInvoices.length,
+        outstanding,
+        outstandingCount: outstandingInvoices.length,
+        moneyOut,
+        expenseCount: (expenses || []).length,
         whatsLeft,
         currency: defaultCurrency,
-        hasMultipleCurrencies: revenueResult.hasMultipleCurrencies || expenseResult.hasMultipleCurrencies,
-        hasUnconvertibleAmounts: revenueResult.hasUnconvertibleAmounts || expenseResult.hasUnconvertibleAmounts,
-        excludedInvoiceCount: revenueResult.excludedCount,
-        excludedExpenseCount: expenseResult.excludedCount,
-        currencyBreakdown: {
-          invoices: invoiceBreakdown,
-          expenses: expenseBreakdown,
-        },
       };
     },
     enabled: !!user,
@@ -191,42 +139,38 @@ export interface CategoryBreakdownItem {
 
 export interface CategoryBreakdownResult {
   data: CategoryBreakdownItem[];
-  hasUnconvertibleAmounts: boolean;
-  excludedCount: number;
   currency: string;
 }
 
-// Get expense breakdown by category with proper currency handling
-export function useExpensesByCategory(businessId?: string, dateRange?: DateRange) {
+// Get expense breakdown by category - strictly scoped by currency account
+export function useExpensesByCategory(
+  businessId?: string, 
+  currencyAccountId?: string,
+  currency?: string,
+  dateRange?: DateRange
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['expenses-by-category', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['expenses-by-category', businessId, currencyAccountId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<CategoryBreakdownResult> => {
       if (!user) throw new Error('Not authenticated');
 
-      // Get business currency
-      let defaultCurrency = 'NGN';
-      if (businessId) {
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('default_currency')
-          .eq('id', businessId)
-          .single();
-        
-        if (business?.default_currency) {
-          defaultCurrency = business.default_currency;
-        }
-      }
+      const defaultCurrency = currency || 'NGN';
 
       let query = supabase
         .from('expenses')
-        .select('category, amount, expense_date, currency, exchange_rate_to_primary');
+        .select('category, amount, expense_date, currency');
 
       if (businessId) {
         query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
+      }
+
+      // Strict currency account filtering
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       if (dateRange) {
@@ -238,39 +182,21 @@ export function useExpensesByCategory(businessId?: string, dateRange?: DateRange
       const { data, error } = await query;
       if (error) throw error;
 
-      // Group by category with proper currency conversion
-      const categoryMap = new Map<string, CurrencyAmount[]>();
+      // Group by category - simple sums, no currency conversion
+      const categoryMap = new Map<string, number>();
       
       (data || []).forEach(expense => {
         const category = expense.category;
-        if (!categoryMap.has(category)) {
-          categoryMap.set(category, []);
-        }
-        categoryMap.get(category)!.push({
-          amount: Number(expense.amount) || 0,
-          currency: expense.currency || defaultCurrency,
-          exchangeRateToPrimary: expense.exchange_rate_to_primary,
-        });
+        const current = categoryMap.get(category) || 0;
+        categoryMap.set(category, current + (Number(expense.amount) || 0));
       });
 
-      let totalExcluded = 0;
-      let hasUnconvertible = false;
-
       const categoryBreakdown = Array.from(categoryMap.entries())
-        .map(([category, amounts]) => {
-          const result = aggregateAmounts(amounts, defaultCurrency);
-          if (result.hasUnconvertibleAmounts) {
-            hasUnconvertible = true;
-            totalExcluded += result.excludedCount;
-          }
-          return { category, amount: result.primaryTotal };
-        })
+        .map(([category, amount]) => ({ category, amount }))
         .sort((a, b) => b.amount - a.amount);
 
       return {
         data: categoryBreakdown,
-        hasUnconvertibleAmounts: hasUnconvertible,
-        excludedCount: totalExcluded,
         currency: defaultCurrency,
       };
     },

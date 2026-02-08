@@ -188,6 +188,18 @@ export function useCreateSupportTicket() {
         .single();
 
       if (error) throw error;
+
+      // Trigger email notification to admins (in-app notification created by DB trigger)
+      const ticketData = data as any;
+      try {
+        await supabase.functions.invoke('send-support-notification', {
+          body: { type: 'ticket_created', ticket_id: ticketData.id }
+        });
+      } catch (emailError) {
+        console.error('Failed to send support notification email:', emailError);
+        // Don't fail the mutation if email fails
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -229,6 +241,19 @@ export function useAddTicketMessage() {
         .single();
 
       if (error) throw error;
+
+      // Trigger email notification to admins (in-app notification created by DB trigger)
+      if (data) {
+        try {
+          await supabase.functions.invoke('send-support-notification', {
+            body: { type: 'user_reply', ticket_id: input.ticketId, message_id: (data as any).id }
+          });
+        } catch (emailError) {
+          console.error('Failed to send user reply notification email:', emailError);
+          // Don't fail the mutation if email fails
+        }
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {

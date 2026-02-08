@@ -79,7 +79,8 @@ export default function Reports() {
   
   const generateReport = useGenerateReport();
   const { data: stats, isLoading: statsLoading, isError: statsError } = useReportStats(
-    parseInt(selectedYear)
+    parseInt(selectedYear),
+    hasReportsAccess
   );
   const { data: auditEventsCount, isLoading: auditLoading, isError: auditError } = useAuditEventsCount(
     parseInt(selectedYear)

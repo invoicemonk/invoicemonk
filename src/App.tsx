@@ -85,6 +85,7 @@ import AdminSystem from "./pages/admin/AdminSystem";
 import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
 import AdminSupport from "./pages/admin/AdminSupport";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 
 // Public pages
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
@@ -238,6 +239,7 @@ const App = () => (
             <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
             <Route path="/admin/templates" element={<AdminTemplates />} />
             <Route path="/admin/support" element={<AdminSupport />} />
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

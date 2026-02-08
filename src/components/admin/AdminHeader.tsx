@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useLocation, Link } from 'react-router-dom';
+import { AdminNotificationDropdown } from './AdminNotificationDropdown';
 
 export function AdminHeader() {
   const location = useLocation();
@@ -26,6 +27,7 @@ export function AdminHeader() {
     if (path.includes('/billing')) return 'Billing';
     if (path.includes('/country-modules')) return 'Country Modules';
     if (path.includes('/system')) return 'System';
+    if (path.includes('/notifications')) return 'Notifications';
     return 'Admin';
   };
 
@@ -55,7 +57,8 @@ export function AdminHeader() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
+        <AdminNotificationDropdown />
         <p className="text-xs text-muted-foreground">
           All actions are logged
         </p>

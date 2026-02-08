@@ -13,12 +13,12 @@ export type InvoiceItem = Tables<'invoice_items'>;
 export type InvoiceInsert = TablesInsert<'invoices'>;
 export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
 
-// Fetch all invoices for a business (or fallback to user)
-export function useInvoices(businessId?: string) {
+// Fetch all invoices for a business, optionally filtered by currency account
+export function useInvoices(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['invoices', businessId || user?.id],
+    queryKey: ['invoices', businessId || user?.id, currencyAccountId],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
@@ -33,6 +33,11 @@ export function useInvoices(businessId?: string) {
       // If businessId is provided, filter by business
       if (businessId) {
         query = query.eq('business_id', businessId);
+      }
+
+      // Filter by currency account if provided
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
       const { data, error } = await query;
@@ -132,6 +137,9 @@ export function useCreateInvoice() {
           business_id: invoice.business_id || null,
           invoice_number: invoiceNumber,
           status: 'draft',
+          // Legacy FX fields - set to null for new records
+          exchange_rate_to_primary: null,
+          exchange_rate_snapshot: null,
         })
         .select()
         .single();
@@ -350,7 +358,7 @@ export function useVoidInvoice() {
 
       const creditNoteNumber = `CN-${String(nextNumber).padStart(4, '0')}`;
 
-      // Create credit note with currency snapshot from invoice
+      // Create credit note with currency snapshot from invoice (inherits currency_account_id via trigger)
       const { error: creditNoteError } = await supabase
         .from('credit_notes')
         .insert({
@@ -358,7 +366,7 @@ export function useVoidInvoice() {
           credit_note_number: creditNoteNumber,
           amount: invoice.total_amount,
           currency: invoice.currency,
-          exchange_rate_to_primary: invoice.exchange_rate_to_primary,
+          currency_account_id: invoice.currency_account_id,
           reason,
           user_id: user.id,
           business_id: invoice.business_id,
@@ -446,7 +454,7 @@ export function useRecordPayment() {
       if (fetchError) throw fetchError;
       if (!invoice) throw new Error('Invoice not found');
 
-      // Create payment record
+      // Create payment record (currency_account_id inherited via trigger)
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -513,9 +521,24 @@ export function useRecordPayment() {
 // Delete a draft invoice
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (invoiceId: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Get the invoice first to check status
+      const { data: invoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('status')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (invoice?.status !== 'draft') {
+        throw new Error('Only draft invoices can be deleted');
+      }
+
       // Delete invoice items first
       await supabase
         .from('invoice_items')
@@ -534,7 +557,7 @@ export function useDeleteInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({
         title: 'Invoice deleted',
-        description: 'The draft invoice has been deleted.',
+        description: 'The draft invoice has been removed.',
       });
     },
     onError: (error) => {
@@ -544,5 +567,24 @@ export function useDeleteInvoice() {
         variant: 'destructive',
       });
     },
+  });
+}
+
+// Check invoice limit
+export function useCheckInvoiceLimit(businessId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoice-limit-check', businessId],
+    queryFn: async () => {
+      if (!businessId) return null;
+
+      const { data, error } = await supabase.rpc('check_tier_limit_business', {
+        _business_id: businessId,
+        _feature: 'invoices_per_month',
+      });
+
+      if (error) throw error;
+      return data as { allowed: boolean; current_count: number; limit_value: number | null };
+    },
+    enabled: !!businessId,
   });
 }

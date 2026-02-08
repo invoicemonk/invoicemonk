@@ -299,6 +299,7 @@ export type Database = {
           credit_note_hash: string | null
           credit_note_number: string
           currency: string | null
+          currency_account_id: string | null
           exchange_rate_to_primary: number | null
           id: string
           issued_at: string
@@ -316,6 +317,7 @@ export type Database = {
           credit_note_hash?: string | null
           credit_note_number: string
           currency?: string | null
+          currency_account_id?: string | null
           exchange_rate_to_primary?: number | null
           id?: string
           issued_at?: string
@@ -333,6 +335,7 @@ export type Database = {
           credit_note_hash?: string | null
           credit_note_number?: string
           currency?: string | null
+          currency_account_id?: string | null
           exchange_rate_to_primary?: number | null
           id?: string
           issued_at?: string
@@ -352,10 +355,55 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "credit_notes_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "credit_notes_original_invoice_id_fkey"
             columns: ["original_invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      currency_accounts: {
+        Row: {
+          business_id: string
+          created_at: string
+          currency: string
+          id: string
+          is_default: boolean
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          currency: string
+          id?: string
+          is_default?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "currency_accounts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
@@ -367,6 +415,7 @@ export type Database = {
           category: string
           created_at: string
           currency: string
+          currency_account_id: string | null
           description: string | null
           exchange_rate_to_primary: number | null
           expense_date: string
@@ -384,6 +433,7 @@ export type Database = {
           category: string
           created_at?: string
           currency?: string
+          currency_account_id?: string | null
           description?: string | null
           exchange_rate_to_primary?: number | null
           expense_date?: string
@@ -401,6 +451,7 @@ export type Database = {
           category?: string
           created_at?: string
           currency?: string
+          currency_account_id?: string | null
           description?: string | null
           exchange_rate_to_primary?: number | null
           expense_date?: string
@@ -418,6 +469,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -578,6 +636,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency: string
+          currency_account_id: string | null
           currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
@@ -617,6 +676,7 @@ export type Database = {
           client_id: string
           created_at?: string
           currency?: string
+          currency_account_id?: string | null
           currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
@@ -656,6 +716,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           currency?: string
+          currency_account_id?: string | null
           currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
@@ -702,6 +763,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -771,6 +839,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          currency_account_id: string | null
           id: string
           invoice_id: string
           notes: string | null
@@ -783,6 +852,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          currency_account_id?: string | null
           id?: string
           invoice_id: string
           notes?: string | null
@@ -795,6 +865,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          currency_account_id?: string | null
           id?: string
           invoice_id?: string
           notes?: string | null
@@ -805,6 +876,13 @@ export type Database = {
           retention_locked_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -904,6 +982,7 @@ export type Database = {
           business_id: string
           created_at: string
           currency: string
+          currency_account_id: string | null
           id: string
           invoice_id: string
           invoice_snapshot: Json
@@ -922,6 +1001,7 @@ export type Database = {
           business_id: string
           created_at?: string
           currency: string
+          currency_account_id?: string | null
           id?: string
           invoice_id: string
           invoice_snapshot: Json
@@ -940,6 +1020,7 @@ export type Database = {
           business_id?: string
           created_at?: string
           currency?: string
+          currency_account_id?: string | null
           id?: string
           invoice_id?: string
           invoice_snapshot?: Json
@@ -959,6 +1040,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -1093,6 +1181,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "support_ticket_messages_sender_id_profiles_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "support_ticket_messages_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
@@ -1153,6 +1248,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_user_id_profiles_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1309,6 +1411,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_currency_account_limit: {
+        Args: { _business_id: string }
+        Returns: Json
+      }
       check_tier_limit: {
         Args: { _feature: string; _user_id: string }
         Returns: Json
@@ -1340,6 +1446,13 @@ export type Database = {
       delete_empty_business: {
         Args: { _business_id: string }
         Returns: undefined
+      }
+      get_platform_admin_emails: {
+        Args: never
+        Returns: {
+          email: string
+          user_id: string
+        }[]
       }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }
       has_business_role: {
@@ -1377,6 +1490,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency: string
+          currency_account_id: string | null
           currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
@@ -1430,6 +1544,18 @@ export type Database = {
         }
         Returns: string
       }
+      notify_admin_first_invoice_issued: {
+        Args: {
+          _business_id: string
+          _invoice_id: string
+          _invoice_number: string
+        }
+        Returns: undefined
+      }
+      notify_admin_payment_failed: {
+        Args: { _business_name: string; _subscription_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
@@ -1468,6 +1594,8 @@ export type Database = {
         | "RECEIPT_EXPORTED"
         | "RETENTION_CLEANUP"
         | "BUSINESS_DELETED"
+        | "SUPPORT_TICKET_CREATED"
+        | "SUPPORT_TICKET_REPLY"
       business_role: "owner" | "admin" | "member" | "auditor"
       invoice_status:
         | "draft"
@@ -1647,6 +1775,8 @@ export const Constants = {
         "RECEIPT_EXPORTED",
         "RETENTION_CLEANUP",
         "BUSINESS_DELETED",
+        "SUPPORT_TICKET_CREATED",
+        "SUPPORT_TICKET_REPLY",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       invoice_status: [
