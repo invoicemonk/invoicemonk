@@ -5,11 +5,12 @@ import type { Tables } from '@/integrations/supabase/types';
 
 export type AuditLog = Tables<'audit_logs'>;
 
-// Fetch audit logs for the current user
+// Fetch audit logs for the current user and business
 export function useAuditLogs(options?: {
   entityType?: string;
   entityId?: string;
   limit?: number;
+  businessId?: string;
 }) {
   const { user } = useAuth();
 
@@ -22,6 +23,10 @@ export function useAuditLogs(options?: {
         .from('audit_logs')
         .select('*')
         .order('timestamp_utc', { ascending: false });
+
+      if (options?.businessId) {
+        query = query.eq('business_id', options.businessId);
+      }
 
       if (options?.entityType) {
         query = query.eq('entity_type', options.entityType);

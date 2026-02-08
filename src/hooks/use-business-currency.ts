@@ -7,6 +7,23 @@ export interface BusinessCurrency {
   default_currency: string | null;
   currency_locked: boolean;
   currency_locked_at: string | null;
+  allowed_currencies: string[] | null;
+}
+
+// All supported currencies with labels
+export const ALL_CURRENCIES = [
+  { value: 'NGN', label: 'NGN - Nigerian Naira' },
+  { value: 'USD', label: 'USD - US Dollar' },
+  { value: 'EUR', label: 'EUR - Euro' },
+  { value: 'GBP', label: 'GBP - British Pound' },
+] as const;
+
+/** Returns the permitted currencies for a business: {default_currency} ∪ allowed_currencies */
+export function getPermittedCurrencies(businessCurrency: BusinessCurrency | null | undefined) {
+  if (!businessCurrency?.default_currency) return ALL_CURRENCIES;
+  const permitted = new Set<string>([businessCurrency.default_currency]);
+  businessCurrency.allowed_currencies?.forEach(c => permitted.add(c));
+  return ALL_CURRENCIES.filter(c => permitted.has(c.value));
 }
 
 export function useBusinessCurrency(businessId: string | null | undefined) {
@@ -17,7 +34,7 @@ export function useBusinessCurrency(businessId: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('businesses')
-        .select('id, name, default_currency, currency_locked, currency_locked_at')
+        .select('id, name, default_currency, currency_locked, currency_locked_at, allowed_currencies')
         .eq('id', businessId)
         .maybeSingle();
 
@@ -29,6 +46,6 @@ export function useBusinessCurrency(businessId: string | null | undefined) {
       return data as BusinessCurrency | null;
     },
     enabled: !!businessId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 }

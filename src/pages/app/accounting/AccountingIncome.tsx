@@ -21,7 +21,9 @@ import {
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useAccountingStats } from '@/hooks/use-accounting-stats';
 import { useInvoices } from '@/hooks/use-invoices';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -46,11 +48,12 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 
 export default function AccountingIncome() {
   const { data: preferences } = useAccountingPreferences();
+  const { currentBusiness: business } = useBusiness();
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(dateRange);
-  const { data: invoices, isLoading: isLoadingInvoices } = useInvoices();
+  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(business?.id, business?.default_currency, dateRange);
+  const { data: invoices, isLoading: isLoadingInvoices } = useInvoices(business?.id);
 
   // Filter invoices by period and non-draft status
   const filteredInvoices = (invoices || []).filter(inv => {
@@ -118,6 +121,23 @@ export default function AccountingIncome() {
             variant="warning"
           />
         </div>
+      )}
+
+      {/* Multi-currency indicator */}
+      {!isLoadingStats && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
+        <MultiCurrencyIndicator
+          hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
+          hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
+          excludedCount={stats?.excludedInvoiceCount || 0}
+          breakdown={stats?.currencyBreakdown?.invoices 
+            ? Object.fromEntries(
+                Object.entries(stats.currencyBreakdown.invoices).map(([k, v]) => [k, { total: v.total, count: v.count }])
+              )
+            : undefined
+          }
+          primaryCurrency={stats?.currency || 'NGN'}
+          variant="card"
+        />
       )}
 
       {/* Invoices list */}

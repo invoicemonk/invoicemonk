@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserBusiness } from '@/hooks/use-business';
 import { toast } from '@/hooks/use-toast';
 
 export interface Expense {
@@ -18,6 +17,9 @@ export interface Expense {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // Exchange rate fields for multi-currency support
+  exchangeRateToPrimary: number | null;
+  primaryCurrency: string | null;
 }
 
 export interface CreateExpenseInput {
@@ -29,6 +31,7 @@ export interface CreateExpenseInput {
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
+  exchangeRateToPrimary?: number;
 }
 
 export interface UpdateExpenseInput {
@@ -40,6 +43,7 @@ export interface UpdateExpenseInput {
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
+  exchangeRateToPrimary?: number;
 }
 
 // Expense categories
@@ -59,12 +63,11 @@ export const EXPENSE_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-export function useExpenses(dateRange?: { start: Date; end: Date }) {
+export function useExpenses(businessId?: string, dateRange?: { start: Date; end: Date }) {
   const { user } = useAuth();
-  const { data: business } = useUserBusiness();
 
   return useQuery({
-    queryKey: ['expenses', business?.id, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['expenses', businessId, user?.id, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<Expense[]> => {
       if (!user) throw new Error('Not authenticated');
 
@@ -74,8 +77,8 @@ export function useExpenses(dateRange?: { start: Date; end: Date }) {
         .order('expense_date', { ascending: false });
 
       // Filter by business or user
-      if (business) {
-        query = query.eq('business_id', business.id);
+      if (businessId) {
+        query = query.eq('business_id', businessId);
       } else {
         query = query.eq('user_id', user.id);
       }
@@ -104,6 +107,8 @@ export function useExpenses(dateRange?: { start: Date; end: Date }) {
         notes: expense.notes,
         createdAt: expense.created_at,
         updatedAt: expense.updated_at,
+        exchangeRateToPrimary: expense.exchange_rate_to_primary,
+        primaryCurrency: expense.primary_currency,
       }));
     },
     enabled: !!user,
@@ -140,16 +145,17 @@ export function useExpense(expenseId: string) {
         notes: data.notes,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        exchangeRateToPrimary: data.exchange_rate_to_primary,
+        primaryCurrency: data.primary_currency,
       };
     },
     enabled: !!user && !!expenseId,
   });
 }
 
-export function useCreateExpense() {
+export function useCreateExpense(businessId?: string, defaultCurrency?: string) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { data: business } = useUserBusiness();
 
   return useMutation({
     mutationFn: async (input: CreateExpenseInput) => {
@@ -159,15 +165,16 @@ export function useCreateExpense() {
         .from('expenses')
         .insert({
           user_id: user.id,
-          business_id: business?.id || null,
+          business_id: businessId || null,
           category: input.category,
           description: input.description || null,
           amount: input.amount,
-          currency: input.currency || business?.default_currency || 'NGN',
+          currency: input.currency || defaultCurrency || 'NGN',
           expense_date: input.expenseDate || new Date().toISOString().split('T')[0],
           vendor: input.vendor || null,
           notes: input.notes || null,
           receipt_url: input.receiptUrl || null,
+          exchange_rate_to_primary: input.exchangeRateToPrimary || null,
         })
         .select()
         .single();

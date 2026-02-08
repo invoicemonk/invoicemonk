@@ -23,6 +23,7 @@ import { MoneyFlowCard } from '@/components/accounting/MoneyFlowCard';
 import { ExpenseForm } from '@/components/accounting/ExpenseForm';
 import { ExpenseList } from '@/components/accounting/ExpenseList';
 import { ExpenseEmptyState } from '@/components/accounting/ExpenseEmptyState';
+import { MultiCurrencyIndicator, ExcludedDataWarning } from '@/components/ui/multi-currency-indicator';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
@@ -30,6 +31,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useExportRecords } from '@/hooks/use-export';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { aggregateAmounts, type CurrencyAmount } from '@/lib/currency-aggregation';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -57,8 +59,8 @@ export default function Expenses() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(dateRange);
-  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(dateRange);
+  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(business?.id, dateRange);
+  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(business?.id, dateRange);
 
   const currency = business?.default_currency || 'NGN';
 
@@ -82,14 +84,24 @@ export default function Expenses() {
     });
   }, [expenses, searchQuery, categoryFilter]);
 
-  // Calculate totals
-  const totalExpenses = useMemo(() => {
-    return filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-  }, [filteredExpenses]);
+  // Calculate totals with proper currency aggregation
+  const filteredAggregation = useMemo(() => {
+    const amounts: CurrencyAmount[] = filteredExpenses.map(e => ({
+      amount: e.amount,
+      currency: e.currency,
+      exchangeRateToPrimary: e.exchangeRateToPrimary,
+    }));
+    return aggregateAmounts(amounts, currency);
+  }, [filteredExpenses, currency]);
 
-  const allExpensesTotal = useMemo(() => {
-    return (expenses || []).reduce((sum, e) => sum + e.amount, 0);
-  }, [expenses]);
+  const allExpensesAggregation = useMemo(() => {
+    const amounts: CurrencyAmount[] = (expenses || []).map(e => ({
+      amount: e.amount,
+      currency: e.currency,
+      exchangeRateToPrimary: e.exchangeRateToPrimary,
+    }));
+    return aggregateAmounts(amounts, currency);
+  }, [expenses, currency]);
 
   const handleExport = async (format: 'csv' | 'json') => {
     await exportRecords({
@@ -172,15 +184,27 @@ export default function Expenses() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2">
-        <MoneyFlowCard
-          title={categoryFilter !== 'all' || searchQuery ? 'Filtered Expenses' : 'Total Expenses'}
-          amount={totalExpenses}
-          currency={currency}
-          count={filteredExpenses.length}
-          countLabel={`expenses in ${getPeriodLabel(period)}`}
-          icon={TrendingDown}
-          variant="warning"
-        />
+        <div className="space-y-2">
+          <MoneyFlowCard
+            title={categoryFilter !== 'all' || searchQuery ? 'Filtered Expenses' : 'Total Expenses'}
+            amount={filteredAggregation.primaryTotal}
+            currency={currency}
+            count={filteredAggregation.convertedCount}
+            countLabel={`expenses in ${getPeriodLabel(period)}`}
+            icon={TrendingDown}
+            variant="warning"
+          />
+          <MultiCurrencyIndicator
+            hasMultipleCurrencies={filteredAggregation.hasMultipleCurrencies}
+            hasUnconvertibleAmounts={filteredAggregation.hasUnconvertibleAmounts}
+            excludedCount={filteredAggregation.excludedCount}
+            breakdown={Object.fromEntries(
+              Object.entries(filteredAggregation.breakdown).map(([k, v]) => [k, { total: v.total, count: v.count }])
+            )}
+            primaryCurrency={currency}
+            variant="card"
+          />
+        </div>
 
         {/* Category breakdown */}
         <Card>
@@ -188,6 +212,9 @@ export default function Expenses() {
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <PieChart className="h-4 w-4" />
               Expense Breakdown
+              {categoryData?.hasUnconvertibleAmounts && (
+                <ExcludedDataWarning count={categoryData.excludedCount} type="expenses" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -197,11 +224,11 @@ export default function Expenses() {
                   <Skeleton key={i} className="h-6" />
                 ))}
               </div>
-            ) : categoryData && categoryData.length > 0 ? (
+            ) : categoryData && categoryData.data.length > 0 ? (
               <div className="space-y-3">
-                {categoryData.slice(0, 5).map((item) => {
-                  const percentage = allExpensesTotal > 0 
-                    ? Math.round((item.amount / allExpensesTotal) * 100) 
+                {categoryData.data.slice(0, 5).map((item) => {
+                  const percentage = allExpensesAggregation.primaryTotal > 0 
+                    ? Math.round((item.amount / allExpensesAggregation.primaryTotal) * 100) 
                     : 0;
                   
                   return (

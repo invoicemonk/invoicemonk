@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,9 +23,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import { useCreateExpense, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
-import { useUserBusiness } from '@/hooks/use-business';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { ReceiptUpload } from './ReceiptUpload';
+import { ExchangeRateInput } from '@/components/app/ExchangeRateInput';
+
+const currencies = [
+  { value: 'NGN', label: 'Nigerian Naira (₦)' },
+  { value: 'USD', label: 'US Dollar ($)' },
+  { value: 'GBP', label: 'British Pound (£)' },
+  { value: 'EUR', label: 'Euro (€)' },
+];
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -35,6 +49,8 @@ const expenseSchema = z.object({
   expenseDate: z.string().optional(),
   notes: z.string().optional(),
   receiptUrl: z.string().optional().nullable(),
+  currency: z.string().optional(),
+  exchangeRateToPrimary: z.number().optional().nullable(),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -45,8 +61,12 @@ interface Props {
 
 export function ExpenseForm({ onSuccess }: Props) {
   const [open, setOpen] = useState(false);
-  const createExpense = useCreateExpense();
-  const { data: business } = useUserBusiness();
+  const { currentBusiness: business } = useBusiness();
+  const createExpense = useCreateExpense(business?.id, business?.default_currency);
+
+  const primaryCurrency = business?.default_currency || 'NGN';
+  const allowedCurrencies = (business as any)?.allowed_currencies || [];
+  const availableCurrencies = [primaryCurrency, ...allowedCurrencies];
 
   const {
     register,
@@ -65,13 +85,32 @@ export function ExpenseForm({ onSuccess }: Props) {
       expenseDate: new Date().toISOString().split('T')[0],
       notes: '',
       receiptUrl: null,
+      currency: primaryCurrency,
+      exchangeRateToPrimary: null,
     },
   });
 
   const category = watch('category');
   const receiptUrl = watch('receiptUrl');
+  const selectedCurrency = watch('currency') || primaryCurrency;
+  const amount = watch('amount') || 0;
+  const exchangeRate = watch('exchangeRateToPrimary');
+
+  const needsExchangeRate = selectedCurrency !== primaryCurrency;
+
+  // Reset exchange rate when currency changes to primary
+  useEffect(() => {
+    if (selectedCurrency === primaryCurrency) {
+      setValue('exchangeRateToPrimary', null);
+    }
+  }, [selectedCurrency, primaryCurrency, setValue]);
 
   const onSubmit = async (data: ExpenseFormData) => {
+    // Validate exchange rate for non-primary currencies
+    if (needsExchangeRate && (!data.exchangeRateToPrimary || data.exchangeRateToPrimary <= 0)) {
+      return;
+    }
+
     await createExpense.mutateAsync({
       category: data.category,
       description: data.description,
@@ -79,8 +118,9 @@ export function ExpenseForm({ onSuccess }: Props) {
       vendor: data.vendor,
       expenseDate: data.expenseDate,
       notes: data.notes,
-      currency: business?.default_currency || 'NGN',
+      currency: data.currency || primaryCurrency,
       receiptUrl: data.receiptUrl || undefined,
+      exchangeRateToPrimary: needsExchangeRate ? data.exchangeRateToPrimary ?? undefined : undefined,
     });
     
     reset();
@@ -96,7 +136,7 @@ export function ExpenseForm({ onSuccess }: Props) {
           Add Expense
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>Add Expense</DialogTitle>
@@ -141,13 +181,46 @@ export function ExpenseForm({ onSuccess }: Props) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expenseDate">Date</Label>
-                <Input
-                  id="expenseDate"
-                  type="date"
-                  {...register('expenseDate')}
-                />
+                <Label htmlFor="currency">Currency</Label>
+                <Select 
+                  value={selectedCurrency} 
+                  onValueChange={(value) => setValue('currency', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies
+                      .filter(c => availableCurrencies.includes(c.value))
+                      .map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+
+            {/* Exchange Rate Input - only show when currency differs from primary */}
+            {needsExchangeRate && (
+              <ExchangeRateInput
+                fromCurrency={selectedCurrency}
+                toCurrency={primaryCurrency}
+                value={exchangeRate}
+                onChange={(rate) => setValue('exchangeRateToPrimary', rate)}
+                amount={amount}
+                required
+              />
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="expenseDate">Date</Label>
+              <Input
+                id="expenseDate"
+                type="date"
+                {...register('expenseDate')}
+              />
             </div>
 
             <div className="space-y-2">
@@ -191,7 +264,10 @@ export function ExpenseForm({ onSuccess }: Props) {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createExpense.isPending}>
+            <Button 
+              type="submit" 
+              disabled={createExpense.isPending || (needsExchangeRate && !exchangeRate)}
+            >
               {createExpense.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Expense
             </Button>

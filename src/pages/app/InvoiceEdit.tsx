@@ -16,6 +16,7 @@ import {
   Info,
   Building2
 } from 'lucide-react';
+import { ExchangeRateInput } from '@/components/app/ExchangeRateInput';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +51,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useInvoice, useUpdateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
-import { useBusinessCurrency } from '@/hooks/use-business-currency';
+import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
@@ -107,6 +108,12 @@ export default function InvoiceEdit() {
   const [summary, setSummary] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [exchangeRateToPrimary, setExchangeRateToPrimary] = useState<number | null>(null);
+
+  // Determine if exchange rate is needed
+  const primaryCurrency = lockedCurrency || currentBusiness?.default_currency || 'NGN';
+  const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
+  const needsExchangeRate = effectiveCurrency !== primaryCurrency;
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -131,6 +138,7 @@ export default function InvoiceEdit() {
       setNotes(invoice.notes || '');
       setTerms(invoice.terms || '');
       setSummary(invoice.summary || '');
+      setExchangeRateToPrimary(invoice.exchange_rate_to_primary || null);
       
       if (invoice.invoice_items && invoice.invoice_items.length > 0) {
         setItems(invoice.invoice_items.map(item => ({
@@ -283,7 +291,7 @@ export default function InvoiceEdit() {
       updates: {
         // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
-        currency,
+        currency: effectiveCurrency,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
@@ -293,6 +301,14 @@ export default function InvoiceEdit() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
+        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
+        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
+          primary_currency: primaryCurrency,
+          invoice_currency: effectiveCurrency,
+          rate_to_primary: exchangeRateToPrimary,
+          rate_date: new Date().toISOString().split('T')[0],
+          source: 'manual'
+        } : null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -338,7 +354,7 @@ export default function InvoiceEdit() {
       updates: {
         // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
-        currency,
+        currency: effectiveCurrency,
         issue_date: issueDate,
         due_date: dueDate || null,
         notes: notes || null,
@@ -348,6 +364,14 @@ export default function InvoiceEdit() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
+        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
+        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
+          primary_currency: primaryCurrency,
+          invoice_currency: effectiveCurrency,
+          rate_to_primary: exchangeRateToPrimary,
+          rate_date: new Date().toISOString().split('T')[0],
+          source: 'manual'
+        } : null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -588,14 +612,25 @@ export default function InvoiceEdit() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                      <SelectItem value="USD">USD - US Dollar</SelectItem>
-                      <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                      <SelectItem value="EUR">EUR - Euro</SelectItem>
+                      {getPermittedCurrencies(businessCurrency).map(c => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
               </div>
+
+              {/* Exchange Rate Input - only for non-primary currencies */}
+              {needsExchangeRate && (
+                <ExchangeRateInput
+                  fromCurrency={effectiveCurrency}
+                  toCurrency={primaryCurrency}
+                  value={exchangeRateToPrimary}
+                  onChange={setExchangeRateToPrimary}
+                  amount={calculateTotal()}
+                  required
+                />
+              )}
 
               {/* Summary / Description */}
               <div className="space-y-2">

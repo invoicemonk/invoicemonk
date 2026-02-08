@@ -64,6 +64,7 @@ import {
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useInvoices, useDeleteInvoice, useVoidInvoice } from '@/hooks/use-invoices';
 import { useClients } from '@/hooks/use-clients';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useExportRecords } from '@/hooks/use-export';
 import { Textarea } from '@/components/ui/textarea';
@@ -117,8 +118,9 @@ export default function Invoices() {
   const [dateFromPopoverOpen, setDateFromPopoverOpen] = useState(false);
   const [dateToPopoverOpen, setDateToPopoverOpen] = useState(false);
 
-  const { data: invoices, isLoading, error } = useInvoices();
-  const { data: clients } = useClients();
+  const { currentBusiness } = useBusiness();
+  const { data: invoices, isLoading, error } = useInvoices(currentBusiness?.id);
+  const { data: clients } = useClients(currentBusiness?.id);
   const deleteInvoice = useDeleteInvoice();
   const voidInvoice = useVoidInvoice();
   const { exportRecords, isExporting } = useExportRecords();

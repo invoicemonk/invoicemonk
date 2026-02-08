@@ -14,16 +14,16 @@ export type CreditNote = Tables<'credit_notes'> & {
   } | null;
 };
 
-// Fetch all credit notes for the current user
-export function useCreditNotes() {
+// Fetch all credit notes for a specific business
+export function useCreditNotes(businessId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['credit-notes', user?.id],
+    queryKey: ['credit-notes', businessId, user?.id],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('credit_notes')
         .select(`
           *,
@@ -35,6 +35,12 @@ export function useCreditNotes() {
           )
         `)
         .order('created_at', { ascending: false });
+
+      if (businessId) {
+        query = query.eq('business_id', businessId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as CreditNote[];

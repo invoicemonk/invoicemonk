@@ -45,6 +45,8 @@ interface InvoiceRegisterEntry {
   total_amount: number
   tax_amount: number
   currency: string
+  exchange_rate_to_primary: number | null
+  primary_currency_equivalent: number
   status: string
   invoice_hash: string | null
 }
@@ -198,10 +200,10 @@ Deno.serve(async (req) => {
 
     switch (report_type) {
       case 'revenue-summary': {
-        // Monthly revenue breakdown
+        // Monthly revenue breakdown with multi-currency support
         const { data: invoices, error } = await supabase
           .from('invoices')
-          .select('issue_date, total_amount, tax_amount, currency, status')
+          .select('issue_date, total_amount, tax_amount, currency, status, exchange_rate_to_primary')
           .or(`user_id.eq.${user.id},business_id.eq.${businessId}`)
           .neq('status', 'draft')
           .neq('status', 'voided')
@@ -211,28 +213,53 @@ Deno.serve(async (req) => {
 
         if (error) throw error
 
-        // Group by month
+        // Get business primary currency
+        const { data: business } = await supabase
+          .from('businesses')
+          .select('default_currency')
+          .eq('id', businessId)
+          .single()
+        
+        const primaryCurrency = business?.default_currency || 'NGN'
+
+        // Group by month with currency conversion
         const monthlyData: Record<string, RevenueSummary> = {}
         let totalRevenue = 0
         let totalTax = 0
-        const currency = invoices?.[0]?.currency || 'NGN'
+        const currencyBreakdown: Record<string, { total: number; count: number }> = {}
 
         invoices?.forEach(inv => {
           const month = inv.issue_date?.substring(0, 7) || 'Unknown'
+          const invCurrency = inv.currency || primaryCurrency
+          const amount = inv.total_amount || 0
+          const taxAmount = inv.tax_amount || 0
+          
+          // Convert to primary currency if needed
+          const rate = inv.exchange_rate_to_primary || 1
+          const convertedAmount = invCurrency === primaryCurrency ? amount : amount * rate
+          const convertedTax = invCurrency === primaryCurrency ? taxAmount : taxAmount * rate
+          
           if (!monthlyData[month]) {
             monthlyData[month] = {
               period: month,
               total_revenue: 0,
               invoice_count: 0,
               tax_collected: 0,
-              currency
+              currency: primaryCurrency
             }
           }
-          monthlyData[month].total_revenue += inv.total_amount || 0
-          monthlyData[month].tax_collected += inv.tax_amount || 0
+          monthlyData[month].total_revenue += convertedAmount
+          monthlyData[month].tax_collected += convertedTax
           monthlyData[month].invoice_count += 1
-          totalRevenue += inv.total_amount || 0
-          totalTax += inv.tax_amount || 0
+          totalRevenue += convertedAmount
+          totalTax += convertedTax
+          
+          // Track currency breakdown
+          if (!currencyBreakdown[invCurrency]) {
+            currencyBreakdown[invCurrency] = { total: 0, count: 0 }
+          }
+          currencyBreakdown[invCurrency].total += amount
+          currencyBreakdown[invCurrency].count += 1
         })
 
         reportData = Object.values(monthlyData)
@@ -240,13 +267,14 @@ Deno.serve(async (req) => {
           total_revenue: totalRevenue,
           total_tax: totalTax,
           total_invoices: invoices?.length || 0,
-          currency
+          currency: primaryCurrency,
+          currency_breakdown: currencyBreakdown
         }
         break
       }
 
       case 'invoice-register': {
-        // Complete list of issued invoices with immutable data
+        // Complete list of issued invoices with immutable data and exchange rate
         const { data: invoices, error } = await supabase
           .from('invoices')
           .select(`
@@ -257,7 +285,9 @@ Deno.serve(async (req) => {
             currency,
             status,
             invoice_hash,
-            recipient_snapshot
+            recipient_snapshot,
+            exchange_rate_to_primary,
+            exchange_rate_snapshot
           `)
           .or(`user_id.eq.${user.id},business_id.eq.${businessId}`)
           .neq('status', 'draft')
@@ -267,29 +297,49 @@ Deno.serve(async (req) => {
 
         if (error) throw error
 
-        reportData = invoices?.map(inv => ({
-          invoice_number: inv.invoice_number,
-          issue_date: inv.issue_date,
-          client_name: (inv.recipient_snapshot as Record<string, unknown>)?.name || 'Unknown',
-          total_amount: inv.total_amount,
-          tax_amount: inv.tax_amount,
-          currency: inv.currency,
-          status: inv.status,
-          invoice_hash: inv.invoice_hash
-        })) as InvoiceRegisterEntry[]
+        // Get primary currency
+        const { data: business } = await supabase
+          .from('businesses')
+          .select('default_currency')
+          .eq('id', businessId)
+          .single()
+        
+        const primaryCurrency = business?.default_currency || 'NGN'
+
+        reportData = invoices?.map(inv => {
+          const rate = inv.exchange_rate_to_primary || 1
+          const invCurrency = inv.currency || primaryCurrency
+          const primaryEquivalent = invCurrency === primaryCurrency 
+            ? inv.total_amount 
+            : (inv.total_amount || 0) * rate
+          
+          return {
+            invoice_number: inv.invoice_number,
+            issue_date: inv.issue_date,
+            client_name: (inv.recipient_snapshot as Record<string, unknown>)?.name || 'Unknown',
+            total_amount: inv.total_amount,
+            tax_amount: inv.tax_amount,
+            currency: inv.currency,
+            exchange_rate_to_primary: inv.exchange_rate_to_primary,
+            primary_currency_equivalent: primaryEquivalent,
+            status: inv.status,
+            invoice_hash: inv.invoice_hash
+          }
+        }) as InvoiceRegisterEntry[]
 
         summary = {
           total_invoices: invoices?.length || 0,
-          total_amount: invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0
+          total_amount: invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0,
+          primary_currency: primaryCurrency
         }
         break
       }
 
       case 'tax-report': {
-        // Tax summary by month for filing
+        // Tax summary by month for filing, converted to primary currency
         const { data: invoices, error } = await supabase
           .from('invoices')
-          .select('issue_date, subtotal, tax_amount, currency')
+          .select('issue_date, subtotal, tax_amount, currency, exchange_rate_to_primary')
           .or(`user_id.eq.${user.id},business_id.eq.${businessId}`)
           .neq('status', 'draft')
           .neq('status', 'voided')
@@ -299,27 +349,49 @@ Deno.serve(async (req) => {
 
         if (error) throw error
 
+        // Get primary currency for this report
+        const { data: businessData } = await supabase
+          .from('businesses')
+          .select('default_currency')
+          .eq('id', businessId)
+          .single()
+        
+        const primaryCurrency = businessData?.default_currency || 'NGN'
+
         const monthlyTax: Record<string, TaxReportEntry> = {}
         let totalTaxable = 0
         let totalTax = 0
-        const currency = invoices?.[0]?.currency || 'NGN'
+        const currencyBreakdown: Record<string, { taxable: number; tax: number; count: number }> = {}
 
         invoices?.forEach(inv => {
+          const rate = inv.exchange_rate_to_primary || 1
+          const convertedSubtotal = (inv.subtotal || 0) * rate
+          const convertedTax = (inv.tax_amount || 0) * rate
           const month = inv.issue_date?.substring(0, 7) || 'Unknown'
+
           if (!monthlyTax[month]) {
             monthlyTax[month] = {
               month,
               taxable_amount: 0,
               tax_collected: 0,
               invoice_count: 0,
-              currency
+              currency: primaryCurrency
             }
           }
-          monthlyTax[month].taxable_amount += inv.subtotal || 0
-          monthlyTax[month].tax_collected += inv.tax_amount || 0
+          monthlyTax[month].taxable_amount += convertedSubtotal
+          monthlyTax[month].tax_collected += convertedTax
           monthlyTax[month].invoice_count += 1
-          totalTaxable += inv.subtotal || 0
-          totalTax += inv.tax_amount || 0
+          totalTaxable += convertedSubtotal
+          totalTax += convertedTax
+
+          // Track per-currency breakdown in original amounts
+          const invCurrency = inv.currency || primaryCurrency
+          if (!currencyBreakdown[invCurrency]) {
+            currencyBreakdown[invCurrency] = { taxable: 0, tax: 0, count: 0 }
+          }
+          currencyBreakdown[invCurrency].taxable += inv.subtotal || 0
+          currencyBreakdown[invCurrency].tax += inv.tax_amount || 0
+          currencyBreakdown[invCurrency].count += 1
         })
 
         reportData = Object.values(monthlyTax)
@@ -327,7 +399,9 @@ Deno.serve(async (req) => {
           total_taxable_amount: totalTaxable,
           total_tax_collected: totalTax,
           total_invoices: invoices?.length || 0,
-          currency
+          primary_currency: primaryCurrency,
+          currency: primaryCurrency,
+          currency_breakdown: currencyBreakdown
         }
         break
       }

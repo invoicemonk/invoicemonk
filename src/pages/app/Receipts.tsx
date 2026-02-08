@@ -3,25 +3,27 @@ import { motion } from 'framer-motion';
 import { Link, useParams } from 'react-router-dom';
 import { 
   FileText, Search, Download, Eye, ExternalLink, 
-  Loader2, Receipt as ReceiptIcon, Calendar, Building2, User, 
+  Loader2, Receipt as ReceiptIcon, Calendar, User, 
   CheckCircle2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 import { useReceipts, useDownloadReceiptPdf } from '@/hooks/use-receipts';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { aggregateAmounts, formatCurrencyAmount, type CurrencyAmount } from '@/lib/currency-aggregation';
+import { useMemo } from 'react';
 
 export default function Receipts() {
   const { businessId } = useParams<{ businessId: string }>();
+  const { currentBusiness: business } = useBusiness();
   const { data: receipts, isLoading } = useReceipts();
   const downloadPdf = useDownloadReceiptPdf();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const formatCurrency = (amount: number, currency: string = 'NGN') => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
-  };
+  const primaryCurrency = business?.default_currency || 'NGN';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', { 
@@ -41,6 +43,27 @@ export default function Receipts() {
       invoiceNumber.includes(search)
     );
   }) || [];
+
+  // Aggregate receipts with proper currency handling
+  const aggregation = useMemo(() => {
+    const amounts: CurrencyAmount[] = (receipts || []).map(r => ({
+      amount: Number(r.amount),
+      currency: r.currency,
+      // Receipts don't have exchange_rate_to_primary directly,
+      // but store the invoice currency - treat same currency as convertible
+      exchangeRateToPrimary: r.currency === primaryCurrency ? 1 : null,
+    }));
+    return aggregateAmounts(amounts, primaryCurrency);
+  }, [receipts, primaryCurrency]);
+
+  const thisMonthReceipts = useMemo(() => {
+    return (receipts || []).filter(r => {
+      const receiptDate = new Date(r.issued_at);
+      const now = new Date();
+      return receiptDate.getMonth() === now.getMonth() && 
+             receiptDate.getFullYear() === now.getFullYear();
+    });
+  }, [receipts]);
 
   const handleDownloadPdf = (receiptId: string, receiptNumber: string) => {
     downloadPdf.mutate({ receiptId, receiptNumber });
@@ -88,11 +111,21 @@ export default function Receipts() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(
-                receipts?.reduce((sum, r) => sum + Number(r.amount), 0) || 0,
-                receipts?.[0]?.currency || 'NGN'
-              )}
+              {formatCurrencyAmount(aggregation.primaryTotal, primaryCurrency)}
             </div>
+            {(aggregation.hasMultipleCurrencies || aggregation.hasUnconvertibleAmounts) && (
+              <MultiCurrencyIndicator
+                hasMultipleCurrencies={aggregation.hasMultipleCurrencies}
+                hasUnconvertibleAmounts={aggregation.hasUnconvertibleAmounts}
+                excludedCount={aggregation.excludedCount}
+                breakdown={Object.fromEntries(
+                  Object.entries(aggregation.breakdown).map(([k, v]) => [k, { total: v.total, count: v.count }])
+                )}
+                primaryCurrency={primaryCurrency}
+                variant="inline"
+                className="mt-2"
+              />
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -102,12 +135,7 @@ export default function Receipts() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {receipts?.filter(r => {
-                const receiptDate = new Date(r.issued_at);
-                const now = new Date();
-                return receiptDate.getMonth() === now.getMonth() && 
-                       receiptDate.getFullYear() === now.getFullYear();
-              }).length || 0}
+              {thisMonthReceipts.length}
             </div>
           </CardContent>
         </Card>
@@ -183,7 +211,7 @@ export default function Receipts() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-right font-medium text-emerald-600">
-                      {formatCurrency(Number(receipt.amount), receipt.currency)}
+                      {formatCurrencyAmount(Number(receipt.amount), receipt.currency)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(receipt.issued_at)}

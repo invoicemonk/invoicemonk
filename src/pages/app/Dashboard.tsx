@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import { MultiCurrencyIndicator, ExcludedDataWarning } from '@/components/ui/multi-currency-indicator';
 
 const container = {
   hidden: { opacity: 0 },
@@ -289,6 +290,20 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* Multi-currency indicator */}
+      {!statsLoading && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
+        <motion.div variants={item}>
+          <MultiCurrencyIndicator
+            hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
+            hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
+            excludedCount={stats?.excludedFromRevenue || 0}
+            breakdown={stats?.revenueBreakdown}
+            primaryCurrency={stats?.currency || 'NGN'}
+            variant="card"
+          />
+        </motion.div>
+      )}
+
       {/* Stats Grid */}
       <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statsCards.map((stat) => (
@@ -320,6 +335,12 @@ export default function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Revenue Trend
+              {revenueTrend?.hasExcludedData && (
+                <ExcludedDataWarning 
+                  count={revenueTrend.excludedCount} 
+                  type="invoices" 
+                />
+              )}
             </CardTitle>
             <CardDescription>Monthly revenue over the past 12 months</CardDescription>
           </CardHeader>
@@ -328,10 +349,10 @@ export default function Dashboard() {
               <div className="h-[250px] flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : revenueTrend && revenueTrend.length > 0 ? (
+            ) : revenueTrend && revenueTrend.data.length > 0 ? (
               <div className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                  <BarChart data={revenueTrend.data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       dataKey="month" 

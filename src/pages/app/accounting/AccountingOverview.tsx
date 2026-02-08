@@ -8,6 +8,7 @@ import { AccountingDisclaimer } from '@/components/accounting/AccountingDisclaim
 import { JurisdictionBadge } from '@/components/accounting/JurisdictionBadge';
 import { MoneyFlowCard } from '@/components/accounting/MoneyFlowCard';
 import { InsightCard } from '@/components/accounting/InsightCard';
+import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 import { useAccountContext } from '@/hooks/use-account-context';
 import { useAccountingPreferences, useUpdateAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useAccountingStats } from '@/hooks/use-accounting-stats';
@@ -23,7 +24,7 @@ export default function AccountingOverview() {
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(dateRange);
+  const { data: stats, isLoading: isLoadingStats } = useAccountingStats(business?.id, business?.default_currency, dateRange);
 
   // Check for missing recommended fields
   const missingFields: ('country' | 'currency' | 'businessType')[] = [];
@@ -50,6 +51,13 @@ export default function AccountingOverview() {
   };
 
   const isLoading = isLoadingBusiness || isLoadingPrefs || isLoadingStats;
+
+  // Build breakdown for indicator
+  const invoiceBreakdown = stats?.currencyBreakdown?.invoices 
+    ? Object.fromEntries(
+        Object.entries(stats.currencyBreakdown.invoices).map(([k, v]) => [k, { total: v.total, count: v.count }])
+      )
+    : undefined;
 
   return (
     <motion.div
@@ -79,6 +87,18 @@ export default function AccountingOverview() {
           />
         </div>
       </div>
+
+      {/* Multi-currency indicator */}
+      {!isLoading && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
+        <MultiCurrencyIndicator
+          hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
+          hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
+          excludedCount={(stats?.excludedInvoiceCount || 0) + (stats?.excludedExpenseCount || 0)}
+          breakdown={invoiceBreakdown}
+          primaryCurrency={stats?.currency || 'NGN'}
+          variant="card"
+        />
+      )}
 
       {/* Stats cards */}
       {isLoading ? (

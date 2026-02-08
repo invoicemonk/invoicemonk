@@ -24,21 +24,28 @@ export type NotificationType =
   | 'INVOICE_VOIDED'
   | 'CLIENT_ADDED';
 
-export function useNotifications(limit = 20) {
+export function useNotifications(limit = 20, businessId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['notifications', user?.id, limit],
+    queryKey: ['notifications', user?.id, businessId, limit],
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit);
+
+      // If businessId provided, filter to that business OR null (user-level notifications)
+      if (businessId) {
+        query = query.or(`business_id.eq.${businessId},business_id.is.null`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Notification[];

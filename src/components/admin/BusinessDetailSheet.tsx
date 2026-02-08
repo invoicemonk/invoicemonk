@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
 
 interface BusinessData {
   id: string;
@@ -17,6 +18,7 @@ interface BusinessData {
   invoice_prefix: string | null;
   created_at: string;
   updated_at: string;
+  business_identity_level: 'unverified' | 'self_declared' | 'verified' | 'nrs_linked' | 'regulator_linked' | null;
   business_members?: { count: number }[];
   subscriptions?: { tier: string; status: string }[];
 }
@@ -97,6 +99,11 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
                 {getSubscriptionBadge()}
               </div>
               
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Identity Level</p>
+                <IdentityLevelBadge level={business.business_identity_level} />
+              </div>
+
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Members</p>
                 <div className="flex items-center gap-1">

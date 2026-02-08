@@ -16,16 +16,18 @@ import {
   Lock,
   Coins,
   AlertCircle,
-  Receipt
+  Receipt,
+  Plus,
+  Info
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -39,6 +41,8 @@ import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
+import { useCheckDuplicateBusinessName } from '@/hooks/use-check-duplicate-business';
+import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
 
 interface AddressData {
   street?: string;
@@ -75,7 +79,15 @@ export default function BusinessProfile() {
     isVatRegistered: false,
     vatRegistrationNumber: '',
     businessType: '',
+    allowedCurrencies: [] as string[],
   });
+
+  // Check for duplicate business name
+  const { data: duplicateCheck } = useCheckDuplicateBusinessName(
+    formData.name,
+    formData.jurisdiction,
+    business?.id
+  );
 
   // Get jurisdiction-specific configuration
   const jurisdictionConfig = getJurisdictionConfig(formData.jurisdiction);
@@ -97,6 +109,7 @@ export default function BusinessProfile() {
         vat_registration_number?: string;
         cac_number?: string;
         business_type?: string;
+        allowed_currencies?: string[];
       };
 
       setFormData({
@@ -117,6 +130,7 @@ export default function BusinessProfile() {
         isVatRegistered: businessExtended.is_vat_registered || false,
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
         businessType: businessExtended.business_type || '',
+        allowedCurrencies: businessExtended.allowed_currencies || [],
       });
     }
   }, [business]);
@@ -148,6 +162,8 @@ export default function BusinessProfile() {
         : null,
       // Business type
       business_type: formData.businessType || null,
+      // Multi-currency: allowed currencies
+      allowed_currencies: formData.allowedCurrencies || [],
     };
 
     if (business) {
@@ -228,9 +244,16 @@ export default function BusinessProfile() {
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
-          <p className="text-muted-foreground mt-1">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
+            {business && (
+              <IdentityLevelBadge 
+                level={(business as any).business_identity_level || 'unverified'} 
+              />
+            )}
+          </div>
+          <p className="text-muted-foreground">
             Configure your legal business details for invoicing
           </p>
         </div>
@@ -243,6 +266,17 @@ export default function BusinessProfile() {
           {isLoading ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
+
+      {/* Duplicate Business Name Warning */}
+      {duplicateCheck?.hasDuplicate && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/5">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400">
+            Another business named "{duplicateCheck.duplicateBusinessName}" already exists in this jurisdiction. 
+            If this is intentional (e.g., different legal entity), you may proceed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Compliance Notice - only show when profile is incomplete */}
       {!profileCompletion.isComplete && (
@@ -667,12 +701,12 @@ export default function BusinessProfile() {
             </div>
 
             {/* Default Currency Section */}
-            <div className="border-t pt-6">
+            <div className="border-t pt-6 space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="defaultCurrency" className="flex items-center gap-2">
                     <Coins className="h-4 w-4" />
-                    Default Currency
+                    Primary Currency
                     {business?.currency_locked && (
                       <Badge variant="secondary" className="ml-2 text-xs">
                         <Lock className="h-3 w-3 mr-1" />
@@ -709,12 +743,69 @@ export default function BusinessProfile() {
                   <p className="text-xs text-muted-foreground">
                     {business?.currency_locked ? (
                       <>
-                        Currency was locked on {business.currency_locked_at ? new Date(business.currency_locked_at).toLocaleDateString() : 'first invoice'}. 
-                        Once you issue your first invoice, currency cannot be changed.
+                        Primary currency locked on {business.currency_locked_at ? new Date(business.currency_locked_at).toLocaleDateString() : 'first invoice'}. 
+                        This is your accounting currency for reports.
                       </>
                     ) : (
-                      'Select your default currency for invoices. This will be locked after you issue your first invoice.'
+                      'This will become your primary accounting currency after your first invoice.'
                     )}
+                  </p>
+                </div>
+
+                {/* Allowed Currencies */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Additional Currencies
+                  </Label>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {formData.allowedCurrencies.map((curr) => (
+                        <Badge 
+                          key={curr} 
+                          variant="secondary"
+                          className="cursor-pointer hover:bg-destructive/10"
+                          onClick={() => setFormData({
+                            ...formData,
+                            allowedCurrencies: formData.allowedCurrencies.filter(c => c !== curr)
+                          })}
+                        >
+                          {currencies.find(c => c.value === curr)?.label || curr}
+                          <X className="h-3 w-3 ml-1" />
+                        </Badge>
+                      ))}
+                      {formData.allowedCurrencies.length === 0 && (
+                        <span className="text-sm text-muted-foreground">No additional currencies</span>
+                      )}
+                    </div>
+                    <Select 
+                      value=""
+                      onValueChange={(value) => {
+                        if (value && !formData.allowedCurrencies.includes(value) && value !== formData.defaultCurrency) {
+                          setFormData({
+                            ...formData,
+                            allowedCurrencies: [...formData.allowedCurrencies, value]
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <Plus className="h-4 w-4 mr-2" />
+                        <span className="text-muted-foreground">Add currency</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies
+                          .filter(c => c.value !== formData.defaultCurrency && !formData.allowedCurrencies.includes(c.value))
+                          .map((currency) => (
+                            <SelectItem key={currency.value} value={currency.value}>
+                              {currency.label}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add currencies you accept. Invoices in these currencies will require an exchange rate for accounting.
                   </p>
                 </div>
               </div>

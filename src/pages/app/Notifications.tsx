@@ -19,7 +19,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { 
+import { useBusiness } from '@/contexts/BusinessContext';
+import {
   useNotifications, 
   useUnreadCount, 
   useMarkAsRead,
@@ -49,10 +50,11 @@ type FilterType = 'all' | 'unread' | 'invoices' | 'payments';
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const { currentBusiness } = useBusiness();
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
-  const { data: notifications = [], isLoading } = useNotifications(100);
+  const { data: notifications = [], isLoading } = useNotifications(100, currentBusiness?.id);
   const { data: unreadCount = 0 } = useUnreadCount();
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();

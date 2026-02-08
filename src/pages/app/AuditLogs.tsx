@@ -92,10 +92,13 @@ export default function AuditLogs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [eventFilter, setEventFilter] = useState<string>('all');
   
-  const { canAccess, loading: subscriptionLoading } = useBusiness();
+  const { currentBusiness, canAccess, loading: subscriptionLoading } = useBusiness();
   const hasAuditAccess = canAccess('audit_logs_visible');
   
-  const { data: auditLogs, isLoading: logsLoading } = useAuditLogs({ limit: 200 });
+  const { data: auditLogs, isLoading: logsLoading } = useAuditLogs({ 
+    limit: 200,
+    businessId: currentBusiness?.id 
+  });
 
   const filteredLogs = (auditLogs || []).filter(log => {
     if (eventFilter !== 'all' && log.event_type !== eventFilter) return false;

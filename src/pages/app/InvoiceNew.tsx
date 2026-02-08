@@ -52,7 +52,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useCreateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates, TemplateWithAccess } from '@/hooks/use-invoice-templates';
-import { useBusinessCurrency } from '@/hooks/use-business-currency';
+import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -60,6 +60,7 @@ import { toast } from '@/hooks/use-toast';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { gaEvents } from '@/hooks/use-google-analytics';
+import { ExchangeRateInput } from '@/components/app/ExchangeRateInput';
 
 interface InvoiceItem {
   id: string;
@@ -116,6 +117,12 @@ export default function InvoiceNew() {
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: defaultVatRate, isVatExempt: false }
   ]);
+  const [exchangeRateToPrimary, setExchangeRateToPrimary] = useState<number | null>(null);
+
+  // Determine if exchange rate is needed
+  const primaryCurrency = lockedCurrency || currentBusiness?.default_currency || 'NGN';
+  const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
+  const needsExchangeRate = effectiveCurrency !== primaryCurrency;
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
@@ -175,6 +182,8 @@ export default function InvoiceNew() {
       tax_schema_id: null,
       tax_schema_snapshot: null,
       tax_schema_version: null,
+      exchange_rate_to_primary: null,
+      exchange_rate_snapshot: null,
       issuer_snapshot: currentBusiness ? {
         name: currentBusiness.name,
         legal_name: currentBusiness.legal_name,
@@ -350,6 +359,14 @@ export default function InvoiceNew() {
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
+        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
+        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
+          primary_currency: primaryCurrency,
+          invoice_currency: effectiveCurrency,
+          rate_to_primary: exchangeRateToPrimary,
+          rate_date: new Date().toISOString().split('T')[0],
+          source: 'manual'
+        } : null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -420,6 +437,14 @@ export default function InvoiceNew() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
+        exchange_rate_to_primary: needsExchangeRate ? exchangeRateToPrimary : null,
+        exchange_rate_snapshot: needsExchangeRate && exchangeRateToPrimary ? {
+          primary_currency: primaryCurrency,
+          invoice_currency: effectiveCurrency,
+          rate_to_primary: exchangeRateToPrimary,
+          rate_date: new Date().toISOString().split('T')[0],
+          source: 'manual'
+        } : null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -647,10 +672,9 @@ export default function InvoiceNew() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        {getPermittedCurrencies(businessCurrency).map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
@@ -659,6 +683,18 @@ export default function InvoiceNew() {
                   </>
                 )}
               </div>
+
+              {/* Exchange Rate Input - only for non-primary currencies */}
+              {needsExchangeRate && (
+                <ExchangeRateInput
+                  fromCurrency={effectiveCurrency}
+                  toCurrency={primaryCurrency}
+                  value={exchangeRateToPrimary}
+                  onChange={setExchangeRateToPrimary}
+                  amount={calculateTotal()}
+                  required
+                />
+              )}
 
               {/* Summary / Description */}
               <div className="space-y-2">

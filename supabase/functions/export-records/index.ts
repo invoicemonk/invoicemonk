@@ -228,6 +228,7 @@ Deno.serve(async (req) => {
             total_amount,
             amount_paid,
             currency,
+            exchange_rate_to_primary,
             created_at,
             issued_at,
             issuer_snapshot,
@@ -249,9 +250,26 @@ Deno.serve(async (req) => {
         const { data: invoices, error } = await query.order('created_at', { ascending: false })
         
         if (error) throw error
+
+        // Get business primary currency for reference
+        let primaryCurrency = 'NGN'
+        if (body.business_id) {
+          const { data: business } = await supabaseService
+            .from('businesses')
+            .select('default_currency')
+            .eq('id', body.business_id)
+            .single()
+          primaryCurrency = business?.default_currency || 'NGN'
+        }
         
         data = (invoices || []).map(inv => {
           const client = Array.isArray(inv.clients) ? inv.clients[0] : inv.clients
+          const rate = inv.exchange_rate_to_primary || 1
+          const invCurrency = inv.currency || primaryCurrency
+          const primaryEquivalent = invCurrency === primaryCurrency 
+            ? inv.total_amount 
+            : (inv.total_amount || 0) * rate
+          
           return {
             invoice_number: inv.invoice_number,
             client_name: client?.name || '',
@@ -265,6 +283,9 @@ Deno.serve(async (req) => {
             total_amount: inv.total_amount,
             amount_paid: inv.amount_paid,
             currency: inv.currency,
+            exchange_rate_to_primary: inv.exchange_rate_to_primary,
+            primary_currency_equivalent: primaryEquivalent,
+            primary_currency: primaryCurrency,
             created_at: inv.created_at,
             issued_at: inv.issued_at,
             issuer_snapshot: inv.issuer_snapshot,
@@ -274,7 +295,8 @@ Deno.serve(async (req) => {
         })
         
         columns = ['invoice_number', 'client_name', 'client_email', 'status', 'issue_date', 'due_date', 
-                   'subtotal', 'tax_amount', 'discount_amount', 'total_amount', 'amount_paid', 'currency', 
+                   'subtotal', 'tax_amount', 'discount_amount', 'total_amount', 'amount_paid', 'currency',
+                   'exchange_rate_to_primary', 'primary_currency_equivalent', 'primary_currency',
                    'created_at', 'issued_at', 'issuer_snapshot', 'recipient_snapshot', 'tax_schema_version']
         filename = `invoices_export_${generatedAt.split('T')[0]}`
         break
@@ -371,7 +393,7 @@ Deno.serve(async (req) => {
       case 'expenses': {
         let query = supabaseUser
           .from('expenses')
-          .select('category, description, amount, currency, expense_date, vendor, notes, created_at')
+          .select('category, description, amount, currency, expense_date, vendor, notes, created_at, exchange_rate_to_primary, primary_currency')
         
         if (body.business_id) {
           query = query.eq('business_id', body.business_id)
@@ -387,18 +409,32 @@ Deno.serve(async (req) => {
         
         if (error) throw error
         
-        data = (expenses || []).map(exp => ({
-          expense_date: exp.expense_date,
-          category: exp.category,
-          description: exp.description || '',
-          vendor: exp.vendor || '',
-          amount: exp.amount,
-          currency: exp.currency,
-          notes: exp.notes || '',
-          created_at: exp.created_at
-        }))
+        data = (expenses || []).map(exp => {
+          const rate = exp.exchange_rate_to_primary || 1
+          const expCurrency = exp.currency || 'NGN'
+          const primaryCurr = exp.primary_currency || 'NGN'
+          const primaryEquivalent = expCurrency === primaryCurr 
+            ? exp.amount 
+            : (exp.amount || 0) * rate
+          
+          return {
+            expense_date: exp.expense_date,
+            category: exp.category,
+            description: exp.description || '',
+            vendor: exp.vendor || '',
+            amount: exp.amount,
+            currency: exp.currency,
+            exchange_rate_to_primary: exp.exchange_rate_to_primary,
+            primary_currency_equivalent: primaryEquivalent,
+            primary_currency: exp.primary_currency,
+            notes: exp.notes || '',
+            created_at: exp.created_at
+          }
+        })
         
-        columns = ['expense_date', 'category', 'description', 'vendor', 'amount', 'currency', 'notes', 'created_at']
+        columns = ['expense_date', 'category', 'description', 'vendor', 'amount', 'currency', 
+                   'exchange_rate_to_primary', 'primary_currency_equivalent', 'primary_currency',
+                   'notes', 'created_at']
         filename = `expenses_export_${generatedAt.split('T')[0]}`
         break
       }

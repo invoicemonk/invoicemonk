@@ -150,6 +150,8 @@ export type Database = {
       businesses: {
         Row: {
           address: Json | null
+          allowed_currencies: string[] | null
+          business_identity_level: string | null
           business_type: string | null
           cac_number: string | null
           compliance_status: string | null
@@ -171,12 +173,15 @@ export type Database = {
           next_invoice_number: number | null
           next_receipt_number: number
           registration_status: string | null
+          regulator_code: string | null
           tax_id: string | null
           updated_at: string
           vat_registration_number: string | null
         }
         Insert: {
           address?: Json | null
+          allowed_currencies?: string[] | null
+          business_identity_level?: string | null
           business_type?: string | null
           cac_number?: string | null
           compliance_status?: string | null
@@ -198,12 +203,15 @@ export type Database = {
           next_invoice_number?: number | null
           next_receipt_number?: number
           registration_status?: string | null
+          regulator_code?: string | null
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
         }
         Update: {
           address?: Json | null
+          allowed_currencies?: string[] | null
+          business_identity_level?: string | null
           business_type?: string | null
           cac_number?: string | null
           compliance_status?: string | null
@@ -225,6 +233,7 @@ export type Database = {
           next_invoice_number?: number | null
           next_receipt_number?: number
           registration_status?: string | null
+          regulator_code?: string | null
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
@@ -297,6 +306,8 @@ export type Database = {
           created_at: string
           credit_note_hash: string | null
           credit_note_number: string
+          currency: string | null
+          exchange_rate_to_primary: number | null
           id: string
           issued_at: string
           issued_by: string | null
@@ -312,6 +323,8 @@ export type Database = {
           created_at?: string
           credit_note_hash?: string | null
           credit_note_number: string
+          currency?: string | null
+          exchange_rate_to_primary?: number | null
           id?: string
           issued_at?: string
           issued_by?: string | null
@@ -327,6 +340,8 @@ export type Database = {
           created_at?: string
           credit_note_hash?: string | null
           credit_note_number?: string
+          currency?: string | null
+          exchange_rate_to_primary?: number | null
           id?: string
           issued_at?: string
           issued_by?: string | null
@@ -361,9 +376,11 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          exchange_rate_to_primary: number | null
           expense_date: string
           id: string
           notes: string | null
+          primary_currency: string | null
           receipt_url: string | null
           updated_at: string
           user_id: string
@@ -376,9 +393,11 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          exchange_rate_to_primary?: number | null
           expense_date?: string
           id?: string
           notes?: string | null
+          primary_currency?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id: string
@@ -391,9 +410,11 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          exchange_rate_to_primary?: number | null
           expense_date?: string
           id?: string
           notes?: string | null
+          primary_currency?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id?: string
@@ -568,6 +589,8 @@ export type Database = {
           currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
+          exchange_rate_snapshot: Json | null
+          exchange_rate_to_primary: number | null
           id: string
           invoice_hash: string | null
           invoice_number: string
@@ -605,6 +628,8 @@ export type Database = {
           currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
+          exchange_rate_snapshot?: Json | null
+          exchange_rate_to_primary?: number | null
           id?: string
           invoice_hash?: string | null
           invoice_number: string
@@ -642,6 +667,8 @@ export type Database = {
           currency_locked_at?: string | null
           discount_amount?: number
           due_date?: string | null
+          exchange_rate_snapshot?: Json | null
+          exchange_rate_to_primary?: number | null
           id?: string
           invoice_hash?: string | null
           invoice_number?: string
@@ -1357,6 +1384,8 @@ export type Database = {
           currency_locked_at: string | null
           discount_amount: number
           due_date: string | null
+          exchange_rate_snapshot: Json | null
+          exchange_rate_to_primary: number | null
           id: string
           invoice_hash: string | null
           invoice_number: string

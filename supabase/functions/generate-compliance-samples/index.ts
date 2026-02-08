@@ -258,9 +258,10 @@ Deno.serve(async (req) => {
     const totalAmount = subtotal + taxAmount
 
     // Government compliance fields (explicitly marked as not submitted)
+    // Using generic naming - regulatory_submission_status instead of NRS-specific
     const governmentComplianceFields = {
       irn: null,
-      nrs_submission_status: 'not_submitted',
+      regulatory_submission_status: 'not_submitted',
       government_signature: null,
       submission_timestamp: null
     }
@@ -653,8 +654,8 @@ Deno.serve(async (req) => {
         <span class="compliance-field-value">${governmentComplianceFields.irn || 'null (not submitted)'}</span>
       </div>
       <div class="compliance-field">
-        <span>NRS Submission Status</span>
-        <span class="compliance-field-value">${governmentComplianceFields.nrs_submission_status}</span>
+        <span>Regulatory Submission Status</span>
+        <span class="compliance-field-value">${governmentComplianceFields.regulatory_submission_status}</span>
       </div>
       <div class="compliance-field">
         <span>Government Signature</span>

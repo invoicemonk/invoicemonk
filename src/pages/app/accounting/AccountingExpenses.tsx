@@ -37,8 +37,8 @@ export default function AccountingExpenses() {
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(dateRange);
-  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(dateRange);
+  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(business?.id, dateRange);
+  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(business?.id, dateRange);
 
   const currency = business?.default_currency || 'NGN';
 
@@ -98,9 +98,9 @@ export default function AccountingExpenses() {
                   <Skeleton key={i} className="h-6" />
                 ))}
               </div>
-            ) : categoryData && categoryData.length > 0 ? (
+            ) : categoryData && categoryData.data.length > 0 ? (
               <div className="space-y-3">
-                {categoryData.slice(0, 5).map((item) => {
+                {categoryData.data.slice(0, 5).map((item) => {
                   const percentage = totalExpenses > 0 
                     ? Math.round((item.amount / totalExpenses) * 100) 
                     : 0;

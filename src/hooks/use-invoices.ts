@@ -350,13 +350,15 @@ export function useVoidInvoice() {
 
       const creditNoteNumber = `CN-${String(nextNumber).padStart(4, '0')}`;
 
-      // Create credit note
+      // Create credit note with currency snapshot from invoice
       const { error: creditNoteError } = await supabase
         .from('credit_notes')
         .insert({
           original_invoice_id: invoiceId,
           credit_note_number: creditNoteNumber,
           amount: invoice.total_amount,
+          currency: invoice.currency,
+          exchange_rate_to_primary: invoice.exchange_rate_to_primary,
           reason,
           user_id: user.id,
           business_id: invoice.business_id,

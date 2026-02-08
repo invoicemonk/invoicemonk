@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgClients } from '@/hooks/use-clients';
 import { useCreateInvoice } from '@/hooks/use-invoices';
-import { useBusinessCurrency } from '@/hooks/use-business-currency';
+import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { toast } from 'sonner';
 
 interface LineItem {
@@ -178,10 +178,9 @@ export default function OrgInvoiceNew() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        {getPermittedCurrencies(businessCurrency).map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {isCurrencyLocked && (

@@ -21,11 +21,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCreditNotes } from '@/hooks/use-credit-notes';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useState } from 'react';
 
 export default function CreditNotes() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: creditNotes, isLoading, error } = useCreditNotes();
+  const { currentBusiness } = useBusiness();
+  const { data: creditNotes, isLoading, error } = useCreditNotes(currentBusiness?.id);
 
   const filteredCreditNotes = (creditNotes || []).filter(cn => {
     if (!searchQuery) return true;
