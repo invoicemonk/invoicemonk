@@ -206,6 +206,7 @@ export default function InvoiceNew() {
       } : null,
       retention_locked_until: null,
       currency_locked_at: null,
+      currency_account_id: null,
       clients: selectedClient || null,
       invoice_items: validItems.map((item, index) => ({
         id: `item-${index}`,

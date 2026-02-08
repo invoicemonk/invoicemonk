@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useAccountingStats } from '@/hooks/use-accounting-stats';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -27,10 +27,16 @@ const formatCurrency = (amount: number, currency: string) => {
 export default function AccountingResult() {
   const { data: preferences } = useAccountingPreferences();
   const { currentBusiness: business } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: stats, isLoading } = useAccountingStats(business?.id, business?.default_currency, dateRange);
+  const { data: stats, isLoading } = useAccountingStats(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency,
+    dateRange
+  );
 
   const currency = stats?.currency || 'NGN';
   const moneyIn = stats?.moneyIn || 0;
@@ -56,23 +62,6 @@ export default function AccountingResult() {
         </div>
         <AccountingPeriodSelector value={period} onChange={setPeriod} />
       </div>
-
-      {/* Multi-currency indicator */}
-      {!isLoading && (stats?.hasMultipleCurrencies || stats?.hasUnconvertibleAmounts) && (
-        <MultiCurrencyIndicator
-          hasMultipleCurrencies={stats?.hasMultipleCurrencies || false}
-          hasUnconvertibleAmounts={stats?.hasUnconvertibleAmounts || false}
-          excludedCount={(stats?.excludedInvoiceCount || 0) + (stats?.excludedExpenseCount || 0)}
-          breakdown={stats?.currencyBreakdown?.invoices 
-            ? Object.fromEntries(
-                Object.entries(stats.currencyBreakdown.invoices).map(([k, v]) => [k, { total: v.total, count: v.count }])
-              )
-            : undefined
-          }
-          primaryCurrency={stats?.currency || 'NGN'}
-          variant="card"
-        />
-      )}
 
       {/* Main result visualization */}
       {isLoading ? (
