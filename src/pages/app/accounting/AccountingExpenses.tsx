@@ -14,6 +14,7 @@ import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 
 const formatCurrency = (amount: number, currency: string) => {
   const symbols: Record<string, string> = {
@@ -34,13 +35,23 @@ const getCategoryLabel = (value: string) => {
 export default function AccountingExpenses() {
   const { data: preferences } = useAccountingPreferences();
   const { currentBusiness: business } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
-  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(business?.id, dateRange);
-  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(business?.id, dateRange);
+  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    dateRange
+  );
+  const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(
+    business?.id, 
+    currentCurrencyAccount?.id,
+    activeCurrency,
+    dateRange
+  );
 
-  const currency = business?.default_currency || 'NGN';
+  const currency = activeCurrency || business?.default_currency || 'NGN';
 
   // Calculate total
   const totalExpenses = useMemo(() => {

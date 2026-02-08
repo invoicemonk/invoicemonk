@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { BusinessSidebar } from './BusinessSidebar';
 import { DashboardHeader } from './DashboardHeader';
 import { BusinessProvider, useBusiness } from '@/contexts/BusinessContext';
+import { CurrencyAccountProvider } from '@/contexts/CurrencyAccountContext';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -42,17 +43,19 @@ function BusinessLayoutContent() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <BusinessSidebar />
-        <SidebarInset className="flex flex-col flex-1">
-          <DashboardHeader />
-          <main className="flex-1 p-6 overflow-auto">
-            <Outlet />
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <CurrencyAccountProvider>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <BusinessSidebar />
+          <SidebarInset className="flex flex-col flex-1">
+            <DashboardHeader />
+            <main className="flex-1 p-6 overflow-auto">
+              <Outlet />
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </CurrencyAccountProvider>
   );
 }
 
