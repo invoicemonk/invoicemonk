@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useParams } from 'react-router-dom';
 import { 
@@ -10,20 +10,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MultiCurrencyIndicator } from '@/components/ui/multi-currency-indicator';
 import { useReceipts, useDownloadReceiptPdf } from '@/hooks/use-receipts';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { aggregateAmounts, formatCurrencyAmount, type CurrencyAmount } from '@/lib/currency-aggregation';
-import { useMemo } from 'react';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
+
+const formatCurrencyAmount = (amount: number, currency: string): string => {
+  const symbols: Record<string, string> = {
+    NGN: '₦',
+    USD: '$',
+    GBP: '£',
+    EUR: '€',
+  };
+  const symbol = symbols[currency] || currency;
+  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 export default function Receipts() {
   const { businessId } = useParams<{ businessId: string }>();
   const { currentBusiness: business } = useBusiness();
-  const { data: receipts, isLoading } = useReceipts();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
+  const { data: receipts, isLoading } = useReceipts(currentCurrencyAccount?.id);
   const downloadPdf = useDownloadReceiptPdf();
   const [searchTerm, setSearchTerm] = useState('');
-
-  const primaryCurrency = business?.default_currency || 'NGN';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', { 
@@ -44,17 +52,10 @@ export default function Receipts() {
     );
   }) || [];
 
-  // Aggregate receipts with proper currency handling
-  const aggregation = useMemo(() => {
-    const amounts: CurrencyAmount[] = (receipts || []).map(r => ({
-      amount: Number(r.amount),
-      currency: r.currency,
-      // Receipts don't have exchange_rate_to_primary directly,
-      // but store the invoice currency - treat same currency as convertible
-      exchangeRateToPrimary: r.currency === primaryCurrency ? 1 : null,
-    }));
-    return aggregateAmounts(amounts, primaryCurrency);
-  }, [receipts, primaryCurrency]);
+  // Simple sum since all receipts are same currency (from currency account)
+  const totalAmount = useMemo(() => {
+    return (receipts || []).reduce((sum, r) => sum + Number(r.amount), 0);
+  }, [receipts]);
 
   const thisMonthReceipts = useMemo(() => {
     return (receipts || []).filter(r => {
@@ -111,21 +112,8 @@ export default function Receipts() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrencyAmount(aggregation.primaryTotal, primaryCurrency)}
+              {formatCurrencyAmount(totalAmount, activeCurrency)}
             </div>
-            {(aggregation.hasMultipleCurrencies || aggregation.hasUnconvertibleAmounts) && (
-              <MultiCurrencyIndicator
-                hasMultipleCurrencies={aggregation.hasMultipleCurrencies}
-                hasUnconvertibleAmounts={aggregation.hasUnconvertibleAmounts}
-                excludedCount={aggregation.excludedCount}
-                breakdown={Object.fromEntries(
-                  Object.entries(aggregation.breakdown).map(([k, v]) => [k, { total: v.total, count: v.count }])
-                )}
-                primaryCurrency={primaryCurrency}
-                variant="inline"
-                className="mt-2"
-              />
-            )}
           </CardContent>
         </Card>
         <Card>
