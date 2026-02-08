@@ -96,15 +96,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       business_members: {
         Row: {
@@ -1345,6 +1337,10 @@ export type Database = {
         Args: { _payment_id: string }
         Returns: string
       }
+      delete_empty_business: {
+        Args: { _business_id: string }
+        Returns: undefined
+      }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }
       has_business_role: {
         Args: {
@@ -1471,6 +1467,7 @@ export type Database = {
         | "RECEIPT_VIEWED"
         | "RECEIPT_EXPORTED"
         | "RETENTION_CLEANUP"
+        | "BUSINESS_DELETED"
       business_role: "owner" | "admin" | "member" | "auditor"
       invoice_status:
         | "draft"
@@ -1649,6 +1646,7 @@ export const Constants = {
         "RECEIPT_VIEWED",
         "RECEIPT_EXPORTED",
         "RETENTION_CLEANUP",
+        "BUSINESS_DELETED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       invoice_status: [

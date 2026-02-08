@@ -36,7 +36,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
+import { useDeleteBusiness } from '@/hooks/use-delete-business';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
@@ -62,10 +64,12 @@ export default function BusinessProfile() {
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();
   const deleteLogo = useDeleteBusinessLogo();
+  const deleteBusiness = useDeleteBusiness();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -883,6 +887,38 @@ export default function BusinessProfile() {
           </CardContent>
         </Card>
       </div>
+      {/* Danger Zone — only for non-default businesses */}
+      {business && !business.is_default && (
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription>
+              Permanently delete this business and all associated data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              Delete Business
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {business && (
+        <DeleteBusinessDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          businessName={business.name}
+          onConfirm={() => deleteBusiness.mutate(business.id)}
+          isPending={deleteBusiness.isPending}
+        />
+      )}
     </motion.div>
   );
 }
