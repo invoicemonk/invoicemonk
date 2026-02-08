@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -43,6 +43,9 @@ import { Switch } from '@/components/ui/switch';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
 import { useCheckDuplicateBusinessName } from '@/hooks/use-check-duplicate-business';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AddressData {
   street?: string;
@@ -59,7 +62,10 @@ export default function BusinessProfile() {
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();
   const deleteLogo = useDeleteBusinessLogo();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -190,6 +196,55 @@ export default function BusinessProfile() {
       fileInputRef.current.value = '';
     }
   };
+
+  const handleUnlockCurrency = useCallback(async () => {
+    if (!business) return;
+    setIsUnlocking(true);
+    try {
+      // Check if business has any non-draft invoices
+      const { count, error: countError } = await supabase
+        .from('invoices')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', business.id)
+        .neq('status', 'draft');
+
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        toast({
+          title: 'Cannot unlock currency',
+          description: `You have ${count} issued invoice(s). Primary currency cannot be changed after invoices have been issued.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Unlock the currency
+      const { error } = await supabase
+        .from('businesses')
+        .update({ currency_locked: false, currency_locked_at: null })
+        .eq('id', business.id);
+
+      if (error) throw error;
+
+      // Refresh business data
+      queryClient.invalidateQueries({ queryKey: ['businesses'] });
+      queryClient.invalidateQueries({ queryKey: ['business-currency'] });
+
+      toast({
+        title: 'Currency unlocked',
+        description: 'You can now change your primary currency.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to unlock currency',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUnlocking(false);
+    }
+  }, [business, toast, queryClient]);
 
   const handleLogoDelete = async () => {
     if (!business) return;
@@ -716,11 +771,26 @@ export default function BusinessProfile() {
                   </Label>
                   
                   {business?.currency_locked ? (
-                    <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border">
-                      <Lock className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">
-                        {currencies.find(c => c.value === formData.defaultCurrency)?.label || formData.defaultCurrency}
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">
+                          {currencies.find(c => c.value === formData.defaultCurrency)?.label || formData.defaultCurrency}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUnlockCurrency}
+                        disabled={isUnlocking}
+                      >
+                        {isUnlocking ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Lock className="h-3 w-3 mr-1" />
+                        )}
+                        {isUnlocking ? 'Checking...' : 'Unlock Currency'}
+                      </Button>
                     </div>
                   ) : (
                     <Select 
@@ -744,7 +814,7 @@ export default function BusinessProfile() {
                     {business?.currency_locked ? (
                       <>
                         Primary currency locked on {business.currency_locked_at ? new Date(business.currency_locked_at).toLocaleDateString() : 'first invoice'}. 
-                        This is your accounting currency for reports.
+                        Click "Unlock Currency" if you have no issued invoices.
                       </>
                     ) : (
                       'This will become your primary accounting currency after your first invoice.'
