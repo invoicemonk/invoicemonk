@@ -57,6 +57,12 @@ interface RecipientSnapshot {
   address?: Record<string, string>
 }
 
+interface PaymentMethodSnapshot {
+  provider_type: string
+  display_name: string
+  instructions: Record<string, string>
+}
+
 interface ViewInvoiceResponse {
   success: boolean
   invoice?: {
@@ -74,6 +80,7 @@ interface ViewInvoiceResponse {
     terms: string | null
     issuer_snapshot: IssuerSnapshot | null
     recipient_snapshot: RecipientSnapshot | null
+    payment_method_snapshot: PaymentMethodSnapshot | null
     items: InvoiceItem[]
     verification_id: string
   }
@@ -131,6 +138,7 @@ Deno.serve(async (req) => {
         verification_id,
         issuer_snapshot,
         recipient_snapshot,
+        payment_method_snapshot,
         invoice_items (
           id,
           description,
@@ -231,6 +239,7 @@ Deno.serve(async (req) => {
         terms: invoice.terms,
         issuer_snapshot: invoice.issuer_snapshot as IssuerSnapshot | null,
         recipient_snapshot: invoice.recipient_snapshot as RecipientSnapshot | null,
+        payment_method_snapshot: invoice.payment_method_snapshot as PaymentMethodSnapshot | null,
         items: sortedItems,
         verification_id: invoice.verification_id
       },

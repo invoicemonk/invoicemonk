@@ -67,6 +67,12 @@ interface RecipientIdentity {
   phone?: string;
 }
 
+interface PaymentMethodSnapshot {
+  provider_type: string;
+  display_name: string;
+  instructions: Record<string, string>;
+}
+
 interface InvoiceViewResponse {
   success: boolean;
   invoice?: {
@@ -84,6 +90,7 @@ interface InvoiceViewResponse {
     terms: string | null;
     issuer_snapshot: IssuerIdentity | null;
     recipient_snapshot: RecipientIdentity | null;
+    payment_method_snapshot: PaymentMethodSnapshot | null;
     items: InvoiceItem[];
     verification_id: string;
   };
@@ -522,6 +529,43 @@ const InvoiceView = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Payment Instructions */}
+            {invoice.payment_method_snapshot && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    Payment Instructions
+                    <Badge variant="outline" className="text-xs">
+                      {invoice.payment_method_snapshot.display_name}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {invoice.payment_method_snapshot.provider_type === 'other' && invoice.payment_method_snapshot.instructions?.details ? (
+                    <p className="text-sm whitespace-pre-wrap">{invoice.payment_method_snapshot.instructions.details}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(invoice.payment_method_snapshot.instructions || {}).map(([key, value]) => (
+                        value && (
+                          <div key={key} className="flex justify-between gap-4 text-sm">
+                            <span className="text-muted-foreground shrink-0 capitalize">{key.replace(/_/g, ' ')}</span>
+                            <span className="font-mono text-right truncate">{value}</span>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex justify-between gap-4 text-sm">
+                      <span className="text-muted-foreground">Reference</span>
+                      <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Notes & Terms */}
             {(invoice.notes || invoice.terms) && (
