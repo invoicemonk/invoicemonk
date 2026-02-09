@@ -5,7 +5,16 @@ import type { Tables } from '@/integrations/supabase/types';
 
 export type AuditLog = Tables<'audit_logs'>;
 
-// Fetch audit logs for the current user and business
+/**
+ * Fetch audit logs for the current user and business.
+ * 
+ * SECURITY NOTE: This query relies on RLS policies for access control.
+ * Audit logs are tier-gated (Professional+ tiers only).
+ * RLS policies:
+ * - Users can only view logs for entities they have access to
+ * - Business members can view logs for their business
+ * - Platform admins have broader access
+ */
 export function useAuditLogs(options?: {
   entityType?: string;
   entityId?: string;

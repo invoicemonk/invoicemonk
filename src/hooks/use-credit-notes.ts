@@ -14,7 +14,13 @@ export type CreditNote = Tables<'credit_notes'> & {
   } | null;
 };
 
-// Fetch all credit notes for a specific business, optionally filtered by currency account
+/**
+ * Fetch all credit notes for a specific business, optionally filtered by currency account.
+ * 
+ * SECURITY NOTE: This query relies on RLS policies for data isolation.
+ * When businessId is provided, explicit filtering is applied.
+ * RLS ensures users only see credit notes from businesses they're members of.
+ */
 export function useCreditNotes(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
@@ -54,7 +60,13 @@ export function useCreditNotes(businessId?: string, currencyAccountId?: string) 
   });
 }
 
-// Fetch a single credit note by ID
+/**
+ * Fetch a single credit note by ID.
+ * 
+ * SECURITY: Single-record fetch by ID.
+ * RLS enforces business membership at the database level.
+ * UI layer should verify business membership via BusinessAccessGuard before rendering.
+ */
 export function useCreditNote(creditNoteId: string | undefined) {
   const { user } = useAuth();
 

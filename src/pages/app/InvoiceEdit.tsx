@@ -55,6 +55,7 @@ import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-busines
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 
@@ -395,6 +396,7 @@ export default function InvoiceEdit() {
   }
 
   return (
+    <BusinessAccessGuard businessId={invoice.business_id} resourceType="invoice">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -905,5 +907,6 @@ export default function InvoiceEdit() {
         </DialogContent>
       </Dialog>
     </motion.div>
+    </BusinessAccessGuard>
   );
 }

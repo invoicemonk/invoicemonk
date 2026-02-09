@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useCreditNote } from '@/hooks/use-credit-notes';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 
 interface IssuerSnapshot {
   legal_name?: string;
@@ -92,6 +93,7 @@ export default function CreditNoteDetail() {
   const recipientSnapshot = originalInvoice?.recipient_snapshot as RecipientSnapshot | null;
 
   return (
+    <BusinessAccessGuard businessId={creditNote.business_id} resourceType="credit note">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -343,5 +345,6 @@ export default function CreditNoteDetail() {
         </div>
       </div>
     </motion.div>
+    </BusinessAccessGuard>
   );
 }

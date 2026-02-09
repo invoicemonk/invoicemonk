@@ -20,6 +20,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClient, useUpdateClient, useClientInvoices } from '@/hooks/use-clients';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 
@@ -167,6 +168,7 @@ export default function ClientEdit() {
   }
 
   return (
+    <BusinessAccessGuard businessId={client.business_id} resourceType="client">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -431,5 +433,6 @@ export default function ClientEdit() {
         </Card>
       </div>
     </motion.div>
+    </BusinessAccessGuard>
   );
 }

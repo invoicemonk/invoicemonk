@@ -54,7 +54,13 @@ export interface Receipt {
   created_at: string;
 }
 
-// Fetch all receipts for current business, optionally filtered by currency account
+/**
+ * Fetch all receipts for current business, optionally filtered by currency account.
+ * 
+ * SECURITY NOTE: This hook explicitly filters by currentBusiness.id.
+ * RLS policies provide additional database-level access control.
+ * The double filtering (hook + RLS) provides defense-in-depth.
+ */
 export function useReceipts(currencyAccountId?: string) {
   const { currentBusiness } = useBusiness();
 
@@ -83,7 +89,14 @@ export function useReceipts(currencyAccountId?: string) {
   });
 }
 
-// Fetch single receipt by ID
+/**
+ * Fetch single receipt by ID.
+ * 
+ * SECURITY: Single-record fetch by ID.
+ * RLS enforces business membership at the database level.
+ * UI layer should verify business membership via BusinessAccessGuard before rendering.
+ * Receipts always have a business_id (never user-level).
+ */
 export function useReceipt(receiptId: string | undefined) {
   return useQuery({
     queryKey: ['receipt', receiptId],

@@ -23,6 +23,7 @@ import { useInvoicePayments } from '@/hooks/use-payments';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -164,6 +165,7 @@ export default function InvoiceDetail() {
   }
 
   return (
+    <BusinessAccessGuard businessId={invoice.business_id} resourceType="invoice">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -658,5 +660,6 @@ export default function InvoiceDetail() {
         />
       )}
     </motion.div>
+    </BusinessAccessGuard>
   );
 }

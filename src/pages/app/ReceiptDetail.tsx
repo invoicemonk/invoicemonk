@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useReceipt, useDownloadReceiptPdf } from '@/hooks/use-receipts';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { toast } from 'sonner';
 
 export default function ReceiptDetail() {
@@ -92,6 +93,7 @@ export default function ReceiptDetail() {
   const issuerAddress = (issuer?.address as Record<string, string>) || {};
 
   return (
+    <BusinessAccessGuard businessId={receipt.business_id} resourceType="receipt">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -379,5 +381,6 @@ export default function ReceiptDetail() {
         </div>
       </div>
     </motion.div>
+    </BusinessAccessGuard>
   );
 }

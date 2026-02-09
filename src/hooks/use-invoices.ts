@@ -13,7 +13,16 @@ export type InvoiceItem = Tables<'invoice_items'>;
 export type InvoiceInsert = TablesInsert<'invoices'>;
 export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
 
-// Fetch all invoices for a business, optionally filtered by currency account
+/**
+ * Fetch all invoices for a business, optionally filtered by currency account.
+ * 
+ * SECURITY NOTE: This query relies on RLS policies for data isolation.
+ * When businessId is provided, explicit filtering is applied.
+ * When omitted, RLS ensures users only see invoices they have access to.
+ * 
+ * RLS policies:
+ * - "Users can view their invoices" - (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
+ */
 export function useInvoices(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
@@ -49,7 +58,18 @@ export function useInvoices(businessId?: string, currencyAccountId?: string) {
   });
 }
 
-// Fetch a single invoice by ID
+/**
+ * Fetch a single invoice by ID.
+ * 
+ * SECURITY: Single-record fetch by ID.
+ * RLS enforces ownership at the database level.
+ * UI layer should verify business membership via BusinessAccessGuard before rendering.
+ * 
+ * Access control flow:
+ * 1. RLS blocks unauthorized access at DB level (returns null/error)
+ * 2. BusinessAccessGuard provides UI-layer defense-in-depth
+ * 3. Clear "Access Denied" UX vs ambiguous "not found"
+ */
 export function useInvoice(invoiceId: string | undefined) {
   const { user } = useAuth();
 

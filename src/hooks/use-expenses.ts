@@ -57,7 +57,14 @@ export const EXPENSE_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-// Fetch expenses filtered by currency account
+/**
+ * Fetch expenses filtered by currency account.
+ * 
+ * SECURITY NOTE: This hook explicitly filters by businessId or user.id.
+ * When businessId is provided, filters to that business.
+ * Otherwise, filters to the authenticated user's expenses.
+ * RLS policies provide additional database-level access control.
+ */
 export function useExpenses(
   businessId?: string, 
   currencyAccountId?: string,
@@ -118,6 +125,13 @@ export function useExpenses(
   });
 }
 
+/**
+ * Fetch a single expense by ID.
+ * 
+ * SECURITY: Single-record fetch by ID.
+ * RLS enforces ownership at the database level.
+ * Expenses belong to users or businesses based on business_id field.
+ */
 export function useExpense(expenseId: string) {
   const { user } = useAuth();
 

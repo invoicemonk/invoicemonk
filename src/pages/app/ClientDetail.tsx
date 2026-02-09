@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useClient, useClientInvoices } from '@/hooks/use-clients';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -89,6 +90,7 @@ export default function ClientDetail() {
   }
 
   return (
+    <BusinessAccessGuard businessId={client.business_id} resourceType="client">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -292,5 +294,6 @@ export default function ClientDetail() {
         </div>
       </div>
     </motion.div>
+    </BusinessAccessGuard>
   );
 }
