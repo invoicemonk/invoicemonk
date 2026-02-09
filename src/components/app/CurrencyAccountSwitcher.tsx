@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Check, ChevronsUpDown, Plus, Wallet, ArrowUpRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Check, ChevronsUpDown, Plus, Wallet } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,7 +38,9 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useCreateCurrencyAccount, useCurrencyAccountLimit } from '@/hooks/use-currency-accounts';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { getCurrencySymbol } from '@/lib/currency-aggregation';
+import { getCurrencySymbol } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 const AVAILABLE_CURRENCIES = [
   { code: 'NGN', name: 'Nigerian Naira', symbol: '₦' },
@@ -62,7 +64,9 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
   const [newCurrency, setNewCurrency] = useState('');
   const [newName, setNewName] = useState('');
 
-  const { currentBusiness, isFree } = useBusiness();
+  const { currentBusiness, isPlatformAdmin } = useBusiness();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const { 
     currentCurrencyAccount, 
     currencyAccounts, 
@@ -90,29 +94,14 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
     setNewName('');
   };
 
-  const canCreateMore = limitInfo?.allowed ?? false;
+  // Platform admins can always create more currency accounts
+  const canCreateMore = isPlatformAdmin || (limitInfo?.allowed ?? false);
   const isAtLimit = !canCreateMore && currencyAccounts.length > 0;
 
   if (loading || currencyAccounts.length === 0) {
     return null;
   }
 
-  // Don't show switcher if only one account
-  if (currencyAccounts.length === 1 && !canCreateMore) {
-    return (
-      <div className={cn(
-        "flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground",
-        collapsed && "justify-center px-0"
-      )}>
-        <Wallet className="h-4 w-4 shrink-0" />
-        {!collapsed && (
-          <span className="truncate">
-            {currentCurrencyAccount?.currency} Account
-          </span>
-        )}
-      </div>
-    );
-  }
 
   return (
     <>
@@ -180,29 +169,30 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup>
-                {canCreateMore && availableCurrencies.length > 0 ? (
+                {availableCurrencies.length > 0 && (
                   <CommandItem
                     onSelect={() => {
                       setOpen(false);
-                      setCreateDialogOpen(true);
+                      if (canCreateMore) {
+                        setCreateDialogOpen(true);
+                      } else {
+                        toast({
+                          title: 'Currency account limit reached',
+                          description: `Your ${limitInfo?.tier || 'current'} plan allows ${limitInfo?.limit ?? 1} currency account(s). Upgrade to add more currencies.`,
+                          action: (
+                            <ToastAction altText="View Plans" onClick={() => navigate(`/b/${currentBusiness?.id}/billing`)}>
+                              View Plans
+                            </ToastAction>
+                          ),
+                        });
+                      }
                     }}
                     className="text-primary"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Currency Account
                   </CommandItem>
-                ) : isAtLimit ? (
-                  <CommandItem asChild>
-                    <Link 
-                      to={`/b/${currentBusiness?.id}/billing`}
-                      className="text-muted-foreground flex items-center"
-                      onClick={() => setOpen(false)}
-                    >
-                      <ArrowUpRight className="mr-2 h-4 w-4" />
-                      Upgrade for more accounts
-                    </Link>
-                  </CommandItem>
-                ) : null}
+                )}
               </CommandGroup>
             </CommandList>
           </Command>

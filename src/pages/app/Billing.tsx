@@ -21,65 +21,7 @@ import { useBusiness, type SubscriptionTier as BusinessTier } from '@/contexts/B
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { gaEvents } from '@/hooks/use-google-analytics';
-
-// Feature lists by tier - different for Nigeria vs International
-const planFeaturesNigeria = {
-  starter: [
-    '5 invoices per month',
-    'Clean invoice layout',
-    'Subtle Invoicemonk branding',
-    'View invoice online',
-    '7-year data retention',
-  ],
-  starter_paid: [
-    'Unlimited invoices',
-    'PDF export',
-    'Branded invoices',
-    'Basic compliance fields',
-    '7-year retention',
-  ],
-  professional: [
-    'Everything in Starter',
-    'Full audit trail',
-    'Immutable invoice hashes',
-    'Public invoice verification',
-    'Compliance-ready exports',
-    'Priority support',
-  ],
-  business: [
-    'Everything in Professional',
-    'Multi-user accounts',
-    'Roles & permissions',
-    'Bulk invoicing',
-    'SLA support',
-    'API access (coming soon)',
-  ],
-};
-
-const planFeaturesInternational = {
-  starter: [
-    '5 invoices per month',
-    'Basic compliance features',
-    'Email support',
-    'Single user',
-  ],
-  professional: [
-    'Unlimited invoices',
-    'Full compliance suite',
-    'Priority support',
-    'Up to 5 team members',
-    'Custom branding',
-    'Audit exports',
-  ],
-  business: [
-    'Everything in Professional',
-    'Unlimited team members',
-    'API access (Coming Soon)',
-    'Dedicated account manager',
-    'Custom integrations',
-    'SLA guarantee',
-  ],
-};
+import { useTierFeatures } from '@/hooks/use-tier-features';
 
 const planIcons = {
   starter: Zap,
@@ -94,6 +36,7 @@ export default function Billing() {
   const { tier, subscription, currentBusiness, loading: businessLoading } = useBusiness();
   const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, openCustomerPortal, isLoading: checkoutLoading } = useCheckout();
+  const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
@@ -118,8 +61,9 @@ export default function Billing() {
     ? ['starter', 'starter_paid', 'professional', 'business']
     : ['starter', 'professional', 'business'];
   
-  const planFeatures = isNigeria ? planFeaturesNigeria : planFeaturesInternational;
   const hasPaidSubscription = subscription?.stripe_subscription_id != null;
+
+  const isLoadingData = pricingLoading || tierFeaturesLoading;
 
   const getTierDisplayName = (t: TierKey) => {
     if (t === 'starter') return 'Free';
@@ -238,7 +182,9 @@ export default function Billing() {
             const isRecommended = planTier === 'professional';
             const pricing = pricingByTier[planTier];
             const isLoadingThis = loadingTier === planTier;
-            const features = planFeatures[planTier as keyof typeof planFeatures] || [];
+            
+            // Get features dynamically from tier_limits table
+            const features = buildFeatureList(planTier);
 
             const price = pricing 
               ? (isYearly && pricing.yearly_price 

@@ -20,66 +20,8 @@ import { Label } from '@/components/ui/label';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
-
-// Feature lists by tier - different for Nigeria vs International
-const planFeaturesNigeria = {
-  starter: [
-    '5 invoices per month',
-    'Clean invoice layout',
-    'Subtle Invoicemonk branding',
-    'View invoice online',
-    '7-year data retention',
-  ],
-  starter_paid: [
-    'Unlimited invoices',
-    'PDF export',
-    'Branded invoices',
-    'Basic compliance fields',
-    '7-year retention',
-  ],
-  professional: [
-    'Everything in Starter',
-    'Full audit trail',
-    'Immutable invoice hashes',
-    'Public invoice verification',
-    'Compliance-ready exports',
-    'Priority support',
-  ],
-  business: [
-    'Everything in Professional',
-    'Multi-user accounts',
-    'Roles & permissions',
-    'Bulk invoicing',
-    'SLA support',
-    'API access (coming soon)',
-  ],
-};
-
-const planFeaturesInternational = {
-  starter: [
-    '5 invoices per month',
-    'Basic compliance features',
-    'Email support',
-    'Single user',
-  ],
-  professional: [
-    'Unlimited invoices',
-    'Full compliance suite',
-    'Priority support',
-    'Up to 5 team members',
-    'Custom branding',
-    'Audit exports',
-  ],
-  business: [
-    'Everything in Professional',
-    'Unlimited team members',
-    'API access (Coming Soon)',
-    'Dedicated account manager',
-    'Custom integrations',
-    'SLA guarantee',
-  ],
-};
 
 const planIcons = {
   starter: Zap,
@@ -98,6 +40,7 @@ export default function PlanSelection() {
   const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { tier: currentTier } = useSubscription();
+  const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
 
   const handleSelectPlan = async (tier: TierKey) => {
     if (tier === 'starter') {
@@ -121,9 +64,7 @@ export default function PlanSelection() {
     ? ['starter', 'starter_paid', 'professional', 'business']
     : ['starter', 'professional', 'business'];
 
-  const planFeatures = isNigeria ? planFeaturesNigeria : planFeaturesInternational;
-
-  if (pricingLoading) {
+  if (pricingLoading || tierFeaturesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -182,7 +123,9 @@ export default function PlanSelection() {
             const isRecommended = tier === 'professional';
             const isCurrent = tier === currentTier;
             const isLoadingThis = loadingTier === tier;
-            const features = planFeatures[tier as keyof typeof planFeatures] || [];
+            
+            // Get features dynamically from tier_limits table
+            const features = buildFeatureList(tier);
             
             const price = pricing 
               ? (isYearly && pricing.yearly_price 

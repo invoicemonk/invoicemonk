@@ -10,7 +10,8 @@ import {
   UserCog,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { UpgradeRequiredPage } from '@/components/app/UpgradeRequiredPage';
 
 type BusinessRole = 'owner' | 'admin' | 'member' | 'auditor';
 
@@ -85,13 +87,20 @@ const getRoleBadgeVariant = (role: string) => {
 export default function Team() {
   const { businessId } = useParams();
   const { user } = useAuth();
-  const { currentBusiness, isOwner, isAdmin } = useBusiness();
+  const { currentBusiness, isOwner, isAdmin, checkTierLimit } = useBusiness();
   const queryClient = useQueryClient();
   const canManageTeam = isOwner || isAdmin;
 
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<BusinessRole>('member');
+
+  // Check team access based on tier
+  const { data: teamAccess, isLoading: teamAccessLoading } = useQuery({
+    queryKey: ['team-access-check', currentBusiness?.id],
+    queryFn: () => checkTierLimit('team_members_limit'),
+    enabled: !!currentBusiness?.id,
+  });
 
   // Fetch team members with profile info
   const { data: members, isLoading } = useQuery({
@@ -220,6 +229,33 @@ export default function Team() {
     }
     return email[0].toUpperCase();
   };
+
+  // Show loading while checking access
+  if (teamAccessLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If team_members_limit = 0, show upgrade prompt
+  if (teamAccess && teamAccess.limit_value === 0) {
+    return (
+      <UpgradeRequiredPage
+        feature="Team Management"
+        description="Team collaboration is available on Professional and Business plans. Upgrade to invite team members, assign roles, and work together."
+        upgradeUrl={`/b/${businessId}/billing`}
+        requiredTier="Professional"
+        benefits={[
+          'Invite up to 5 team members (Professional)',
+          'Assign roles: Admin, Member, Auditor',
+          'Collaborative invoice management',
+          'Unlimited team members on Business plan',
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

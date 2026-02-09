@@ -61,7 +61,7 @@ import { toast } from '@/hooks/use-toast';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { gaEvents } from '@/hooks/use-google-analytics';
-import { ExchangeRateInput } from '@/components/app/ExchangeRateInput';
+
 
 interface InvoiceItem {
   id: string;
@@ -121,12 +121,6 @@ export default function InvoiceNew() {
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: defaultVatRate, isVatExempt: false }
   ]);
-  const [exchangeRateToPrimary, setExchangeRateToPrimary] = useState<number | null>(null);
-
-  // Determine if exchange rate is needed
-  const primaryCurrency = lockedCurrency || currentBusiness?.default_currency || 'NGN';
-  const effectiveCurrency = isCurrencyLocked && lockedCurrency ? lockedCurrency : currency;
-  const needsExchangeRate = effectiveCurrency !== primaryCurrency;
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
@@ -683,17 +677,6 @@ export default function InvoiceNew() {
                 )}
               </div>
 
-              {/* Exchange Rate Input - only for non-primary currencies */}
-              {needsExchangeRate && (
-                <ExchangeRateInput
-                  fromCurrency={effectiveCurrency}
-                  toCurrency={primaryCurrency}
-                  value={exchangeRateToPrimary}
-                  onChange={setExchangeRateToPrimary}
-                  amount={calculateTotal()}
-                  required
-                />
-              )}
 
               {/* Summary / Description */}
               <div className="space-y-2">

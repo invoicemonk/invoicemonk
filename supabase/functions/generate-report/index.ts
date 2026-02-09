@@ -172,7 +172,8 @@ Deno.serve(async (req) => {
     }
 
     // TIER ENFORCEMENT: Check if business has reports access (using business-level check)
-    const { data: tierCheck } = await supabase.rpc('check_tier_limit_business', {
+    // Use the user client so that auth.uid() works for platform admin bypass
+    const { data: tierCheck } = await supabaseUser.rpc('check_tier_limit_business', {
       _business_id: businessId,
       _feature: 'reports_enabled'
     })

@@ -47,16 +47,21 @@ import {
 import { BusinessSwitcher } from './BusinessSwitcher';
 import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
 import { useUnreadCount } from '@/hooks/use-notifications';
+import { useTeamAccess } from '@/hooks/use-tier-features';
 import logo from '@/assets/invoicemonk-logo.png';
 import logoIcon from '@/assets/invoicemonk-icon.png';
 
 export function BusinessSidebar() {
   const { signOut, profile } = useAuth();
   const { businessId } = useParams<{ businessId: string }>();
-  const { currentBusiness, tier, isFree, canManageTeam } = useBusiness();
+  const { currentBusiness, tier, isFree, canManageTeam, isPlatformAdmin } = useBusiness();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const { data: unreadCount = 0 } = useUnreadCount();
+  
+  // Check if tier allows team access - platform admins always have access
+  const { data: teamAccess } = useTeamAccess();
+  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
 
   const baseUrl = `/b/${businessId}`;
 
@@ -74,7 +79,8 @@ export function BusinessSidebar() {
     { title: 'Audit Logs', url: `${baseUrl}/audit-logs`, icon: History },
   ];
 
-  const teamNavItems = canManageTeam ? [
+  // Only show Team link if tier allows team access AND user can manage team
+  const teamNavItems = canManageTeam && hasTeamAccess ? [
     { title: 'Team', url: `${baseUrl}/team`, icon: UserPlus },
   ] : [];
 
