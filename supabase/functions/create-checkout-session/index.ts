@@ -300,7 +300,7 @@ serve(async (req) => {
     }
 
     // Get the app URL for redirects
-    const appUrl = Deno.env.get("APP_URL") || "https://id-preview--d2127126-79b5-4329-9bbf-46c900eb564d.lovable.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
     // Create checkout session with business_id in metadata
     const session = await stripe.checkout.sessions.create({

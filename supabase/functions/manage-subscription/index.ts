@@ -110,7 +110,7 @@ serve(async (req) => {
       );
     }
 
-    const appUrl = Deno.env.get("APP_URL") || "https://id-preview--d2127126-79b5-4329-9bbf-46c900eb564d.lovable.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
     switch (action) {
       case "portal": {
