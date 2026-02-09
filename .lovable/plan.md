@@ -1,138 +1,67 @@
 
-# Plan: Make Client Form Jurisdiction-Aware
 
-## Problem Summary
+# Fix: Invoice Issuing "[Object Object]" Error
 
-When adding a new client, the form currently shows **Nigerian-specific** placeholders regardless of where the client is actually located:
+## Problem Analysis
 
-| Field | Current Placeholder | Issue |
-|-------|---------------------|-------|
-| Phone | `+234 ...` | Assumes Nigerian client |
-| City | `Lagos` | Nigerian city |
-| State | `Lagos State` | Nigerian state |
-| Postal Code | `100001` | Nigerian postal code |
-| Country | `Nigeria` | Nigerian country |
-| Tax ID | Nigerian TIN format | May not apply to international clients |
+Two bugs are causing invoice issuing to fail with an unhelpful "[Object Object]" error message:
 
-A Nigerian business adding a US or UK client sees confusing Nigerian examples.
+### Bug 1: Database function `issue_invoice` fails (Root Cause)
+The `issue_invoice` RPC function uses `digest()` (from the `pgcrypto` extension) to generate SHA-256 hashes. However, the function is declared with `SET search_path TO 'public'`, and `digest()` lives in the `extensions` schema. When the function runs, it cannot find `digest()` and throws:
 
-## Solution
+```
+function digest(bytea, unknown) does not exist
+```
 
-Add a **Client Country** selector that dynamically updates placeholders based on the client's location.
+### Bug 2: Error displayed as "[Object Object]" (Display Bug)
+When the RPC fails, Supabase returns a plain error object (not an `Error` instance). The code does `throw error` on this plain object. In `sanitizeErrorMessage()`, `String(error)` converts a plain object to `[object Object]` instead of extracting the `.message` property.
 
-## Files to Modify
+### Bug 3: Build error in `export-records` edge function
+The select query for invoices does not include `payment_method_snapshot`, but the mapping code tries to access it, causing a TypeScript error.
 
-| File | Changes |
-|------|---------|
-| `src/lib/jurisdiction-config.ts` | Add address placeholder examples for each jurisdiction |
-| `src/pages/app/Clients.tsx` | Add country selector, make placeholders dynamic |
-| `src/pages/org/OrgClients.tsx` | Same changes as Clients.tsx |
-| `src/pages/app/ClientEdit.tsx` | Add country selector, make placeholders dynamic |
+## Fix Plan
 
-## Implementation Details
+### 1. Fix the `issue_invoice` database function
+Update the SQL function to qualify `digest()` with the `extensions` schema:
 
-### 1. Extend Jurisdiction Config
+```sql
+-- Change this line in issue_invoice:
+_invoice_hash := encode(digest(_hash_input::bytea, 'sha256'), 'hex');
+-- To:
+_invoice_hash := encode(extensions.digest(_hash_input::bytea, 'sha256'), 'hex');
+```
 
-Add address-related placeholders to each jurisdiction:
+This is a database migration that replaces the function definition with the schema-qualified call.
+
+### 2. Fix `sanitizeErrorMessage` in `src/lib/error-utils.ts`
+Update the function to handle plain Supabase error objects that have a `.message` property but are not `Error` instances:
 
 ```typescript
-// Example additions to JurisdictionConfig interface
-cityPlaceholder: string;
-statePlaceholder: string;
-stateLabel: string;  // "State" vs "Province" vs "County"
-postalCodePlaceholder: string;
-postalCodeLabel: string;  // "Postal Code" vs "ZIP Code"
-countryName: string;
+// Before:
+const msg = error instanceof Error ? error.message : String(error);
 
-// Example for US
-US: {
-  // ...existing fields...
-  cityPlaceholder: 'New York',
-  statePlaceholder: 'NY',
-  stateLabel: 'State',
-  postalCodePlaceholder: '10001',
-  postalCodeLabel: 'ZIP Code',
-  countryName: 'United States',
-}
-
-// Example for UK
-GB: {
-  cityPlaceholder: 'London',
-  statePlaceholder: 'Greater London',
-  stateLabel: 'County',
-  postalCodePlaceholder: 'SW1A 1AA',
-  postalCodeLabel: 'Postcode',
-  countryName: 'United Kingdom',
-}
+// After:
+const msg = error instanceof Error
+  ? error.message
+  : (typeof error === 'object' && error !== null && 'message' in error)
+    ? String((error as Record<string, unknown>).message)
+    : String(error);
 ```
 
-### 2. Update Client Creation Dialogs
+### 3. Fix `export-records` edge function build error
+Add `payment_method_snapshot` to the invoice select query in `supabase/functions/export-records/index.ts`.
 
-Add a country selector that controls the form's placeholders:
+## Files Changed
 
-```text
-Form Layout:
-1. Client Type (Company/Individual)
-2. Name
-3. Contact Person (if company)
-4. [NEW] Client Country <-- Dropdown with supported countries + "Other"
-5. Email & Phone (phone placeholder based on selected country)
-6. Tax & Compliance (based on client's country, not business)
-7. Address (all placeholders based on selected country)
-```
+| File | Change |
+|------|--------|
+| Migration SQL | Fix `issue_invoice` to use `extensions.digest()` |
+| `src/lib/error-utils.ts` | Handle plain object errors with `.message` property |
+| `supabase/functions/export-records/index.ts` | Add `payment_method_snapshot` to invoice select query |
 
-### 3. Dynamic Placeholder Logic
+## Testing
 
-When user selects a country:
-- Phone field shows that country's phone prefix
-- Tax ID shows that country's format (or generic if "Other")
-- City/State/Postal placeholders update to that country's examples
-- Country field auto-fills with the selected country name
+After the fix:
+1. Create a draft invoice and issue it -- should succeed
+2. If there is a real validation error (e.g., tier limit), the error message should display properly instead of "[Object Object]"
 
-### 4. Default Behavior
-
-- When dialog opens, default to the **business's jurisdiction** (current behavior)
-- User can change to any supported country or "Other"
-- If "Other" is selected, show generic placeholders
-
-## Supported Countries
-
-Based on existing `JURISDICTION_CONFIG`:
-- Nigeria (NG)
-- United States (US)
-- United Kingdom (GB)
-- Canada (CA)
-- Germany (DE)
-- France (FR)
-- Other (generic fallback)
-
-## User Experience Flow
-
-```text
-1. Nigerian business user clicks "Add Client"
-2. Form opens with Nigeria pre-selected (matches their business)
-3. User realizes client is in the US
-4. User selects "United States" from country dropdown
-5. Form updates:
-   - Phone: "+1 ..." 
-   - Tax ID: "Tax ID (EIN/SSN)" with "12-3456789" placeholder
-   - City: "New York"
-   - State: "NY" (label changes to "State")
-   - Postal Code: "10001" (label shows "ZIP Code")
-   - Country: auto-fills "United States"
-```
-
-## Technical Implementation
-
-The changes are primarily UI/form updates:
-- No database schema changes required
-- No API changes required
-- Client country is stored in the existing `address.country` field
-- Tax compliance fields remain optional (user can fill based on what they know)
-
-## Files Changed Summary
-
-1. **`src/lib/jurisdiction-config.ts`** - Add ~6 new fields per jurisdiction
-2. **`src/pages/app/Clients.tsx`** - Add country state, selector UI, dynamic placeholders
-3. **`src/pages/org/OrgClients.tsx`** - Mirror changes from Clients.tsx
-4. **`src/pages/app/ClientEdit.tsx`** - Add country selector, infer from existing address.country
