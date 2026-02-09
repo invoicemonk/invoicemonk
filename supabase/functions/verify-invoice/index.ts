@@ -45,13 +45,12 @@ interface VerificationResponse {
       legal_name?: string
     }
     payment_status: string
+    payment_method_type?: string
     total_amount: number
     currency: string
     integrity_valid: boolean
   }
-  issuer_tier?: string
   error?: string
-  upgrade_required?: boolean
 }
 
 Deno.serve(async (req) => {
@@ -95,10 +94,10 @@ Deno.serve(async (req) => {
         total_amount,
         currency,
         invoice_hash,
-        user_id,
         business_id,
         issuer_snapshot,
-        recipient_snapshot
+        recipient_snapshot,
+        payment_method_snapshot
       `)
       .eq('verification_id', verification_id)
       .maybeSingle()
@@ -138,39 +137,15 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Query issuer tier for logging/analytics only (no blocking)
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('tier')
-      .eq('user_id', invoice.user_id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const issuerTier = subscription?.tier || 'starter'
-    // Note: We no longer block Starter tier - verification is now available for all tiers
-    // This enables universal verification as a trust/marketing feature
-
-    // USE SNAPSHOT DATA - Not live data
-    // This ensures verification matches the invoice as it was at issuance time
+    // USE SNAPSHOT DATA ONLY - no live data queries, no subscription lookups
     let issuerName = 'Unknown Business'
     const snapshot = invoice.issuer_snapshot as IssuerSnapshot | null
     
     if (snapshot) {
       issuerName = snapshot.legal_name || snapshot.name || 'Unknown Business'
     } else {
-      // Fallback: Query live data only if snapshot missing (legacy invoices)
-      console.warn('Invoice missing issuer_snapshot, falling back to live data:', invoice.id)
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('name, legal_name')
-        .eq('id', invoice.business_id)
-        .maybeSingle()
-      
-      if (business) {
-        issuerName = business.legal_name || business.name || 'Unknown Business'
-      }
+      // No fallback to live data - snapshot should always exist for issued invoices
+      console.warn('Invoice missing issuer_snapshot:', invoice.id)
     }
 
     // Check integrity (hash exists = not tampered)
@@ -201,6 +176,10 @@ Deno.serve(async (req) => {
         paymentStatus = 'Unknown'
     }
 
+    // Extract payment method type from snapshot (no sensitive details)
+    const paymentMethodSnapshot = invoice.payment_method_snapshot as { provider_type?: string } | null
+    const paymentMethodType = paymentMethodSnapshot?.provider_type || undefined
+
     const response: VerificationResponse = {
       verified: true,
       invoice: {
@@ -214,29 +193,25 @@ Deno.serve(async (req) => {
           legal_name: snapshot.legal_name || snapshot.name
         } : undefined,
         payment_status: paymentStatus,
+        payment_method_type: paymentMethodType,
         total_amount: invoice.total_amount,
         currency: invoice.currency,
         integrity_valid: integrityValid
-      },
-      issuer_tier: issuerTier
+      }
     }
 
-    // Log the verification event (for audit purposes)
-    try {
-      await supabase.rpc('log_audit_event', {
-        _entity_type: 'invoice',
-        _entity_id: invoice.id,
-        _event_type: 'INVOICE_VIEWED',
-        _metadata: { 
-          verification_type: 'public_portal',
-          issuer_tier: issuerTier,
-          snapshot_used: !!snapshot
-        }
+    // Fire-and-forget: Log to verification_access_logs (lightweight, auto-expiring)
+    supabase
+      .from('verification_access_logs')
+      .insert({
+        entity_type: 'invoice',
+        entity_id: invoice.id,
+        verification_id: verification_id,
+        metadata: { snapshot_used: !!snapshot }
       })
-    } catch (auditErr) {
-      // Don't fail the request if audit logging fails
-      console.error('Audit log error:', auditErr)
-    }
+      .then(({ error: logErr }) => {
+        if (logErr) console.error('Verification access log error:', logErr)
+      })
 
     return new Response(JSON.stringify(response), {
       status: 200,

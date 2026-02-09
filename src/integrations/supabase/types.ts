@@ -650,6 +650,8 @@ export type Database = {
           issued_by: string | null
           issuer_snapshot: Json | null
           notes: string | null
+          payment_method_id: string | null
+          payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -690,6 +692,8 @@ export type Database = {
           issued_by?: string | null
           issuer_snapshot?: Json | null
           notes?: string | null
+          payment_method_id?: string | null
+          payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -730,6 +734,8 @@ export type Database = {
           issued_by?: string | null
           issuer_snapshot?: Json | null
           notes?: string | null
+          payment_method_id?: string | null
+          payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -770,6 +776,13 @@ export type Database = {
             columns: ["currency_account_id"]
             isOneToOne: false
             referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
             referencedColumns: ["id"]
           },
           {
@@ -831,6 +844,115 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          business_id: string
+          created_at: string
+          currency_account_id: string
+          display_name: string
+          id: string
+          instructions: Json
+          is_default: boolean
+          provider_type: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          currency_account_id: string
+          display_name: string
+          id?: string
+          instructions?: Json
+          is_default?: boolean
+          provider_type: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          currency_account_id?: string
+          display_name?: string
+          id?: string
+          instructions?: Json
+          is_default?: boolean
+          provider_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_proofs: {
+        Row: {
+          business_id: string
+          created_at: string
+          file_name: string
+          file_type: string | null
+          file_url: string
+          id: string
+          invoice_id: string
+          payment_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          file_name: string
+          file_type?: string | null
+          file_url: string
+          id?: string
+          invoice_id: string
+          payment_id: string
+          uploaded_by: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          file_name?: string
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          invoice_id?: string
+          payment_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
         ]
@@ -1406,6 +1528,33 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_access_logs: {
+        Row: {
+          accessed_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json | null
+          verification_id: string
+        }
+        Insert: {
+          accessed_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          verification_id: string
+        }
+        Update: {
+          accessed_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          verification_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1413,6 +1562,10 @@ export type Database = {
     Functions: {
       check_currency_account_limit: {
         Args: { _business_id: string }
+        Returns: Json
+      }
+      check_payment_method_limit: {
+        Args: { _business_id: string; _currency_account_id: string }
         Returns: Json
       }
       check_tier_limit: {
@@ -1504,6 +1657,8 @@ export type Database = {
           issued_by: string | null
           issuer_snapshot: Json | null
           notes: string | null
+          payment_method_id: string | null
+          payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -1523,12 +1678,12 @@ export type Database = {
           void_reason: string | null
           voided_at: string | null
           voided_by: string | null
-        }
+        }[]
         SetofOptions: {
           from: "*"
           to: "invoices"
-          isOneToOne: true
-          isSetofReturn: false
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       log_audit_event: {
@@ -1596,6 +1751,10 @@ export type Database = {
         | "BUSINESS_DELETED"
         | "SUPPORT_TICKET_CREATED"
         | "SUPPORT_TICKET_REPLY"
+        | "PAYMENT_METHOD_CREATED"
+        | "PAYMENT_METHOD_UPDATED"
+        | "PAYMENT_METHOD_DELETED"
+        | "PROOF_UPLOADED"
       business_role: "owner" | "admin" | "member" | "auditor"
       invoice_status:
         | "draft"
@@ -1777,6 +1936,10 @@ export const Constants = {
         "BUSINESS_DELETED",
         "SUPPORT_TICKET_CREATED",
         "SUPPORT_TICKET_REPLY",
+        "PAYMENT_METHOD_CREATED",
+        "PAYMENT_METHOD_UPDATED",
+        "PAYMENT_METHOD_DELETED",
+        "PROOF_UPLOADED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       invoice_status: [

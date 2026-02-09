@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
       invoice_items_deleted: 0,
       payments_deleted: 0,
       credit_notes_deleted: 0,
+      verification_logs_deleted: 0,
+      export_manifests_deleted: 0,
       started_at: now,
       completed_at: '',
       errors: [] as string[]
@@ -149,6 +151,42 @@ Deno.serve(async (req) => {
       } else {
         results.invoices_deleted = invoiceIds.length
       }
+    }
+
+    // Step 6: Clean up verification_access_logs older than 90 days
+    try {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+      const { error: verLogError } = await supabase
+        .from('verification_access_logs')
+        .delete()
+        .lt('accessed_at', ninetyDaysAgo)
+
+      if (verLogError) {
+        console.error('Error cleaning verification_access_logs:', verLogError)
+        results.errors.push(`Verification logs cleanup error: ${verLogError.message}`)
+      } else {
+        results.verification_logs_deleted = (results.verification_logs_deleted || 0) + 1
+      }
+    } catch (err) {
+      console.error('Verification logs cleanup error:', err)
+    }
+
+    // Step 7: Clean up export_manifests older than 365 days
+    try {
+      const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
+      const { error: exportError } = await supabase
+        .from('export_manifests')
+        .delete()
+        .lt('timestamp_utc', oneYearAgo)
+
+      if (exportError) {
+        console.error('Error cleaning export_manifests:', exportError)
+        results.errors.push(`Export manifests cleanup error: ${exportError.message}`)
+      } else {
+        results.export_manifests_deleted = (results.export_manifests_deleted || 0) + 1
+      }
+    } catch (err) {
+      console.error('Export manifests cleanup error:', err)
     }
 
     results.completed_at = new Date().toISOString()

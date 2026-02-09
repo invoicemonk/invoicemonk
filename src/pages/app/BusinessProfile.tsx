@@ -20,6 +20,7 @@ import {
   Plus,
   Info
 } from 'lucide-react';
+import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -887,6 +888,16 @@ export default function BusinessProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment Methods Section */}
+      {business && (
+        <PaymentMethodsSection
+          businessId={business.id}
+          canManage={true}
+          canDelete={true}
+        />
+      )}
+
       {/* Danger Zone — only for non-default businesses */}
       {business && !business.is_default && (
         <Card className="border-destructive/30">

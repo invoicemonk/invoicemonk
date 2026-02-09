@@ -61,6 +61,7 @@ import { toast } from '@/hooks/use-toast';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { gaEvents } from '@/hooks/use-google-analytics';
+import { usePaymentMethods } from '@/hooks/use-payment-methods';
 
 
 interface InvoiceItem {
@@ -134,11 +135,29 @@ export default function InvoiceNew() {
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
   const [newClient, setNewClient] = useState({
     name: '',
     email: '',
     phone: '',
   });
+
+  // Fetch payment methods for the active currency account
+  const { data: paymentMethods } = usePaymentMethods(currentCurrencyAccount?.id);
+
+  // Auto-inherit default payment method when currency account changes
+  useEffect(() => {
+    if (paymentMethods?.length) {
+      const defaultMethod = paymentMethods.find(m => m.is_default);
+      if (defaultMethod) {
+        setSelectedPaymentMethodId(defaultMethod.id);
+      } else {
+        setSelectedPaymentMethodId(paymentMethods[0].id);
+      }
+    } else {
+      setSelectedPaymentMethodId('');
+    }
+  }, [paymentMethods]);
 
   // Get selected client for preview
   const selectedClient = clients?.find(c => c.id === selectedClientId);
@@ -205,6 +224,8 @@ export default function InvoiceNew() {
       retention_locked_until: null,
       currency_locked_at: null,
       currency_account_id: null,
+      payment_method_id: null,
+      payment_method_snapshot: null,
       clients: selectedClient || null,
       invoice_items: validItems.map((item, index) => ({
         id: `item-${index}`,
@@ -363,6 +384,7 @@ export default function InvoiceNew() {
         // Legacy FX fields - null for new records created through currency accounts
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
+        payment_method_id: selectedPaymentMethodId || null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -438,6 +460,7 @@ export default function InvoiceNew() {
         // Legacy FX fields - null for new records created through currency accounts
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
+        payment_method_id: selectedPaymentMethodId || null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -732,6 +755,39 @@ export default function InvoiceNew() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payment Method Selector */}
+          {paymentMethods && paymentMethods.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Payment Method</CardTitle>
+                <CardDescription>How should your client pay this invoice?</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedPaymentMethodId} onValueChange={setSelectedPaymentMethodId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map(pm => (
+                      <SelectItem key={pm.id} value={pm.id}>
+                        {pm.display_name}{pm.is_default ? ' (Default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+          {paymentMethods && paymentMethods.length === 0 && currentCurrencyAccount && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No payment method configured for {currentCurrencyAccount.currency}. Your client won't see payment instructions.{' '}
+                <Link to="/business-profile" className="underline font-medium">Add one</Link>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Line Items */}
           <Card>

@@ -70,16 +70,20 @@ const VerifyInvoice = () => {
   const { verificationId } = useParams<{ verificationId: string }>();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  const { data, isLoading, error } = useQuery<VerificationResponse>({
+  const { data, isLoading, error, refetch } = useQuery<VerificationResponse>({
     queryKey: ['verify-invoice', verificationId],
     queryFn: async () => {
       const response = await fetch(
         `https://skcxogeaerudoadluexz.supabase.co/functions/v1/verify-invoice?verification_id=${verificationId}`
       );
+      if (!response.ok && response.status >= 500) {
+        throw new Error('Verification service temporarily unavailable');
+      }
       return response.json();
     },
     enabled: !!verificationId,
-    retry: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 
   const formatDate = (dateStr: string | null) => {
@@ -207,12 +211,15 @@ const VerifyInvoice = () => {
                   <div className="rounded-full bg-destructive/10 p-4 mb-4">
                     <XCircle className="h-12 w-12 text-destructive" />
                   </div>
-                  <h2 className="text-2xl font-semibold mb-2">Verification Failed</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Unable to connect to the verification service. Please try again later.
+                  <h2 className="text-2xl font-semibold mb-2">Verification Unavailable</h2>
+                  <p className="text-muted-foreground mb-2">
+                    The verification service is temporarily unavailable. The document may still be valid.
                   </p>
-                  <Button variant="outline" onClick={() => window.location.reload()}>
-                    Try Again
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Please try again in a few moments.
+                  </p>
+                  <Button variant="outline" onClick={() => refetch()}>
+                    Retry Verification
                   </Button>
                 </div>
               </CardContent>

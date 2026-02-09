@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { sanitizeErrorMessage } from '@/lib/error-utils';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Invoice = Tables<'invoices'> & {
@@ -173,14 +174,18 @@ export function useCreateInvoice() {
         if (itemsError) throw itemsError;
       }
 
-      // Log audit event
-      await supabase.rpc('log_audit_event', {
-        _event_type: 'INVOICE_CREATED',
-        _entity_type: 'invoice',
-        _entity_id: createdInvoice.id,
-        _user_id: user.id,
-        _new_state: createdInvoice,
-      });
+      // Log audit event (fire-and-forget - never block invoice creation)
+      try {
+        await supabase.rpc('log_audit_event', {
+          _event_type: 'INVOICE_CREATED',
+          _entity_type: 'invoice',
+          _entity_id: createdInvoice.id,
+          _user_id: user.id,
+          _new_state: createdInvoice,
+        });
+      } catch (auditErr) {
+        console.error('Audit log error (non-blocking):', auditErr);
+      }
 
       return createdInvoice;
     },
@@ -194,7 +199,7 @@ export function useCreateInvoice() {
     onError: (error) => {
       toast({
         title: 'Error creating invoice',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -257,17 +262,21 @@ export function useUpdateInvoice() {
         }
       }
 
-      // Log audit event for draft invoice changes (compliance requirement)
+      // Log audit event for draft invoice changes (fire-and-forget)
       if (user && previousState) {
-        await supabase.rpc('log_audit_event', {
-          _event_type: 'INVOICE_UPDATED',
-          _entity_type: 'invoice',
-          _entity_id: invoiceId,
-          _user_id: user.id,
-          _business_id: updatedInvoice.business_id,
-          _previous_state: previousState,
-          _new_state: updatedInvoice,
-        });
+        try {
+          await supabase.rpc('log_audit_event', {
+            _event_type: 'INVOICE_UPDATED',
+            _entity_type: 'invoice',
+            _entity_id: invoiceId,
+            _user_id: user.id,
+            _business_id: updatedInvoice.business_id,
+            _previous_state: previousState,
+            _new_state: updatedInvoice,
+          });
+        } catch (auditErr) {
+          console.error('Audit log error (non-blocking):', auditErr);
+        }
       }
 
       return updatedInvoice;
@@ -283,7 +292,7 @@ export function useUpdateInvoice() {
     onError: (error) => {
       toast({
         title: 'Error updating invoice',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -307,7 +316,8 @@ export function useIssueInvoice() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      const issued = Array.isArray(data) ? data[0] : data;
+      queryClient.invalidateQueries({ queryKey: ['invoice', issued?.id] });
       queryClient.invalidateQueries({ queryKey: ['invoice-limit-check'] });
       // Accounting cache invalidations
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
@@ -322,7 +332,7 @@ export function useIssueInvoice() {
       console.error('Issue invoice error:', error);
       toast({
         title: 'Error issuing invoice',
-        description: error.message || 'Failed to issue invoice. Please try again.',
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -406,16 +416,20 @@ export function useVoidInvoice() {
 
       if (updateError) throw updateError;
 
-      // Log audit event
-      await supabase.rpc('log_audit_event', {
-        _event_type: 'INVOICE_VOIDED',
-        _entity_type: 'invoice',
-        _entity_id: invoiceId,
-        _user_id: user.id,
-        _previous_state: invoice,
-        _new_state: updatedInvoice,
-        _metadata: { reason, credit_note_number: creditNoteNumber },
-      });
+      // Log audit event (fire-and-forget)
+      try {
+        await supabase.rpc('log_audit_event', {
+          _event_type: 'INVOICE_VOIDED',
+          _entity_type: 'invoice',
+          _entity_id: invoiceId,
+          _user_id: user.id,
+          _previous_state: invoice,
+          _new_state: updatedInvoice,
+          _metadata: { reason, credit_note_number: creditNoteNumber },
+        });
+      } catch (auditErr) {
+        console.error('Audit log error (non-blocking):', auditErr);
+      }
 
       return updatedInvoice;
     },
@@ -435,7 +449,7 @@ export function useVoidInvoice() {
     onError: (error) => {
       toast({
         title: 'Error voiding invoice',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -476,7 +490,7 @@ export function useRecordPayment() {
       if (!invoice) throw new Error('Invoice not found');
 
       // Create payment record (currency_account_id inherited via trigger)
-      const { error: paymentError } = await supabase
+      const { data: paymentRecord, error: paymentError } = await supabase
         .from('payments')
         .insert({
           invoice_id: invoiceId,
@@ -486,7 +500,9 @@ export function useRecordPayment() {
           notes,
           payment_date: paymentDate || new Date().toISOString().split('T')[0],
           recorded_by: user.id,
-        });
+        })
+        .select()
+        .single();
 
       if (paymentError) throw paymentError;
 
@@ -508,18 +524,22 @@ export function useRecordPayment() {
       if (updateError) throw updateError;
       if (!updatedInvoice) throw new Error('Failed to update invoice - no rows affected. You may not have permission to update this invoice.');
 
-      // Log audit event
-      await supabase.rpc('log_audit_event', {
-        _event_type: 'PAYMENT_RECORDED',
-        _entity_type: 'invoice',
-        _entity_id: invoiceId,
-        _user_id: user.id,
-        _previous_state: invoice,
-        _new_state: updatedInvoice,
-        _metadata: { amount, payment_method: paymentMethod },
-      });
+      // Log audit event (fire-and-forget)
+      try {
+        await supabase.rpc('log_audit_event', {
+          _event_type: 'PAYMENT_RECORDED',
+          _entity_type: 'invoice',
+          _entity_id: invoiceId,
+          _user_id: user.id,
+          _previous_state: invoice,
+          _new_state: updatedInvoice,
+          _metadata: { amount, payment_method: paymentMethod },
+        });
+      } catch (auditErr) {
+        console.error('Audit log error (non-blocking):', auditErr);
+      }
 
-      return updatedInvoice;
+      return { ...updatedInvoice, _payment_id: paymentRecord.id };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -538,7 +558,7 @@ export function useRecordPayment() {
     onError: (error) => {
       toast({
         title: 'Error recording payment',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -590,7 +610,7 @@ export function useDeleteInvoice() {
     onError: (error) => {
       toast({
         title: 'Error deleting invoice',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },

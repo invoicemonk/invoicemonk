@@ -63,13 +63,30 @@ export default function VerifyReceipt() {
                 <div className="rounded-full bg-destructive/10 p-4 mb-4">
                   <XCircle className="h-12 w-12 text-destructive" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Verification Failed</h2>
-                <p className="text-muted-foreground text-center max-w-sm mb-6">
-                  {(error as Error)?.message || data?.error || 'This receipt could not be verified. It may not exist or has been tampered with.'}
+                <h2 className="text-2xl font-bold mb-2">
+                  {error ? 'Verification Unavailable' : 'Verification Failed'}
+                </h2>
+                <p className="text-muted-foreground text-center max-w-sm mb-2">
+                  {error 
+                    ? 'The verification service is temporarily unavailable. The receipt may still be valid.'
+                    : data?.error || 'This receipt could not be verified. It may not exist or has been tampered with.'
+                  }
                 </p>
-                <Button asChild>
-                  <Link to="/">Return to Invoicemonk</Link>
-                </Button>
+                {error && (
+                  <p className="text-sm text-muted-foreground text-center max-w-sm mb-6">
+                    Please try again in a few moments.
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  {error && (
+                    <Button variant="outline" onClick={() => window.location.reload()}>
+                      Retry
+                    </Button>
+                  )}
+                  <Button asChild>
+                    <Link to="/">Return to Invoicemonk</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

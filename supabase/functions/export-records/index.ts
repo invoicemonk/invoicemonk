@@ -201,9 +201,39 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Pre-flight record count check to prevent timeout on large exports
+    let countQuery = supabaseUser.from(body.export_type).select('id', { count: 'exact', head: true })
+    if (body.business_id && ['invoices', 'clients', 'expenses'].includes(body.export_type)) {
+      countQuery = countQuery.eq('business_id', body.business_id)
+    }
+    if (body.date_from) {
+      const dateCol = body.export_type === 'audit_logs' ? 'timestamp_utc' : 
+                       body.export_type === 'expenses' ? 'expense_date' :
+                       body.export_type === 'payments' ? 'payment_date' : 'created_at'
+      countQuery = countQuery.gte(dateCol, body.date_from)
+    }
+    if (body.date_to) {
+      const dateCol = body.export_type === 'audit_logs' ? 'timestamp_utc' : 
+                       body.export_type === 'expenses' ? 'expense_date' :
+                       body.export_type === 'payments' ? 'payment_date' : 'created_at'
+      countQuery = countQuery.lte(dateCol, body.date_to)
+    }
+    const { count: estimatedCount } = await countQuery
+    if (estimatedCount && estimatedCount > 5000) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Export contains ${estimatedCount} records (max 5,000). Please narrow your date range or add filters.` 
+        } as ExportRecordsResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const format = body.format || 'csv'
     const exportId = crypto.randomUUID()
     const generatedAt = new Date().toISOString()
+    const startTime = Date.now()
+    const TIMEOUT_MS = 25000  // 25s guard (Supabase free tier has 30s limit)
     
     // Capture chain of custody information
     const sourceIP = getClientIP(req)
@@ -290,6 +320,8 @@ Deno.serve(async (req) => {
             exchange_rate_to_primary: inv.exchange_rate_to_primary,
             primary_currency_equivalent: primaryEquivalent,
             primary_currency: primaryCurrency,
+            payment_method_display_name: (inv.payment_method_snapshot as Record<string, unknown>)?.display_name || '',
+            payment_method_type: (inv.payment_method_snapshot as Record<string, unknown>)?.provider_type || '',
             created_at: inv.created_at,
             issued_at: inv.issued_at,
             issuer_snapshot: inv.issuer_snapshot,
@@ -301,6 +333,7 @@ Deno.serve(async (req) => {
         columns = ['invoice_number', 'client_name', 'client_email', 'status', 'issue_date', 'due_date', 
                    'subtotal', 'tax_amount', 'discount_amount', 'total_amount', 'amount_paid', 'currency',
                    'exchange_rate_to_primary', 'primary_currency_equivalent', 'primary_currency',
+                   'payment_method_display_name', 'payment_method_type',
                    'created_at', 'issued_at', 'issuer_snapshot', 'recipient_snapshot', 'tax_schema_version']
         filename = `invoices_export_${generatedAt.split('T')[0]}`
         break
@@ -445,6 +478,18 @@ Deno.serve(async (req) => {
         filename = `expenses_export_${generatedAt.split('T')[0]}`
         break
       }
+    }
+
+    // Check timeout before generating export content
+    const elapsed = Date.now() - startTime
+    if (elapsed > TIMEOUT_MS) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Export timed out after ${Math.round(elapsed / 1000)}s. Please narrow your date range or filters.` 
+        } as ExportRecordsResponse),
+        { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Generate export content

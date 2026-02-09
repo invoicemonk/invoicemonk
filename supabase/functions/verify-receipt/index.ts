@@ -64,10 +64,10 @@ Deno.serve(async (req) => {
     // Use service client - public endpoint, no auth required
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Fetch receipt by verification_id
+    // Fetch receipt by verification_id - narrow column selection to minimize data transfer
     const { data: receipt, error: receiptError } = await supabase
       .from('receipts')
-      .select('*')
+      .select('id, receipt_number, amount, currency, issued_at, receipt_hash, invoice_id, payment_id, business_id, verification_id, issuer_snapshot, payer_snapshot, invoice_snapshot, payment_snapshot')
       .eq('verification_id', verificationId)
       .maybeSingle()
 
@@ -98,26 +98,18 @@ Deno.serve(async (req) => {
     
     const integrityValid = computedHash === receipt.receipt_hash
 
-    // Log RECEIPT_VIEWED audit event (no user context for public endpoint)
-    try {
-      await supabase.rpc('log_audit_event', {
-        _event_type: 'RECEIPT_VIEWED',
-        _entity_type: 'receipt',
-        _entity_id: receipt.id,
-        _user_id: null,
-        _business_id: receipt.business_id,
-        _previous_state: null,
-        _new_state: null,
-        _metadata: {
-          verification_id: verificationId,
-          integrity_valid: integrityValid,
-          source: 'public_verification'
-        }
+    // Fire-and-forget: Log to verification_access_logs (lightweight, auto-expiring)
+    supabase
+      .from('verification_access_logs')
+      .insert({
+        entity_type: 'receipt',
+        entity_id: receipt.id,
+        verification_id: verificationId,
+        metadata: { integrity_valid: integrityValid, source: 'public_verification' }
       })
-    } catch (auditErr) {
-      console.error('Audit log error:', auditErr)
-      // Don't fail the request if audit logging fails
-    }
+      .then(({ error: logErr }) => {
+        if (logErr) console.error('Verification access log error:', logErr)
+      })
 
     // Extract snapshot data only - never use live data
     const issuerSnapshot = receipt.issuer_snapshot as { name?: string; legal_name?: string }

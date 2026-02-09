@@ -56,7 +56,8 @@ function formatDate(dateStr: string): string {
 // Generate HTML for receipt PDF
 function generateReceiptHtml(
   receipt: Record<string, unknown>,
-  showWatermark: boolean
+  showWatermark: boolean,
+  paymentMethodSnapshot?: Record<string, unknown> | null
 ): string {
   const issuer = receipt.issuer_snapshot as Record<string, unknown> || {}
   const payer = receipt.payer_snapshot as Record<string, unknown> || {}
@@ -273,6 +274,26 @@ function generateReceiptHtml(
         </div>
       </div>
 
+      ${(() => {
+        if (!paymentMethodSnapshot) return ''
+        const pmInstructions = paymentMethodSnapshot.instructions as Record<string, string> || {}
+        const pmDisplayName = (paymentMethodSnapshot.display_name as string) || (paymentMethodSnapshot.provider_type as string) || 'Payment Method'
+        const pmRows = Object.entries(pmInstructions)
+          .filter(([, v]) => v)
+          .map(([k, v]) => `
+            <div class="detail-row">
+              <span class="detail-label" style="text-transform: capitalize;">${String(k).replace(/_/g, ' ')}</span>
+              <span class="detail-value" style="font-family: 'Courier New', monospace; font-size: 13px;">${String(v)}</span>
+            </div>
+          `).join('')
+        return `
+        <div class="section">
+          <div class="section-title">Payment Method</div>
+          <div style="font-weight: 500; font-size: 15px; margin-bottom: 8px;">${pmDisplayName}</div>
+          ${pmRows}
+        </div>`
+      })()}
+
       <div class="verification-section">
         <div class="verification-title">Verification Information</div>
         <div class="verification-id">
@@ -368,6 +389,17 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Fetch payment method snapshot from the related invoice
+    let paymentMethodSnapshot: Record<string, unknown> | null = null
+    if (receipt.invoice_id) {
+      const { data: invoiceData } = await supabaseService
+        .from('invoices')
+        .select('payment_method_snapshot')
+        .eq('id', receipt.invoice_id)
+        .maybeSingle()
+      paymentMethodSnapshot = invoiceData?.payment_method_snapshot as Record<string, unknown> | null
+    }
+
     // Check user's subscription tier for watermark decision
     const { data: subscription } = await supabaseService
       .from('subscriptions')
@@ -382,7 +414,7 @@ Deno.serve(async (req) => {
     const showWatermark = tier === 'starter' || tier === 'starter_paid'
 
     // Generate HTML
-    const html = generateReceiptHtml(receipt, showWatermark)
+    const html = generateReceiptHtml(receipt, showWatermark, paymentMethodSnapshot)
 
     // Generate PDF using PDFShift
     if (!pdfShiftApiKey) {

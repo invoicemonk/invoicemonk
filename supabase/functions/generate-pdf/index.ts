@@ -228,6 +228,28 @@ Deno.serve(async (req) => {
       }
 
       invoice = invoiceData
+
+      // Check for cached HTML in storage before regenerating
+      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}.html`
+      const supabaseAdminForCache = createClient(supabaseUrl, supabaseServiceKey)
+      const { data: cachedFile } = await supabaseAdminForCache.storage
+        .from('invoice-pdfs')
+        .download(cachePath)
+      
+      if (cachedFile) {
+        const cachedHtml = await cachedFile.text()
+        if (cachedHtml && cachedHtml.length > 100) {
+          return new Response(cachedHtml, {
+            status: 200,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'text/html; charset=utf-8',
+              'X-Invoice-Number': invoiceData.invoice_number,
+              'X-Cache': 'HIT'
+            }
+          })
+        }
+      }
     }
 
     // At this point invoice is guaranteed to not be null
@@ -260,6 +282,7 @@ Deno.serve(async (req) => {
       issuer_snapshot: IssuerSnapshot | null
       recipient_snapshot: RecipientSnapshot | null
       template_snapshot: TemplateSnapshot | null
+      payment_method_snapshot: { provider_type?: string; display_name?: string; instructions?: Record<string, string> } | null
       clients?: { name?: string; email?: string; address?: Record<string, unknown> } | null
       invoice_items?: InvoiceItem[]
     }
@@ -753,6 +776,32 @@ Deno.serve(async (req) => {
     </div>
     ` : ''}
 
+    ${(() => {
+      const pm = inv.payment_method_snapshot
+      if (!pm) return ''
+      const instructions = (pm as Record<string, unknown>).instructions as Record<string, string> || {}
+      const displayName = (pm as Record<string, unknown>).display_name as string || (pm as Record<string, unknown>).provider_type as string || 'Payment Method'
+      const instructionRows = Object.entries(instructions)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `
+          <div style="display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0;">
+            <span style="color: #666; text-transform: capitalize;">${String(k).replace(/_/g, ' ')}</span>
+            <span style="font-family: monospace; font-size: 10px;">${String(v)}</span>
+          </div>
+        `).join('')
+      return `
+      <div class="notes-section no-break" style="margin-bottom: 12px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
+        <div style="font-size: 9px; font-weight: 600; color: #166534; text-transform: uppercase; margin-bottom: 6px;">Payment Instructions</div>
+        <div style="font-size: 10px; color: #333; margin-bottom: 4px;">
+          <strong>${displayName}</strong>
+        </div>
+        ${instructionRows}
+        <div style="margin-top: 6px; font-size: 9px; color: #666; border-top: 1px solid #dcfce7; padding-top: 4px;">
+          Reference: <strong>${inv.invoice_number}</strong>
+        </div>
+      </div>`
+    })()}
+
     <!-- Footer with QR Code -->
     <div class="footer">
       <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
@@ -778,9 +827,22 @@ Deno.serve(async (req) => {
 </body>
 </html>`
 
+    // Cache the generated HTML to storage for subsequent requests (fire-and-forget)
+    // Only cache for issued/paid/voided invoices (stable states)
+    if (['issued', 'sent', 'viewed', 'paid', 'voided', 'credited'].includes(inv.status)) {
+      const cachePath = `${inv.business_id || 'personal'}/${inv.id}.html`
+      supabaseAdmin.storage
+        .from('invoice-pdfs')
+        .upload(cachePath, new Blob([html], { type: 'text/html' }), { upsert: true })
+        .then(({ error: cacheErr }) => {
+          if (cacheErr) console.error('PDF cache write error (non-blocking):', cacheErr)
+        })
+    }
+
     // Log PDF export event for compliance (skip for public access to avoid permission issues)
+    // Fire-and-forget: never block the response
     if (!isPublicAccess) {
-      await supabaseAdmin.rpc('log_audit_event', {
+      supabaseAdmin.rpc('log_audit_event', {
         _event_type: 'DATA_EXPORTED',
         _entity_type: 'invoice',
         _entity_id: inv.id,
@@ -793,6 +855,8 @@ Deno.serve(async (req) => {
           watermark_shown: showWatermark,
           branding_used: canUseBranding
         }
+      }).then(({ error: auditErr }) => {
+        if (auditErr) console.error('PDF audit log error (non-blocking):', auditErr)
       })
     }
 

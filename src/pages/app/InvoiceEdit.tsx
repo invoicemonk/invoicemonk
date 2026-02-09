@@ -58,6 +58,7 @@ import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
+import { usePaymentMethods } from '@/hooks/use-payment-methods';
 
 interface InvoiceItem {
   id: string;
@@ -109,6 +110,7 @@ export default function InvoiceEdit() {
   const [summary, setSummary] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -116,6 +118,22 @@ export default function InvoiceEdit() {
     email: '',
     phone: '',
   });
+
+  // Fetch payment methods for the invoice's currency account
+  const { data: paymentMethods } = usePaymentMethods(invoice?.currency_account_id || undefined);
+
+  // Auto-inherit default payment method when payment methods load, or use existing
+  useEffect(() => {
+    if (!isInitialized) return;
+    if (invoice?.payment_method_id && paymentMethods?.some(m => m.id === invoice.payment_method_id)) {
+      setSelectedPaymentMethodId(invoice.payment_method_id);
+    } else if (paymentMethods?.length) {
+      const defaultMethod = paymentMethods.find(m => m.is_default);
+      setSelectedPaymentMethodId(defaultMethod?.id || paymentMethods[0].id);
+    } else {
+      setSelectedPaymentMethodId('');
+    }
+  }, [paymentMethods, isInitialized, invoice?.payment_method_id]);
 
   // Get selected client for B2B validation
   const selectedClient = clients?.find(c => c.id === selectedClientId);
@@ -284,7 +302,6 @@ export default function InvoiceEdit() {
     await updateInvoice.mutateAsync({
       invoiceId: id,
       updates: {
-        // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
         currency: currency,
         issue_date: issueDate,
@@ -296,9 +313,9 @@ export default function InvoiceEdit() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
-        // Legacy FX fields - null for currency account based records
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
+        payment_method_id: selectedPaymentMethodId || null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -342,7 +359,6 @@ export default function InvoiceEdit() {
     await updateInvoice.mutateAsync({
       invoiceId: id,
       updates: {
-        // Note: business_id/user_id are immutable after creation (invoice_owner_check constraint)
         client_id: selectedClientId,
         currency: currency,
         issue_date: issueDate,
@@ -354,9 +370,9 @@ export default function InvoiceEdit() {
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
         template_id: selectedTemplateId || null,
-        // Legacy FX fields - null for currency account based records
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
+        payment_method_id: selectedPaymentMethodId || null,
       },
       items: validItems.map(item => ({
         description: item.description,
@@ -749,6 +765,39 @@ export default function InvoiceEdit() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Payment Method Selector */}
+          {paymentMethods && paymentMethods.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Payment Method</CardTitle>
+                <CardDescription>How should your client pay this invoice?</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedPaymentMethodId} onValueChange={setSelectedPaymentMethodId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map(pm => (
+                      <SelectItem key={pm.id} value={pm.id}>
+                        {pm.display_name}{pm.is_default ? ' (Default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+          {paymentMethods && paymentMethods.length === 0 && invoice?.currency_account_id && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No payment method configured. Your client won't see payment instructions.{' '}
+                <Link to="/business-profile" className="underline font-medium">Add one</Link>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Notes & Terms */}
           <Card>

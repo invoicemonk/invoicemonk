@@ -1,0 +1,6 @@
+
+-- 1. Extend audit_event_type enum
+ALTER TYPE public.audit_event_type ADD VALUE IF NOT EXISTS 'PAYMENT_METHOD_CREATED';
+ALTER TYPE public.audit_event_type ADD VALUE IF NOT EXISTS 'PAYMENT_METHOD_UPDATED';
+ALTER TYPE public.audit_event_type ADD VALUE IF NOT EXISTS 'PAYMENT_METHOD_DELETED';
+ALTER TYPE public.audit_event_type ADD VALUE IF NOT EXISTS 'PROOF_UPLOADED';

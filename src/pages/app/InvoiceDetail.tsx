@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX
+  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,13 @@ import { useInvoiceAuditLogs } from '@/hooks/use-audit-logs';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
 import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
 import { useInvoicePayments } from '@/hooks/use-payments';
+import { useInvoicePaymentProofs, useUploadPaymentProof } from '@/hooks/use-payment-proofs';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
+import { PaymentMethodCard } from '@/components/payment-methods/PaymentMethodCard';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -59,14 +62,17 @@ const statusColors: Record<InvoiceStatus, string> = {
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: invoice, isLoading, error } = useInvoice(id);
   const { data: auditLogs } = useInvoiceAuditLogs(id);
   const { data: creditNote } = useCreditNoteByInvoice(id);
   const { data: payments } = useInvoicePayments(id);
+  const { data: paymentProofs } = useInvoicePaymentProofs(id);
   const issueInvoice = useIssueInvoice();
   const voidInvoice = useVoidInvoice();
   const recordPayment = useRecordPayment();
   const downloadPdf = useDownloadInvoicePdf();
+  const uploadProof = useUploadPaymentProof();
   const { isStarter } = useBusiness();
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
@@ -79,6 +85,8 @@ export default function InvoiceDetail() {
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const proofFileRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
@@ -120,8 +128,8 @@ export default function InvoiceDetail() {
   };
 
   const handleRecordPayment = async () => {
-    if (id && paymentAmount) {
-      await recordPayment.mutateAsync({ 
+    if (id && paymentAmount && invoice) {
+      const result = await recordPayment.mutateAsync({ 
         invoiceId: id, 
         amount: parseFloat(paymentAmount),
         paymentMethod: paymentMethod || undefined,
@@ -129,12 +137,26 @@ export default function InvoiceDetail() {
         paymentDate: paymentDate,
         notes: paymentNotes || undefined
       });
+
+      // Upload proof of payment if a file was selected
+      const paymentId = (result as any)?._payment_id;
+      if (proofFile && paymentId && user?.id) {
+        await uploadProof.mutateAsync({
+          paymentId,
+          invoiceId: id,
+          businessId: invoice.business_id || '',
+          file: proofFile,
+          userId: user.id,
+        });
+      }
+
       setPaymentDialogOpen(false);
       setPaymentAmount('');
       setPaymentMethod('');
       setPaymentReference('');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setPaymentNotes('');
+      setProofFile(null);
     }
   };
 
@@ -402,6 +424,14 @@ export default function InvoiceDetail() {
               </CardContent>
             </Card>
           )}
+
+          {/* Payment Instructions - from snapshot */}
+          {isImmutable && invoice.payment_method_snapshot && (
+            <PaymentMethodCard
+              snapshot={invoice.payment_method_snapshot as { provider_type: string; display_name: string; instructions: Record<string, string> }}
+              invoiceNumber={invoice.invoice_number}
+            />
+          )}
         </div>
 
         {/* Sidebar */}
@@ -480,7 +510,27 @@ export default function InvoiceDetail() {
                     No payments recorded yet
                   </p>
                 )}
-                
+                {/* Payment Proofs */}
+                {paymentProofs && paymentProofs.length > 0 && (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Paperclip className="h-3 w-3" /> Payment Proofs
+                    </p>
+                    {paymentProofs.map(proof => (
+                      <a
+                        key={proof.id}
+                        href={proof.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <Upload className="h-3 w-3" />
+                        {proof.file_name}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 {/* Summary Section */}
                 <Separator className="my-4" />
                 <div className="space-y-2">
@@ -627,6 +677,26 @@ export default function InvoiceDetail() {
                 placeholder="Additional notes..."
                 rows={2}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="proof">Proof of Payment (optional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  ref={proofFileRef}
+                  id="proof"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                  className="text-xs"
+                />
+                {proofFile && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    {proofFile.name.slice(0, 20)}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Upload a screenshot or PDF of the payment confirmation.</p>
             </div>
           </div>
           <AlertDialogFooter>

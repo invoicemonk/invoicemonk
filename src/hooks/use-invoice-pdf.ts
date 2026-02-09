@@ -2,38 +2,42 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { gaEvents } from '@/hooks/use-google-analytics';
+import { sanitizeErrorMessage } from '@/lib/error-utils';
 
 interface GeneratePdfParams {
   invoiceId: string;
   invoiceNumber: string;
 }
 
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1500;
+
+async function generatePdfWithRetry(invoiceId: string, attempt = 0): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('generate-pdf', {
+    body: { 
+      invoice_id: invoiceId,
+      app_url: window.location.origin
+    }
+  });
+
+  if (error) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+      return generatePdfWithRetry(invoiceId, attempt + 1);
+    }
+    throw new Error(error.message || 'Failed to generate PDF');
+  }
+
+  return typeof data === 'string' ? data : '';
+}
+
 export function useDownloadInvoicePdf() {
   return useMutation({
     mutationFn: async ({ invoiceId, invoiceNumber }: GeneratePdfParams) => {
-      // Use supabase.functions.invoke for consistent auth handling
-      const { data, error } = await supabase.functions.invoke('generate-pdf', {
-        body: { 
-          invoice_id: invoiceId,
-          app_url: window.location.origin // Pass current domain for correct QR/verification links
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to generate PDF');
-      }
-
-      // The response is HTML text
-      const html = typeof data === 'string' ? data : '';
-      
-      // Note: When using supabase.functions.invoke, we can't easily access response headers
-      // The watermark/tier info would need to be embedded in the response if needed
-      const watermarkApplied = false; // Will be determined by the HTML content itself
-      const userTier = 'unknown';
-
-      return { html, invoiceNumber, watermarkApplied, userTier };
+      const html = await generatePdfWithRetry(invoiceId);
+      return { html, invoiceNumber };
     },
-    onSuccess: ({ html, invoiceNumber, watermarkApplied, userTier }, variables) => {
+    onSuccess: ({ html, invoiceNumber }, variables) => {
       // Track PDF download event
       gaEvents.pdfDownloaded(variables.invoiceId);
       
@@ -50,9 +54,7 @@ export function useDownloadInvoicePdf() {
         
         toast({
           title: 'PDF Ready',
-          description: watermarkApplied 
-            ? `Invoice ${invoiceNumber} opened for printing. Upgrade to remove watermark.`
-            : `Invoice ${invoiceNumber} opened for printing.`,
+          description: `Invoice ${invoiceNumber} opened for printing.`,
         });
       } else {
         // Fallback: download as HTML file
@@ -74,8 +76,8 @@ export function useDownloadInvoicePdf() {
     },
     onError: (error) => {
       toast({
-        title: 'Error generating PDF',
-        description: error.message,
+        title: 'PDF generation failed',
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
