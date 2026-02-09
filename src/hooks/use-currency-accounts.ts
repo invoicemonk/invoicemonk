@@ -37,7 +37,7 @@ export function useCurrencyAccounts(businessId?: string) {
 // Create a new currency account
 export function useCreateCurrencyAccount() {
   const queryClient = useQueryClient();
-  const { currentBusiness } = useBusiness();
+  const { currentBusiness, isPlatformAdmin } = useBusiness();
 
   return useMutation({
     mutationFn: async ({ currency, name }: { currency: string; name?: string }) => {
@@ -45,29 +45,32 @@ export function useCreateCurrencyAccount() {
         throw new Error('No business selected');
       }
 
-      // Check tier limit first
-      const { data: limitCheck, error: limitError } = await supabase.rpc('check_currency_account_limit', {
-        _business_id: currentBusiness.id,
-      });
+      // Platform admins skip limit check - they have unlimited access
+      if (!isPlatformAdmin) {
+        // Check tier limit first
+        const { data: limitCheck, error: limitError } = await supabase.rpc('check_currency_account_limit', {
+          _business_id: currentBusiness.id,
+        });
 
-      if (limitError) {
-        throw new Error('Failed to check account limit');
-      }
-
-      const limit = limitCheck as { allowed: boolean; tier: string; limit: number | null; current_count: number; limit_type?: string };
-      
-      if (!limit.allowed) {
-        // Build helpful upgrade message based on tier
-        let upgradeMessage = '';
-        if (limit.tier === 'starter') {
-          upgradeMessage = 'Free tier allows 1 currency account. Upgrade to Starter Paid for 3 accounts, or Professional/Business for unlimited.';
-        } else if (limit.tier === 'starter_paid') {
-          upgradeMessage = 'Starter Paid tier allows 3 currency accounts. Upgrade to Professional or Business for unlimited.';
-        } else {
-          upgradeMessage = 'Currency account limit reached. Please upgrade your plan.';
+        if (limitError) {
+          throw new Error('Failed to check account limit');
         }
+
+        const limit = limitCheck as { allowed: boolean; tier: string; limit: number | null; current_count: number; limit_type?: string };
         
-        throw new Error(upgradeMessage);
+        if (!limit.allowed) {
+          // Build helpful upgrade message based on tier
+          let upgradeMessage = '';
+          if (limit.tier === 'starter') {
+            upgradeMessage = 'Free tier allows 1 currency account. Upgrade to Starter Paid for 3 accounts, or Professional/Business for unlimited.';
+          } else if (limit.tier === 'starter_paid') {
+            upgradeMessage = 'Starter Paid tier allows 3 currency accounts. Upgrade to Professional or Business for unlimited.';
+          } else {
+            upgradeMessage = 'Currency account limit reached. Please upgrade your plan.';
+          }
+          
+          throw new Error(upgradeMessage);
+        }
       }
 
       const { data, error } = await supabase

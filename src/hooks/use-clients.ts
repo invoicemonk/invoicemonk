@@ -10,13 +10,10 @@ export type ClientUpdate = TablesUpdate<'clients'>;
 
 /**
  * Fetch all clients for a business (or fallback to user).
- * 
- * SECURITY NOTE: This query relies on RLS policies for data isolation.
+ *
+ * SECURITY: Relies on RLS policies for data isolation.
  * When businessId is provided, explicit filtering is applied.
- * Otherwise, RLS ensures users only see clients they own or have business access to.
- * 
- * RLS policies:
- * - "Users can view their clients" - (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
+ * RLS policies: "Users can view their clients" — (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
  */
 export function useClients(businessId?: string) {
   const { user } = useAuth();
@@ -47,13 +44,10 @@ export function useClients(businessId?: string) {
 
 /**
  * Fetch a single client by ID.
- * 
- * SECURITY: Single-record fetch by ID.
- * RLS enforces ownership at the database level.
+ *
+ * SECURITY: Single-record fetch by ID. RLS enforces ownership at database level.
  * UI layer should verify business membership via BusinessAccessGuard before rendering.
- * 
- * Note: Clients can have business_id = null (user-level personal clients).
- * These are accessible only to the owning user.
+ * Note: Clients can have business_id = null (user-level clients), which is allowed.
  */
 export function useClient(clientId: string | undefined) {
   const { user } = useAuth();

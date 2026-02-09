@@ -15,13 +15,11 @@ export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
 
 /**
  * Fetch all invoices for a business, optionally filtered by currency account.
- * 
- * SECURITY NOTE: This query relies on RLS policies for data isolation.
+ *
+ * SECURITY: Relies on RLS policies for data isolation.
  * When businessId is provided, explicit filtering is applied.
  * When omitted, RLS ensures users only see invoices they have access to.
- * 
- * RLS policies:
- * - "Users can view their invoices" - (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
+ * RLS policies: "Users can view their invoices" — (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
  */
 export function useInvoices(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
@@ -60,15 +58,9 @@ export function useInvoices(businessId?: string, currencyAccountId?: string) {
 
 /**
  * Fetch a single invoice by ID.
- * 
- * SECURITY: Single-record fetch by ID.
- * RLS enforces ownership at the database level.
+ *
+ * SECURITY: Single-record fetch by ID. RLS enforces ownership at database level.
  * UI layer should verify business membership via BusinessAccessGuard before rendering.
- * 
- * Access control flow:
- * 1. RLS blocks unauthorized access at DB level (returns null/error)
- * 2. BusinessAccessGuard provides UI-layer defense-in-depth
- * 3. Clear "Access Denied" UX vs ambiguous "not found"
  */
 export function useInvoice(invoiceId: string | undefined) {
   const { user } = useAuth();
@@ -317,6 +309,10 @@ export function useIssueInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
       queryClient.invalidateQueries({ queryKey: ['invoice-limit-check'] });
+      // Accounting cache invalidations
+      queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue-trend'] });
       toast({
         title: 'Invoice issued',
         description: 'This invoice is now immutable and cannot be modified.',
@@ -426,6 +422,11 @@ export function useVoidInvoice() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      // Credit notes + accounting invalidations
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue-trend'] });
       toast({
         title: 'Invoice voided',
         description: 'A credit note has been created. The original invoice is preserved.',
@@ -523,6 +524,12 @@ export function useRecordPayment() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      // Accounting cache invalidations
+      queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['due-date-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue-trend'] });
       toast({
         title: 'Payment recorded',
         description: 'The payment has been recorded successfully.',

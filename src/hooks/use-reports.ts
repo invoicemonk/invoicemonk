@@ -2,8 +2,24 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type ReportType = 'revenue-summary' | 'invoice-register' | 'tax-report' | 'audit-export';
+export type ReportType =
+  | 'invoice-register'
+  | 'revenue-by-period'
+  | 'revenue-by-client'
+  | 'outstanding-report'
+  | 'receipt-register'
+  | 'expense-register'
+  | 'expense-by-category'
+  | 'expense-by-vendor'
+  | 'income-statement'
+  | 'cash-flow-summary'
+  | 'tax-report'
+  | 'audit-export'
+  | 'export-history';
+
 export type ReportFormat = 'json' | 'csv';
+
+export type ReportCategory = 'revenue' | 'receipts' | 'expenses' | 'accounting' | 'compliance';
 
 interface ReportRequest {
   report_type: ReportType;
@@ -13,65 +29,66 @@ interface ReportRequest {
   currency_account_id?: string;
 }
 
-interface RevenueSummary {
-  period: string;
-  total_revenue: number;
-  invoice_count: number;
-  tax_collected: number;
-  currency: string;
-}
-
-interface InvoiceRegisterEntry {
-  invoice_number: string;
-  issue_date: string | null;
-  client_name: string;
-  total_amount: number;
-  tax_amount: number;
-  currency: string;
-  status: string;
-  invoice_hash: string | null;
-}
-
-interface TaxReportEntry {
-  month: string;
-  taxable_amount: number;
-  tax_collected: number;
-  invoice_count: number;
-  currency: string;
-}
-
-interface AuditExportEntry {
-  timestamp: string;
-  event_type: string;
-  entity_type: string;
-  entity_id: string | null;
-  actor_id: string | null;
-  actor_role: string | null;
-  event_hash: string | null;
-}
-
 export interface ReportResponse<T = unknown> {
   success: boolean;
   report_type?: string;
   generated_at?: string;
-  data?: T[];
+  currency?: string;
+  currency_account_id?: string;
+  data?: T[] | T;
   summary?: Record<string, unknown>;
   error?: string;
   upgrade_required?: boolean;
 }
 
+export interface ReportDefinition {
+  id: ReportType;
+  title: string;
+  description: string;
+  category: ReportCategory;
+  requiresCurrencyAccount: boolean;
+  exportable: boolean;
+  requiredTier: 'starter' | 'professional' | 'business';
+}
+
+export const REPORT_DEFINITIONS: ReportDefinition[] = [
+  // Revenue
+  { id: 'invoice-register', title: 'Invoice Register', description: 'All issued invoices with payment & credit note status', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'revenue-by-period', title: 'Revenue by Period', description: 'Monthly revenue breakdown', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'revenue-by-client', title: 'Revenue by Client', description: 'Top clients by invoiced amount', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'outstanding-report', title: 'Outstanding Report', description: 'Invoices with unpaid balances', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  // Receipts
+  { id: 'receipt-register', title: 'Receipt Register', description: 'All receipts with verification status', category: 'receipts', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  // Expenses
+  { id: 'expense-register', title: 'Expense Register', description: 'All expenses for the currency account', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'expense-by-category', title: 'Expenses by Category', description: 'Category-level expense breakdown', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'expense-by-vendor', title: 'Expenses by Vendor', description: 'Vendor-level expense breakdown', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  // Accounting
+  { id: 'income-statement', title: 'Income Statement (P&L)', description: 'Revenue minus expenses for the period', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'cash-flow-summary', title: 'Cash Flow Summary', description: 'Cash inflow vs outflow with net position', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  // Compliance
+  { id: 'tax-report', title: 'Tax Report', description: 'Tax collected by period with credit note adjustments', category: 'compliance', requiresCurrencyAccount: true, exportable: true, requiredTier: 'business' },
+  { id: 'audit-export', title: 'Audit Export', description: 'Full audit trail with state snapshots', category: 'compliance', requiresCurrencyAccount: false, exportable: true, requiredTier: 'business' },
+  { id: 'export-history', title: 'Export History', description: 'History of all data exports', category: 'compliance', requiresCurrencyAccount: false, exportable: false, requiredTier: 'business' },
+];
+
+export const REPORT_CATEGORIES: { id: ReportCategory; label: string }[] = [
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'receipts', label: 'Receipts' },
+  { id: 'expenses', label: 'Expenses' },
+  { id: 'accounting', label: 'Accounting' },
+  { id: 'compliance', label: 'Compliance' },
+];
+
 async function generateReport<T>(request: ReportRequest): Promise<ReportResponse<T>> {
   const { data: { session } } = await supabase.auth.getSession();
-  
   if (!session?.access_token) {
     throw new Error('Not authenticated');
   }
 
   const response = await supabase.functions.invoke('generate-report', {
     body: request,
-    headers: {
-      Authorization: `Bearer ${session.access_token}`
-    }
+    headers: { Authorization: `Bearer ${session.access_token}` },
   });
 
   if (response.error) {
@@ -85,23 +102,21 @@ export function useGenerateReport() {
   return useMutation({
     mutationFn: async (request: ReportRequest) => {
       if (request.format === 'csv') {
-        // For CSV, we need to handle the response differently
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (!session?.access_token) {
           throw new Error('Not authenticated');
         }
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL || 'https://skcxogeaerudoadluexz.supabase.co'}/functions/v1/generate-report`,
+          'https://skcxogeaerudoadluexz.supabase.co/functions/v1/generate-report',
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrY3hvZ2VhZXJ1ZG9hZGx1ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyOTkyODcsImV4cCI6MjA4Mzg3NTI4N30._G14u4zLW4sTO0VIIgeNideez3vwBuxKAa_ef4rvImc'
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrY3hvZ2VhZXJ1ZG9hZGx1ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyOTkyODcsImV4cCI6MjA4Mzg3NTI4N30._G14u4zLW4sTO0VIIgeNideez3vwBuxKAa_ef4rvImc',
             },
-            body: JSON.stringify(request)
+            body: JSON.stringify(request),
           }
         );
 
@@ -110,7 +125,6 @@ export function useGenerateReport() {
           throw new Error(errorData.error || 'Failed to generate report');
         }
 
-        // Download CSV
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -128,44 +142,16 @@ export function useGenerateReport() {
     },
     onSuccess: (data, variables) => {
       if (data.success) {
-        toast.success(`${variables.report_type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} generated successfully`);
+        toast.success(`${variables.report_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} generated`);
       } else if (data.upgrade_required) {
-        toast.error('Upgrade required to access reports');
+        toast.error('Upgrade required to access this report');
       } else {
         toast.error(data.error || 'Failed to generate report');
       }
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to generate report');
-    }
-  });
-}
-
-export function useReportStats(year: number, hasReportsAccess: boolean = true) {
-  return useQuery({
-    queryKey: ['report-stats', year],
-    queryFn: async () => {
-      // Fetch summary stats for the dashboard
-      const response = await generateReport<RevenueSummary>({
-        report_type: 'revenue-summary',
-        year,
-        format: 'json'
-      });
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch stats');
-      }
-
-      return {
-        totalRevenue: response.summary?.total_revenue as number || 0,
-        totalTax: response.summary?.total_tax as number || 0,
-        totalInvoices: response.summary?.total_invoices as number || 0,
-        currency: response.summary?.currency as string || 'NGN'
-      };
     },
-    enabled: hasReportsAccess, // Only fetch if user has reports access
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1
   });
 }
 
@@ -186,60 +172,7 @@ export function useAuditEventsCount(year: number) {
       if (error) throw error;
       return count || 0;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1
-  });
-}
-
-// Type-safe report generators
-export function useRevenueSummaryReport() {
-  return useMutation({
-    mutationFn: (params: { year: number; format?: ReportFormat }) => 
-      generateReport<RevenueSummary>({ 
-        report_type: 'revenue-summary', 
-        year: params.year,
-        format: params.format 
-      }),
-    onSuccess: () => toast.success('Revenue summary generated'),
-    onError: (error: Error) => toast.error(error.message)
-  });
-}
-
-export function useInvoiceRegisterReport() {
-  return useMutation({
-    mutationFn: (params: { year: number; format?: ReportFormat }) => 
-      generateReport<InvoiceRegisterEntry>({ 
-        report_type: 'invoice-register', 
-        year: params.year,
-        format: params.format 
-      }),
-    onSuccess: () => toast.success('Invoice register generated'),
-    onError: (error: Error) => toast.error(error.message)
-  });
-}
-
-export function useTaxReport() {
-  return useMutation({
-    mutationFn: (params: { year: number; format?: ReportFormat }) => 
-      generateReport<TaxReportEntry>({ 
-        report_type: 'tax-report', 
-        year: params.year,
-        format: params.format 
-      }),
-    onSuccess: () => toast.success('Tax report generated'),
-    onError: (error: Error) => toast.error(error.message)
-  });
-}
-
-export function useAuditExportReport() {
-  return useMutation({
-    mutationFn: (params: { year: number; format?: ReportFormat }) => 
-      generateReport<AuditExportEntry>({ 
-        report_type: 'audit-export', 
-        year: params.year,
-        format: params.format 
-      }),
-    onSuccess: () => toast.success('Audit export generated'),
-    onError: (error: Error) => toast.error(error.message)
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 }

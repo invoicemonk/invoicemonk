@@ -22,3 +22,15 @@ export function getCurrencySymbol(currency: string): string {
   };
   return symbols[currency] || currency;
 }
+
+/**
+ * Format a number as currency with proper symbol
+ */
+export function formatCurrency(amount: number, currency: string = 'NGN'): string {
+  const symbol = getCurrencySymbol(currency);
+  const formatted = amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${symbol}${formatted}`;
+}

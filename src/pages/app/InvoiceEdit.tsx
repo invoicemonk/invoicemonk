@@ -50,12 +50,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
 import { useInvoice, useUpdateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
+import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
 import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
-import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 

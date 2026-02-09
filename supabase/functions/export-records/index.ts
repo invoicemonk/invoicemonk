@@ -56,6 +56,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 interface ExportRecordsRequest {
   export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients' | 'expenses'
   business_id?: string
+  currency_account_id?: string
   date_from?: string
   date_to?: string
   format?: 'csv' | 'json'
@@ -240,6 +241,9 @@ Deno.serve(async (req) => {
         if (body.business_id) {
           query = query.eq('business_id', body.business_id)
         }
+        if (body.currency_account_id) {
+          query = query.eq('currency_account_id', body.currency_account_id)
+        }
         if (body.date_from) {
           query = query.gte('created_at', body.date_from)
         }
@@ -397,6 +401,9 @@ Deno.serve(async (req) => {
         
         if (body.business_id) {
           query = query.eq('business_id', body.business_id)
+        }
+        if (body.currency_account_id) {
+          query = query.eq('currency_account_id', body.currency_account_id)
         }
         if (body.date_from) {
           query = query.gte('expense_date', body.date_from)

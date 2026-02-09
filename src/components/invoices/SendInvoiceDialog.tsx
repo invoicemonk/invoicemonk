@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ const getProductionUrl = (): string => {
 };
 
 export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDialogProps) {
+  const queryClient = useQueryClient();
   const [sending, setSending] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(
     invoice.clients?.email || ''
@@ -80,6 +82,12 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
       if (response.error) {
         throw new Error(response.error.message || 'Failed to send invoice');
       }
+
+      // Invalidate caches after successful send (status changes to 'sent')
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
 
       // Track invoice sent event
       gaEvents.invoiceSent(invoice.id);

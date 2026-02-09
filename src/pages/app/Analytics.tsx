@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  PieChart, 
-  Users, 
-  Clock, 
+import {
+  PieChart,
+  Users,
+  Clock,
   TrendingUp,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { 
-  useRevenueByClient, 
-  useStatusDistribution, 
-  usePaymentAging, 
-  useMonthlyComparison 
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
+import {
+  useRevenueByClient,
+  useStatusDistribution,
+  usePaymentAging,
+  useMonthlyComparison,
 } from '@/hooks/use-analytics';
 import {
   BarChart,
@@ -33,12 +35,11 @@ import {
   Line,
 } from 'recharts';
 
-// Currency formatting utility
 function formatCurrency(amount: number, currency: string = 'NGN'): string {
   try {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: currency,
+      currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -50,23 +51,22 @@ function formatCurrency(amount: number, currency: string = 'NGN'): string {
 export default function Analytics() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
-  
-  // Use BusinessContext instead of useUserOrganizations
+
   const { currentBusiness } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const businessId = currentBusiness?.id;
-  const currency = currentBusiness?.default_currency || 'NGN';
+  const currencyAccountId = currentCurrencyAccount?.id;
 
   const { data: revenueByClient, isLoading: clientLoading } = useRevenueByClient(
-    businessId, 
+    businessId,
+    currencyAccountId,
     parseInt(selectedYear)
   );
-  const { data: statusDistribution, isLoading: statusLoading } = useStatusDistribution(businessId);
-  const { data: paymentAging, isLoading: agingLoading } = usePaymentAging(businessId);
-  const { data: monthlyComparison, isLoading: monthlyLoading } = useMonthlyComparison(businessId);
+  const { data: statusDistribution, isLoading: statusLoading } = useStatusDistribution(businessId, currencyAccountId);
+  const { data: paymentAging, isLoading: agingLoading } = usePaymentAging(businessId, currencyAccountId);
+  const { data: monthlyComparison, isLoading: monthlyLoading } = useMonthlyComparison(businessId, currencyAccountId);
 
-  // Helper function using business currency
-  const formatAmount = (amount: number) => formatCurrency(amount, currency);
-
+  const formatAmount = (amount: number) => formatCurrency(amount, activeCurrency);
   const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
 
   return (
@@ -83,20 +83,25 @@ export default function Analytics() {
             Visual insights into your invoicing performance
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(year => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-3">
+          {currentCurrencyAccount && (
+            <Badge variant="outline" className="font-mono text-sm">
+              {activeCurrency}
+            </Badge>
+          )}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map(year => (
+                  <SelectItem key={year} value={year}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -117,46 +122,17 @@ export default function Analytics() {
             ) : revenueByClient && revenueByClient.length > 0 ? (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={revenueByClient}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
+                  <BarChart data={revenueByClient} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      type="number" 
-                      tickFormatter={(value) => formatAmount(value)}
-                      className="text-xs fill-muted-foreground"
-                    />
-                    <YAxis 
-                      type="category" 
-                      dataKey="clientName" 
-                      width={100}
-                      className="text-xs fill-muted-foreground"
-                      tickFormatter={(value) => value.length > 12 ? value.slice(0, 12) + '...' : value}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => formatAmount(value)}
-                      labelClassName="font-medium"
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Bar 
-                      dataKey="totalRevenue" 
-                      fill="hsl(var(--primary))" 
-                      radius={[0, 4, 4, 0]}
-                      name="Revenue"
-                    />
+                    <XAxis type="number" tickFormatter={formatAmount} className="text-xs fill-muted-foreground" />
+                    <YAxis type="category" dataKey="clientName" width={100} className="text-xs fill-muted-foreground" tickFormatter={(v) => v.length > 12 ? v.slice(0, 12) + '...' : v} />
+                    <Tooltip formatter={(value: number) => formatAmount(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                    <Bar dataKey="totalRevenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Revenue" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No invoice data available for {selectedYear}
-              </div>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">No invoice data available for {selectedYear}</div>
             )}
           </CardContent>
         </Card>
@@ -177,45 +153,18 @@ export default function Analytics() {
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="count"
-                      nameKey="status"
-                      label={({ status, count }) => `${status}: ${count}`}
-                      labelLine={false}
-                    >
+                    <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="count" nameKey="status" label={({ status, count }) => `${status}: ${count}`} labelLine={false}>
                       {statusDistribution.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [
-                        `${value} invoices (${formatAmount(props.payload.amount)})`,
-                        props.payload.status
-                      ]}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Legend 
-                      formatter={(value, entry: any) => (
-                        <span className="capitalize text-foreground">{entry.payload?.status}</span>
-                      )}
-                    />
+                    <Tooltip formatter={(value: number, name: string, props: any) => [`${value} invoices (${formatAmount(props.payload.amount)})`, props.payload.status]} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                    <Legend formatter={(value, entry: any) => <span className="capitalize text-foreground">{entry.payload?.status}</span>} />
                   </RechartsPieChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No invoices found
-              </div>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">No invoices found</div>
             )}
           </CardContent>
         </Card>
@@ -235,35 +184,12 @@ export default function Analytics() {
             ) : paymentAging && paymentAging.some(b => b.count > 0) ? (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={paymentAging}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
+                  <BarChart data={paymentAging} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="bucket" 
-                      className="text-xs fill-muted-foreground"
-                    />
-                    <YAxis 
-                      tickFormatter={(value) => formatAmount(value)}
-                      className="text-xs fill-muted-foreground"
-                    />
-                    <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [
-                        `${formatAmount(value)} (${props.payload.count} invoices)`,
-                        'Outstanding'
-                      ]}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Bar 
-                      dataKey="amount" 
-                      radius={[4, 4, 0, 0]}
-                      name="Amount"
-                    >
+                    <XAxis dataKey="bucket" className="text-xs fill-muted-foreground" />
+                    <YAxis tickFormatter={formatAmount} className="text-xs fill-muted-foreground" />
+                    <Tooltip formatter={(value: number, name: string, props: any) => [`${formatAmount(value)} (${props.payload.count} invoices)`, 'Outstanding']} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                    <Bar dataKey="amount" radius={[4, 4, 0, 0]} name="Amount">
                       {paymentAging.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -272,9 +198,7 @@ export default function Analytics() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No outstanding invoices
-              </div>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">No outstanding invoices</div>
             )}
           </CardContent>
         </Card>
@@ -294,52 +218,19 @@ export default function Analytics() {
             ) : monthlyComparison ? (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={monthlyComparison}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
+                  <LineChart data={monthlyComparison} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="month" 
-                      className="text-xs fill-muted-foreground"
-                    />
-                    <YAxis 
-                      tickFormatter={(value) => formatAmount(value)}
-                      className="text-xs fill-muted-foreground"
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => formatAmount(value)}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
+                    <XAxis dataKey="month" className="text-xs fill-muted-foreground" />
+                    <YAxis tickFormatter={formatAmount} className="text-xs fill-muted-foreground" />
+                    <Tooltip formatter={(value: number) => formatAmount(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="thisYear" 
-                      name={currentYear.toString()}
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="lastYear" 
-                      name={(currentYear - 1).toString()}
-                      stroke="hsl(var(--muted-foreground))" 
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={{ fill: 'hsl(var(--muted-foreground))' }}
-                    />
+                    <Line type="monotone" dataKey="thisYear" name={currentYear.toString()} stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))' }} />
+                    <Line type="monotone" dataKey="lastYear" name={(currentYear - 1).toString()} stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'hsl(var(--muted-foreground))' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No data available
-              </div>
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>
             )}
           </CardContent>
         </Card>

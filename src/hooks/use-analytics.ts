@@ -41,19 +41,19 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const AGING_COLORS = [
-  'hsl(142, 76%, 36%)', // Current - green
-  'hsl(45, 93%, 47%)',  // 1-30 - yellow
-  'hsl(25, 95%, 53%)',  // 31-60 - orange
-  'hsl(0, 84%, 60%)',   // 61-90 - red
-  'hsl(0, 84%, 40%)',   // 90+ - dark red
+  'hsl(142, 76%, 36%)',
+  'hsl(45, 93%, 47%)',
+  'hsl(25, 95%, 53%)',
+  'hsl(0, 84%, 60%)',
+  'hsl(0, 84%, 40%)',
 ];
 
-export function useRevenueByClient(businessId?: string, year?: number) {
+export function useRevenueByClient(businessId?: string, currencyAccountId?: string, year?: number) {
   const { user } = useAuth();
   const currentYear = year || new Date().getFullYear();
 
   return useQuery({
-    queryKey: ['analytics-revenue-by-client', businessId, user?.id, currentYear],
+    queryKey: ['analytics-revenue-by-client', businessId, currencyAccountId, user?.id, currentYear],
     queryFn: async (): Promise<ClientRevenue[]> => {
       if (!user) return [];
 
@@ -62,13 +62,7 @@ export function useRevenueByClient(businessId?: string, year?: number) {
 
       let query = supabase
         .from('invoices')
-        .select(`
-          id,
-          total_amount,
-          status,
-          client_id,
-          clients (id, name)
-        `)
+        .select(`id, total_amount, status, client_id, clients (id, name)`)
         .gte('issued_at', startOfYear)
         .lte('issued_at', endOfYear)
         .not('status', 'eq', 'draft');
@@ -79,58 +73,42 @@ export function useRevenueByClient(businessId?: string, year?: number) {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching revenue by client:', error);
-        return [];
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
-      // Aggregate by client
-      const clientMap = new Map<string, ClientRevenue>();
+      const { data, error } = await query;
+      if (error) { console.error('Error fetching revenue by client:', error); return []; }
 
+      const clientMap = new Map<string, ClientRevenue>();
       for (const invoice of data || []) {
         const client = invoice.clients as any;
         if (!client) continue;
-
         const clientId = client.id;
         const existing = clientMap.get(clientId) || {
-          clientId,
-          clientName: client.name,
-          totalRevenue: 0,
-          invoiceCount: 0,
-          paidCount: 0,
+          clientId, clientName: client.name, totalRevenue: 0, invoiceCount: 0, paidCount: 0,
         };
-
         existing.totalRevenue += Number(invoice.total_amount);
         existing.invoiceCount += 1;
-        if (invoice.status === 'paid') {
-          existing.paidCount += 1;
-        }
-
+        if (invoice.status === 'paid') existing.paidCount += 1;
         clientMap.set(clientId, existing);
       }
 
-      // Sort by revenue and return top 10
-      return Array.from(clientMap.values())
-        .sort((a, b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 10);
+      return Array.from(clientMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 10);
     },
     enabled: !!user,
   });
 }
 
-export function useStatusDistribution(businessId?: string) {
+export function useStatusDistribution(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['analytics-status-distribution', businessId, user?.id],
+    queryKey: ['analytics-status-distribution', businessId, currencyAccountId, user?.id],
     queryFn: async (): Promise<StatusDistribution[]> => {
       if (!user) return [];
 
-      let query = supabase
-        .from('invoices')
-        .select('status, total_amount');
+      let query = supabase.from('invoices').select('status, total_amount');
 
       if (businessId) {
         query = query.eq('business_id', businessId);
@@ -138,28 +116,21 @@ export function useStatusDistribution(businessId?: string) {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching status distribution:', error);
-        return [];
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
-      // Aggregate by status
-      const statusMap = new Map<string, StatusDistribution>();
+      const { data, error } = await query;
+      if (error) { console.error('Error fetching status distribution:', error); return []; }
 
+      const statusMap = new Map<string, StatusDistribution>();
       for (const invoice of data || []) {
         const status = invoice.status;
         const existing = statusMap.get(status) || {
-          status,
-          count: 0,
-          amount: 0,
-          color: STATUS_COLORS[status] || 'hsl(var(--muted-foreground))',
+          status, count: 0, amount: 0, color: STATUS_COLORS[status] || 'hsl(var(--muted-foreground))',
         };
-
         existing.count += 1;
         existing.amount += Number(invoice.total_amount);
-
         statusMap.set(status, existing);
       }
 
@@ -169,15 +140,14 @@ export function useStatusDistribution(businessId?: string) {
   });
 }
 
-export function usePaymentAging(businessId?: string) {
+export function usePaymentAging(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['analytics-payment-aging', businessId, user?.id],
+    queryKey: ['analytics-payment-aging', businessId, currencyAccountId, user?.id],
     queryFn: async (): Promise<AgingBucket[]> => {
       if (!user) return [];
 
-      // Get outstanding invoices (issued, sent, viewed - not paid, voided, or credited)
       let query = supabase
         .from('invoices')
         .select('id, total_amount, amount_paid, due_date, status')
@@ -189,12 +159,12 @@ export function usePaymentAging(businessId?: string) {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching payment aging:', error);
-        return [];
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
+
+      const { data, error } = await query;
+      if (error) { console.error('Error fetching payment aging:', error); return []; }
 
       const today = new Date();
       const buckets = [
@@ -210,7 +180,6 @@ export function usePaymentAging(businessId?: string) {
         if (outstanding <= 0) continue;
 
         if (!invoice.due_date) {
-          // No due date = current
           buckets[0].count += 1;
           buckets[0].amount += outstanding;
           continue;
@@ -228,18 +197,17 @@ export function usePaymentAging(businessId?: string) {
         }
       }
 
-      // Remove minDays/maxDays from output
       return buckets.map(({ bucket, count, amount, color }) => ({ bucket, count, amount, color }));
     },
     enabled: !!user,
   });
 }
 
-export function useMonthlyComparison(businessId?: string) {
+export function useMonthlyComparison(businessId?: string, currencyAccountId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['analytics-monthly-comparison', businessId, user?.id],
+    queryKey: ['analytics-monthly-comparison', businessId, currencyAccountId, user?.id],
     queryFn: async (): Promise<MonthlyComparison[]> => {
       if (!user) return [];
 
@@ -259,23 +227,18 @@ export function useMonthlyComparison(businessId?: string) {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching monthly comparison:', error);
-        return [];
+      if (currencyAccountId) {
+        query = query.eq('currency_account_id', currencyAccountId);
       }
 
+      const { data, error } = await query;
+      if (error) { console.error('Error fetching monthly comparison:', error); return []; }
+
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const result: MonthlyComparison[] = months.map(month => ({
-        month,
-        thisYear: 0,
-        lastYear: 0,
-      }));
+      const result: MonthlyComparison[] = months.map(month => ({ month, thisYear: 0, lastYear: 0 }));
 
       for (const invoice of data || []) {
         if (!invoice.issued_at) continue;
-        
         const date = new Date(invoice.issued_at);
         const year = date.getFullYear();
         const monthIndex = date.getMonth();

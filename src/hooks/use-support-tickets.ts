@@ -77,15 +77,16 @@ export function useSupportTickets() {
     queryFn: async (): Promise<SupportTicket[]> => {
       if (!user) throw new Error('Not authenticated');
 
-      // Use raw query since types not yet regenerated
+      // CRITICAL: Filter by user_id for defense in depth (RLS also enforces)
       const { data, error } = await supabase
-        .from('support_tickets' as any)
+        .from('support_tickets')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      return (data || []).map((ticket: any) => ({
+      return (data || []).map((ticket) => ({
         id: ticket.id,
         userId: ticket.user_id,
         businessId: ticket.business_id,
@@ -114,42 +115,42 @@ export function useSupportTicket(ticketId: string) {
     queryFn: async (): Promise<{ ticket: SupportTicket; messages: SupportTicketMessage[] }> => {
       if (!user || !ticketId) throw new Error('Not authenticated or missing ticket ID');
 
-      // Fetch ticket
+      // CRITICAL: Filter by user_id for ownership verification (defense in depth)
       const { data: ticketData, error: ticketError } = await supabase
-        .from('support_tickets' as any)
+        .from('support_tickets')
         .select('*')
         .eq('id', ticketId)
+        .eq('user_id', user.id)
         .single();
 
       if (ticketError) throw ticketError;
 
       // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
-        .from('support_ticket_messages' as any)
+        .from('support_ticket_messages')
         .select('*')
         .eq('ticket_id', ticketId)
         .order('created_at', { ascending: true });
 
       if (messagesError) throw messagesError;
 
-      const ticket = ticketData as any;
       return {
         ticket: {
-          id: ticket.id,
-          userId: ticket.user_id,
-          businessId: ticket.business_id,
-          subject: ticket.subject,
-          description: ticket.description,
-          category: ticket.category,
-          priority: ticket.priority,
-          status: ticket.status,
-          attachments: ticket.attachments || [],
-          assignedTo: ticket.assigned_to,
-          createdAt: ticket.created_at,
-          updatedAt: ticket.updated_at,
-          resolvedAt: ticket.resolved_at,
+          id: ticketData.id,
+          userId: ticketData.user_id,
+          businessId: ticketData.business_id,
+          subject: ticketData.subject,
+          description: ticketData.description,
+          category: ticketData.category,
+          priority: ticketData.priority,
+          status: ticketData.status,
+          attachments: ticketData.attachments || [],
+          assignedTo: ticketData.assigned_to,
+          createdAt: ticketData.created_at,
+          updatedAt: ticketData.updated_at,
+          resolvedAt: ticketData.resolved_at,
         },
-        messages: ((messagesData as any[]) || []).map((msg: any) => ({
+        messages: (messagesData || []).map((msg) => ({
           id: msg.id,
           ticketId: msg.ticket_id,
           senderId: msg.sender_id,
@@ -174,7 +175,7 @@ export function useCreateSupportTicket() {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from('support_tickets' as any)
+        .from('support_tickets')
         .insert({
           user_id: user.id,
           business_id: input.businessId || null,
@@ -190,10 +191,9 @@ export function useCreateSupportTicket() {
       if (error) throw error;
 
       // Trigger email notification to admins (in-app notification created by DB trigger)
-      const ticketData = data as any;
       try {
         await supabase.functions.invoke('send-support-notification', {
-          body: { type: 'ticket_created', ticket_id: ticketData.id }
+          body: { type: 'ticket_created', ticket_id: data.id }
         });
       } catch (emailError) {
         console.error('Failed to send support notification email:', emailError);
@@ -229,7 +229,7 @@ export function useAddTicketMessage() {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from('support_ticket_messages' as any)
+        .from('support_ticket_messages')
         .insert({
           ticket_id: input.ticketId,
           sender_id: user.id,
@@ -246,7 +246,7 @@ export function useAddTicketMessage() {
       if (data) {
         try {
           await supabase.functions.invoke('send-support-notification', {
-            body: { type: 'user_reply', ticket_id: input.ticketId, message_id: (data as any).id }
+            body: { type: 'user_reply', ticket_id: input.ticketId, message_id: data.id }
           });
         } catch (emailError) {
           console.error('Failed to send user reply notification email:', emailError);
@@ -286,7 +286,7 @@ export function useUpdateTicketStatus() {
       }
 
       const { data, error } = await supabase
-        .from('support_tickets' as any)
+        .from('support_tickets')
         .update(updates)
         .eq('id', ticketId)
         .select()
@@ -322,9 +322,11 @@ export function useOpenTicketCount() {
     queryFn: async (): Promise<number> => {
       if (!user) return 0;
 
+      // CRITICAL: Filter by user_id for defense in depth
       const { count, error } = await supabase
-        .from('support_tickets' as any)
+        .from('support_tickets')
         .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
         .in('status', ['open', 'in_progress', 'waiting']);
 
       if (error) throw error;

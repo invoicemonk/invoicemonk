@@ -524,13 +524,13 @@ const VerifyInvoice = () => {
                     </p>
                     <div className="flex gap-3">
                       <Button variant="outline" asChild>
-                        <Link to="/">Return Home</Link>
+                        <a href="https://invoicemonk.com">Return Home</a>
                       </Button>
                       <Button asChild>
-                        <Link to="/contact">
+                        <a href="https://invoicemonk.com/contact">
                           Contact Support
                           <ExternalLink className="ml-2 h-4 w-4" />
-                        </Link>
+                        </a>
                       </Button>
                     </div>
                   </div>
@@ -563,7 +563,7 @@ const VerifyInvoice = () => {
                     This link is typically provided on the invoice document or by the issuing party.
                   </p>
                   <Button variant="outline" asChild>
-                    <Link to="/">Return Home</Link>
+                    <a href="https://invoicemonk.com">Return Home</a>
                   </Button>
                 </div>
               </CardContent>
@@ -580,17 +580,17 @@ const VerifyInvoice = () => {
             Every invoice issued through our platform is verifiable and tamper-evident.
           </p>
           <div className="flex items-center justify-center gap-4 mt-4 text-sm">
-            <Link to="/compliance" className="text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://invoicemonk.com/compliance" className="text-muted-foreground hover:text-foreground transition-colors">
               Compliance
-            </Link>
+            </a>
             <span className="text-border">•</span>
-            <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://invoicemonk.com/about" className="text-muted-foreground hover:text-foreground transition-colors">
               About
-            </Link>
+            </a>
             <span className="text-border">•</span>
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://invoicemonk.com" className="text-muted-foreground hover:text-foreground transition-colors">
               Home
-            </Link>
+            </a>
           </div>
         </div>
       </footer>

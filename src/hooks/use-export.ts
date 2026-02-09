@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 interface ExportParams {
   export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients' | 'expenses';
   business_id?: string;
+  currency_account_id?: string;
   date_from?: string;
   date_to?: string;
   format?: 'csv' | 'json';
@@ -29,37 +30,32 @@ export function useExportRecords() {
 
   const exportRecords = async (params: ExportParams): Promise<boolean> => {
     setIsExporting(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke<ExportResponse>('export-records', {
-        body: params
+        body: params,
       });
 
       if (error) {
         console.error('Export error:', error);
-        toast.error('Export failed', {
-          description: error.message || 'An unexpected error occurred'
-        });
+        toast.error('Export failed', { description: error.message || 'An unexpected error occurred' });
         return false;
       }
 
       if (!data?.success) {
         if (data?.upgrade_required) {
           toast.error('Upgrade Required', {
-            description: data.error || 'Data exports require a Professional subscription.'
+            description: data.error || 'Data exports require a Professional subscription.',
           });
         } else {
-          toast.error('Export failed', {
-            description: data?.error || 'Unknown error'
-          });
+          toast.error('Export failed', { description: data?.error || 'Unknown error' });
         }
         return false;
       }
 
-      // Download the file
       if (data.data && data.filename) {
-        const blob = new Blob([data.data], { 
-          type: params.format === 'json' ? 'application/json' : 'text/csv' 
+        const blob = new Blob([data.data], {
+          type: params.format === 'json' ? 'application/json' : 'text/csv',
         });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -71,7 +67,7 @@ export function useExportRecords() {
         URL.revokeObjectURL(url);
 
         toast.success('Export Complete', {
-          description: `${data.record_count} records exported successfully`
+          description: `${data.record_count} records exported successfully`,
         });
         return true;
       }
@@ -79,9 +75,7 @@ export function useExportRecords() {
       return false;
     } catch (err) {
       console.error('Export error:', err);
-      toast.error('Export failed', {
-        description: 'An unexpected error occurred'
-      });
+      toast.error('Export failed', { description: 'An unexpected error occurred' });
       return false;
     } finally {
       setIsExporting(false);

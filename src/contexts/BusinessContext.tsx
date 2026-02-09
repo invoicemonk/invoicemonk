@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { Tables } from '@/integrations/supabase/types';
+import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 
 type Business = Tables<'businesses'> & {
   registration_status?: string;
@@ -79,6 +80,9 @@ interface BusinessContextType {
   isBusiness: boolean;
   isFree: boolean;
   isPaid: boolean;
+  
+  // Platform admin status
+  isPlatformAdmin: boolean;
 }
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
@@ -97,6 +101,9 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  
+  // Check if user is a platform admin (unlimited access)
+  const { isPlatformAdmin } = usePlatformAdmin();
   
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [currentRole, setCurrentRole] = useState<BusinessRole | null>(null);
@@ -230,8 +237,11 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const canViewReports = true; // All roles can view reports
   const canEditSettings = isOwner || isAdmin;
 
-  // Subscription helpers
+  // Subscription helpers - Platform admins bypass all limits
   const canAccess = (feature: string): boolean => {
+    // Platform admins have unlimited access
+    if (isPlatformAdmin) return true;
+    
     const limit = limits.find((l) => l.feature === feature);
     if (!limit) return true;
 
@@ -247,6 +257,8 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const hasTier = (requiredTier: SubscriptionTier): boolean => {
+    // Platform admins have the highest tier access
+    if (isPlatformAdmin) return true;
     return TIER_ORDER[tier] >= TIER_ORDER[requiredTier];
   };
 
@@ -255,6 +267,16 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const checkTierLimit = async (feature: string): Promise<TierCheckResult> => {
+    // Platform admins bypass all tier limits
+    if (isPlatformAdmin) {
+      return {
+        allowed: true,
+        tier: 'business', // Treat as highest tier
+        feature,
+        limit_type: 'unlimited',
+      };
+    }
+    
     if (!currentBusiness?.id) {
       return {
         allowed: false,
@@ -313,12 +335,14 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         hasTier,
         getLimit,
         checkTierLimit,
-        isStarter: tier === 'starter',
-        isStarterPaid: tier === 'starter_paid',
-        isProfessional: tier === 'professional' || tier === 'business',
-        isBusiness: tier === 'business',
-        isFree: tier === 'starter',
-        isPaid: tier !== 'starter',
+        // Platform admins are never treated as "starter" for feature access
+        isStarter: isPlatformAdmin ? false : tier === 'starter',
+        isStarterPaid: isPlatformAdmin ? false : tier === 'starter_paid',
+        isProfessional: isPlatformAdmin ? true : tier === 'professional' || tier === 'business',
+        isBusiness: isPlatformAdmin ? true : tier === 'business',
+        isFree: isPlatformAdmin ? false : tier === 'starter',
+        isPaid: isPlatformAdmin ? true : tier !== 'starter',
+        isPlatformAdmin,
       }}
     >
       {children}

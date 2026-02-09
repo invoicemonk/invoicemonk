@@ -7,13 +7,10 @@ export type AuditLog = Tables<'audit_logs'>;
 
 /**
  * Fetch audit logs for the current user and business.
- * 
- * SECURITY NOTE: This query relies on RLS policies for access control.
- * Audit logs are tier-gated (Professional+ tiers only).
- * RLS policies:
- * - Users can only view logs for entities they have access to
- * - Business members can view logs for their business
- * - Platform admins have broader access
+ *
+ * SECURITY: RLS enforces tier-gated access. Requires professional tier or higher
+ * (via has_audit_access) plus ownership/membership checks.
+ * Platform admins can view all logs.
  */
 export function useAuditLogs(options?: {
   entityType?: string;
@@ -60,7 +57,11 @@ export function useAuditLogs(options?: {
   });
 }
 
-// Fetch audit logs for a specific invoice
+/**
+ * Fetch audit logs for a specific invoice.
+ *
+ * SECURITY: RLS enforces that only users with audit access and invoice ownership can view.
+ */
 export function useInvoiceAuditLogs(invoiceId: string | undefined) {
   const { user } = useAuth();
 

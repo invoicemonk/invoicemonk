@@ -92,10 +92,18 @@ import VerifyInvoice from "./pages/verify/VerifyInvoice";
 import VerifyReceipt from "./pages/verify/VerifyReceipt";
 import InvoiceView from "./pages/public/InvoiceView";
 
+// Demo pages (public - no auth required)
+import { 
+  DemoInvoices, 
+  DemoReceipts, 
+  DemoExpenses, 
+  DemoClients, 
+  DemoAccounting 
+} from "./pages/demo";
+
 // Legal and Documentation pages
 import SLA from "./pages/legal/SLA";
 import { APIDocumentation } from "./pages/docs";
-
 const queryClient = new QueryClient();
 
 // Root redirect component
@@ -251,6 +259,13 @@ const App = () => (
           {/* Legal and Documentation pages - No auth required */}
           <Route path="/legal/sla" element={<SLA />} />
           <Route path="/docs/api" element={<APIDocumentation />} />
+          
+          {/* Demo Pages - No auth required (for marketing screenshots) */}
+          <Route path="/demo/invoices" element={<DemoInvoices />} />
+          <Route path="/demo/receipts" element={<DemoReceipts />} />
+          <Route path="/demo/expenses" element={<DemoExpenses />} />
+          <Route path="/demo/clients" element={<DemoClients />} />
+          <Route path="/demo/accounting" element={<DemoAccounting />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

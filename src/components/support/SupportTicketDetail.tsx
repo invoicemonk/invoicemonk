@@ -43,8 +43,21 @@ export function SupportTicketDetail() {
   if (!data?.ticket) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Ticket not found</p>
+        <p className="text-muted-foreground">Ticket not found or access denied</p>
         <Button variant="link" onClick={() => navigate(-1)}>
+          Go back
+        </Button>
+      </div>
+    );
+  }
+
+  // CRITICAL: Defense in depth - verify ownership even though query already filters
+  if (data.ticket.userId !== user?.id) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-lg font-semibold text-destructive">Access Denied</p>
+        <p className="text-muted-foreground mb-4">You don't have permission to view this ticket.</p>
+        <Button variant="outline" onClick={() => navigate(-1)}>
           Go back
         </Button>
       </div>

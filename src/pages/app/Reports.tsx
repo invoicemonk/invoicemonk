@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  BarChart3, 
+import {
   Download,
   Calendar,
   FileText,
   TrendingUp,
   DollarSign,
-  Loader2
+  Loader2,
+  Receipt,
+  Wallet,
+  Calculator,
+  ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -22,95 +27,43 @@ import {
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
-import { useGenerateReport, useReportStats, useAuditEventsCount, type ReportType } from '@/hooks/use-reports';
+import {
+  useGenerateReport,
+  REPORT_DEFINITIONS,
+  REPORT_CATEGORIES,
+  type ReportType,
+  type ReportCategory,
+} from '@/hooks/use-reports';
 
-const reportTypes: {
-  id: ReportType;
-  title: string;
-  description: string;
-  icon: typeof DollarSign;
-  format: string;
-}[] = [
-  {
-    id: 'revenue-summary',
-    title: 'Revenue Summary',
-    description: 'Monthly revenue breakdown with trends',
-    icon: DollarSign,
-    format: 'PDF / Excel',
-  },
-  {
-    id: 'invoice-register',
-    title: 'Invoice Register',
-    description: 'Complete list of all issued invoices',
-    icon: FileText,
-    format: 'PDF / Excel / CSV',
-  },
-  {
-    id: 'tax-report',
-    title: 'Tax Report',
-    description: 'Tax-ready summary for filing',
-    icon: TrendingUp,
-    format: 'PDF',
-  },
-  {
-    id: 'audit-export',
-    title: 'Audit Export',
-    description: 'Complete audit trail with hash verification',
-    icon: BarChart3,
-    format: 'PDF / JSON',
-  },
-];
-
-function formatCurrency(amount: number, currency: string = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+const CATEGORY_ICONS: Record<ReportCategory, typeof DollarSign> = {
+  revenue: DollarSign,
+  receipts: Receipt,
+  expenses: Wallet,
+  accounting: Calculator,
+  compliance: ShieldCheck,
+};
 
 export default function Reports() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
-  
-  const { canAccess, loading: isLoading, currentBusiness } = useBusiness();
-  const { currentCurrencyAccount } = useCurrencyAccount();
-  const hasReportsAccess = canAccess('reports_enabled');
-  
-  const generateReport = useGenerateReport();
-  const { data: stats, isLoading: statsLoading, isError: statsError } = useReportStats(
-    parseInt(selectedYear),
-    hasReportsAccess
-  );
-  const { data: auditEventsCount, isLoading: auditLoading, isError: auditError } = useAuditEventsCount(
-    parseInt(selectedYear)
-  );
+  const [activeCategory, setActiveCategory] = useState<ReportCategory>('revenue');
 
-  const handleGenerateReport = async (reportId: ReportType) => {
-    setGeneratingReport(reportId);
+  const { canAccess, loading: isLoading, currentBusiness, hasTier, isPlatformAdmin } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
+  const hasReportsAccess = canAccess('reports_enabled');
+
+  const generateReport = useGenerateReport();
+
+  const handleGenerateReport = async (reportId: ReportType, format: 'json' | 'csv' = 'json') => {
+    setGeneratingReport(`${reportId}-${format}`);
     try {
       await generateReport.mutateAsync({
         report_type: reportId,
         year: parseInt(selectedYear),
-        format: 'json',
+        format,
         business_id: currentBusiness?.id,
         currency_account_id: currentCurrencyAccount?.id,
-      });
-    } finally {
-      setGeneratingReport(null);
-    }
-  };
-
-  const handleDownloadCSV = async (reportId: ReportType) => {
-    setGeneratingReport(reportId);
-    try {
-      await generateReport.mutateAsync({
-        report_type: reportId,
-        year: parseInt(selectedYear),
-        format: 'csv',
-        business_id: currentBusiness?.id
       });
     } finally {
       setGeneratingReport(null);
@@ -131,8 +84,7 @@ export default function Reports() {
             Generate compliance-ready reports and exports
           </p>
         </div>
-        
-        <UpgradePrompt 
+        <UpgradePrompt
           feature="Reports"
           title="Unlock Powerful Reports"
           description="Generate tax-ready reports, revenue summaries, and audit exports with a Professional subscription."
@@ -143,6 +95,8 @@ export default function Reports() {
       </motion.div>
     );
   }
+
+  const categoryReports = REPORT_DEFINITIONS.filter(r => r.category === activeCategory);
 
   return (
     <motion.div
@@ -155,7 +109,7 @@ export default function Reports() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground mt-1">
-            Generate compliance-ready reports and exports
+            Compliance-ready reports scoped by currency account
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -165,139 +119,126 @@ export default function Reports() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={currentYear.toString()}>{currentYear}</SelectItem>
-              <SelectItem value={(currentYear - 1).toString()}>{currentYear - 1}</SelectItem>
-              <SelectItem value={(currentYear - 2).toString()}>{currentYear - 2}</SelectItem>
+              {Array.from({ length: 5 }, (_, i) => currentYear - i).map(y => (
+                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Quick Stats - Real Data */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            {statsLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            ) : statsError ? (
-              <div className="text-2xl font-bold text-muted-foreground">--</div>
-            ) : (
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.totalRevenue || 0, stats?.currency)}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">Total Revenue (YTD)</p>
+      {/* Currency Account Indicator */}
+      {currentCurrencyAccount ? (
+        <Card className="bg-muted/30 border-dashed">
+          <CardContent className="flex items-center gap-3 py-3">
+            <Badge variant="outline" className="text-sm font-mono">
+              {activeCurrency}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              All reports below are scoped to <strong>{currentCurrencyAccount.name || activeCurrency}</strong> account.
+              Switch currency accounts to see reports in a different currency.
+            </span>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            {statsLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            ) : statsError ? (
-              <div className="text-2xl font-bold text-muted-foreground">--</div>
-            ) : (
-              <div className="text-2xl font-bold">{stats?.totalInvoices || 0}</div>
-            )}
-            <p className="text-sm text-muted-foreground">Invoices Issued (YTD)</p>
+      ) : (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 py-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <span className="text-sm text-destructive">
+              No currency account selected. Financial reports require a currency account to ensure accurate, single-currency data.
+            </span>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            {statsLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            ) : statsError ? (
-              <div className="text-2xl font-bold text-muted-foreground">--</div>
-            ) : (
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.totalTax || 0, stats?.currency)}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">Tax Collected (YTD)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            {auditLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            ) : auditError ? (
-              <div className="text-2xl font-bold text-muted-foreground">--</div>
-            ) : (
-              <div className="text-2xl font-bold">{auditEventsCount?.toLocaleString() || 0}</div>
-            )}
-            <p className="text-sm text-muted-foreground">Audit Events (YTD)</p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
-      {/* Report Types */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {reportTypes.map((report) => {
-          const isGenerating = generatingReport === report.id;
-          return (
-            <Card key={report.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <report.icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{report.title}</CardTitle>
-                      <CardDescription>{report.description}</CardDescription>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs">
-                    {report.format}
-                  </Badge>
-                  <div className="flex gap-2">
-                    {(report.id === 'invoice-register' || report.id === 'revenue-summary' || report.id === 'tax-report') && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDownloadCSV(report.id)}
-                        disabled={isGenerating}
-                      >
-                        {isGenerating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>CSV</>
+      {/* Category Tabs */}
+      <Tabs value={activeCategory} onValueChange={v => setActiveCategory(v as ReportCategory)}>
+        <TabsList className="w-full sm:w-auto">
+          {REPORT_CATEGORIES.map(cat => {
+            const Icon = CATEGORY_ICONS[cat.id];
+            return (
+              <TabsTrigger key={cat.id} value={cat.id} className="gap-1.5">
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{cat.label}</span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        {REPORT_CATEGORIES.map(cat => (
+          <TabsContent key={cat.id} value={cat.id} className="mt-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {REPORT_DEFINITIONS.filter(r => r.category === cat.id).map(report => {
+                const isGeneratingJson = generatingReport === `${report.id}-json`;
+                const isGeneratingCsv = generatingReport === `${report.id}-csv`;
+                const isGenerating = isGeneratingJson || isGeneratingCsv;
+                const tierLocked = !isPlatformAdmin && !hasTier(report.requiredTier as any);
+                const needsCurrencyAccount = report.requiresCurrencyAccount && !currentCurrencyAccount;
+
+                return (
+                  <Card key={report.id} className={`transition-shadow ${tierLocked ? 'opacity-60' : 'hover:shadow-md'}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{report.title}</CardTitle>
+                            <CardDescription className="text-xs mt-0.5">{report.description}</CardDescription>
+                          </div>
+                        </div>
+                        {tierLocked && (
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {report.requiredTier}
+                          </Badge>
                         )}
-                      </Button>
-                    )}
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleGenerateReport(report.id)}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Generate
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center justify-end gap-2">
+                        {report.exportable && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGenerateReport(report.id, 'csv')}
+                            disabled={isGenerating || tierLocked || needsCurrencyAccount}
+                          >
+                            {isGeneratingCsv ? <Loader2 className="h-4 w-4 animate-spin" /> : 'CSV'}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateReport(report.id, 'json')}
+                          disabled={isGenerating || tierLocked || needsCurrencyAccount}
+                        >
+                          {isGeneratingJson ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          Generate
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {/* Compliance Notice */}
       <Card className="bg-muted/30 border-dashed">
         <CardContent className="flex items-start gap-3 py-4">
-          <BarChart3 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+          <ShieldCheck className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium">Audit-Ready Exports</p>
+            <p className="text-sm font-medium">Audit-Ready & Currency-Safe</p>
             <p className="text-xs text-muted-foreground">
-              All exports include verification hashes and timestamps. Reports are generated from immutable 
-              source data and include cryptographic proof of integrity.
+              All reports are scoped to a single currency account — no cross-currency aggregation.
+              Exports include verification hashes and timestamps for compliance.
             </p>
           </div>
         </CardContent>

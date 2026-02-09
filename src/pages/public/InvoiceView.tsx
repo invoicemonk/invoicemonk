@@ -254,7 +254,7 @@ const InvoiceView = () => {
                       "This invoice could not be found. Please check the link or contact the business that sent you this invoice."}
                   </p>
                   <Button variant="outline" asChild>
-                    <Link to="/">Return Home</Link>
+                    <a href="https://invoicemonk.com">Return Home</a>
                   </Button>
                 </div>
               </CardContent>
@@ -617,7 +617,7 @@ const InvoiceView = () => {
                     typically provided in the email from the issuing business.
                   </p>
                   <Button variant="outline" asChild>
-                    <Link to="/">Return Home</Link>
+                    <a href="https://invoicemonk.com">Return Home</a>
                   </Button>
                 </div>
               </CardContent>
@@ -641,12 +641,12 @@ const InvoiceView = () => {
               Start Free
             </Link>
             <span className="text-border">•</span>
-            <Link
-              to="/"
+            <a
+              href="https://invoicemonk.com"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Home
-            </Link>
+            </a>
           </div>
         </div>
       </footer>

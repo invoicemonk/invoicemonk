@@ -28,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 const container = {
   hidden: { opacity: 0 },
@@ -41,19 +42,6 @@ const item = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0 }
 };
-
-function formatCurrency(amount: number, currency: string = 'USD'): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
-}
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {

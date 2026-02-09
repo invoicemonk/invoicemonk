@@ -96,7 +96,7 @@ const InvoicemonkCTA = ({ variant = "default" }: InvoicemonkCTAProps) => {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg">
-                  <Link to="/">Learn More</Link>
+                  <a href="https://invoicemonk.com">Learn More</a>
                 </Button>
               </div>
             </div>

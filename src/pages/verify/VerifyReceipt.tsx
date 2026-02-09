@@ -236,10 +236,10 @@ export default function VerifyReceipt() {
               This receipt was verified through Invoicemonk's secure verification system.
             </p>
             <Button asChild className="print:hidden">
-              <Link to="/">
+              <a href="https://invoicemonk.com">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Learn more about Invoicemonk
-              </Link>
+              </a>
             </Button>
           </div>
         </motion.div>

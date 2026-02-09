@@ -12,10 +12,10 @@ export default function SLA() {
       {/* Header - hidden in print */}
       <header className="border-b border-border print:hidden">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <a href="https://invoicemonk.com" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Invoicemonk</span>
-          </Link>
+          </a>
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Print Document

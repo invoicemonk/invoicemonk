@@ -3,15 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface AccountingStats {
-  // Revenue = Sum of invoices with status != 'draft' (issued)
+  // Revenue = Sum of total_amount for issued invoices (issued, sent, viewed, paid)
   revenue: number;
   revenueCount: number;
   
-  // Money In = Sum of invoices with status = 'paid'
+  // Money In = Sum of amount_paid across all non-draft, non-voided invoices (supports partial payments)
   moneyIn: number;
-  moneyInCount: number;
+  moneyInCount: number; // Count of invoices with any payment recorded
   
-  // Outstanding = Revenue - Money In
+  // Outstanding = Sum of (total_amount - amount_paid) for unpaid invoices
   outstanding: number;
   outstandingCount: number;
   
@@ -100,24 +100,49 @@ export function useAccountingStats(
       const { data: expenses, error: expenseError } = await expenseQuery;
       if (expenseError) throw expenseError;
 
-      // Calculate stats - simple sums, no currency conversion needed
-      const issuedInvoices = (invoices || []).filter(i => i.status !== 'draft');
-      const paidInvoices = (invoices || []).filter(i => i.status === 'paid');
-      const outstandingInvoices = (invoices || []).filter(i => ['issued', 'sent', 'viewed'].includes(i.status));
+      // Log warning if filtering by currency account but invoices might be excluded
+      if (currencyAccountId) {
+        const invoicesWithoutAccount = (invoices || []).filter(i => i.status !== 'draft');
+        if (invoicesWithoutAccount.length === 0) {
+          console.warn('[Accounting] No invoices found for currency account filter. Some invoices may have null currency_account_id.');
+        }
+      }
 
-      const revenue = issuedInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
-      const moneyIn = paidInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      // CORRECTED CALCULATIONS:
+      
+      // Revenue = SUM(total_amount) for issued, sent, viewed, paid (excludes draft and voided)
+      const revenueInvoices = (invoices || []).filter(i => 
+        ['issued', 'sent', 'viewed', 'paid'].includes(i.status)
+      );
+      const revenue = revenueInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+
+      // Money In = SUM(amount_paid) for all non-draft, non-voided invoices (captures partial payments)
+      const nonDraftInvoices = (invoices || []).filter(i => 
+        i.status !== 'draft' && i.status !== 'voided'
+      );
+      const moneyIn = nonDraftInvoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
+      const moneyInCount = nonDraftInvoices.filter(i => Number(i.amount_paid) > 0).length;
+
+      // Outstanding = SUM(total_amount - amount_paid) for invoices with remaining balance
+      const outstandingInvoices = (invoices || []).filter(i => {
+        if (!['issued', 'sent', 'viewed'].includes(i.status)) return false;
+        const balance = (Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0);
+        return balance > 0;
+      });
       const outstanding = outstandingInvoices.reduce((sum, i) => 
         sum + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
+
+      // Money Out = SUM(expenses)
       const moneyOut = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
+      // What's Left = Money In - Money Out
       const whatsLeft = moneyIn - moneyOut;
 
       return {
         revenue,
-        revenueCount: issuedInvoices.length,
+        revenueCount: revenueInvoices.length,
         moneyIn,
-        moneyInCount: paidInvoices.length,
+        moneyInCount,
         outstanding,
         outstandingCount: outstandingInvoices.length,
         moneyOut,

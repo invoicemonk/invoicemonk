@@ -107,21 +107,31 @@ export function useDashboardStats(
       const startOfMonth = dateRange?.start || new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = dateRange?.end || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-      const paidInvoices = invoices?.filter(i => i.status === 'paid') || [];
+      // Filter invoices by status
       const outstandingInvoices = invoices?.filter(i => ['issued', 'sent', 'viewed'].includes(i.status)) || [];
       const draftInvoices = invoices?.filter(i => i.status === 'draft') || [];
       
-      const paidThisMonthInvoices = paidInvoices.filter(i => {
+      // CORRECTED: All non-draft, non-voided invoices for revenue calculations
+      const allActiveInvoices = invoices?.filter(i => 
+        i.status !== 'draft' && i.status !== 'voided'
+      ) || [];
+      
+      // Filter for invoices issued this month with payments
+      const paidThisMonthInvoices = allActiveInvoices.filter(i => {
         if (!i.issued_at) return false;
         const issuedDate = new Date(i.issued_at);
-        return issuedDate >= startOfMonth && issuedDate <= endOfMonth;
+        return issuedDate >= startOfMonth && issuedDate <= endOfMonth && Number(i.amount_paid) > 0;
       });
 
-      // Simple sum - no currency conversion needed
-      const totalRevenue = paidInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      // CORRECTED: Total revenue = SUM(amount_paid) to reflect actual collected money
+      const totalRevenue = allActiveInvoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
+      
+      // Outstanding = unpaid balance across outstanding invoices
       const outstanding = outstandingInvoices.reduce((sum, i) => 
         sum + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
-      const paidThisMonth = paidThisMonthInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+      
+      // Paid this month = amount_paid for invoices issued this month
+      const paidThisMonth = paidThisMonthInvoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
 
       return {
         totalRevenue,
