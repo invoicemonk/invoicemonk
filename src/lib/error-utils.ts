@@ -4,7 +4,11 @@
 export function sanitizeErrorMessage(error: unknown): string {
   if (!error) return 'An unexpected error occurred. Please try again.';
   
-  const msg = error instanceof Error ? error.message : String(error);
+  const msg = error instanceof Error
+    ? error.message
+    : (typeof error === 'object' && error !== null && 'message' in error)
+      ? String((error as Record<string, unknown>).message)
+      : String(error);
   
   // Strip Supabase-specific patterns
   const patterns: [RegExp, string][] = [

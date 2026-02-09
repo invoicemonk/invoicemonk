@@ -265,6 +265,7 @@ Deno.serve(async (req) => {
             issuer_snapshot,
             recipient_snapshot,
             tax_schema_version,
+            payment_method_snapshot,
             clients!inner(name, email)
           `)
         
