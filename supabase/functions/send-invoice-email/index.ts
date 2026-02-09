@@ -172,7 +172,8 @@ const generateProfessionalHtml = (
   verificationUrl: string | null,
   showWatermark: boolean,
   canUseBranding: boolean,
-  issuerLogoUrlParam: string | null = null
+  issuerLogoUrlParam: string | null = null,
+  paymentMethodSnapshot: Record<string, unknown> | null = null
 ): string => {
   const currency = invoice.currency as string
   const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
@@ -543,6 +544,32 @@ const generateProfessionalHtml = (
     </div>
     ` : ''}
 
+    ${paymentMethodSnapshot ? (() => {
+      const displayName = (paymentMethodSnapshot.display_name as string) || 'Payment Method';
+      const instructions = paymentMethodSnapshot.instructions as Record<string, string> | null;
+      const instructionRows = instructions
+        ? Object.entries(instructions).map(([key, value]) =>
+            `<div style="display: flex; justify-content: space-between; font-size: 10px; color: #333; padding: 2px 0;">
+              <span style="color: #666;">${key}</span>
+              <span style="font-weight: 500;">${value}</span>
+            </div>`
+          ).join('')
+        : '';
+      return `
+    <div class="no-break" style="margin-bottom: 12px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
+      <div style="font-size: 9px; font-weight: 600; color: #166534; text-transform: uppercase; margin-bottom: 6px;">
+        Payment Instructions
+      </div>
+      <div style="font-size: 10px; color: #333; margin-bottom: 4px;">
+        <strong>${displayName}</strong>
+      </div>
+      ${instructionRows}
+      <div style="margin-top: 6px; font-size: 9px; color: #666; border-top: 1px solid #dcfce7; padding-top: 4px;">
+        Reference: <strong>${invoice.invoice_number}</strong>
+      </div>
+    </div>`;
+    })() : ''}
+
     <!-- Footer with QR Code -->
     <div class="footer">
       <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
@@ -750,6 +777,12 @@ Deno.serve(async (req) => {
 
     // Generate professional HTML (matching generate-pdf output)
     console.log('Generating professional HTML invoice attachment...')
+    const paymentMethodSnapshot = invoice.payment_method_snapshot
+      ? (typeof invoice.payment_method_snapshot === 'string'
+          ? JSON.parse(invoice.payment_method_snapshot)
+          : invoice.payment_method_snapshot) as Record<string, unknown>
+      : null;
+
     const professionalHtml = generateProfessionalHtml(
       invoice,
       items,
@@ -758,7 +791,8 @@ Deno.serve(async (req) => {
       verificationUrl,
       showWatermark,
       canUseBranding,
-      issuerLogoUrl
+      issuerLogoUrl,
+      paymentMethodSnapshot
     )
     
     // Convert HTML to PDF using PDFShift API
