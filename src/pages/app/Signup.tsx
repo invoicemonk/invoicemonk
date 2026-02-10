@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +34,21 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Capture referral code from URL param or cookie
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      localStorage.setItem('pending_referral_code', refCode);
+    } else if (!localStorage.getItem('pending_referral_code')) {
+      // Fallback: read from im_ref cookie (set by track-referral-click)
+      const cookieMatch = document.cookie.match(/(?:^|;\s*)im_ref=([^;]+)/);
+      if (cookieMatch?.[1]) {
+        localStorage.setItem('pending_referral_code', cookieMatch[1]);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {

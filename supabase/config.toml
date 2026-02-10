@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.send-support-notification]
 verify_jwt = false
+
+[functions.track-referral-click]
+verify_jwt = false
+
+[functions.attribute-referral]
+verify_jwt = false
+
+[functions.lock-commissions]
+verify_jwt = false

@@ -86,8 +86,19 @@ import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
 import AdminSupport from "./pages/admin/AdminSupport";
 import AdminNotifications from "./pages/admin/AdminNotifications";
+import AdminPartners from "./pages/admin/AdminPartners";
+
+// Partner pages
+import { PartnerLayout } from "./components/partner/PartnerLayout";
+import PartnerDashboard from "./pages/partner/PartnerDashboard";
+import PartnerLinks from "./pages/partner/PartnerLinks";
+import PartnerReferrals from "./pages/partner/PartnerReferrals";
+import PartnerCommissions from "./pages/partner/PartnerCommissions";
+import PartnerPayouts from "./pages/partner/PartnerPayouts";
+import PartnerSettings from "./pages/partner/PartnerSettings";
 
 // Public pages
+import ReferralRedirect from "./components/app/ReferralRedirect";
 import VerifyInvoice from "./pages/verify/VerifyInvoice";
 import VerifyReceipt from "./pages/verify/VerifyReceipt";
 import InvoiceView from "./pages/public/InvoiceView";
@@ -248,7 +259,18 @@ const App = () => (
             <Route path="/admin/templates" element={<AdminTemplates />} />
             <Route path="/admin/support" element={<AdminSupport />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
+            <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/system" element={<AdminSystem />} />
+          </Route>
+
+          {/* Partner routes - Protected + PartnerLayout handles partner role check */}
+          <Route element={<ProtectedRoute><PartnerLayout /></ProtectedRoute>}>
+            <Route path="/partner" element={<PartnerDashboard />} />
+            <Route path="/partner/links" element={<PartnerLinks />} />
+            <Route path="/partner/referrals" element={<PartnerReferrals />} />
+            <Route path="/partner/commissions" element={<PartnerCommissions />} />
+            <Route path="/partner/payouts" element={<PartnerPayouts />} />
+            <Route path="/partner/settings" element={<PartnerSettings />} />
           </Route>
 
           {/* Public Pages - No auth required */}
@@ -266,6 +288,9 @@ const App = () => (
           <Route path="/demo/expenses" element={<DemoExpenses />} />
           <Route path="/demo/clients" element={<DemoClients />} />
           <Route path="/demo/accounting" element={<DemoAccounting />} />
+          
+          {/* Referral tracking redirect */}
+          <Route path="/r/:code" element={<ReferralRedirect />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -274,6 +274,89 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("stripe_subscription_id", subscriptionId);
+
+          // --- REFERRAL COMMISSION LOGIC ---
+          try {
+            // Find our subscription record
+            const { data: subRecord } = await supabase
+              .from("subscriptions")
+              .select("id, business_id, tier, billing_currency")
+              .eq("stripe_subscription_id", subscriptionId)
+              .maybeSingle();
+
+            if (subRecord?.business_id) {
+              // Find the business owner
+              const { data: ownerMember } = await supabase
+                .from("business_members")
+                .select("user_id")
+                .eq("business_id", subRecord.business_id)
+                .eq("role", "owner")
+                .maybeSingle();
+
+              if (ownerMember?.user_id) {
+                // Check if this user has a referral
+                const { data: referral } = await supabase
+                  .from("referrals")
+                  .select("id, partner_id, commission_business_id, is_self_referral")
+                  .eq("referred_user_id", ownerMember.user_id)
+                  .maybeSingle();
+
+                if (referral && !referral.is_self_referral) {
+                  // Lock commission_business_id on first billing event
+                  if (!referral.commission_business_id) {
+                    await supabase
+                      .from("referrals")
+                      .update({ commission_business_id: subRecord.business_id })
+                      .eq("id", referral.id);
+                    referral.commission_business_id = subRecord.business_id;
+                    console.log("Locked commission_business_id:", subRecord.business_id);
+                  }
+
+                  // Only generate commission if this is the commission-bearing business
+                  if (referral.commission_business_id === subRecord.business_id) {
+                    // Check partner is still active
+                    const { data: partner } = await supabase
+                      .from("referral_partners")
+                      .select("id, commission_rate, status")
+                      .eq("id", referral.partner_id)
+                      .maybeSingle();
+
+                    if (partner && partner.status === "active") {
+                      const grossAmount = (invoice.amount_paid || 0) / 100; // Stripe amounts in cents
+                      const commissionRate = Number(partner.commission_rate);
+                      const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
+                      const currency = subRecord.billing_currency || invoice.currency?.toUpperCase() || "USD";
+
+                      // Avoid duplicate commissions for same billing event
+                      const { data: existingComm } = await supabase
+                        .from("commissions")
+                        .select("id")
+                        .eq("billing_event_id", invoice.id)
+                        .maybeSingle();
+
+                      if (!existingComm) {
+                        await supabase.from("commissions").insert({
+                          partner_id: partner.id,
+                          referral_id: referral.id,
+                          subscription_id: subRecord.id,
+                          billing_event_id: invoice.id,
+                          gross_amount: grossAmount,
+                          commission_rate: commissionRate,
+                          commission_amount: commissionAmount,
+                          currency: currency,
+                        });
+
+                        console.log("Commission created:", commissionAmount, currency, "for partner:", partner.id);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (commErr) {
+            // Don't fail the webhook for commission errors
+            console.error("Commission processing error:", commErr);
+          }
         }
         break;
       }

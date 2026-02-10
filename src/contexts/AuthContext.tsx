@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -94,10 +94,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const triggerReferralAttribution = useCallback(async (userId: string) => {
+    try {
+      const refCode = localStorage.getItem('pending_referral_code');
+      if (!refCode) return;
+      localStorage.removeItem('pending_referral_code');
+
+      await supabase.functions.invoke('attribute-referral', {
+        body: { referral_code: refCode, user_id: userId },
+      });
+      console.log('Referral attribution triggered for code:', refCode);
+    } catch (err) {
+      console.error('Referral attribution error:', err);
+    }
+  }, []);
+
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/verify-email`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -107,6 +122,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       },
     });
+
+    // Trigger referral attribution if signup succeeded and we have a user
+    if (!error && data?.user?.id) {
+      triggerReferralAttribution(data.user.id);
+    }
     
     return { error: error as Error | null };
   };

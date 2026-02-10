@@ -40,6 +40,7 @@ const mainNavItems = [
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Businesses', url: '/admin/businesses', icon: Building2 },
   { title: 'Invoices', url: '/admin/invoices', icon: FileText },
+  { title: 'Partners', url: '/admin/partners', icon: Users },
   { title: 'Support Tickets', url: '/admin/support', icon: MessageCircle },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
   { title: 'Audit Logs', url: '/admin/audit-logs', icon: History },

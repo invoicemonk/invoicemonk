@@ -291,6 +291,86 @@ export type Database = {
           },
         ]
       }
+      commissions: {
+        Row: {
+          billing_event_id: string
+          commission_amount: number
+          commission_rate: number
+          created_at: string
+          currency: string
+          gross_amount: number
+          id: string
+          locked_at: string | null
+          paid_at: string | null
+          partner_id: string
+          payout_batch_id: string | null
+          referral_id: string
+          status: Database["public"]["Enums"]["commission_status"]
+          subscription_id: string
+        }
+        Insert: {
+          billing_event_id: string
+          commission_amount: number
+          commission_rate: number
+          created_at?: string
+          currency: string
+          gross_amount: number
+          id?: string
+          locked_at?: string | null
+          paid_at?: string | null
+          partner_id: string
+          payout_batch_id?: string | null
+          referral_id: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          subscription_id: string
+        }
+        Update: {
+          billing_event_id?: string
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          currency?: string
+          gross_amount?: number
+          id?: string
+          locked_at?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          payout_batch_id?: string | null
+          referral_id?: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_payout_batch_id_fkey"
+            columns: ["payout_batch_id"]
+            isOneToOne: false
+            referencedRelation: "payout_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_notes: {
         Row: {
           amount: number
@@ -1014,6 +1094,63 @@ export type Database = {
           },
         ]
       }
+      payout_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          partner_id: string
+          payment_method: string | null
+          payment_reference: string | null
+          status: Database["public"]["Enums"]["payout_batch_status"]
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          status?: Database["public"]["Enums"]["payout_batch_status"]
+          total_amount?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          status?: Database["public"]["Enums"]["payout_batch_status"]
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_batches_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_regions: {
         Row: {
           country_code: string
@@ -1183,6 +1320,204 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: true
             referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_clicks: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string | null
+          link_id: string
+          referrer_url: string | null
+          user_agent: string | null
+          visitor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          link_id: string
+          referrer_url?: string | null
+          user_agent?: string | null
+          visitor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          link_id?: string
+          referrer_url?: string | null
+          user_agent?: string | null
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "referral_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_links: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          landing_page: string | null
+          partner_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          landing_page?: string | null
+          partner_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          landing_page?: string | null
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_links_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_partners: {
+        Row: {
+          commission_rate: number
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          name: string
+          payout_details: Json | null
+          payout_method: string | null
+          status: Database["public"]["Enums"]["partner_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          name: string
+          payout_details?: Json | null
+          payout_method?: string | null
+          status?: Database["public"]["Enums"]["partner_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          name?: string
+          payout_details?: Json | null
+          payout_method?: string | null
+          status?: Database["public"]["Enums"]["partner_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_partners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_partners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          attributed_at: string
+          commission_business_id: string | null
+          created_at: string
+          customer_ref: string
+          first_click_at: string
+          id: string
+          is_self_referral: boolean
+          link_id: string | null
+          partner_id: string
+          referred_user_id: string
+        }
+        Insert: {
+          attributed_at?: string
+          commission_business_id?: string | null
+          created_at?: string
+          customer_ref: string
+          first_click_at: string
+          id?: string
+          is_self_referral?: boolean
+          link_id?: string | null
+          partner_id: string
+          referred_user_id: string
+        }
+        Update: {
+          attributed_at?: string
+          commission_business_id?: string | null
+          created_at?: string
+          customer_ref?: string
+          first_click_at?: string
+          id?: string
+          is_self_referral?: boolean
+          link_id?: string | null
+          partner_id?: string
+          referred_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_commission_business_id_fkey"
+            columns: ["commission_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "referral_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_user_id_fkey"
+            columns: ["referred_user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1699,6 +2034,7 @@ export type Database = {
         }
         Returns: string
       }
+      nextval: { Args: { seq_name: string }; Returns: number }
       notify_admin_first_invoice_issued: {
         Args: {
           _business_id: string
@@ -1719,6 +2055,7 @@ export type Database = {
         | "team_member"
         | "auditor"
         | "platform_admin"
+        | "partner"
       audit_event_type:
         | "USER_LOGIN"
         | "USER_LOGOUT"
@@ -1755,7 +2092,16 @@ export type Database = {
         | "PAYMENT_METHOD_UPDATED"
         | "PAYMENT_METHOD_DELETED"
         | "PROOF_UPLOADED"
+        | "PARTNER_CREATED"
+        | "PARTNER_UPDATED"
+        | "COMMISSION_CREATED"
+        | "COMMISSION_LOCKED"
+        | "COMMISSION_VOIDED"
+        | "PAYOUT_CREATED"
+        | "PAYOUT_PAID"
+        | "REFERRAL_ATTRIBUTED"
       business_role: "owner" | "admin" | "member" | "auditor"
+      commission_status: "pending" | "locked" | "paid" | "voided"
       invoice_status:
         | "draft"
         | "issued"
@@ -1764,6 +2110,8 @@ export type Database = {
         | "paid"
         | "voided"
         | "credited"
+      partner_status: "active" | "paused" | "suspended"
+      payout_batch_status: "draft" | "processing" | "paid" | "cancelled"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
       subscription_tier:
         | "starter"
@@ -1903,6 +2251,7 @@ export const Constants = {
         "team_member",
         "auditor",
         "platform_admin",
+        "partner",
       ],
       audit_event_type: [
         "USER_LOGIN",
@@ -1940,8 +2289,17 @@ export const Constants = {
         "PAYMENT_METHOD_UPDATED",
         "PAYMENT_METHOD_DELETED",
         "PROOF_UPLOADED",
+        "PARTNER_CREATED",
+        "PARTNER_UPDATED",
+        "COMMISSION_CREATED",
+        "COMMISSION_LOCKED",
+        "COMMISSION_VOIDED",
+        "PAYOUT_CREATED",
+        "PAYOUT_PAID",
+        "REFERRAL_ATTRIBUTED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
+      commission_status: ["pending", "locked", "paid", "voided"],
       invoice_status: [
         "draft",
         "issued",
@@ -1951,6 +2309,8 @@ export const Constants = {
         "voided",
         "credited",
       ],
+      partner_status: ["active", "paused", "suspended"],
+      payout_batch_status: ["draft", "processing", "paid", "cancelled"],
       subscription_status: ["active", "cancelled", "past_due", "trialing"],
       subscription_tier: [
         "starter",

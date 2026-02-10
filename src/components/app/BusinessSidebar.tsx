@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  ShieldCheck,
   FileX,
   Bell,
   PieChart,
@@ -18,7 +19,8 @@ import {
   ChevronDown,
   User,
   Receipt,
-  MessageCircle
+  MessageCircle,
+  Handshake
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -48,6 +50,7 @@ import { BusinessSwitcher } from './BusinessSwitcher';
 import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
 import { useUnreadCount } from '@/hooks/use-notifications';
 import { useTeamAccess } from '@/hooks/use-tier-features';
+import { usePartnerRole } from '@/hooks/use-partner-role';
 import logo from '@/assets/invoicemonk-logo.png';
 import logoIcon from '@/assets/invoicemonk-icon.png';
 
@@ -58,6 +61,7 @@ export function BusinessSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const { data: unreadCount = 0 } = useUnreadCount();
+  const { isPartner } = usePartnerRole();
   
   // Check if tier allows team access - platform admins always have access
   const { data: teamAccess } = useTeamAccess();
@@ -253,6 +257,23 @@ export function BusinessSidebar() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              {isPartner && (
+                <DropdownMenuItem asChild>
+                  <Link to="/partner" className="cursor-pointer">
+                    <Handshake className="mr-2 h-4 w-4" />
+                    Partner Portal
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {isPlatformAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin" className="cursor-pointer">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Admin Panel
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {(isPartner || isPlatformAdmin) && <DropdownMenuSeparator />}
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
