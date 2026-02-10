@@ -70,7 +70,7 @@ function generateReceiptHtml(
   const paymentDate = formatDate(payment.payment_date as string || receipt.issued_at as string)
 
   const watermarkFooter = showWatermark 
-    ? `<div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 11px;">
+    ? `<div style="text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 10px;">
          Generated with Invoicemonk
        </div>`
     : ''
@@ -84,10 +84,10 @@ function generateReceiptHtml(
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
           font-family: 'Helvetica Neue', Arial, sans-serif; 
-          font-size: 14px; 
-          line-height: 1.5; 
+          font-size: 13px; 
+          line-height: 1.4; 
           color: #1f2937;
-          padding: 40px;
+          padding: 30px;
           max-width: 800px;
           margin: 0 auto;
         }
@@ -95,72 +95,72 @@ function generateReceiptHtml(
           display: flex; 
           justify-content: space-between; 
           align-items: flex-start;
-          margin-bottom: 40px;
-          padding-bottom: 20px;
+          margin-bottom: 24px;
+          padding-bottom: 14px;
           border-bottom: 2px solid #e5e7eb;
         }
         .receipt-title { 
-          font-size: 28px; 
+          font-size: 22px; 
           font-weight: 700; 
           color: #111827;
           text-transform: uppercase;
           letter-spacing: 2px;
         }
         .receipt-number { 
-          font-size: 16px; 
+          font-size: 14px; 
           color: #6b7280;
-          margin-top: 8px;
+          margin-top: 4px;
         }
         .issuer-info { 
           text-align: right;
         }
         .issuer-name { 
-          font-size: 18px; 
+          font-size: 16px; 
           font-weight: 600; 
           color: #111827;
         }
         .issuer-details { 
           color: #6b7280; 
-          font-size: 13px;
+          font-size: 12px;
           margin-top: 4px;
         }
         .section { 
-          margin-bottom: 30px;
+          margin-bottom: 18px;
         }
         .section-title { 
-          font-size: 12px; 
+          font-size: 11px; 
           font-weight: 600; 
           color: #9ca3af; 
           text-transform: uppercase;
           letter-spacing: 1px;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         .amount-box {
           background: linear-gradient(135deg, #10b981 0%, #059669 100%);
           color: white;
-          padding: 30px;
+          padding: 18px;
           border-radius: 12px;
           text-align: center;
-          margin: 30px 0;
+          margin: 20px 0;
         }
         .amount-label {
-          font-size: 14px;
+          font-size: 13px;
           opacity: 0.9;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
         .amount-value {
-          font-size: 36px;
+          font-size: 28px;
           font-weight: 700;
         }
         .details-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 30px;
+          gap: 20px;
         }
         .detail-row {
           display: flex;
           justify-content: space-between;
-          padding: 10px 0;
+          padding: 6px 0;
           border-bottom: 1px solid #f3f4f6;
         }
         .detail-label {
@@ -172,30 +172,30 @@ function generateReceiptHtml(
         }
         .verification-section {
           background: #f9fafb;
-          padding: 20px;
+          padding: 14px;
           border-radius: 8px;
-          margin-top: 30px;
+          margin-top: 20px;
         }
         .verification-title {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         .verification-hash {
           font-family: 'Courier New', monospace;
-          font-size: 11px;
+          font-size: 10px;
           color: #6b7280;
           word-break: break-all;
           background: white;
-          padding: 10px;
+          padding: 8px;
           border-radius: 4px;
           border: 1px solid #e5e7eb;
         }
         .verification-id {
-          font-size: 12px;
+          font-size: 11px;
           color: #6b7280;
-          margin-top: 10px;
+          margin-top: 6px;
         }
         .paid-stamp {
           display: inline-block;
@@ -302,7 +302,7 @@ function generateReceiptHtml(
         <div class="verification-hash">
           SHA-256: ${receipt.receipt_hash}
         </div>
-        <div style="margin-top: 10px; font-size: 12px; color: #6b7280;">
+        <div style="margin-top: 6px; font-size: 11px; color: #6b7280;">
           Verify this receipt at: invoicemonk.com/verify/receipt/${receipt.verification_id}
         </div>
       </div>
@@ -440,7 +440,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         source: html,
         format: 'A4',
-        margin: '20mm'
+        margin: '15mm'
       })
     })
 

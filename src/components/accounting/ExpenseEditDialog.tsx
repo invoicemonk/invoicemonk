@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { useUpdateExpense, EXPENSE_CATEGORIES, Expense } from '@/hooks/use-expenses';
 import { ReceiptUpload } from './ReceiptUpload';
+import { VendorCombobox } from './VendorCombobox';
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -167,11 +168,10 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="vendor">Vendor / Supplier</Label>
-              <Input
-                id="vendor"
-                placeholder="Who did you pay?"
-                {...register('vendor')}
+              <Label>Vendor / Supplier</Label>
+              <VendorCombobox
+                value={watch('vendor')}
+                onChange={(val) => setValue('vendor', val)}
               />
             </div>
 
