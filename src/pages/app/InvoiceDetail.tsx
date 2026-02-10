@@ -139,7 +139,7 @@ export default function InvoiceDetail() {
       });
 
       // Upload proof of payment if a file was selected
-      const paymentId = (result as any)?._payment_id;
+      const paymentId = result?.payment_id;
       if (proofFile && paymentId && user?.id) {
         await uploadProof.mutateAsync({
           paymentId,

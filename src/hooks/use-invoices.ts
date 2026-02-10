@@ -456,10 +456,9 @@ export function useVoidInvoice() {
   });
 }
 
-// Record a payment
+// Record a payment via edge function (creates receipt automatically)
 export function useRecordPayment() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -477,82 +476,43 @@ export function useRecordPayment() {
       notes?: string;
       paymentDate?: string;
     }) => {
-      if (!user) throw new Error('Not authenticated');
-
-      // Get current invoice
-      const { data: invoice, error: fetchError } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('id', invoiceId)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!invoice) throw new Error('Invoice not found');
-
-      // Create payment record (currency_account_id inherited via trigger)
-      const { data: paymentRecord, error: paymentError } = await supabase
-        .from('payments')
-        .insert({
+      const { data, error } = await supabase.functions.invoke('record-payment', {
+        body: {
           invoice_id: invoiceId,
           amount,
           payment_method: paymentMethod,
           payment_reference: paymentReference,
-          notes,
           payment_date: paymentDate || new Date().toISOString().split('T')[0],
-          recorded_by: user.id,
-        })
-        .select()
-        .single();
+          notes,
+        },
+      });
 
-      if (paymentError) throw paymentError;
+      if (error) throw new Error(error.message || 'Failed to record payment');
+      if (!data?.success) throw new Error(data?.error || 'Failed to record payment');
 
-      // Calculate new amount paid
-      const newAmountPaid = Number(invoice.amount_paid) + amount;
-      const newStatus = newAmountPaid >= Number(invoice.total_amount) ? 'paid' : invoice.status;
-
-      // Update invoice
-      const { data: updatedInvoice, error: updateError } = await supabase
-        .from('invoices')
-        .update({
-          amount_paid: newAmountPaid,
-          status: newStatus,
-        })
-        .eq('id', invoiceId)
-        .select()
-        .maybeSingle();
-
-      if (updateError) throw updateError;
-      if (!updatedInvoice) throw new Error('Failed to update invoice - no rows affected. You may not have permission to update this invoice.');
-
-      // Log audit event (fire-and-forget)
-      try {
-        await supabase.rpc('log_audit_event', {
-          _event_type: 'PAYMENT_RECORDED',
-          _entity_type: 'invoice',
-          _entity_id: invoiceId,
-          _user_id: user.id,
-          _previous_state: invoice,
-          _new_state: updatedInvoice,
-          _metadata: { amount, payment_method: paymentMethod },
-        });
-      } catch (auditErr) {
-        console.error('Audit log error (non-blocking):', auditErr);
-      }
-
-      return { ...updatedInvoice, _payment_id: paymentRecord.id };
+      return {
+        invoice_id: invoiceId,
+        payment_id: data.payment?.id,
+        receipt: data.receipt,
+        invoice_status: data.invoice_status,
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
-      // Accounting cache invalidations
+      queryClient.invalidateQueries({ queryKey: ['invoice', data?.invoice_id] });
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['due-date-stats'] });
       queryClient.invalidateQueries({ queryKey: ['revenue-trend'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receipt'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
         title: 'Payment recorded',
-        description: 'The payment has been recorded successfully.',
+        description: data?.receipt
+          ? 'Payment recorded and receipt generated successfully.'
+          : 'The payment has been recorded successfully.',
       });
     },
     onError: (error) => {
