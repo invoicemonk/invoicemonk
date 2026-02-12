@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Loader2, Mail, Lock, Shield } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { gaEvents } from '@/hooks/use-google-analytics';
 
@@ -22,11 +23,44 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const handleResendFromLogin = useCallback(async () => {
+    if (!unverifiedEmail || resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: unverifiedEmail });
+    setIsResending(false);
+    if (error) {
+      toast({ title: 'Could not send email', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Verification email sent!', description: 'Please check your inbox.' });
+      setResendCooldown(60);
+      intervalRef.current = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  }, [unverifiedEmail, resendCooldown, isResending]);
 
   useEffect(() => {
     if (user) {
@@ -45,11 +79,18 @@ const Login = () => {
 
     if (error) {
       setIsLoading(false);
+      const isUnverified = error.message?.toLowerCase().includes('email not confirmed');
+      if (isUnverified) {
+        setEmailNotVerified(true);
+        setUnverifiedEmail(data.email);
+      }
       toast({
         title: 'Login failed',
-        description: error.message === 'Invalid login credentials' 
-          ? 'Invalid email or password. Please try again.'
-          : error.message,
+        description: isUnverified
+          ? 'Your email is not verified yet. Please check your inbox.'
+          : error.message === 'Invalid login credentials'
+            ? 'Invalid email or password. Please try again.'
+            : error.message,
         variant: 'destructive',
       });
     } else {
@@ -135,7 +176,38 @@ const Login = () => {
               'Log in'
             )}
           </Button>
-        </form>
+      </form>
+
+        {emailNotVerified && (
+          <div className="mt-4 bg-accent/50 border border-accent rounded-lg p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-accent-foreground flex-shrink-0 mt-0.5" />
+              <div className="space-y-2 flex-1">
+                <p className="text-sm font-medium text-accent-foreground">
+                  Your email is not verified yet
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Check your inbox for a verification link, or resend it below.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendFromLogin}
+                  disabled={isResending || resendCooldown > 0}
+                  className="w-full"
+                >
+                  {isResending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                  ) : resendCooldown > 0 ? (
+                    `Resend in ${resendCooldown}s`
+                  ) : (
+                    <><RefreshCw className="w-4 h-4 mr-2" />Resend verification email</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">

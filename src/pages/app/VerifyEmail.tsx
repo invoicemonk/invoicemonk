@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Mail, CheckCircle, Loader2, Shield, AlertCircle } from 'lucide-react';
+import { Mail, CheckCircle, Loader2, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import logo from '@/assets/logo-red.png';
 
 const VerifyEmail = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isVerified, setIsVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (user?.email_confirmed_at) {
@@ -19,6 +24,34 @@ const VerifyEmail = () => {
       }, 2000);
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const handleResend = useCallback(async () => {
+    if (!user?.email || resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: user.email });
+    setIsResending(false);
+    if (error) {
+      toast({ title: 'Could not send email', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Verification email sent!', description: 'Please check your inbox.' });
+      setResendCooldown(60);
+      intervalRef.current = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  }, [user?.email, resendCooldown, isResending]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -111,13 +144,32 @@ const VerifyEmail = () => {
             <span>Email verification protects your financial records</span>
           </div>
 
-          {/* Help text */}
-          <p className="mt-4 text-sm text-muted-foreground">
-            Didn't receive the email? Check your spam folder or contact{' '}
-            <a href="mailto:support@invoicemonk.com" className="text-primary hover:underline">
-              support@invoicemonk.com
-            </a>
-          </p>
+          {/* Resend button */}
+          {!isVerified && user?.email && (
+            <div className="mt-4 space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResend}
+                disabled={isResending || resendCooldown > 0}
+                className="w-full"
+              >
+                {isResending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                ) : resendCooldown > 0 ? (
+                  `Resend in ${resendCooldown}s`
+                ) : (
+                  <><RefreshCw className="w-4 h-4 mr-2" />Resend verification email</>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Check your spam folder or contact{' '}
+                <a href="mailto:support@invoicemonk.com" className="text-primary hover:underline">
+                  support@invoicemonk.com
+                </a>
+              </p>
+            </div>
+          )}
         </motion.div>
       </main>
     </div>
