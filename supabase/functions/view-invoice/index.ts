@@ -222,6 +222,33 @@ Deno.serve(async (req) => {
       console.error('Audit log error:', auditErr)
     }
 
+    // Update status to 'viewed' on first view (only from issued/sent)
+    if (invoice.status === 'issued' || invoice.status === 'sent') {
+      try {
+        await supabase
+          .from('invoices')
+          .update({ status: 'viewed' })
+          .eq('id', invoice.id)
+
+        // Create notification for the invoice owner on first view
+        const recipientName = (invoice.recipient_snapshot as RecipientSnapshot | null)?.name || 'A client'
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: invoice.user_id,
+            business_id: invoice.business_id,
+            type: 'INVOICE_VIEWED',
+            title: 'Invoice Viewed',
+            message: `${recipientName} viewed invoice ${invoice.invoice_number}`,
+            entity_type: 'invoice',
+            entity_id: invoice.id,
+          })
+      } catch (viewErr) {
+        // Don't fail the request if status update or notification fails
+        console.error('View status update error:', viewErr)
+      }
+    }
+
     const response: ViewInvoiceResponse = {
       success: true,
       invoice: {

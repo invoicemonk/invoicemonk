@@ -22,6 +22,7 @@ export type NotificationType =
   | 'INVOICE_OVERDUE'
   | 'INVOICE_SENT'
   | 'INVOICE_VOIDED'
+  | 'INVOICE_VIEWED'
   | 'CLIENT_ADDED';
 
 export function useNotifications(limit = 20, businessId?: string) {

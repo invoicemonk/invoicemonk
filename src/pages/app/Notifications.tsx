@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Mail,
   UserPlus,
-  Ban
+  Ban,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,7 @@ const iconMap: Record<NotificationType, React.ComponentType<{ className?: string
   INVOICE_OVERDUE: AlertCircle,
   INVOICE_SENT: Mail,
   INVOICE_VOIDED: Ban,
+  INVOICE_VIEWED: Eye,
   CLIENT_ADDED: UserPlus,
 };
 
@@ -43,6 +45,7 @@ const colorMap: Record<NotificationType, string> = {
   INVOICE_OVERDUE: 'text-red-500 bg-red-50',
   INVOICE_SENT: 'text-purple-500 bg-purple-50',
   INVOICE_VOIDED: 'text-orange-500 bg-orange-50',
+  INVOICE_VIEWED: 'text-indigo-500 bg-indigo-50',
   CLIENT_ADDED: 'text-cyan-500 bg-cyan-50',
 };
 
