@@ -27,7 +27,10 @@ const Login = () => {
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lockoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,6 +40,7 @@ const Login = () => {
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (lockoutRef.current) clearInterval(lockoutRef.current);
     };
   }, []);
 
@@ -73,12 +77,35 @@ const Login = () => {
     defaultValues: { email: '', password: '' },
   });
 
+  const startLockout = useCallback(() => {
+    setLockoutSeconds(60);
+    if (lockoutRef.current) clearInterval(lockoutRef.current);
+    lockoutRef.current = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          if (lockoutRef.current) clearInterval(lockoutRef.current);
+          setFailedAttempts(0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const isLockedOut = lockoutSeconds > 0;
+
   const onSubmit = async (data: LoginFormData) => {
+    if (isLockedOut) return;
     setIsLoading(true);
     const { error } = await signIn(data.email, data.password);
 
     if (error) {
       setIsLoading(false);
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      if (newAttempts >= 5) {
+        startLockout();
+      }
       const isUnverified = error.message?.toLowerCase().includes('email not confirmed');
       if (isUnverified) {
         setEmailNotVerified(true);
@@ -94,6 +121,7 @@ const Login = () => {
         variant: 'destructive',
       });
     } else {
+      setFailedAttempts(0);
       // Track successful login
       gaEvents.loginSuccess();
       toast({
@@ -166,12 +194,21 @@ const Login = () => {
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLockedOut && (
+            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Too many attempts. Try again in {lockoutSeconds}s</span>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={isLoading || isLockedOut}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Logging in...
               </>
+            ) : isLockedOut ? (
+              `Locked (${lockoutSeconds}s)`
             ) : (
               'Log in'
             )}

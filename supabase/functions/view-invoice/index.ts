@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
       .select(`
         id,
         user_id,
+        business_id,
         invoice_number,
         issue_date,
         due_date,

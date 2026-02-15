@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
+import { TawkTo } from "@/components/TawkTo";
 import NotFound from "./pages/NotFound";
 
 // App pages (authentication)
@@ -144,6 +145,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <TawkTo />
         <BrowserRouter>
           <AnalyticsProvider>
           <Routes>

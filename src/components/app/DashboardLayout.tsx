@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
+import { TawkTo } from '@/components/TawkTo';
 
 export function DashboardLayout() {
   return (
@@ -13,6 +14,7 @@ export function DashboardLayout() {
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />
           </main>
+          <TawkTo />
         </SidebarInset>
       </div>
     </SidebarProvider>
