@@ -17,11 +17,12 @@ interface DemoLayoutProps {
 }
 
 const demoNavItems = [
+  { href: '/demo/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/demo/invoices', label: 'Invoices', icon: FileText },
   { href: '/demo/receipts', label: 'Receipts', icon: Receipt },
   { href: '/demo/expenses', label: 'Expenses', icon: Wallet },
   { href: '/demo/clients', label: 'Clients', icon: Users },
-  { href: '/demo/accounting', label: 'Accounting', icon: LayoutDashboard },
+  { href: '/demo/accounting', label: 'Accounting', icon: FileText },
 ];
 
 export function DemoLayout({ children }: DemoLayoutProps) {
@@ -68,10 +69,10 @@ export function DemoLayout({ children }: DemoLayoutProps) {
                   key={item.href}
                   to={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors",
                     isActive 
-                      ? "bg-primary text-primary-foreground" 
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "text-primary border-l-[3px] border-l-primary bg-transparent rounded-none" 
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg"
                   )}
                 >
                   <Icon className="h-4 w-4" />

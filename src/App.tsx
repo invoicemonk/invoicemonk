@@ -106,6 +106,7 @@ import InvoiceView from "./pages/public/InvoiceView";
 
 // Demo pages (public - no auth required)
 import { 
+  DemoDashboard,
   DemoInvoices, 
   DemoReceipts, 
   DemoExpenses, 
@@ -285,6 +286,7 @@ const App = () => (
           <Route path="/docs/api" element={<APIDocumentation />} />
           
           {/* Demo Pages - No auth required (for marketing screenshots) */}
+          <Route path="/demo/dashboard" element={<DemoDashboard />} />
           <Route path="/demo/invoices" element={<DemoInvoices />} />
           <Route path="/demo/receipts" element={<DemoReceipts />} />
           <Route path="/demo/expenses" element={<DemoExpenses />} />

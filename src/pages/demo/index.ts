@@ -1,3 +1,4 @@
+export { default as DemoDashboard } from './DemoDashboard';
 export { default as DemoInvoices } from './DemoInvoices';
 export { default as DemoReceipts } from './DemoReceipts';
 export { default as DemoExpenses } from './DemoExpenses';

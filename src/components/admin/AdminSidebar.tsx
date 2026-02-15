@@ -71,8 +71,8 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-destructive/20 bg-background">
-      <SidebarHeader className="border-b border-destructive/20 p-4">
+    <Sidebar collapsible="icon" className="border-r border-border bg-background">
+      <SidebarHeader className="border-b border-border p-4">
         <Link to="/admin" className="flex items-center gap-2">
           <img 
             src={isCollapsed ? logoIcon : logo} 
@@ -181,7 +181,7 @@ export function AdminSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-destructive/20 p-4">
+      <SidebarFooter className="border-t border-border p-4">
         {!isCollapsed && (
           <div className="mb-3 flex items-center gap-2 text-xs text-destructive">
             <ShieldAlert className="h-3 w-3" />

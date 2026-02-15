@@ -161,7 +161,7 @@ export function BusinessSidebar() {
                         <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </span>
                       {item.showBadge && unreadCount > 0 && !isCollapsed && (
-                        <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                        <Badge variant="default" className="h-5 px-1.5 text-xs">
                           {unreadCount > 99 ? '99+' : unreadCount}
                         </Badge>
                       )}

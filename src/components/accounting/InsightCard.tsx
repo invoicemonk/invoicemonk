@@ -25,7 +25,7 @@ export function InsightCard({
   const trendColor = trend === 'up' 
     ? 'text-emerald-600 dark:text-emerald-400' 
     : trend === 'down' 
-    ? 'text-red-600 dark:text-red-400'
+    ? 'text-destructive'
     : 'text-muted-foreground';
 
   return (
