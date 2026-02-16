@@ -71,7 +71,7 @@ export function BusinessRedirect() {
     if (data.businessId) {
       navigate(`/b/${data.businessId}/dashboard`, { replace: true });
     } else {
-      navigate('/business-profile', { replace: true });
+      navigate('/select-plan', { replace: true });
     }
   }, [data, authLoading, isLoading, navigate]);
 

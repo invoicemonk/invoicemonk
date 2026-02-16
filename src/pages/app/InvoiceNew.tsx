@@ -357,7 +357,7 @@ export default function InvoiceNew() {
         description: 'Please complete your business profile before creating invoices.',
         variant: 'destructive',
       });
-      navigate('/business-profile');
+      navigate(`/b/${currentBusiness?.id}/settings`);
       return;
     }
 
@@ -411,7 +411,7 @@ export default function InvoiceNew() {
         description: 'Please complete your business profile before issuing invoices.',
         variant: 'destructive',
       });
-      navigate('/business-profile');
+      navigate(`/b/${currentBusiness?.id}/settings`);
       return;
     }
 
@@ -784,7 +784,7 @@ export default function InvoiceNew() {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 No payment method configured for {currentCurrencyAccount.currency}. Your client won't see payment instructions.{' '}
-                <Link to="/business-profile" className="underline font-medium">Add one</Link>
+                <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
               </AlertDescription>
             </Alert>
           )}

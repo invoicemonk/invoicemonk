@@ -6,6 +6,7 @@ type MissingField = 'country' | 'currency' | 'businessType';
 
 interface Props {
   missingFields: MissingField[];
+  settingsUrl: string;
   onDismiss?: () => void;
 }
 
@@ -26,7 +27,7 @@ const fieldMessages: Record<MissingField, { label: string; description: string }
 
 const STORAGE_KEY = 'accounting-banner-dismissed';
 
-export function MissingBusinessDataBanner({ missingFields, onDismiss }: Props) {
+export function MissingBusinessDataBanner({ missingFields, settingsUrl, onDismiss }: Props) {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export function MissingBusinessDataBanner({ missingFields, onDismiss }: Props) {
             ))}
           </ul>
           <Link 
-            to="/business-profile" 
+            to={settingsUrl} 
             className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-amber-800 dark:text-amber-300 hover:underline"
           >
             Go to Business Profile <ArrowRight className="h-4 w-4" />

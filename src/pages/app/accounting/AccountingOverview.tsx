@@ -67,7 +67,7 @@ export default function AccountingOverview() {
       <AccountingNavTabs />
 
       {/* Non-blocking prompt if fields missing */}
-      {missingFields.length > 0 && <MissingBusinessDataBanner missingFields={missingFields} />}
+      {missingFields.length > 0 && <MissingBusinessDataBanner missingFields={missingFields} settingsUrl={`/b/${business?.id}/settings`} />}
 
       {/* Header with jurisdiction badge */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -20,7 +20,6 @@ const routeTitles: Record<string, string> = {
   '/clients': 'Clients',
   '/reports': 'Reports',
   '/audit-logs': 'Audit Logs',
-  '/business-profile': 'Business Profile',
   '/billing': 'Billing',
   '/settings': 'Settings',
 };

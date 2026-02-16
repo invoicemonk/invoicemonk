@@ -446,7 +446,7 @@ export default function Dashboard() {
             </div>
             {businessComplianceStatus !== 'complete' && (
               <Button variant="outline" size="sm" asChild>
-                <Link to="/business-profile">Complete Profile</Link>
+                <Link to={`/b/${currentBusiness?.id}/settings`}>Complete Profile</Link>
               </Button>
             )}
           </CardContent>

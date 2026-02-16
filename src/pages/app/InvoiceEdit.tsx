@@ -794,7 +794,7 @@ export default function InvoiceEdit() {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 No payment method configured. Your client won't see payment instructions.{' '}
-                <Link to="/business-profile" className="underline font-medium">Add one</Link>
+                <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
               </AlertDescription>
             </Alert>
           )}
