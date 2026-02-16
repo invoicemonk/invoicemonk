@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
@@ -15,12 +16,15 @@ export default function CheckoutSuccess() {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Invalidate subscription cache to fetch updated data
-    if (user?.id) {
-      queryClient.invalidateQueries({ queryKey: ['subscription', user.id] });
-    }
+    const init = async () => {
+      if (user?.id) {
+        // Mark plan as selected after successful checkout
+        await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
+        queryClient.invalidateQueries({ queryKey: ['subscription', user.id] });
+      }
+    };
+    init();
 
-    // Auto-redirect after 5 seconds
     const timer = setTimeout(() => {
       navigate('/dashboard');
     }, 5000);

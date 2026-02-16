@@ -8,15 +8,23 @@ import { Loader2 } from 'lucide-react';
 /**
  * Redirects the user to their default/first business dashboard.
  * Used when accessing /dashboard without a business context.
+ * Also gates access: if the user hasn't selected a plan yet, redirects to /select-plan.
  */
 export function BusinessRedirect() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  const { data: defaultBusinessId, isLoading } = useQuery({
-    queryKey: ['default-business', user?.id],
+  const { data, isLoading } = useQuery({
+    queryKey: ['business-redirect', user?.id],
     queryFn: async () => {
       if (!user) return null;
+
+      // Check if user has selected a plan
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('has_selected_plan')
+        .eq('id', user.id)
+        .maybeSingle();
 
       // First try to find the user's default business
       const { data: defaultMembership, error: defaultError } = await supabase
@@ -30,39 +38,42 @@ export function BusinessRedirect() {
         .limit(1)
         .maybeSingle();
 
-      if (!defaultError && defaultMembership?.business_id) {
-        return defaultMembership.business_id;
+      let businessId = defaultMembership?.business_id ?? null;
+
+      if (!businessId) {
+        const { data: firstMembership } = await supabase
+          .from('business_members')
+          .select('business_id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        businessId = firstMembership?.business_id ?? null;
       }
 
-      // If no default, get the first business
-      const { data: firstMembership, error: firstError } = await supabase
-        .from('business_members')
-        .select('business_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (!firstError && firstMembership?.business_id) {
-        return firstMembership.business_id;
-      }
-
-      return null;
+      return {
+        hasSelectedPlan: profile?.has_selected_plan ?? false,
+        businessId,
+      };
     },
     enabled: !!user,
   });
 
   useEffect(() => {
-    if (authLoading || isLoading) return;
+    if (authLoading || isLoading || !data) return;
 
-    if (defaultBusinessId) {
-      navigate(`/b/${defaultBusinessId}/dashboard`, { replace: true });
+    if (!data.hasSelectedPlan) {
+      navigate('/select-plan', { replace: true });
+      return;
+    }
+
+    if (data.businessId) {
+      navigate(`/b/${data.businessId}/dashboard`, { replace: true });
     } else {
-      // User has no business - this shouldn't happen with the new trigger,
-      // but handle it gracefully by redirecting to business profile setup
       navigate('/business-profile', { replace: true });
     }
-  }, [defaultBusinessId, authLoading, isLoading, navigate]);
+  }, [data, authLoading, isLoading, navigate]);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">

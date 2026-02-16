@@ -132,7 +132,7 @@ interface TemplateSnapshot {
   tier_required?: string
 }
 
-// Helper: Format currency with proper locale
+// Helper: Format currency with proper locale (for HTML emails - supports all Unicode)
 const formatCurrency = (amount: number, currency: string): string => {
   const localeMap: Record<string, string> = {
     'NGN': 'en-NG', 'USD': 'en-US', 'EUR': 'de-DE', 'GBP': 'en-GB',
@@ -141,6 +141,15 @@ const formatCurrency = (amount: number, currency: string): string => {
   }
   const locale = localeMap[currency] || 'en-US'
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
+}
+
+// Helper: Format currency for PDF (WinAnsi-safe - no special currency symbols)
+const formatCurrencyPdf = (amount: number, currency: string): string => {
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+  return `${currency} ${formatted}`
 }
 
 // Helper: Format date
@@ -493,6 +502,19 @@ const generateProfessionalHtml = (
       </tbody>
     </table>
 
+    <!-- Financial Summary -->
+    <div class="no-break" style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
+      <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 6px;">Invoice Summary</div>
+      <div class="summary-row"><span>Total Items</span><span>${items.length}</span></div>
+      <div class="summary-row"><span>Subtotal</span><span>${formatCurrency(invoice.subtotal as number, currency)}</span></div>
+      ${(invoice.tax_amount as number) > 0 ? `<div class="summary-row"><span>Tax</span><span>${formatCurrency(invoice.tax_amount as number, currency)}</span></div>` : ''}
+      ${(invoice.discount_amount as number) > 0 ? `<div class="summary-row"><span>Discount</span><span>-${formatCurrency(invoice.discount_amount as number, currency)}</span></div>` : ''}
+      <div class="summary-row" style="font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px;">
+        <span>Grand Total</span><span>${formatCurrency(invoice.total_amount as number, currency)}</span>
+      </div>
+      <div class="summary-row amount-due"><span>Amount Due</span><span>${formatCurrency(balanceDue, currency)}</span></div>
+    </div>
+
     <!-- Totals -->
     <div class="totals-wrapper no-break">
       <div class="totals">
@@ -590,6 +612,340 @@ const generateProfessionalHtml = (
   </div>
 </body>
 </html>`
+}
+
+// Helper: fetch an image URL and return a base64 data URI, or null on failure
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const buf = new Uint8Array(await resp.arrayBuffer())
+    const contentType = resp.headers.get('content-type') || 'image/png'
+    let binary = ''
+    for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i])
+    return `data:${contentType};base64,${btoa(binary)}`
+  } catch {
+    return null
+  }
+}
+
+// Generate PDF using pdfmake (structured document definitions, works in Deno)
+async function generateInvoicePdfBase64(
+  invoice: Record<string, unknown>,
+  items: InvoiceItem[],
+  issuerSnapshot: IssuerSnapshot | null,
+  recipientSnapshot: RecipientSnapshot | null,
+  verificationUrl: string | null,
+  showWatermark: boolean,
+  paymentMethodSnapshot: Record<string, unknown> | null
+): Promise<string> {
+  // Dynamic imports for pdfmake using npm: specifiers (faster than esm.sh, no bundle timeout)
+  const pdfMakeModule = await import('npm:pdfmake@0.2.13/build/pdfmake.js')
+  const pdfFontsModule = await import('npm:pdfmake@0.2.13/build/vfs_fonts.js')
+  const pdfMake = pdfMakeModule.default || pdfMakeModule
+  const vfsData = pdfFontsModule.pdfMake?.vfs || (pdfFontsModule.default || pdfFontsModule).pdfMake?.vfs
+  if (vfsData) pdfMake.vfs = vfsData
+
+  const currency = invoice.currency as string
+  const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
+  const issuerName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Business'
+  const recipientName = recipientSnapshot?.name || 'Client'
+  const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
+  const issuerEmail = issuerSnapshot?.contact_email || ''
+  const issuerTaxId = issuerSnapshot?.tax_id || ''
+  const issuerVatReg = issuerSnapshot?.vat_registration_number || ''
+  const recipientEmail = recipientSnapshot?.email || ''
+  const recipientAddress = formatAddressCompact(recipientSnapshot?.address)
+  const recipientTaxId = recipientSnapshot?.tax_id || ''
+
+  const statusColors: Record<string, string> = {
+    'issued': '#1d4ed8', 'sent': '#4338ca', 'viewed': '#d97706',
+    'paid': '#059669', 'voided': '#dc2626', 'credited': '#db2777'
+  }
+  const statusBgColors: Record<string, string> = {
+    'issued': '#dbeafe', 'sent': '#e0e7ff', 'viewed': '#fef3c7',
+    'paid': '#d1fae5', 'voided': '#fee2e2', 'credited': '#fce7f3'
+  }
+  const status = invoice.status as string
+
+  // --- Fetch logo as base64 ---
+  let logoDataUri: string | null = null
+  const logoUrl = issuerSnapshot?.logo_url || null
+  if (logoUrl) {
+    logoDataUri = await fetchImageAsBase64(logoUrl)
+  }
+
+  // --- Fetch QR code as base64 ---
+  let qrDataUri: string | null = null
+  if (verificationUrl) {
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verificationUrl)}&format=png`
+    qrDataUri = await fetchImageAsBase64(qrApiUrl)
+  }
+
+  // === BUILD CONTENT ARRAY (compact single-page layout) ===
+  const content: unknown[] = []
+
+  // --- 1. HEADER (compact two-column) ---
+  const leftHeaderStack: unknown[] = []
+  if (logoDataUri) {
+    leftHeaderStack.push({ image: logoDataUri, width: 120, fit: [120, 45], margin: [0, 0, 0, 4] })
+  } else {
+    leftHeaderStack.push({ text: issuerName, style: 'businessName', margin: [0, 0, 0, 2] })
+  }
+
+  const metaLine = `${formatDate(invoice.issue_date as string)}  •  Due: ${formatDate(invoice.due_date as string)}  •  ${currency}`
+  const rightHeaderStack: unknown[] = [
+    { text: 'INVOICE', style: 'headerTitle', alignment: 'right' },
+    { text: invoice.invoice_number as string, fontSize: 10, color: '#666666', alignment: 'right', margin: [0, 1, 0, 3] },
+    {
+      table: {
+        widths: ['auto'],
+        body: [[{ text: status.toUpperCase(), fontSize: 7, bold: true, color: statusColors[status] || '#1d4ed8', fillColor: statusBgColors[status] || '#dbeafe', margin: [5, 1, 5, 1] }]]
+      },
+      layout: 'noBorders',
+      alignment: 'right',
+      margin: [0, 0, 0, 3]
+    },
+    { text: metaLine, fontSize: 8, color: '#666666', alignment: 'right' },
+  ]
+
+  content.push({
+    columns: [
+      { stack: leftHeaderStack, width: '*' },
+      { stack: rightHeaderStack, width: 'auto' }
+    ],
+    margin: [0, 0, 0, 8]
+  })
+
+  // Separator line (1px)
+  content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 1, lineColor: '#d1d5db' }], margin: [0, 0, 0, 10] })
+
+  // --- 2. BILLING SECTION (two-column: FROM + BILL TO) ---
+  const fromStack: unknown[] = [
+    { text: 'FROM', fontSize: 8, bold: true, color: '#999999', margin: [0, 0, 0, 3] },
+    { text: issuerName, fontSize: 9, bold: true, margin: [0, 0, 0, 1] },
+  ]
+  if (issuerAddress) fromStack.push({ text: issuerAddress, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+  if (issuerTaxId) fromStack.push({ text: `TIN: ${issuerTaxId}`, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+  if (issuerVatReg) fromStack.push({ text: `VAT: ${issuerVatReg}`, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+  if (issuerSnapshot?.is_vat_registered) {
+    fromStack.push({ text: 'VAT INVOICE', fontSize: 7, bold: true, color: '#1d4ed8', margin: [0, 2, 0, 0] })
+  }
+
+  const toStack: unknown[] = [
+    { text: 'BILL TO', fontSize: 8, bold: true, color: '#999999', margin: [0, 0, 0, 3] },
+    { text: recipientName, fontSize: 9, bold: true, margin: [0, 0, 0, 1] },
+  ]
+  if (recipientEmail) toStack.push({ text: recipientEmail, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+  if (recipientAddress) toStack.push({ text: recipientAddress, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+  if (recipientTaxId) toStack.push({ text: `TIN: ${recipientTaxId}`, fontSize: 9, color: '#444444', margin: [0, 0, 0, 1] })
+
+  content.push({
+    columns: [
+      { stack: fromStack, width: '50%' },
+      { stack: toStack, width: '50%' }
+    ],
+    margin: [0, 0, 0, 10]
+  })
+
+  // --- 3. LINE ITEMS TABLE (compact padding) ---
+  const hasVat = issuerSnapshot?.is_vat_registered || false
+  const tableHeaders = hasVat
+    ? ['Description', 'Qty', 'Rate', 'VAT', 'Amount']
+    : ['Description', 'Qty', 'Rate', 'Amount']
+  const tableWidths = hasVat
+    ? ['*', 35, 65, 55, 70]
+    : ['*', 45, 75, 75]
+
+  const headerRow = tableHeaders.map((h, i) => ({
+    text: h,
+    style: 'tableHeader',
+    alignment: i > 0 ? 'right' as const : 'left' as const,
+    margin: [3, 4, 3, 4]
+  }))
+
+  const itemRows = items.map(item => {
+    const base = [
+      { text: item.description || '', fontSize: 9, margin: [3, 3, 3, 3] },
+      { text: String(item.quantity), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] },
+      { text: formatCurrencyPdf(item.unit_price, currency), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] },
+    ]
+    if (hasVat) {
+      base.push({ text: formatCurrencyPdf(item.tax_amount, currency), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] })
+    }
+    base.push({ text: formatCurrencyPdf(item.amount, currency), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] })
+    return base
+  })
+
+  content.push({
+    table: {
+      headerRows: 1,
+      widths: tableWidths,
+      body: [headerRow, ...itemRows]
+    },
+    layout: {
+      hLineWidth: (i: number, _node: unknown) => i === 0 || i === 1 ? 1 : 0.5,
+      vLineWidth: () => 0,
+      hLineColor: (i: number, _node: unknown) => i <= 1 ? '#d1d5db' : '#f0f0f0',
+      fillColor: (rowIndex: number) => rowIndex === 0 ? '#f5f5f5' : null,
+      paddingLeft: () => 0,
+      paddingRight: () => 0,
+      paddingTop: () => 0,
+      paddingBottom: () => 0,
+    },
+    margin: [0, 0, 0, 10]
+  })
+
+  // --- 4. TOTALS SECTION (single block, right-aligned) ---
+  const totalsBody: unknown[][] = [
+    [{ text: 'Subtotal', fontSize: 9, color: '#666666', margin: [3, 2, 3, 2] }, { text: formatCurrencyPdf(invoice.subtotal as number, currency), fontSize: 9, alignment: 'right', margin: [3, 2, 3, 2] }],
+  ]
+  if ((invoice.tax_amount as number) > 0) {
+    totalsBody.push([
+      { text: 'Tax', fontSize: 9, color: '#666666', margin: [3, 2, 3, 2] },
+      { text: formatCurrencyPdf(invoice.tax_amount as number, currency), fontSize: 9, alignment: 'right', margin: [3, 2, 3, 2] }
+    ])
+  }
+  if ((invoice.discount_amount as number) > 0) {
+    totalsBody.push([
+      { text: 'Discount', fontSize: 9, color: '#666666', margin: [3, 2, 3, 2] },
+      { text: `-${formatCurrencyPdf(invoice.discount_amount as number, currency)}`, fontSize: 9, alignment: 'right', margin: [3, 2, 3, 2] }
+    ])
+  }
+  // Grand Total row
+  totalsBody.push([
+    { text: 'Grand Total', fontSize: 11, bold: true, margin: [3, 3, 3, 3] },
+    { text: formatCurrencyPdf(invoice.total_amount as number, currency), fontSize: 11, bold: true, alignment: 'right', margin: [3, 3, 3, 3] }
+  ])
+  // Amount Paid (if > 0)
+  if ((invoice.amount_paid as number) > 0) {
+    totalsBody.push([
+      { text: 'Paid', fontSize: 9, color: '#059669', margin: [3, 2, 3, 2] },
+      { text: `-${formatCurrencyPdf(invoice.amount_paid as number, currency)}`, fontSize: 9, color: '#059669', alignment: 'right', margin: [3, 2, 3, 2] }
+    ])
+  }
+  // Total Due (only if balance > 0)
+  if (balanceDue > 0) {
+    totalsBody.push([
+      { text: 'Total Due', fontSize: 11, bold: true, fillColor: '#fef3c7', margin: [3, 3, 3, 3] },
+      { text: formatCurrencyPdf(balanceDue, currency), fontSize: 11, bold: true, alignment: 'right', fillColor: '#fef3c7', margin: [3, 3, 3, 3] }
+    ])
+  }
+
+  // Determine where to draw the heavy separator (before Grand Total)
+  const grandTotalIndex = totalsBody.length - (balanceDue > 0 ? ((invoice.amount_paid as number) > 0 ? 3 : 2) : 1)
+
+  content.push({
+    columns: [
+      { text: '', width: '*' },
+      {
+        table: {
+          widths: [90, 90],
+          body: totalsBody
+        },
+        layout: {
+          hLineWidth: (i: number) => i === grandTotalIndex ? 2 : 0,
+          vLineWidth: () => 0,
+          hLineColor: () => '#1a1a1a',
+          paddingLeft: () => 0,
+          paddingRight: () => 0,
+          paddingTop: () => 0,
+          paddingBottom: () => 0,
+        },
+        width: 'auto'
+      }
+    ],
+    margin: [0, 0, 0, 10]
+  })
+
+  // --- 5. PAYMENT INSTRUCTIONS (compact inline) ---
+  if (paymentMethodSnapshot) {
+    const displayName = (paymentMethodSnapshot.display_name as string) || 'Payment Method'
+    const instructions = paymentMethodSnapshot.instructions as Record<string, string> | null
+
+    const pmLines: unknown[] = [
+      { text: 'PAYMENT INSTRUCTIONS', fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] },
+      { text: displayName, fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
+    ]
+
+    if (instructions) {
+      const parts = Object.entries(instructions).map(([_k, v]) => String(v))
+      if (parts.length > 0) {
+        pmLines.push({ text: parts.join('  |  '), fontSize: 9, color: '#444444', margin: [0, 0, 0, 2] })
+      }
+    }
+    pmLines.push({ text: `Reference: ${invoice.invoice_number}`, fontSize: 8, color: '#666666', margin: [0, 0, 0, 8] })
+
+    content.push({ stack: pmLines })
+  }
+
+  // --- 6. NOTES & TERMS (minimal spacing) ---
+  if (invoice.notes) {
+    content.push({ text: 'NOTES', fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] })
+    content.push({ text: invoice.notes as string, fontSize: 9, color: '#444444', margin: [0, 0, 0, 6] })
+  }
+  if (invoice.terms) {
+    content.push({ text: 'TERMS', fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] })
+    content.push({ text: invoice.terms as string, fontSize: 9, color: '#444444', margin: [0, 0, 0, 6] })
+  }
+
+  // --- 7. QR CODE + FOOTER (combined row) ---
+  content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }], margin: [0, 8, 0, 6] })
+
+  const vLine = invoice.verification_id ? `Verification: ${(invoice.verification_id as string).substring(0, 8)}...` : ''
+  const hLine = invoice.invoice_hash ? `Hash: ${(invoice.invoice_hash as string).substring(0, 12)}...` : ''
+  const footerLines = [`${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}`]
+  const verifyLine = [vLine, hLine].filter(Boolean).join(' • ')
+  if (verifyLine) footerLines.push(verifyLine)
+
+  const footerLeft: unknown[] = footerLines.map(l => ({ text: l, fontSize: 8, color: '#888888' }))
+
+  if (qrDataUri) {
+    content.push({
+      columns: [
+        { stack: footerLeft, width: '*' },
+        {
+          stack: [
+            { image: qrDataUri, width: 60, alignment: 'right' },
+            { text: 'Scan to verify', fontSize: 7, color: '#999999', alignment: 'right', margin: [0, 1, 0, 0] }
+          ],
+          width: 'auto'
+        }
+      ]
+    })
+  } else {
+    footerLeft.forEach(l => content.push(l))
+  }
+
+  // === DOCUMENT DEFINITION ===
+  const docDefinition = {
+    pageSize: 'A4' as const,
+    pageMargins: [36, 40, 36, 40] as [number, number, number, number],
+    content,
+    styles: {
+      headerTitle: { fontSize: 18, bold: true },
+      businessName: { fontSize: 14, bold: true },
+      sectionTitle: { fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] },
+      tableHeader: { fontSize: 9, bold: true, fillColor: '#f5f5f5' },
+      smallText: { fontSize: 8, color: '#666666' },
+    },
+    defaultStyle: {
+      fontSize: 9,
+    },
+    watermark: showWatermark ? { text: 'INVOICEMONK', opacity: 0.04, angle: -45, fontSize: 60 } : undefined,
+  }
+
+  // Generate PDF and return base64
+  return new Promise<string>((resolve, reject) => {
+    try {
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition)
+      pdfDocGenerator.getBase64((base64: string) => {
+        resolve(base64)
+      })
+    } catch (err) {
+      reject(err)
+    }
+  })
 }
 
 Deno.serve(async (req) => {
@@ -795,57 +1151,19 @@ Deno.serve(async (req) => {
       paymentMethodSnapshot
     )
     
-    // Convert HTML to PDF using PDFShift API
-    const pdfshiftApiKey = Deno.env.get('PDFSHIFT_API_KEY')
-    let attachmentContent: string
-    let attachmentName: string
-    let attachmentType: 'pdf' | 'html' = 'html'
-
-    if (pdfshiftApiKey) {
-      console.log('Converting HTML to PDF via PDFShift...')
-      try {
-        const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${btoa(`api:${pdfshiftApiKey}`)}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            source: professionalHtml,
-            format: 'A4',
-            margin: '10mm',
-          }),
-        })
-
-        if (pdfResponse.ok) {
-          const pdfBuffer = await pdfResponse.arrayBuffer()
-          // Convert to base64
-          const pdfBytes = new Uint8Array(pdfBuffer)
-          let binary = ''
-          for (let i = 0; i < pdfBytes.byteLength; i++) {
-            binary += String.fromCharCode(pdfBytes[i])
-          }
-          attachmentContent = btoa(binary)
-          attachmentName = `Invoice-${invoice.invoice_number}.pdf`
-          attachmentType = 'pdf'
-          console.log('PDF generated successfully, size:', attachmentContent.length)
-        } else {
-          const errorText = await pdfResponse.text()
-          console.error('PDFShift error:', pdfResponse.status, errorText)
-          throw new Error('PDF generation failed')
-        }
-      } catch (pdfError) {
-        console.error('PDF generation error, falling back to HTML:', pdfError)
-        // Fallback to HTML
-        attachmentContent = btoa(unescape(encodeURIComponent(professionalHtml)))
-        attachmentName = `Invoice-${invoice.invoice_number}.html`
-      }
-    } else {
-      console.log('PDFSHIFT_API_KEY not configured, using HTML attachment')
-      attachmentContent = btoa(unescape(encodeURIComponent(professionalHtml)))
-      attachmentName = `Invoice-${invoice.invoice_number}.html`
-    }
-    console.log(`Attachment prepared: ${attachmentName}, type: ${attachmentType}`)
+    // Generate PDF using pdf-lib (pure JS, free, no external API)
+    console.log('Generating PDF attachment using pdfmake...')
+    const attachmentContent = await generateInvoicePdfBase64(
+      invoice,
+      items,
+      issuerSnapshot,
+      recipientSnapshot,
+      verificationUrl,
+      showWatermark,
+      paymentMethodSnapshot
+    )
+    const attachmentName = `Invoice-${invoice.invoice_number}.pdf`
+    console.log(`PDF attachment generated: ${attachmentName}`)
 
     // Build enhanced email HTML with branded header and clean footer
     const emailHtml = `
@@ -998,7 +1316,7 @@ Deno.serve(async (req) => {
                 <tr>
                   <td>
                     <p style="margin: 0; color: #166534; font-size: 14px;">
-                      📎 <strong>Invoice Attached:</strong> Please find your professional invoice ${attachmentType === 'pdf' ? 'PDF' : 'document'} attached to this email.
+                      📎 <strong>Invoice Attached:</strong> Please find your professional invoice PDF attached to this email.
                     </p>
                   </td>
                 </tr>
@@ -1130,7 +1448,7 @@ Deno.serve(async (req) => {
           recipient_email: body.recipient_email,
           sent_at: new Date().toISOString(),
           verification_url: verificationUrl,
-          attachment_type: attachmentType,
+          attachment_type: 'pdf',
           watermark_shown: showWatermark,
           branding_used: canUseBranding
         }
@@ -1152,9 +1470,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Invoice sent successfully with ${attachmentType.toUpperCase()} attachment`,
+        message: 'Invoice sent successfully with PDF attachment',
         recipient: body.recipient_email,
-        attachment_type: attachmentType
+        attachment_type: 'pdf'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

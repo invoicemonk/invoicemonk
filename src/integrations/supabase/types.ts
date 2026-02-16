@@ -1204,6 +1204,7 @@ export type Database = {
           email: string
           email_verified: boolean | null
           full_name: string | null
+          has_selected_plan: boolean
           id: string
           updated_at: string | null
         }
@@ -1217,6 +1218,7 @@ export type Database = {
           email: string
           email_verified?: boolean | null
           full_name?: string | null
+          has_selected_plan?: boolean
           id: string
           updated_at?: string | null
         }
@@ -1230,6 +1232,7 @@ export type Database = {
           email?: string
           email_verified?: boolean | null
           full_name?: string | null
+          has_selected_plan?: boolean
           id?: string
           updated_at?: string | null
         }

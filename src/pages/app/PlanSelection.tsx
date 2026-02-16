@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Check, 
   Zap, 
@@ -34,6 +36,7 @@ type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export default function PlanSelection() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   
@@ -42,20 +45,26 @@ export default function PlanSelection() {
   const { tier: currentTier } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
 
+  const markPlanSelected = async () => {
+    if (user?.id) {
+      await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
+    }
+  };
+
   const handleSelectPlan = async (tier: TierKey) => {
     if (tier === 'starter') {
-      // Free plan - just go to dashboard
+      await markPlanSelected();
       navigate('/dashboard');
       return;
     }
 
     setLoadingTier(tier);
-    // Pass undefined for businessId (not available during plan selection), and countryCode for regional pricing
     await createCheckoutSession(tier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
     setLoadingTier(null);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    await markPlanSelected();
     navigate('/dashboard');
   };
 

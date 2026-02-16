@@ -725,6 +725,19 @@ Deno.serve(async (req) => {
       </tbody>
     </table>
 
+    <!-- Financial Summary -->
+    <div class="no-break" style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
+      <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 6px;">Invoice Summary</div>
+      <div class="summary-row"><span>Total Items</span><span>${items.length}</span></div>
+      <div class="summary-row"><span>Subtotal</span><span>${formatCurrency(inv.subtotal, inv.currency)}</span></div>
+      ${inv.tax_amount > 0 ? `<div class="summary-row"><span>${isNigerianVatRegistered ? 'VAT' : 'Tax'}</span><span>${formatCurrency(inv.tax_amount, inv.currency)}</span></div>` : ''}
+      ${inv.discount_amount > 0 ? `<div class="summary-row"><span>Discount</span><span>-${formatCurrency(inv.discount_amount, inv.currency)}</span></div>` : ''}
+      <div class="summary-row" style="font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px;">
+        <span>Grand Total</span><span>${formatCurrency(inv.total_amount, inv.currency)}</span>
+      </div>
+      <div class="summary-row amount-due"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
+    </div>
+
     <!-- Totals -->
     <div class="totals-wrapper no-break">
       <div class="totals">
