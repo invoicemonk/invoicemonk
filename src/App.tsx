@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
+import { useTawkIdentity } from "@/hooks/use-tawk-identity";
 import NotFound from "./pages/NotFound";
 
 // App pages (authentication)
@@ -140,9 +141,16 @@ function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Identifies logged-in users to the Tawk.to widget
+function TawkIdentityProvider({ children }: { children: React.ReactNode }) {
+  useTawkIdentity();
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <TawkIdentityProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -302,6 +310,7 @@ const App = () => (
           </AnalyticsProvider>
       </BrowserRouter>
     </TooltipProvider>
+      </TawkIdentityProvider>
   </AuthProvider>
 </QueryClientProvider>
 );

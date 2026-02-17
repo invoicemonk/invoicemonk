@@ -639,11 +639,13 @@ async function generateInvoicePdfBase64(
   showWatermark: boolean,
   paymentMethodSnapshot: Record<string, unknown> | null
 ): Promise<string> {
-  // Dynamic imports for pdfmake using npm: specifiers (faster than esm.sh, no bundle timeout)
-  const pdfMakeModule = await import('npm:pdfmake@0.2.13/build/pdfmake.js')
-  const pdfFontsModule = await import('npm:pdfmake@0.2.13/build/vfs_fonts.js')
+  // Dynamic imports for pdfmake using esm.sh with ?bundle=false to avoid bundle timeout
+  // deno-lint-ignore no-explicit-any
+  const pdfMakeModule: any = await import('https://esm.sh/pdfmake@0.2.13/build/pdfmake.js?bundle=false')
+  // deno-lint-ignore no-explicit-any
+  const pdfFontsModule: any = await import('https://esm.sh/pdfmake@0.2.13/build/vfs_fonts.js?bundle=false')
   const pdfMake = pdfMakeModule.default || pdfMakeModule
-  const vfsData = pdfFontsModule.pdfMake?.vfs || (pdfFontsModule.default || pdfFontsModule).pdfMake?.vfs
+  const vfsData = pdfFontsModule?.pdfMake?.vfs || pdfFontsModule?.default?.pdfMake?.vfs
   if (vfsData) pdfMake.vfs = vfsData
 
   const currency = invoice.currency as string
@@ -938,7 +940,8 @@ async function generateInvoicePdfBase64(
   // Generate PDF and return base64
   return new Promise<string>((resolve, reject) => {
     try {
-      const pdfDocGenerator = pdfMake.createPdf(docDefinition)
+      // deno-lint-ignore no-explicit-any
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition as any)
       pdfDocGenerator.getBase64((base64: string) => {
         resolve(base64)
       })
