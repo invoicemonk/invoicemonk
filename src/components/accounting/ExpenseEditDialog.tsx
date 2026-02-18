@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Pencil } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +25,8 @@ import {
 import { useUpdateExpense, EXPENSE_CATEGORIES, Expense } from '@/hooks/use-expenses';
 import { ReceiptUpload } from './ReceiptUpload';
 import { VendorCombobox } from './VendorCombobox';
+import { useProductsServices } from '@/hooks/use-products-services';
+import { useBusiness } from '@/contexts/BusinessContext';
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -47,6 +49,13 @@ interface Props {
 
 export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Props) {
   const updateExpense = useUpdateExpense();
+  const { currentBusiness } = useBusiness();
+  const { data: products = [] } = useProductsServices(currentBusiness?.id);
+  const activeProducts = products.filter((p) => p.isActive);
+
+  const [linkedProductId, setLinkedProductId] = useState<string>(
+    (expense as any).productServiceId || ''
+  );
 
   const {
     register,
@@ -71,7 +80,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
   const category = watch('category');
   const receiptUrl = watch('receiptUrl');
 
-  // Reset form when expense changes
+  // Reset form + linked product when expense changes
   useEffect(() => {
     reset({
       category: expense.category,
@@ -82,6 +91,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
       notes: expense.notes || '',
       receiptUrl: expense.receiptUrl || null,
     });
+    setLinkedProductId((expense as any).productServiceId || '');
   }, [expense, reset]);
 
   const onSubmit = async (data: ExpenseFormData) => {
@@ -95,6 +105,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
         expenseDate: data.expenseDate,
         notes: data.notes,
         receiptUrl: data.receiptUrl || undefined,
+        productServiceId: linkedProductId || null,
       },
     });
     
@@ -174,6 +185,24 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
                 onChange={(val) => setValue('vendor', val)}
               />
             </div>
+
+            {activeProducts.length > 0 && (
+              <div className="space-y-2">
+                <Label>Related Product/Service (optional)</Label>
+                <Select value={linkedProductId} onValueChange={setLinkedProductId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Link to a product or service..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {activeProducts.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Enables future profit-per-product reporting</p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>

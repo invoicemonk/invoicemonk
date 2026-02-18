@@ -59,9 +59,12 @@ import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
+import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
+import { useProductsServices } from '@/hooks/use-products-services';
 
 interface InvoiceItem {
   id: string;
+  productServiceId?: string | null;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -79,6 +82,8 @@ export default function InvoiceEdit() {
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: templates } = useInvoiceTemplates();
   const { currentBusiness, isStarter, checkTierLimit } = useBusiness();
+  // Pre-fetch products for the combobox (cached — no extra calls per line item interaction)
+  useProductsServices(currentBusiness?.id);
   const { data: businessCurrency } = useBusinessCurrency(currentBusiness?.id);
   const createClient = useCreateClient();
   const updateInvoice = useUpdateInvoice();
@@ -324,6 +329,7 @@ export default function InvoiceEdit() {
         tax_rate: item.taxRate,
         tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
         amount: item.quantity * item.unitPrice,
+        product_service_id: item.productServiceId || null,
       })),
     });
 
@@ -381,6 +387,7 @@ export default function InvoiceEdit() {
         tax_rate: item.taxRate,
         tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
         amount: item.quantity * item.unitPrice,
+        product_service_id: item.productServiceId || null,
       })),
     });
 
@@ -678,6 +685,23 @@ export default function InvoiceEdit() {
                 <div key={item.id} className="space-y-4 pb-4 border-b last:border-0 last:pb-0">
                   <div className="flex items-start gap-4">
                     <div className="flex-1 space-y-4">
+                      {/* Product/Service selector — optional, auto-fills fields below */}
+                      <ProductServiceCombobox
+                        selectedId={item.productServiceId}
+                        onSelect={(ps) => {
+                          if (ps) {
+                            setItems(prev => prev.map(i => i.id !== item.id ? i : {
+                              ...i,
+                              productServiceId: ps.id,
+                              description: ps.name,
+                              unitPrice: ps.defaultPrice,
+                              taxRate: ps.taxApplicable ? (ps.taxRate ?? 0) : 0,
+                            }));
+                          } else {
+                            setItems(prev => prev.map(i => i.id !== item.id ? i : { ...i, productServiceId: null }));
+                          }
+                        }}
+                      />
                       <div className="space-y-2">
                         <Label>Description</Label>
                         <Input

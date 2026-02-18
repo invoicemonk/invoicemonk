@@ -20,7 +20,8 @@ import {
   User,
   Receipt,
   MessageCircle,
-  Handshake
+  Handshake,
+  Package
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -75,6 +76,7 @@ export function BusinessSidebar() {
     { title: 'Credit Notes', url: `${baseUrl}/credit-notes`, icon: FileX },
     { title: 'Receipts', url: `${baseUrl}/receipts`, icon: Receipt },
     { title: 'Clients', url: `${baseUrl}/clients`, icon: Users },
+    { title: 'Products & Services', url: `${baseUrl}/products`, icon: Package },
     { title: 'Accounting', url: `${baseUrl}/accounting`, icon: Calculator },
     { title: 'Expenses', url: `${baseUrl}/expenses`, icon: Receipt },
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },

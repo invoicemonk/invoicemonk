@@ -28,6 +28,7 @@ export interface CreateExpenseInput {
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
+  productServiceId?: string | null;
 }
 
 export interface UpdateExpenseInput {
@@ -38,6 +39,7 @@ export interface UpdateExpenseInput {
   vendor?: string;
   notes?: string;
   receiptUrl?: string;
+  productServiceId?: string | null;
 }
 
 // Expense categories
@@ -190,6 +192,7 @@ export function useCreateExpense(businessId?: string, currencyAccountId?: string
           vendor: input.vendor || null,
           notes: input.notes || null,
           receipt_url: input.receiptUrl || null,
+          product_service_id: input.productServiceId ?? null,
           // Legacy FX fields - null for new records
           exchange_rate_to_primary: null,
           primary_currency: null,
@@ -236,6 +239,7 @@ export function useUpdateExpense() {
       if (updates.vendor !== undefined) updateData.vendor = updates.vendor;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.receiptUrl !== undefined) updateData.receipt_url = updates.receiptUrl;
+      if (updates.productServiceId !== undefined) updateData.product_service_id = updates.productServiceId ?? null;
 
       const { data, error } = await supabase
         .from('expenses')

@@ -502,6 +502,7 @@ export type Database = {
           id: string
           notes: string | null
           primary_currency: string | null
+          product_service_id: string | null
           receipt_url: string | null
           updated_at: string
           user_id: string
@@ -520,6 +521,7 @@ export type Database = {
           id?: string
           notes?: string | null
           primary_currency?: string | null
+          product_service_id?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id: string
@@ -538,6 +540,7 @@ export type Database = {
           id?: string
           notes?: string | null
           primary_currency?: string | null
+          product_service_id?: string | null
           receipt_url?: string | null
           updated_at?: string
           user_id?: string
@@ -556,6 +559,13 @@ export type Database = {
             columns: ["currency_account_id"]
             isOneToOne: false
             referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
             referencedColumns: ["id"]
           },
         ]
@@ -616,6 +626,7 @@ export type Database = {
           discount_percent: number
           id: string
           invoice_id: string
+          product_service_id: string | null
           quantity: number
           sort_order: number
           tax_amount: number
@@ -629,6 +640,7 @@ export type Database = {
           discount_percent?: number
           id?: string
           invoice_id: string
+          product_service_id?: string | null
           quantity?: number
           sort_order?: number
           tax_amount?: number
@@ -642,6 +654,7 @@ export type Database = {
           discount_percent?: number
           id?: string
           invoice_id?: string
+          product_service_id?: string | null
           quantity?: number
           sort_order?: number
           tax_amount?: number
@@ -654,6 +667,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
             referencedColumns: ["id"]
           },
         ]
@@ -1192,6 +1212,80 @@ export type Database = {
           yearly_price?: number | null
         }
         Relationships: []
+      }
+      products_services: {
+        Row: {
+          business_id: string
+          category: string | null
+          created_at: string
+          currency: string
+          default_price: number
+          description: string | null
+          id: string
+          income_account_id: string | null
+          inventory_last_updated_at: string | null
+          is_active: boolean
+          low_stock_threshold: number | null
+          name: string
+          sku: string | null
+          stock_quantity: number | null
+          tax_applicable: boolean
+          tax_rate: number | null
+          track_inventory: boolean
+          type: Database["public"]["Enums"]["product_service_type"]
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          category?: string | null
+          created_at?: string
+          currency: string
+          default_price?: number
+          description?: string | null
+          id?: string
+          income_account_id?: string | null
+          inventory_last_updated_at?: string | null
+          is_active?: boolean
+          low_stock_threshold?: number | null
+          name: string
+          sku?: string | null
+          stock_quantity?: number | null
+          tax_applicable?: boolean
+          tax_rate?: number | null
+          track_inventory?: boolean
+          type?: Database["public"]["Enums"]["product_service_type"]
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          category?: string | null
+          created_at?: string
+          currency?: string
+          default_price?: number
+          description?: string | null
+          id?: string
+          income_account_id?: string | null
+          inventory_last_updated_at?: string | null
+          is_active?: boolean
+          low_stock_threshold?: number | null
+          name?: string
+          sku?: string | null
+          stock_quantity?: number | null
+          tax_applicable?: boolean
+          tax_rate?: number | null
+          track_inventory?: boolean
+          type?: Database["public"]["Enums"]["product_service_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_services_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2115,6 +2209,7 @@ export type Database = {
         | "credited"
       partner_status: "active" | "paused" | "suspended"
       payout_batch_status: "draft" | "processing" | "paid" | "cancelled"
+      product_service_type: "product" | "service"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
       subscription_tier:
         | "starter"
@@ -2314,6 +2409,7 @@ export const Constants = {
       ],
       partner_status: ["active", "paused", "suspended"],
       payout_batch_status: ["draft", "processing", "paid", "cancelled"],
+      product_service_type: ["product", "service"],
       subscription_status: ["active", "cancelled", "past_due", "trialing"],
       subscription_tier: [
         "starter",

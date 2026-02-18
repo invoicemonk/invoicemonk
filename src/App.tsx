@@ -33,6 +33,7 @@ import Clients from "./pages/app/Clients";
 import ClientDetail from "./pages/app/ClientDetail";
 import ClientEdit from "./pages/app/ClientEdit";
 import Reports from "./pages/app/Reports";
+import ProductsServices from "./pages/app/ProductsServices";
 import Analytics from "./pages/app/Analytics";
 import AuditLogs from "./pages/app/AuditLogs";
 import BusinessProfile from "./pages/app/BusinessProfile";
@@ -191,6 +192,7 @@ const App = () => (
             <Route path="/b/:businessId/clients" element={<Clients />} />
             <Route path="/b/:businessId/clients/:id" element={<ClientDetail />} />
             <Route path="/b/:businessId/clients/:id/edit" element={<ClientEdit />} />
+            <Route path="/b/:businessId/products" element={<ProductsServices />} />
             <Route path="/b/:businessId/receipts" element={<Receipts />} />
             <Route path="/b/:businessId/receipts/:id" element={<ReceiptDetail />} />
             <Route path="/b/:businessId/reports" element={<Reports />} />
