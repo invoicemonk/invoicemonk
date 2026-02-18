@@ -26,10 +26,14 @@ export function QuickSetupChecklist() {
             <div className="flex items-center justify-center gap-3 pt-2">
               {firstIssuedInvoice.verification_id && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link to={`/verify/invoice?id=${firstIssuedInvoice.verification_id}`}>
+                  <a
+                    href={`/invoice/view/${firstIssuedInvoice.verification_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <ExternalLink className="h-4 w-4 mr-1.5" />
                     View Public Invoice
-                  </Link>
+                  </a>
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={dismiss}>
