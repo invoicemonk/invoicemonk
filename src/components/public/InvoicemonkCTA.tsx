@@ -35,7 +35,7 @@ const InvoicemonkCTA = ({ variant = "default" }: InvoicemonkCTAProps) => {
                     Ready to streamline your invoicing?
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Join other businesses using Invoicemonk
+                    Join thounsands of businesses using Invoicemonk
                   </p>
                 </div>
               </div>
