@@ -31,7 +31,7 @@ export function BusinessRedirect() {
         .from('business_members')
         .select(`
           business_id,
-          business:businesses!inner(id, is_default)
+          business:businesses!inner(id, is_default, jurisdiction)
         `)
         .eq('user_id', user.id)
         .eq('businesses.is_default', true)
@@ -39,22 +39,39 @@ export function BusinessRedirect() {
         .maybeSingle();
 
       let businessId = defaultMembership?.business_id ?? null;
+      let jurisdiction = (defaultMembership?.business as any)?.jurisdiction ?? null;
 
       if (!businessId) {
         const { data: firstMembership } = await supabase
           .from('business_members')
-          .select('business_id')
+          .select(`
+            business_id,
+            business:businesses!inner(id, jurisdiction)
+          `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle();
 
         businessId = firstMembership?.business_id ?? null;
+        jurisdiction = (firstMembership?.business as any)?.jurisdiction ?? null;
+      }
+
+      // Check if business has any invoices (to skip onboarding for returning users)
+      let hasInvoices = false;
+      if (businessId) {
+        const { count } = await supabase
+          .from('invoices')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId);
+        hasInvoices = (count ?? 0) > 0;
       }
 
       return {
         hasSelectedPlan: profile?.has_selected_plan ?? false,
         businessId,
+        jurisdiction,
+        hasInvoices,
       };
     },
     enabled: !!user,
@@ -69,6 +86,11 @@ export function BusinessRedirect() {
     }
 
     if (data.businessId) {
+      // Redirect to country onboarding if jurisdiction is null/empty and no invoices yet
+      if (!data.jurisdiction && !data.hasInvoices) {
+        navigate('/onboarding/country', { replace: true });
+        return;
+      }
       navigate(`/b/${data.businessId}/dashboard`, { replace: true });
     } else {
       navigate('/select-plan', { replace: true });

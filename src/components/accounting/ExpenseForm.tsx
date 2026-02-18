@@ -50,7 +50,7 @@ export function ExpenseForm({ onSuccess }: Props) {
   const [open, setOpen] = useState(false);
   const { currentBusiness: business } = useBusiness();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
-  const { data: products = [] } = useProductsServices(business?.id);
+  const { data: products = [] } = useProductsServices(currentCurrencyAccount?.id);
   
   // Currency is now derived from the active currency account
   const createExpense = useCreateExpense(

@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import {
   useCreateProductService,
   useUpdateProductService,
@@ -63,7 +63,7 @@ interface Props {
 }
 
 export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
-  const { currentBusiness } = useBusiness();
+  const { currentCurrencyAccount } = useCurrencyAccount();
   const createMutation = useCreateProductService();
   const updateMutation = useUpdateProductService();
   const isEdit = !!editItem;
@@ -163,7 +163,7 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const saveLabel = type === 'product' ? 'Save Product' : 'Save Service';
-  const currency = currentBusiness?.default_currency || '—';
+  const currency = currentCurrencyAccount?.currency || '—';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -219,7 +219,7 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
               <div className="space-y-2">
                 <Label htmlFor="sku">SKU</Label>
                 <Input id="sku" placeholder="e.g. SVC-001" {...register('sku')} />
-                <p className="text-xs text-muted-foreground">Must be unique within this business</p>
+                <p className="text-xs text-muted-foreground">Must be unique within this currency account</p>
                 {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
               </div>
               <div className="space-y-2">
@@ -250,7 +250,7 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
                 <Label>Currency</Label>
                 <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
                   <Badge variant="outline" className="font-mono">{currency}</Badge>
-                  <span className="text-xs text-muted-foreground">inherited from business</span>
+                  <span className="text-xs text-muted-foreground">inherited from currency account</span>
                 </div>
               </div>
             </div>

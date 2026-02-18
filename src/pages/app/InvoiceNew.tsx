@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Plus, 
@@ -64,6 +65,16 @@ import { gaEvents } from '@/hooks/use-google-analytics';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
+import { supabase } from '@/integrations/supabase/client';
+import { getCountryName } from '@/lib/countries';
+
+function getSmartPrefillAmount(currency: string): number {
+  const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
+  const lowValue = ['NGN', 'KES', 'TZS', 'GHS', 'EGP', 'PKR', 'INR', 'PHP', 'BDT', 'LKR', 'MXN', 'COP', 'ARS', 'CZK', 'HUF', 'PLN', 'THB', 'ZAR', 'MAD', 'XOF', 'XAF', 'IDR'];
+  if (zeroDecimal.includes(currency)) return 10000;
+  if (lowValue.includes(currency)) return 10000;
+  return 100;
+}
 
 interface InvoiceItem {
   id: string;
@@ -112,6 +123,20 @@ export default function InvoiceNew() {
   // B2B Transaction state
   const [isB2BTransaction, setIsB2BTransaction] = useState(false);
 
+  // First invoice detection for smart prefill
+  const { data: invoiceCount } = useQuery({
+    queryKey: ['invoice-count', currentBusiness?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('invoices')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', currentBusiness!.id);
+      return count ?? 0;
+    },
+    enabled: !!currentBusiness?.id,
+  });
+  const isFirstInvoice = invoiceCount === 0;
+
   // Currency lock state
   const isCurrencyLocked = businessCurrency?.currency_locked || false;
   const lockedCurrency = businessCurrency?.default_currency;
@@ -137,6 +162,23 @@ export default function InvoiceNew() {
       ));
     }
   }, [isNigerianVatRegistered, activeTaxSchema]);
+
+  // First invoice prefill: populate a sample line item for new users
+  const [prefillApplied, setPrefillApplied] = useState(false);
+  useEffect(() => {
+    if (isFirstInvoice && !prefillApplied && activeCurrency) {
+      const amount = getSmartPrefillAmount(activeCurrency);
+      setItems([{
+        id: '1',
+        description: 'Sample Service',
+        quantity: 1,
+        unitPrice: amount,
+        taxRate: defaultVatRate,
+        isVatExempt: false,
+      }]);
+      setPrefillApplied(true);
+    }
+  }, [isFirstInvoice, prefillApplied, activeCurrency, defaultVatRate]);
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -511,6 +553,16 @@ export default function InvoiceNew() {
           </p>
         </div>
       </div>
+
+      {/* First invoice helper banner */}
+      {isFirstInvoice && currentBusiness?.jurisdiction && (
+        <Alert className="border-primary/20 bg-primary/5">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This invoice is automatically formatted for {getCountryName(currentBusiness.jurisdiction)}. All fields are editable.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Invoice Limit Banner */}
       <InvoiceLimitBanner />

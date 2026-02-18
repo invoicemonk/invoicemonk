@@ -489,10 +489,10 @@ export default function Clients() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
+                      <DropdownMenuItem onClick={() => navigate(`/b/${currentBusiness?.id}/clients/${client.id}`)}>
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/invoices/new?client=${client.id}`)}>
+                      <DropdownMenuItem onClick={() => navigate(`/b/${currentBusiness?.id}/invoices/new?client=${client.id}`)}>
                         Create Invoice
                       </DropdownMenuItem>
                     </DropdownMenuContent>

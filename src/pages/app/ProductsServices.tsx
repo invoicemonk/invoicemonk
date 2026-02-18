@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import {
   useProductsServices,
   useArchiveProductService,
@@ -41,7 +42,8 @@ type StatusFilter = 'active' | 'archived' | 'all';
 
 export default function ProductsServices() {
   const { currentBusiness } = useBusiness();
-  const { data: items = [], isLoading } = useProductsServices(currentBusiness?.id);
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
+  const { data: items = [], isLoading } = useProductsServices(currentCurrencyAccount?.id);
   const archiveMutation = useArchiveProductService();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -91,13 +93,22 @@ export default function ProductsServices() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Products & Services</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your catalog and auto-fill invoice line items.
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            {currentCurrencyAccount && (
+              <Badge variant="secondary" className="font-mono text-xs">
+                {activeCurrency} · {currentCurrencyAccount.name || 'Default Account'}
+              </Badge>
+            )}
+            <p className="text-muted-foreground text-sm">
+              {currentCurrencyAccount
+                ? 'Showing products for this account only'
+                : 'Manage your catalog and auto-fill invoice line items.'}
+            </p>
+          </div>
         </div>
-        <Button onClick={handleAdd}>
+        <Button onClick={handleAdd} disabled={!currentCurrencyAccount}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Product or Service
+          Add {activeCurrency} Product or Service
         </Button>
       </div>
 
@@ -145,18 +156,22 @@ export default function ProductsServices() {
             <Package className="h-12 w-12 text-muted-foreground/40" />
             <div className="text-center">
               <p className="font-medium text-muted-foreground">
-                {items.length === 0 ? 'No products or services yet' : 'No results match your filters'}
+                {!currentCurrencyAccount
+                  ? 'No currency account selected'
+                  : items.length === 0
+                  ? `No products defined for ${activeCurrency} account`
+                  : 'No results match your filters'}
               </p>
-              {items.length === 0 && (
+              {items.length === 0 && currentCurrencyAccount && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Add your first product or service to start using them in invoices.
+                  Add your first {activeCurrency} product or service to use them in invoices.
                 </p>
               )}
             </div>
-            {items.length === 0 && (
+            {items.length === 0 && currentCurrencyAccount && (
               <Button variant="outline" onClick={handleAdd}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add your first item
+                Create {activeCurrency} Product
               </Button>
             )}
           </CardContent>

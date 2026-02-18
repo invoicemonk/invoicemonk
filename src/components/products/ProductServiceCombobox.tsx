@@ -17,7 +17,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { useProductsServices, ProductService } from '@/hooks/use-products-services';
-import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 
 interface Props {
   selectedId?: string | null;
@@ -27,10 +27,10 @@ interface Props {
 export function ProductServiceCombobox({ selectedId, onSelect }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const { currentBusiness } = useBusiness();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
 
-  // Reads from cache — no extra DB calls per render
-  const { data: allItems = [] } = useProductsServices(currentBusiness?.id);
+  // Reads from cache — scoped to active currency account
+  const { data: allItems = [] } = useProductsServices(currentCurrencyAccount?.id);
 
   // Only show active items for new selections
   const activeItems = allItems.filter((i) => i.isActive);
@@ -101,7 +101,9 @@ export function ProductServiceCombobox({ selectedId, onSelect }: Props) {
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No active products or services found</CommandEmpty>
+            <CommandEmpty>
+              No active products or services found for {activeCurrency} account
+            </CommandEmpty>
             {services.length > 0 && (
               <CommandGroup heading="Services">
                 {services.map((item) => (

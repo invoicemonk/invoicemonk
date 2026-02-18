@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useBusiness } from '@/contexts/BusinessContext';
 
 interface UpgradePromptProps {
   feature: string;
@@ -42,6 +43,8 @@ export function UpgradePrompt({
   variant = 'card',
   className,
 }: UpgradePromptProps) {
+  const { currentBusiness } = useBusiness();
+  const billingPath = currentBusiness ? `/b/${currentBusiness.id}/billing` : '/billing';
   const defaultTitle = `Upgrade to ${requiredTier === 'business' ? 'Business' : 'Professional'}`;
   const defaultDescription = `${feature} requires a ${requiredTier === 'business' ? 'Business' : 'Professional'} subscription. Upgrade now to unlock this feature and many more.`;
 
@@ -55,7 +58,7 @@ export function UpgradePrompt({
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <Link to="/billing">
+          <Link to={billingPath}>
             Upgrade
             <ArrowRight className="h-3 w-3 ml-1" />
           </Link>
@@ -84,7 +87,7 @@ export function UpgradePrompt({
           </div>
         </div>
         <Button asChild>
-          <Link to="/billing">
+          <Link to={billingPath}>
             Upgrade Now
             <ArrowRight className="h-4 w-4 ml-2" />
           </Link>
@@ -120,7 +123,7 @@ export function UpgradePrompt({
         
         <div className="flex flex-col sm:flex-row gap-3">
           <Button className="flex-1" asChild>
-            <Link to="/billing">
+            <Link to={billingPath}>
               Upgrade to {requiredTier === 'business' ? 'Business' : 'Professional'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Link>

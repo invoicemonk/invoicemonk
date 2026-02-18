@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from '@/hooks/use-toast';
 
 export interface ProductService {
   id: string;
   businessId: string;
+  currencyAccountId: string;
   name: string;
   description: string | null;
   type: 'product' | 'service';
@@ -28,6 +30,7 @@ function mapRow(row: any): ProductService {
   return {
     id: row.id,
     businessId: row.business_id,
+    currencyAccountId: row.currency_account_id,
     name: row.name,
     description: row.description,
     type: row.type,
@@ -48,23 +51,23 @@ function mapRow(row: any): ProductService {
 }
 
 /**
- * Fetch all products/services for a business.
+ * Fetch all products/services for a currency account.
  * Cached for 5 minutes — used as the single source for all client-side filtering.
  */
-export function useProductsServices(businessId?: string) {
+export function useProductsServices(currencyAccountId?: string) {
   return useQuery({
-    queryKey: ['products-services', businessId],
+    queryKey: ['products-services', currencyAccountId],
     queryFn: async (): Promise<ProductService[]> => {
-      if (!businessId) return [];
+      if (!currencyAccountId) return [];
       const { data, error } = await supabase
         .from('products_services')
         .select('*')
-        .eq('business_id', businessId)
+        .eq('currency_account_id', currencyAccountId)
         .order('name', { ascending: true });
       if (error) throw error;
       return (data || []).map(mapRow);
     },
-    enabled: !!businessId,
+    enabled: !!currencyAccountId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -90,20 +93,21 @@ export interface UpdateProductServiceInput extends Partial<CreateProductServiceI
 export function useCreateProductService() {
   const queryClient = useQueryClient();
   const { currentBusiness } = useBusiness();
+  const { currentCurrencyAccount } = useCurrencyAccount();
 
   return useMutation({
     mutationFn: async (input: CreateProductServiceInput) => {
       if (!currentBusiness) throw new Error('No business selected');
-      const currency = currentBusiness.default_currency;
-      if (!currency) throw new Error('Business has no default currency set');
+      if (!currentCurrencyAccount) throw new Error('No active currency account selected');
 
-      // Enforce service inventory rules at app layer (mirrors DB constraint)
+      const currency = currentCurrencyAccount.currency;
       const isService = input.type === 'service';
 
       const { data, error } = await supabase
         .from('products_services')
         .insert({
           business_id: currentBusiness.id,
+          currency_account_id: currentCurrencyAccount.id,
           name: input.name,
           type: input.type,
           description: input.description || null,
@@ -125,7 +129,7 @@ export function useCreateProductService() {
       return mapRow(data);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['products-services', data.businessId] });
+      queryClient.invalidateQueries({ queryKey: ['products-services', data.currencyAccountId] });
       toast({ title: `${data.type === 'product' ? 'Product' : 'Service'} created`, description: `${data.name} has been added.` });
     },
     onError: (error: any) => {
@@ -133,7 +137,7 @@ export function useCreateProductService() {
       toast({
         title: isDuplicateSku ? 'SKU already in use' : 'Error creating item',
         description: isDuplicateSku
-          ? 'This SKU is already in use by another product or service.'
+          ? 'This SKU is already in use by another product or service in this currency account.'
           : error.message,
         variant: 'destructive',
       });
@@ -143,12 +147,9 @@ export function useCreateProductService() {
 
 export function useUpdateProductService() {
   const queryClient = useQueryClient();
-  const { currentBusiness } = useBusiness();
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: UpdateProductServiceInput }) => {
-      if (!currentBusiness) throw new Error('No business selected');
-
       const isService = updates.type === 'service';
       const updatePayload: Record<string, any> = {};
 
@@ -176,7 +177,7 @@ export function useUpdateProductService() {
         if (updates.lowStockThreshold !== undefined) updatePayload.low_stock_threshold = updates.lowStockThreshold;
       }
 
-      // currency is immutable — never updated
+      // currency and currency_account_id are immutable — never updated
 
       const { data, error } = await supabase
         .from('products_services')
@@ -189,7 +190,7 @@ export function useUpdateProductService() {
       return mapRow(data);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['products-services', data.businessId] });
+      queryClient.invalidateQueries({ queryKey: ['products-services', data.currencyAccountId] });
       toast({ title: 'Item updated', description: `${data.name} has been saved.` });
     },
     onError: (error: any) => {
@@ -197,7 +198,7 @@ export function useUpdateProductService() {
       toast({
         title: isDuplicateSku ? 'SKU already in use' : 'Error updating item',
         description: isDuplicateSku
-          ? 'This SKU is already in use by another product or service.'
+          ? 'This SKU is already in use by another product or service in this currency account.'
           : error.message,
         variant: 'destructive',
       });
@@ -207,18 +208,20 @@ export function useUpdateProductService() {
 
 export function useArchiveProductService() {
   const queryClient = useQueryClient();
-  const { currentBusiness } = useBusiness();
 
   return useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products_services')
         .update({ is_active: isActive })
-        .eq('id', id);
+        .eq('id', id)
+        .select('currency_account_id')
+        .single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products-services', currentBusiness?.id] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['products-services', data.currency_account_id] });
       toast({ title: 'Status updated' });
     },
     onError: (error: any) => {

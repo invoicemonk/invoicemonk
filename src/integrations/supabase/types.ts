@@ -158,7 +158,7 @@ export type Database = {
           invoice_prefix: string | null
           is_default: boolean | null
           is_vat_registered: boolean | null
-          jurisdiction: string
+          jurisdiction: string | null
           legal_name: string | null
           logo_url: string | null
           name: string
@@ -188,7 +188,7 @@ export type Database = {
           invoice_prefix?: string | null
           is_default?: boolean | null
           is_vat_registered?: boolean | null
-          jurisdiction?: string
+          jurisdiction?: string | null
           legal_name?: string | null
           logo_url?: string | null
           name: string
@@ -218,7 +218,7 @@ export type Database = {
           invoice_prefix?: string | null
           is_default?: boolean | null
           is_vat_registered?: boolean | null
-          jurisdiction?: string
+          jurisdiction?: string | null
           legal_name?: string | null
           logo_url?: string | null
           name?: string
@@ -1219,6 +1219,7 @@ export type Database = {
           category: string | null
           created_at: string
           currency: string
+          currency_account_id: string
           default_price: number
           description: string | null
           id: string
@@ -1240,6 +1241,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           currency: string
+          currency_account_id: string
           default_price?: number
           description?: string | null
           id?: string
@@ -1261,6 +1263,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           currency?: string
+          currency_account_id?: string
           default_price?: number
           description?: string | null
           id?: string
@@ -1283,6 +1286,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_services_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -2032,11 +2042,61 @@ export type Database = {
         Args: { _business_id: string }
         Returns: undefined
       }
+      generate_invoice_number: {
+        Args: { _business_id: string }
+        Returns: string
+      }
+      get_accounting_stats: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _date_end?: string
+          _date_start?: string
+        }
+        Returns: Json
+      }
+      get_dashboard_stats: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _date_end?: string
+          _date_start?: string
+        }
+        Returns: Json
+      }
+      get_due_date_stats: {
+        Args: { _business_id: string; _currency_account_id?: string }
+        Returns: Json
+      }
+      get_expenses_by_category: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _date_end?: string
+          _date_start?: string
+        }
+        Returns: {
+          amount: number
+          category: string
+        }[]
+      }
       get_platform_admin_emails: {
         Args: never
         Returns: {
           email: string
           user_id: string
+        }[]
+      }
+      get_revenue_trend: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _months?: number
+        }
+        Returns: {
+          invoice_count: number
+          month: string
+          revenue: number
         }[]
       }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }

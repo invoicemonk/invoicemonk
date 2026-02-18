@@ -22,21 +22,25 @@ export type InvoiceItemInsert = TablesInsert<'invoice_items'>;
  * When omitted, RLS ensures users only see invoices they have access to.
  * RLS policies: "Users can view their invoices" — (auth.uid() = user_id OR is_business_member(auth.uid(), business_id))
  */
-export function useInvoices(businessId?: string, currencyAccountId?: string) {
+export function useInvoices(businessId?: string, currencyAccountId?: string, page = 0, pageSize = 25) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['invoices', businessId || user?.id, currencyAccountId],
+    queryKey: ['invoices', businessId || user?.id, currencyAccountId, page, pageSize],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
+
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
 
       let query = supabase
         .from('invoices')
         .select(`
           *,
           clients (*)
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       // If businessId is provided, filter by business
       if (businessId) {
@@ -48,10 +52,10 @@ export function useInvoices(businessId?: string, currencyAccountId?: string) {
         query = query.eq('currency_account_id', currencyAccountId);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      return data as Invoice[];
+      return { data: data as Invoice[], totalCount: count ?? 0, page, pageSize };
     },
     enabled: !!user,
   });
@@ -103,42 +107,37 @@ export function useCreateInvoice() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Generate invoice number scoped to either business_id or user_id
       const isBusinessInvoice = !!invoice.business_id;
-      
-      // Query for highest existing invoice number within the correct scope
-      let query = supabase
-        .from('invoices')
-        .select('invoice_number')
-        .order('created_at', { ascending: false })
-        .limit(100); // Get more to find highest number reliably
-      
+
+      // Generate invoice number atomically via database function
+      let invoiceNumber: string;
       if (isBusinessInvoice) {
-        query = query.eq('business_id', invoice.business_id);
+        const { data: genNumber, error: genError } = await supabase.rpc('generate_invoice_number', {
+          _business_id: invoice.business_id!,
+        });
+        if (genError) throw genError;
+        invoiceNumber = genNumber as string;
       } else {
-        query = query.eq('user_id', user.id);
-      }
+        // Fallback for non-business invoices (legacy)
+        const { data: existingInvoices } = await supabase
+          .from('invoices')
+          .select('invoice_number')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
 
-      const { data: existingInvoices, error: countError } = await query;
-
-      if (countError) throw countError;
-
-      // Find the highest invoice number
-      let nextNumber = 1;
-      if (existingInvoices && existingInvoices.length > 0) {
-        const numbers = existingInvoices
-          .map(inv => {
-            const match = inv.invoice_number.match(/\d+$/);
-            return match ? parseInt(match[0], 10) : 0;
-          })
-          .filter(n => !isNaN(n));
-        
-        if (numbers.length > 0) {
-          nextNumber = Math.max(...numbers) + 1;
+        let nextNumber = 1;
+        if (existingInvoices && existingInvoices.length > 0) {
+          const numbers = existingInvoices
+            .map(inv => {
+              const match = inv.invoice_number.match(/\d+$/);
+              return match ? parseInt(match[0], 10) : 0;
+            })
+            .filter(n => !isNaN(n));
+          if (numbers.length > 0) nextNumber = Math.max(...numbers) + 1;
         }
+        invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`;
       }
-
-      const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`;
 
       // Create the invoice
       // Note: invoice_owner_check constraint requires either user_id OR business_id, not both

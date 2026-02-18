@@ -107,6 +107,10 @@ export default function Invoices() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [selectedSendInvoice, setSelectedSendInvoice] = useState<typeof filteredInvoices[0] | null>(null);
   
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
+  
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
@@ -121,7 +125,10 @@ export default function Invoices() {
 
   const { currentBusiness } = useBusiness();
   const { currentCurrencyAccount } = useCurrencyAccount();
-  const { data: invoices, isLoading, error } = useInvoices(currentBusiness?.id, currentCurrencyAccount?.id);
+  const { data: invoiceResult, isLoading, error } = useInvoices(currentBusiness?.id, currentCurrencyAccount?.id, page, pageSize);
+  const invoices = invoiceResult?.data;
+  const totalCount = invoiceResult?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
   const { data: clients } = useClients(currentBusiness?.id);
   const deleteInvoice = useDeleteInvoice();
   const voidInvoice = useVoidInvoice();
@@ -324,7 +331,7 @@ export default function Invoices() {
           </p>
         </div>
         <Button asChild>
-          <Link to="/invoices/new">
+          <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
             <Plus className="h-4 w-4 mr-2" />
             New Invoice
           </Link>
@@ -587,7 +594,7 @@ export default function Invoices() {
                     <TableRow key={invoice.id}>
                       <TableCell className="font-medium">
                         <Link 
-                          to={`/invoices/${invoice.id}`}
+                          to={`/b/${currentBusiness?.id}/invoices/${invoice.id}`}
                           className="hover:text-primary transition-colors flex items-center gap-2"
                         >
                           {invoice.invoice_number}
@@ -617,7 +624,7 @@ export default function Invoices() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link to={`/invoices/${invoice.id}`}>
+                              <Link to={`/b/${currentBusiness?.id}/invoices/${invoice.id}`}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View
                               </Link>
@@ -673,7 +680,7 @@ export default function Invoices() {
                     }
                   </p>
                   <Button asChild>
-                    <Link to="/invoices/new">
+                    <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create Invoice
                     </Link>
@@ -684,6 +691,36 @@ export default function Invoices() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} of {totalCount} invoices
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Compliance Notice */}
       <Card className="bg-muted/30 border-dashed">

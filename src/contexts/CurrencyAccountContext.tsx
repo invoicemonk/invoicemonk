@@ -112,6 +112,7 @@ export const CurrencyAccountProvider = ({ children }: { children: ReactNode }) =
     queryClient.invalidateQueries({ queryKey: ['due-date-stats'] });
     queryClient.invalidateQueries({ queryKey: ['recent-invoices'] });
     queryClient.invalidateQueries({ queryKey: ['expenses-by-category'] });
+    queryClient.invalidateQueries({ queryKey: ['products-services'] });
   }, [currentBusiness?.id, currencyAccounts, queryClient]);
 
   // Check tier limit for creating new currency accounts

@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ComplianceConfidenceCard } from '@/components/dashboard/ComplianceConfidenceCard';
+import { QuickSetupChecklist } from '@/components/dashboard/QuickSetupChecklist';
+import { ImmutabilityBanner } from '@/components/dashboard/ImmutabilityBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +32,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
+import { getCountryName } from '@/lib/countries';
 
 const container = {
   hidden: { opacity: 0 },
@@ -238,12 +242,24 @@ export default function Dashboard() {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
           <Button asChild>
-            <Link to="/invoices/new">
+            <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
               <FileText className="h-4 w-4 mr-2" />
               Create Invoice
             </Link>
           </Button>
         </div>
+      </motion.div>
+
+      {/* Compliance Confidence Card */}
+      {currentBusiness && (
+        <motion.div variants={item}>
+          <ComplianceConfidenceCard />
+        </motion.div>
+      )}
+
+      {/* Quick Setup Checklist */}
+      <motion.div variants={item}>
+        <QuickSetupChecklist />
       </motion.div>
 
       {/* Email Verification Warning */}
@@ -350,7 +366,7 @@ export default function Dashboard() {
                       <p className="text-2xl font-bold text-destructive">{formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}</p>
                       <p className="text-sm text-muted-foreground mt-1">{dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due</p>
                       <Button variant="outline" size="sm" className="mt-3" asChild>
-                        <Link to="/invoices?status=overdue">View Overdue</Link>
+                        <Link to={`/b/${currentBusiness?.id}/invoices?status=overdue`}>View Overdue</Link>
                       </Button>
                     </>
                   ) : (
@@ -388,7 +404,7 @@ export default function Dashboard() {
               <CardDescription>Your latest invoice activity</CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/invoices">View All <ArrowUpRight className="ml-1 h-3 w-3" /></Link>
+              <Link to={`/b/${currentBusiness?.id}/invoices`}>View All <ArrowUpRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -399,7 +415,7 @@ export default function Dashboard() {
             ) : recentInvoices && recentInvoices.length > 0 ? (
               <div className="space-y-3">
                 {recentInvoices.map((invoice) => (
-                  <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                  <Link key={invoice.id} to={`/b/${currentBusiness?.id}/invoices/${invoice.id}`} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <FileText className="h-5 w-5 text-primary" />
@@ -417,16 +433,33 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No invoices yet</p>
+              <div className="text-center py-8">
+                <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-green-500/10 mb-4">
+                  <Shield className="h-7 w-7 text-green-600" />
+                </div>
+                <p className="font-medium">
+                  {currentBusiness?.jurisdiction
+                    ? `You're set up for compliant invoicing in ${getCountryName(currentBusiness.jurisdiction)}.`
+                    : 'You\'re ready to create invoices.'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Create your first invoice to see it in action.
+                </p>
                 <Button className="mt-4" asChild>
-                  <Link to="/invoices/new">Create your first invoice</Link>
+                  <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Create Invoice
+                  </Link>
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
+      </motion.div>
+
+      {/* Immutability Banner */}
+      <motion.div variants={item}>
+        <ImmutabilityBanner />
       </motion.div>
 
       {/* Compliance Footer */}

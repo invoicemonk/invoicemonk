@@ -47,7 +47,7 @@ interface RecentInvoice {
   created_at: string;
 }
 
-// Dashboard stats scoped by currency account - single currency, no aggregation needed
+// Dashboard stats via server-side RPC - no row limit issues
 export function useDashboardStats(
   businessId: string | undefined, 
   currencyAccountId: string | undefined,
@@ -61,7 +61,7 @@ export function useDashboardStats(
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<DashboardStats> => {
-      if (!user?.id) {
+      if (!user?.id || !businessId) {
         return {
           totalRevenue: 0,
           outstanding: 0,
@@ -73,77 +73,31 @@ export function useDashboardStats(
         };
       }
 
-      // Build query - strictly scoped by currency account
-      let query = supabase
-        .from('invoices')
-        .select('status, total_amount, currency, issued_at, amount_paid');
-
-      if (businessId) {
-        query = query.eq('business_id', businessId);
-      } else {
-        query = query.eq('user_id', user.id);
-      }
-
-      // Strict currency account filtering
-      if (currencyAccountId) {
-        query = query.eq('currency_account_id', currencyAccountId);
-      }
-
-      // Apply date range filter for issued invoices
-      if (dateRange) {
-        query = query.gte('issued_at', dateRange.start.toISOString())
-                     .lte('issued_at', dateRange.end.toISOString());
-      }
-
-      const { data: invoices, error } = await query;
+      const { data, error } = await supabase.rpc('get_dashboard_stats', {
+        _business_id: businessId,
+        _currency_account_id: currencyAccountId || null,
+        _date_start: dateRange?.start?.toISOString() || null,
+        _date_end: dateRange?.end?.toISOString() || null,
+      });
 
       if (error) {
         console.error('Error fetching dashboard stats:', error);
         throw error;
       }
 
-      // Calculate stats - all amounts are guaranteed same currency
-      const now = new Date();
-      const startOfMonth = dateRange?.start || new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = dateRange?.end || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-      // Filter invoices by status
-      const outstandingInvoices = invoices?.filter(i => ['issued', 'sent', 'viewed'].includes(i.status)) || [];
-      const draftInvoices = invoices?.filter(i => i.status === 'draft') || [];
-      
-      // CORRECTED: All non-draft, non-voided invoices for revenue calculations
-      const allActiveInvoices = invoices?.filter(i => 
-        i.status !== 'draft' && i.status !== 'voided'
-      ) || [];
-      
-      // Filter for invoices issued this month with payments
-      const paidThisMonthInvoices = allActiveInvoices.filter(i => {
-        if (!i.issued_at) return false;
-        const issuedDate = new Date(i.issued_at);
-        return issuedDate >= startOfMonth && issuedDate <= endOfMonth && Number(i.amount_paid) > 0;
-      });
-
-      // CORRECTED: Total revenue = SUM(amount_paid) to reflect actual collected money
-      const totalRevenue = allActiveInvoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
-      
-      // Outstanding = unpaid balance across outstanding invoices
-      const outstanding = outstandingInvoices.reduce((sum, i) => 
-        sum + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
-      
-      // Paid this month = amount_paid for invoices issued this month
-      const paidThisMonth = paidThisMonthInvoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
+      const result = data as Record<string, unknown>;
 
       return {
-        totalRevenue,
-        outstanding,
-        paidThisMonth,
-        draftCount: draftInvoices.length,
-        currency,
-        outstandingCount: outstandingInvoices.length,
-        paidThisMonthCount: paidThisMonthInvoices.length,
+        totalRevenue: Number(result.total_revenue) || 0,
+        outstanding: Number(result.outstanding) || 0,
+        paidThisMonth: Number(result.paid_this_month) || 0,
+        draftCount: Number(result.draft_count) || 0,
+        currency: (result.currency as string) || currency,
+        outstandingCount: Number(result.outstanding_count) || 0,
+        paidThisMonthCount: Number(result.paid_this_month_count) || 0,
       };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!businessId,
   });
 }
 
@@ -158,6 +112,7 @@ interface RevenueTrendResult {
   currency: string;
 }
 
+// Revenue trend via server-side RPC
 export function useRevenueTrend(
   businessId: string | undefined, 
   currencyAccountId: string | undefined,
@@ -170,78 +125,28 @@ export function useRevenueTrend(
     queryKey: ['revenue-trend', businessId, currencyAccountId, user?.id, months],
     refetchInterval: 60000,
     queryFn: async (): Promise<RevenueTrendResult> => {
-      if (!user?.id) return { data: [], currency };
+      if (!user?.id || !businessId) return { data: [], currency };
 
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - months);
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase.rpc('get_revenue_trend', {
+        _business_id: businessId,
+        _currency_account_id: currencyAccountId || null,
+        _months: months,
+      });
 
-      let query = supabase
-        .from('invoices')
-        .select('total_amount, issued_at, currency')
-        .eq('status', 'paid')
-        .gte('issued_at', startDate.toISOString());
-
-      if (businessId) {
-        query = query.eq('business_id', businessId);
-      } else {
-        query = query.eq('user_id', user.id);
-      }
-
-      // Strict currency account filtering
-      if (currencyAccountId) {
-        query = query.eq('currency_account_id', currencyAccountId);
-      }
-
-      const { data: invoices, error } = await query;
-      
       if (error) {
         console.error('Error fetching revenue trend:', error);
         throw error;
       }
 
-      // Create buckets for each month
-      const monthBuckets: Map<string, { total: number; count: number }> = new Map();
-      
-      // Initialize all months
-      for (let i = 0; i < months; i++) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - (months - 1 - i));
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthBuckets.set(key, { total: 0, count: 0 });
-      }
+      const trendData = (data as Array<{ month: string; revenue: number; invoice_count: number }> || []).map(row => ({
+        month: row.month,
+        revenue: Number(row.revenue) || 0,
+        invoiceCount: Number(row.invoice_count) || 0,
+      }));
 
-      // Aggregate invoice data by month - simple sum, no conversion
-      (invoices || []).forEach(invoice => {
-        if (!invoice.issued_at) return;
-        const date = new Date(invoice.issued_at);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const bucket = monthBuckets.get(key);
-        if (bucket) {
-          bucket.total += Number(invoice.total_amount) || 0;
-          bucket.count += 1;
-        }
-      });
-
-      // Convert to array
-      const trendData = Array.from(monthBuckets.entries()).map(([key, bucket]) => {
-        const [year, month] = key.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1);
-        
-        return {
-          month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          revenue: bucket.total,
-          invoiceCount: bucket.count,
-        };
-      });
-
-      return {
-        data: trendData,
-        currency,
-      };
+      return { data: trendData, currency };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!businessId,
   });
 }
 
@@ -280,7 +185,6 @@ export function useRecentInvoices(
         query = query.eq('user_id', user.id);
       }
 
-      // Strict currency account filtering
       if (currencyAccountId) {
         query = query.eq('currency_account_id', currencyAccountId);
       }
@@ -315,6 +219,7 @@ interface DueDateStats {
   currency: string;
 }
 
+// Due date stats via server-side RPC
 export function useDueDateStats(
   businessId: string | undefined,
   currencyAccountId: string | undefined,
@@ -327,7 +232,7 @@ export function useDueDateStats(
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<DueDateStats> => {
-      if (!user?.id) {
+      if (!user?.id || !businessId) {
         return {
           overdueCount: 0,
           overdueAmount: 0,
@@ -337,67 +242,26 @@ export function useDueDateStats(
         };
       }
 
-      // Get outstanding invoices with due dates - strictly scoped
-      let query = supabase
-        .from('invoices')
-        .select('id, due_date, total_amount, amount_paid, currency, status')
-        .in('status', ['issued', 'sent', 'viewed'])
-        .not('due_date', 'is', null);
-
-      if (businessId) {
-        query = query.eq('business_id', businessId);
-      } else {
-        query = query.eq('user_id', user.id);
-      }
-
-      // Strict currency account filtering
-      if (currencyAccountId) {
-        query = query.eq('currency_account_id', currencyAccountId);
-      }
-
-      const { data: invoices, error } = await query;
+      const { data, error } = await supabase.rpc('get_due_date_stats', {
+        _business_id: businessId,
+        _currency_account_id: currencyAccountId || null,
+      });
 
       if (error) {
         console.error('Error fetching due date stats:', error);
         throw error;
       }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const sevenDaysFromNow = new Date(today);
-      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
-      let overdueCount = 0;
-      let overdueAmount = 0;
-      let upcomingCount = 0;
-      let upcomingAmount = 0;
-
-      (invoices || []).forEach(invoice => {
-        if (!invoice.due_date) return;
-        
-        const dueDate = new Date(invoice.due_date);
-        dueDate.setHours(0, 0, 0, 0);
-        
-        const outstanding = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
-        
-        if (dueDate < today) {
-          overdueCount++;
-          overdueAmount += outstanding;
-        } else if (dueDate <= sevenDaysFromNow) {
-          upcomingCount++;
-          upcomingAmount += outstanding;
-        }
-      });
+      const result = data as Record<string, unknown>;
 
       return {
-        overdueCount,
-        overdueAmount,
-        upcomingCount,
-        upcomingAmount,
-        currency,
+        overdueCount: Number(result.overdue_count) || 0,
+        overdueAmount: Number(result.overdue_amount) || 0,
+        upcomingCount: Number(result.upcoming_count) || 0,
+        upcomingAmount: Number(result.upcoming_amount) || 0,
+        currency: (result.currency as string) || currency,
       };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!businessId,
   });
 }

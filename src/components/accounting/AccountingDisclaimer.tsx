@@ -8,13 +8,13 @@ export function AccountingDisclaimer({ type = 'overview' }: Props) {
   const getMessage = () => {
     switch (type) {
       case 'income':
-        return 'Money In figures are based on invoices marked as paid. This may differ from actual cash received.';
+        return 'Money In reflects invoices marked as paid. This may differ from actual bank deposits.';
       case 'expenses':
-        return 'Expenses are self-reported and not verified. This is for personal tracking purposes only.';
+        return 'Expenses are self-reported for your tracking. They are not independently verified.';
       case 'result':
-        return 'The "What\'s Left" calculation is for informational purposes. Consult a qualified accountant for official financial statements.';
+        return 'What\'s Left is an estimate based on your data. Consult your accountant for official statements.';
       default:
-        return 'This accounting overview is for informational purposes only and does not constitute professional financial advice. Please consult a qualified accountant for tax and compliance matters.';
+        return 'This summary is cash-based and does not replace professional accounting. It shows money received vs. money spent based on your records. For tax filings or audits, consult a qualified accountant.';
     }
   };
 

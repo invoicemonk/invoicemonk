@@ -59,7 +59,8 @@ export default function AccountingIncome() {
     activeCurrency,
     dateRange
   );
-  const { data: invoices, isLoading: isLoadingInvoices } = useInvoices(business?.id);
+  const { data: invoiceResult, isLoading: isLoadingInvoices } = useInvoices(business?.id);
+  const invoices = invoiceResult?.data;
 
   // Filter invoices by period and non-draft status
   const filteredInvoices = (invoices || []).filter(inv => {
@@ -136,7 +137,7 @@ export default function AccountingIncome() {
             <CardTitle>Recent Invoices</CardTitle>
             <CardDescription>Invoices issued in {getPeriodLabel(period)}</CardDescription>
           </div>
-          <Link to="/invoices">
+          <Link to={`/b/${business?.id}/invoices`}>
             <Button variant="outline" size="sm">
               View All
               <ArrowRight className="h-4 w-4 ml-2" />
@@ -154,7 +155,7 @@ export default function AccountingIncome() {
             <div className="text-center py-8">
               <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No invoices issued in this period.</p>
-              <Link to="/invoices/new">
+              <Link to={`/b/${business?.id}/invoices/new`}>
                 <Button className="mt-4">Create Invoice</Button>
               </Link>
             </div>
@@ -174,7 +175,7 @@ export default function AccountingIncome() {
                   <TableRow key={invoice.id}>
                     <TableCell>
                       <Link 
-                        to={`/invoices/${invoice.id}`}
+                        to={`/b/${business?.id}/invoices/${invoice.id}`}
                         className="font-medium hover:underline"
                       >
                         {invoice.invoice_number}

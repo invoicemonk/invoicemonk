@@ -26,7 +26,7 @@ import { useUpdateExpense, EXPENSE_CATEGORIES, Expense } from '@/hooks/use-expen
 import { ReceiptUpload } from './ReceiptUpload';
 import { VendorCombobox } from './VendorCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
-import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -49,8 +49,8 @@ interface Props {
 
 export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Props) {
   const updateExpense = useUpdateExpense();
-  const { currentBusiness } = useBusiness();
-  const { data: products = [] } = useProductsServices(currentBusiness?.id);
+  const { currentCurrencyAccount } = useCurrencyAccount();
+  const { data: products = [] } = useProductsServices(currentCurrencyAccount?.id);
   const activeProducts = products.filter((p) => p.isActive);
 
   const [linkedProductId, setLinkedProductId] = useState<string>(

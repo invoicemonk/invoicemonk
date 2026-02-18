@@ -134,7 +134,7 @@ export default function CreditNotes() {
                   </TableCell>
                   <TableCell>
                     <Link 
-                      to={`/invoices/${cn.original_invoice_id}`}
+                      to={`/b/${currentBusiness?.id}/invoices/${cn.original_invoice_id}`}
                       className="text-primary hover:underline"
                     >
                       {cn.original_invoice?.invoice_number || 'N/A'}
@@ -150,7 +150,7 @@ export default function CreditNotes() {
                   <TableCell>{formatDate(cn.issued_at)}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/credit-notes/${cn.id}`}>
+                      <Link to={`/b/${currentBusiness?.id}/credit-notes/${cn.id}`}>
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -170,7 +170,7 @@ export default function CreditNotes() {
                 Credit notes are automatically created when you void an issued invoice.
               </p>
               <Button variant="outline" asChild>
-                <Link to="/invoices">
+                <Link to={`/b/${currentBusiness?.id}/invoices`}>
                   <FileText className="h-4 w-4 mr-2" />
                   View Invoices
                 </Link>

@@ -62,18 +62,13 @@ import ReceiptDetail from "./pages/app/ReceiptDetail";
 import Support from "./pages/app/Support";
 import SupportTicket from "./pages/app/SupportTicket";
 
-// Organization pages (to be deprecated, keeping for backward compatibility)
-import { OrgLayout } from "./components/org/OrgLayout";
-import OrgDashboard from "./pages/org/OrgDashboard";
-import OrgInvoices from "./pages/org/OrgInvoices";
-import OrgInvoiceNew from "./pages/org/OrgInvoiceNew";
-import OrgInvoiceDetail from "./pages/org/OrgInvoiceDetail";
-import OrgInvoiceEdit from "./pages/org/OrgInvoiceEdit";
-import OrgClients from "./pages/org/OrgClients";
-import OrgReports from "./pages/org/OrgReports";
-import OrgTeam from "./pages/org/OrgTeam";
-import OrgAuditLogs from "./pages/org/OrgAuditLogs";
-import OrgSettings from "./pages/org/OrgSettings";
+// Legacy org route redirect component
+function OrgRedirect() {
+  const params = window.location.pathname.match(/^\/org\/([^/]+)(\/.*)?$/);
+  const orgId = params?.[1] || '';
+  const rest = params?.[2] || '/dashboard';
+  return <Navigate to={`/b/${orgId}${rest}`} replace />;
+}
 
 // Admin pages (Phase 6)
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -119,6 +114,9 @@ import {
 // Legal and Documentation pages
 import SLA from "./pages/legal/SLA";
 import { APIDocumentation } from "./pages/docs";
+
+// Onboarding pages
+import CountryConfirmation from "./pages/app/CountryConfirmation";
 const queryClient = new QueryClient();
 
 // Root redirect component
@@ -173,6 +171,9 @@ const App = () => (
           <Route path="/select-plan" element={<ProtectedRoute><PlanSelection /></ProtectedRoute>} />
           <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
           <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancel /></ProtectedRoute>} />
+          
+          {/* Onboarding routes */}
+          <Route path="/onboarding/country" element={<ProtectedRoute><CountryConfirmation /></ProtectedRoute>} />
           
           {/* Legacy route redirects */}
           <Route path="/auth" element={<Login />} />
@@ -245,19 +246,8 @@ const App = () => (
           <Route path="/accounting/result" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute><LegacyRouteRedirect /></ProtectedRoute>} />
 
-          {/* LEGACY: Organization routes (keeping for backward compatibility) */}
-          <Route element={<ProtectedRoute><OrgLayout /></ProtectedRoute>}>
-            <Route path="/org/:orgId/dashboard" element={<OrgDashboard />} />
-            <Route path="/org/:orgId/invoices" element={<OrgInvoices />} />
-            <Route path="/org/:orgId/invoices/new" element={<OrgInvoiceNew />} />
-            <Route path="/org/:orgId/invoices/:id" element={<OrgInvoiceDetail />} />
-            <Route path="/org/:orgId/invoices/:id/edit" element={<OrgInvoiceEdit />} />
-            <Route path="/org/:orgId/clients" element={<OrgClients />} />
-            <Route path="/org/:orgId/reports" element={<OrgReports />} />
-            <Route path="/org/:orgId/team" element={<OrgTeam />} />
-            <Route path="/org/:orgId/audit-logs" element={<OrgAuditLogs />} />
-            <Route path="/org/:orgId/settings" element={<OrgSettings />} />
-          </Route>
+          {/* LEGACY: Organization routes redirect to business-scoped routes */}
+          <Route path="/org/*" element={<ProtectedRoute><OrgRedirect /></ProtectedRoute>} />
 
           {/* Platform Admin routes (Phase 6) - Protected + AdminLayout handles admin role check */}
           <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>

@@ -519,7 +519,9 @@ export default function BusinessProfile() {
                 onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                {jurisdictionConfig.taxIdHint}
+                {jurisdictionConfig.countryName
+                  ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
+                  : jurisdictionConfig.taxIdHint}
               </p>
             </div>
 
@@ -578,6 +580,9 @@ export default function BusinessProfile() {
                         ? 'Toggle on if your business is registered for GST/HST'
                         : 'Toggle on if your business is registered for VAT'
                       }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Tax is applied automatically based on your country selection.
                     </p>
                   </div>
                   <Switch
@@ -822,7 +827,7 @@ export default function BusinessProfile() {
                         Click "Unlock Currency" if you have no issued invoices.
                       </>
                     ) : (
-                      'This will become your primary accounting currency after your first invoice.'
+                      'Currency is set based on your business location. This will become your primary accounting currency after your first invoice.'
                     )}
                   </p>
                 </div>
