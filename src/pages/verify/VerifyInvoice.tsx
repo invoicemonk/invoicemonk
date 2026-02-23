@@ -252,7 +252,7 @@ const VerifyInvoice = () => {
                     Invoice Verified
                   </h1>
                   <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                    This invoice is a verified financial record issued via InvoiceMonk's 
+                    This invoice is a verified financial record issued via Invoicemonk's 
                     compliance-first invoicing platform.
                   </p>
                 </div>
@@ -515,7 +515,7 @@ const VerifyInvoice = () => {
                 <div className="text-center pt-6 pb-4">
                   <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 rounded-full px-4 py-2">
                     <Shield className="h-4 w-4 text-primary" />
-                    <span>Verified via InvoiceMonk Compliance Platform</span>
+                    <span>Verified via Invoicemonk Compliance Platform</span>
                   </div>
                 </div>
               </>
@@ -585,7 +585,7 @@ const VerifyInvoice = () => {
       <footer className="border-t border-border/50 bg-card/50 mt-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 text-center">
           <p className="text-sm text-muted-foreground">
-            InvoiceMonk provides compliance-first invoicing with immutable audit trails. 
+            Invoicemonk provides compliance-first invoicing with immutable audit trails. 
             Every invoice issued through our platform is verifiable and tamper-evident.
           </p>
           <div className="flex items-center justify-center gap-4 mt-4 text-sm">

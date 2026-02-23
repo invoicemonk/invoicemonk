@@ -674,7 +674,7 @@ const InvoiceView = () => {
       <footer className="border-t border-border/50 bg-card/50 mt-auto">
         <div className="max-w-5xl mx-auto px-4 py-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Powered by InvoiceMonk — Compliance-first invoicing with immutable
+            Powered by Invoicemonk — Compliance-first invoicing with immutable
             audit trails.
           </p>
           <div className="flex items-center justify-center gap-4 mt-4 text-sm">
