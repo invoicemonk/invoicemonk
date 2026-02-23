@@ -25,6 +25,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Gate unverified users — only allow /verify-email and /select-plan
+  if (!user.email_confirmed_at && location.pathname !== '/verify-email' && location.pathname !== '/select-plan') {
+    return <Navigate to="/verify-email" replace />;
+  }
+
   return <>{children}</>;
 };
 

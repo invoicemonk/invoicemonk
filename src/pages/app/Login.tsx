@@ -68,7 +68,11 @@ const Login = () => {
 
   useEffect(() => {
     if (user) {
-      navigate(from, { replace: true });
+      if (user.email_confirmed_at) {
+        navigate(from, { replace: true });
+      } else {
+        navigate('/verify-email', { replace: true });
+      }
     }
   }, [user, navigate, from]);
 
@@ -124,6 +128,14 @@ const Login = () => {
       setFailedAttempts(0);
       // Track successful login
       gaEvents.loginSuccess();
+      
+      // Check if the user's email is verified before proceeding
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+      if (freshUser && !freshUser.email_confirmed_at) {
+        navigate('/verify-email', { replace: true });
+        return;
+      }
+      
       toast({
         title: 'Welcome back!',
         description: 'You have successfully logged in.',

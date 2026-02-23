@@ -132,7 +132,10 @@ function RootRedirect() {
     );
   }
   
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+  if (user) {
+    return <Navigate to={user.email_confirmed_at ? "/dashboard" : "/verify-email"} replace />;
+  }
+  return <Navigate to="/login" replace />;
 }
 
 // Analytics wrapper to track page views

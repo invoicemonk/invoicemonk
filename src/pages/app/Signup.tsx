@@ -52,7 +52,11 @@ const Signup = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard', { replace: true });
+      if (user.email_confirmed_at) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/verify-email', { replace: true });
+      }
     } else {
       // Track signup page view
       gaEvents.signupStarted();
@@ -86,7 +90,7 @@ const Signup = () => {
         title: 'Account created!',
         description: "Please check your email to verify your account. If you don't see it, check your spam folder and mark it as 'Not Spam'.",
       });
-      navigate('/select-plan');
+      navigate('/verify-email');
     }
   };
 
