@@ -4,10 +4,9 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireEmailVerification?: boolean;
 }
 
-const ProtectedRoute = ({ children, requireEmailVerification = false }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -24,10 +23,6 @@ const ProtectedRoute = ({ children, requireEmailVerification = false }: Protecte
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (requireEmailVerification && !user.email_confirmed_at) {
-    return <Navigate to="/verify-email" replace />;
   }
 
   return <>{children}</>;

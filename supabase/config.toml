@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.tawk-identity]
 verify_jwt = false
 
+[functions.process-submission-queue]
+verify_jwt = false
+

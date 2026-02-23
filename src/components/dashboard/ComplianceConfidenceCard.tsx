@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, ChevronDown, ExternalLink } from 'lucide-react';
+import { Shield, ChevronDown, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -184,10 +184,24 @@ export function ComplianceConfidenceCard() {
     () => items.filter(i => i.isApplicable && !i.isComplete && i.missingAction),
     [items]
   );
-  const progressColor = score >= 80 ? 'bg-green-500' : score >= 50 ? 'bg-amber-500' : 'bg-destructive';
-  const progressClassName = `h-2 ${score >= 80 ? '[&>div]:bg-green-500' : score >= 50 ? '[&>div]:bg-amber-500' : '[&>div]:bg-destructive'}`;
 
   if (!currentBusiness || items.length === 0) return null;
+
+  // Compact variant when compliance is 100%
+  if (score === 100 && missingItems.length === 0) {
+    return (
+      <Card className="border-green-500/30 bg-green-500/5">
+        <CardContent className="flex items-center gap-3 py-4">
+          <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+          <p className="text-sm font-medium text-green-700 dark:text-green-400">
+            Compliance Infrastructure Complete — 100%
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const progressClassName = `h-2 ${score >= 80 ? '[&>div]:bg-green-500' : score >= 50 ? '[&>div]:bg-amber-500' : '[&>div]:bg-destructive'}`;
 
   return (
     <Card>

@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -76,6 +77,7 @@ export default function Clients() {
     client_type: 'company' as 'individual' | 'company',
     cac_number: '',
     contact_person: '',
+    notes: '',
     address: {
       street: '',
       city: '',
@@ -126,6 +128,7 @@ export default function Clients() {
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
+      notes: newClient.notes || null,
       address: addressData,
       business_id: currentBusiness?.id,
     });
@@ -143,6 +146,7 @@ export default function Clients() {
       client_type: 'company',
       cac_number: '',
       contact_person: '',
+      notes: '',
       address: { street: '', city: '', state: '', postal_code: '', country: '' },
     });
   };
@@ -311,6 +315,18 @@ export default function Clients() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add any notes about this client..."
+                  value={newClient.notes}
+                  onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+                  rows={3}
+                />
               </div>
 
               {/* Address Section */}

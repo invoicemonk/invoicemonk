@@ -73,8 +73,9 @@ const VerifyInvoice = () => {
   const { data, isLoading, error, refetch } = useQuery<VerificationResponse>({
     queryKey: ['verify-invoice', verificationId],
     queryFn: async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
-        `https://skcxogeaerudoadluexz.supabase.co/functions/v1/verify-invoice?verification_id=${verificationId}`
+        `${supabaseUrl}/functions/v1/verify-invoice?verification_id=${verificationId}`
       );
       if (!response.ok && response.status >= 500) {
         throw new Error('Verification service temporarily unavailable');
@@ -122,8 +123,9 @@ const VerifyInvoice = () => {
     
     setDownloadingPdf(true);
     try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
-        `https://skcxogeaerudoadluexz.supabase.co/functions/v1/generate-pdf?verification_id=${verificationId}`
+        `${supabaseUrl}/functions/v1/generate-pdf?verification_id=${verificationId}`
       );
       
       if (!response.ok) throw new Error('Failed to generate PDF');

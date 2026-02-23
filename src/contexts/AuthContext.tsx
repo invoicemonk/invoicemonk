@@ -94,14 +94,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const triggerReferralAttribution = useCallback(async (userId: string) => {
+  const triggerReferralAttribution = useCallback(async () => {
     try {
       const refCode = localStorage.getItem('pending_referral_code');
       if (!refCode) return;
       localStorage.removeItem('pending_referral_code');
 
       await supabase.functions.invoke('attribute-referral', {
-        body: { referral_code: refCode, user_id: userId },
+        body: { referral_code: refCode },
       });
       console.log('Referral attribution triggered for code:', refCode);
     } catch (err) {
@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Trigger referral attribution if signup succeeded and we have a user
     if (!error && data?.user?.id) {
-      triggerReferralAttribution(data.user.id);
+      triggerReferralAttribution();
     }
     
     return { error: error as Error | null };

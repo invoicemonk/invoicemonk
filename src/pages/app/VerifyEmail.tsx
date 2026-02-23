@@ -124,6 +124,23 @@ const VerifyEmail = () => {
                   </div>
                 </div>
 
+                {/* Spam folder guidance */}
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 text-left">
+                  <div className="flex gap-3">
+                    <Mail className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">
+                        Can't find the email?
+                      </p>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        <li>Check your <strong className="text-foreground">Spam</strong> or <strong className="text-foreground">Junk</strong> folder</li>
+                        <li>If found there, <strong className="text-foreground">mark it as "Not Spam"</strong> so future emails (like invoice delivery) reach your inbox</li>
+                        <li>Still can't find it? Use the resend button below</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-4 pt-2">
                   <p className="text-sm text-muted-foreground">
                     Click the link in your email to verify your account and start issuing invoices.
@@ -163,7 +180,7 @@ const VerifyEmail = () => {
                 )}
               </Button>
               <p className="text-xs text-muted-foreground">
-                Check your spam folder or contact{' '}
+                If the email landed in spam, mark it as 'Not Spam' to ensure future emails arrive in your inbox. Need help?{' '}
                 <a href="mailto:support@invoicemonk.com" className="text-primary hover:underline">
                   support@invoicemonk.com
                 </a>

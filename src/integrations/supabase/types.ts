@@ -98,6 +98,50 @@ export type Database = {
         }
         Relationships: []
       }
+      business_compliance_analytics: {
+        Row: {
+          artifact_count: number
+          avg_score: number
+          blocked_count: number
+          business_id: string
+          id: string
+          last_updated: string
+          period: string
+          total_invoices: number
+          warning_count: number
+        }
+        Insert: {
+          artifact_count?: number
+          avg_score?: number
+          blocked_count?: number
+          business_id: string
+          id?: string
+          last_updated?: string
+          period?: string
+          total_invoices?: number
+          warning_count?: number
+        }
+        Update: {
+          artifact_count?: number
+          avg_score?: number
+          blocked_count?: number
+          business_id?: string
+          id?: string
+          last_updated?: string
+          period?: string
+          total_invoices?: number
+          warning_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_compliance_analytics_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_members: {
         Row: {
           accepted_at: string | null
@@ -370,6 +414,114 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      compliance_artifacts: {
+        Row: {
+          artifact_data: Json
+          artifact_hash: string
+          artifact_type: string
+          business_id: string
+          created_by: string | null
+          generated_at: string
+          id: string
+          invoice_id: string
+          schema_version: string | null
+          xml_content: string | null
+          xml_generated_at: string | null
+          xml_hash: string | null
+        }
+        Insert: {
+          artifact_data: Json
+          artifact_hash: string
+          artifact_type: string
+          business_id: string
+          created_by?: string | null
+          generated_at?: string
+          id?: string
+          invoice_id: string
+          schema_version?: string | null
+          xml_content?: string | null
+          xml_generated_at?: string | null
+          xml_hash?: string | null
+        }
+        Update: {
+          artifact_data?: Json
+          artifact_hash?: string
+          artifact_type?: string
+          business_id?: string
+          created_by?: string | null
+          generated_at?: string
+          id?: string
+          invoice_id?: string
+          schema_version?: string | null
+          xml_content?: string | null
+          xml_generated_at?: string | null
+          xml_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_artifacts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_artifacts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_system_policy: {
+        Row: {
+          id: boolean
+          require_rules_for_jurisdiction: boolean
+        }
+        Insert: {
+          id?: boolean
+          require_rules_for_jurisdiction?: boolean
+        }
+        Update: {
+          id?: boolean
+          require_rules_for_jurisdiction?: boolean
+        }
+        Relationships: []
+      }
+      compliance_validation_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          jurisdiction: string
+          rule_definition: Json
+          rule_key: string
+          rule_type: string
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jurisdiction: string
+          rule_definition?: Json
+          rule_key: string
+          rule_type: string
+          severity: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jurisdiction?: string
+          rule_definition?: Json
+          rule_key?: string
+          rule_type?: string
+          severity?: string
+        }
+        Relationships: []
       }
       credit_notes: {
         Row: {
@@ -734,6 +886,8 @@ export type Database = {
           amount_paid: number
           business_id: string | null
           client_id: string
+          compliance_hash: string | null
+          compliance_result: Json | null
           created_at: string
           currency: string
           currency_account_id: string | null
@@ -753,6 +907,7 @@ export type Database = {
           payment_method_id: string | null
           payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
+          regulatory_status: string
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
@@ -776,6 +931,8 @@ export type Database = {
           amount_paid?: number
           business_id?: string | null
           client_id: string
+          compliance_hash?: string | null
+          compliance_result?: Json | null
           created_at?: string
           currency?: string
           currency_account_id?: string | null
@@ -795,6 +952,7 @@ export type Database = {
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
+          regulatory_status?: string
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -818,6 +976,8 @@ export type Database = {
           amount_paid?: number
           business_id?: string | null
           client_id?: string
+          compliance_hash?: string | null
+          compliance_result?: Json | null
           created_at?: string
           currency?: string
           currency_account_id?: string | null
@@ -837,6 +997,7 @@ export type Database = {
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
+          regulatory_status?: string
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -1629,6 +1790,127 @@ export type Database = {
           },
         ]
       }
+      regulator_submissions: {
+        Row: {
+          artifact_id: string
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string
+          jurisdiction: string
+          max_retries: number
+          regulator_code: string
+          resolved_at: string | null
+          retry_count: number
+          submission_reference: string | null
+          submission_response: Json | null
+          submission_status: string
+          submitted_at: string | null
+        }
+        Insert: {
+          artifact_id: string
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          jurisdiction: string
+          max_retries?: number
+          regulator_code: string
+          resolved_at?: string | null
+          retry_count?: number
+          submission_reference?: string | null
+          submission_response?: Json | null
+          submission_status?: string
+          submitted_at?: string | null
+        }
+        Update: {
+          artifact_id?: string
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          jurisdiction?: string
+          max_retries?: number
+          regulator_code?: string
+          resolved_at?: string | null
+          retry_count?: number
+          submission_reference?: string | null
+          submission_response?: Json | null
+          submission_status?: string
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regulator_submissions_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regulator_submissions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regulator_submissions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      regulatory_events: {
+        Row: {
+          business_id: string
+          created_at: string
+          event_payload: Json | null
+          event_type: string
+          id: string
+          invoice_id: string | null
+          submission_id: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          event_payload?: Json | null
+          event_type: string
+          id?: string
+          invoice_id?: string | null
+          submission_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          event_payload?: Json | null
+          event_type?: string
+          id?: string
+          invoice_id?: string | null
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regulatory_events_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regulatory_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "regulator_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retention_policies: {
         Row: {
           created_at: string | null
@@ -1655,6 +1937,41 @@ export type Database = {
           retention_years?: number
         }
         Relationships: []
+      }
+      submission_queue: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          scheduled_at: string
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          scheduled_at?: string
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          scheduled_at?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_queue_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "regulator_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -2002,6 +2319,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      canonicalize_jsonb: { Args: { p_input: Json }; Returns: string }
       check_currency_account_limit: {
         Args: { _business_id: string }
         Returns: Json
@@ -2036,6 +2354,17 @@ export type Database = {
       }
       create_receipt_from_payment: {
         Args: { _payment_id: string }
+        Returns: string
+      }
+      create_regulatory_submission: {
+        Args: {
+          p_artifact_id: string
+          p_business_id: string
+          p_created_by?: string
+          p_invoice_id: string
+          p_jurisdiction: string
+          p_regulator_code: string
+        }
         Returns: string
       }
       delete_empty_business: {
@@ -2133,6 +2462,8 @@ export type Database = {
           amount_paid: number
           business_id: string | null
           client_id: string
+          compliance_hash: string | null
+          compliance_result: Json | null
           created_at: string
           currency: string
           currency_account_id: string | null
@@ -2152,6 +2483,7 @@ export type Database = {
           payment_method_id: string | null
           payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
+          regulatory_status: string
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
@@ -2204,6 +2536,20 @@ export type Database = {
         Args: { _business_name: string; _subscription_id: string }
         Returns: undefined
       }
+      update_compliance_analytics: {
+        Args: { p_business_id: string; p_compliance_result: Json }
+        Returns: undefined
+      }
+      update_submission_status: {
+        Args: {
+          p_new_status: string
+          p_reference?: string
+          p_response?: Json
+          p_submission_id: string
+        }
+        Returns: undefined
+      }
+      validate_compliance: { Args: { p_invoice_id: string }; Returns: Json }
     }
     Enums: {
       app_role:
@@ -2257,6 +2603,9 @@ export type Database = {
         | "PAYOUT_CREATED"
         | "PAYOUT_PAID"
         | "REFERRAL_ATTRIBUTED"
+        | "XML_ARTIFACT_GENERATED"
+        | "REGULATORY_SUBMISSION_CREATED"
+        | "REGULATORY_STATUS_CHANGED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
       invoice_status:
@@ -2455,6 +2804,9 @@ export const Constants = {
         "PAYOUT_CREATED",
         "PAYOUT_PAID",
         "REFERRAL_ATTRIBUTED",
+        "XML_ARTIFACT_GENERATED",
+        "REGULATORY_SUBMISSION_CREATED",
+        "REGULATORY_STATUS_CHANGED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],

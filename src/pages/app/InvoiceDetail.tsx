@@ -22,6 +22,8 @@ import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
 import { useInvoicePayments } from '@/hooks/use-payments';
 import { useInvoicePaymentProofs, useUploadPaymentProof } from '@/hooks/use-payment-proofs';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
+import { ComplianceArtifactsSection } from '@/components/invoices/ComplianceArtifactsSection';
+import { RegulatoryStatusSection } from '@/components/invoices/RegulatoryStatusSection';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -423,6 +425,29 @@ export default function InvoiceDetail() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Compliance Artifacts Section */}
+          {isImmutable && (
+            <ComplianceArtifactsSection
+              invoiceId={invoice.id}
+              invoiceStatus={invoice.status}
+              complianceResult={invoice.compliance_result as {
+                score?: number;
+                result?: string;
+                checks?: Array<{ rule_key: string; rule_type: string; severity: string; passed: boolean; message: string }>;
+              } | null}
+            />
+          )}
+
+          {/* Regulatory Status Section */}
+          {isImmutable && (
+            <RegulatoryStatusSection
+              invoiceId={invoice.id}
+              invoiceStatus={invoice.status}
+              regulatoryStatus={(invoice as any).regulatory_status || 'not_required'}
+              jurisdiction={(issuerSnapshot?.jurisdiction as string) || undefined}
+            />
           )}
 
           {/* Payment Instructions - from snapshot */}

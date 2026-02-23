@@ -34,7 +34,20 @@ export default function CountryConfirmation() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedCountry, setSelectedCountry] = useState<string>(() => {
+    // Auto-detect country from browser locale (e.g. 'en-NG' → 'NG')
+    try {
+      const locale = navigator.language || '';
+      const parts = locale.split('-');
+      if (parts.length >= 2) {
+        const code = parts[parts.length - 1].toUpperCase();
+        if (COUNTRY_OPTIONS.some(c => c.code === code)) {
+          return code;
+        }
+      }
+    } catch {}
+    return '';
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch user's first business directly (no BusinessProvider needed)

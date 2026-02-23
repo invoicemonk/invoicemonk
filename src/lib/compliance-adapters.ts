@@ -29,6 +29,12 @@ export interface ComplianceAdapter {
   
   /** Default tax rate for this jurisdiction (if applicable) */
   defaultTaxRate?: number;
+
+  /** Whether regulatory submission is required for this jurisdiction */
+  submissionRequired: boolean;
+
+  /** Supported XML/document formats (e.g., 'UBL_2_1', 'XRECHNUNG') */
+  supportedFormats: string[];
 }
 
 /**
@@ -42,8 +48,10 @@ export const COMPLIANCE_ADAPTERS: Record<string, ComplianceAdapter> = {
     supportedArtifacts: ['IRN', 'UBL_3_0', 'CRYPTO_STAMP'],
     displayName: 'Nigeria — National Revenue Service',
     regulatorName: 'National Revenue Service',
-    eInvoicingAvailable: false, // Future integration
+    eInvoicingAvailable: false,
     defaultTaxRate: 7.5,
+    submissionRequired: false,
+    supportedFormats: ['UBL_2_1'],
   },
   'GBR-HMRC': {
     regulatorCode: 'GBR-HMRC',
@@ -53,6 +61,8 @@ export const COMPLIANCE_ADAPTERS: Record<string, ComplianceAdapter> = {
     regulatorName: 'HM Revenue & Customs',
     eInvoicingAvailable: false,
     defaultTaxRate: 20,
+    submissionRequired: false,
+    supportedFormats: ['UBL_2_1'],
   },
   'DEU-BFINV': {
     regulatorCode: 'DEU-BFINV',
@@ -62,6 +72,8 @@ export const COMPLIANCE_ADAPTERS: Record<string, ComplianceAdapter> = {
     regulatorName: 'Bundesfinanzministerium',
     eInvoicingAvailable: false,
     defaultTaxRate: 19,
+    submissionRequired: false,
+    supportedFormats: ['UBL_2_1', 'XRECHNUNG', 'ZUGFERD'],
   },
 };
 

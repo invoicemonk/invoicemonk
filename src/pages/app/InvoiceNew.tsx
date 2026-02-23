@@ -240,6 +240,8 @@ export default function InvoiceNew() {
       voided_by: null,
       void_reason: null,
       invoice_hash: null,
+      compliance_result: null,
+      compliance_hash: null,
       verification_id: null,
       template_id: selectedTemplateId || null,
       template_snapshot: null,
@@ -273,6 +275,7 @@ export default function InvoiceNew() {
       currency_account_id: null,
       payment_method_id: null,
       payment_method_snapshot: null,
+      regulatory_status: 'not_required',
       clients: selectedClient || null,
       invoice_items: validItems.map((item, index) => ({
         id: `item-${index}`,

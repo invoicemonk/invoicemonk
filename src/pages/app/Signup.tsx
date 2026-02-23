@@ -84,9 +84,9 @@ const Signup = () => {
       gaEvents.signupCompleted();
       toast({
         title: 'Account created!',
-        description: 'Please check your email to verify your account.',
+        description: "Please check your email to verify your account. If you don't see it, check your spam folder and mark it as 'Not Spam'.",
       });
-      navigate('/verify-email');
+      navigate('/select-plan');
     }
   };
 

@@ -49,6 +49,7 @@ const mainNavItems = [
 const complianceNavItems = [
   { title: 'Retention Policies', url: '/admin/retention-policies', icon: Clock },
   { title: 'Invoice Templates', url: '/admin/templates', icon: FileText },
+  { title: 'Regulatory Submissions', url: '/admin/regulatory-submissions', icon: ShieldAlert },
 ];
 
 const systemNavItems = [
