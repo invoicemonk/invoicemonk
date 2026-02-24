@@ -475,6 +475,42 @@ export type Database = {
           },
         ]
       }
+      compliance_risks: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          invoice_id: string
+          resolved: boolean
+          risk_severity: string
+          risk_type: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          invoice_id: string
+          resolved?: boolean
+          risk_severity: string
+          risk_type: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          invoice_id?: string
+          resolved?: boolean
+          risk_severity?: string
+          risk_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       compliance_system_policy: {
         Row: {
           id: boolean
@@ -903,11 +939,13 @@ export type Database = {
           issued_at: string | null
           issued_by: string | null
           issuer_snapshot: Json | null
+          last_reminder_sent_at: string | null
           notes: string | null
           payment_method_id: string | null
           payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
           regulatory_status: string
+          reminder_count: number
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
@@ -948,11 +986,13 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           issuer_snapshot?: Json | null
+          last_reminder_sent_at?: string | null
           notes?: string | null
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
           regulatory_status?: string
+          reminder_count?: number
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -993,11 +1033,13 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           issuer_snapshot?: Json | null
+          last_reminder_sent_at?: string | null
           notes?: string | null
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
           regulatory_status?: string
+          reminder_count?: number
           retention_locked_until?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -1061,6 +1103,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lifecycle_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -2215,6 +2281,72 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activity_state: {
+        Row: {
+          created_at: string
+          email_verified: boolean
+          has_business: boolean
+          last_abandoned_draft_email_at: string | null
+          last_business_created_at: string | null
+          last_first_invoice_email_at: string | null
+          last_inactivity_email_at: string | null
+          last_invoice_at: string | null
+          last_login_at: string | null
+          last_no_business_email_at: string | null
+          last_no_invoice_email_at: string | null
+          last_overdue_email_at: string | null
+          last_unverified_email_at: string | null
+          last_upgrade_cta_email_at: string | null
+          last_weekly_summary_email_at: string | null
+          overdue_count: number
+          total_invoices: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_verified?: boolean
+          has_business?: boolean
+          last_abandoned_draft_email_at?: string | null
+          last_business_created_at?: string | null
+          last_first_invoice_email_at?: string | null
+          last_inactivity_email_at?: string | null
+          last_invoice_at?: string | null
+          last_login_at?: string | null
+          last_no_business_email_at?: string | null
+          last_no_invoice_email_at?: string | null
+          last_overdue_email_at?: string | null
+          last_unverified_email_at?: string | null
+          last_upgrade_cta_email_at?: string | null
+          last_weekly_summary_email_at?: string | null
+          overdue_count?: number
+          total_invoices?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_verified?: boolean
+          has_business?: boolean
+          last_abandoned_draft_email_at?: string | null
+          last_business_created_at?: string | null
+          last_first_invoice_email_at?: string | null
+          last_inactivity_email_at?: string | null
+          last_invoice_at?: string | null
+          last_login_at?: string | null
+          last_no_business_email_at?: string | null
+          last_no_invoice_email_at?: string | null
+          last_overdue_email_at?: string | null
+          last_unverified_email_at?: string | null
+          last_upgrade_cta_email_at?: string | null
+          last_weekly_summary_email_at?: string | null
+          overdue_count?: number
+          total_invoices?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           browser_notifications: boolean
@@ -2479,11 +2611,13 @@ export type Database = {
           issued_at: string | null
           issued_by: string | null
           issuer_snapshot: Json | null
+          last_reminder_sent_at: string | null
           notes: string | null
           payment_method_id: string | null
           payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
           regulatory_status: string
+          reminder_count: number
           retention_locked_until: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number

@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ArrowUpRight,
   Shield,
+  Bell,
   Loader2,
   RefreshCw,
   Calendar as CalendarIcon
@@ -403,9 +404,17 @@ export default function Dashboard() {
                         <>
                           <p className="text-2xl font-bold text-destructive">{formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}</p>
                           <p className="text-sm text-muted-foreground mt-1">{dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due</p>
-                          <Button variant="outline" size="sm" className="mt-3" asChild>
-                            <Link to={`/b/${currentBusiness?.id}/invoices?status=overdue`}>View Overdue</Link>
-                          </Button>
+                         <div className="flex gap-2 mt-3">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/b/${currentBusiness?.id}/invoices?status=overdue`}>View Overdue</Link>
+                            </Button>
+                            <Button variant="outline" size="sm" className="border-destructive/50 text-destructive" asChild>
+                              <Link to={`/b/${currentBusiness?.id}/invoices?status=overdue`}>
+                                <Bell className="h-3 w-3 mr-1" />
+                                Send Reminders
+                              </Link>
+                            </Button>
+                          </div>
                         </>
                       ) : (
                         <p className="text-sm text-muted-foreground">No overdue invoices</p>

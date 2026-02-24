@@ -8,6 +8,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { UpgradeModal } from './UpgradeModal';
 
 
 function BusinessLayoutContent() {
@@ -56,6 +57,7 @@ function BusinessLayoutContent() {
           </SidebarInset>
         </div>
       </SidebarProvider>
+      <UpgradeModal />
     </CurrencyAccountProvider>
   );
 }

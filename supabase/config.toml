@@ -30,3 +30,12 @@ verify_jwt = false
 [functions.process-submission-queue]
 verify_jwt = false
 
+[functions.process-lifecycle-campaigns]
+verify_jwt = false
+
+[functions.process-compliance-risk]
+verify_jwt = false
+
+[functions.send-invoice-reminder]
+verify_jwt = false
+

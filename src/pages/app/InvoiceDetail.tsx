@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip
+  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { PaymentMethodCard } from '@/components/payment-methods/PaymentMethodCard';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
@@ -89,6 +91,35 @@ export default function InvoiceDetail() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const proofFileRef = useRef<HTMLInputElement>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
+
+  // Overdue and cooldown logic
+  const isOverdue = invoice && (invoice.status === 'issued' || invoice.status === 'sent' || invoice.status === 'viewed') && invoice.due_date && invoice.due_date < new Date().toISOString().split('T')[0];
+  const lastReminderAt = invoice?.last_reminder_sent_at ? new Date(invoice.last_reminder_sent_at).getTime() : null;
+  const cooldownActive = lastReminderAt ? (Date.now() - lastReminderAt) < 24 * 60 * 60 * 1000 : false;
+  const hoursAgo = lastReminderAt ? Math.floor((Date.now() - lastReminderAt) / (1000 * 60 * 60)) : null;
+
+  const handleSendReminder = async () => {
+    if (!id) return;
+    setSendingReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invoice-reminder', {
+        body: { invoice_id: id }
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success('Payment reminder sent successfully');
+        // Refetch invoice data
+        window.location.reload();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send reminder');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
@@ -206,7 +237,7 @@ export default function InvoiceDetail() {
             <p className="text-muted-foreground">{invoice.clients?.name}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {invoice.status === 'draft' && (
             <>
               <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
@@ -228,11 +259,27 @@ export default function InvoiceDetail() {
                 {downloadPdf.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
                 Download PDF
               </Button>
-              {(invoice.status === 'issued' || invoice.status === 'sent') && (
+              {(invoice.status === 'issued' || invoice.status === 'sent' || invoice.status === 'viewed') && (
                 <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
                   <Send className="h-4 w-4 mr-2" />
                   Send
                 </Button>
+              )}
+              {isOverdue && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                    onClick={handleSendReminder}
+                    disabled={sendingReminder || cooldownActive}
+                  >
+                    {sendingReminder ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Bell className="h-4 w-4 mr-2" />}
+                    Send Payment Reminder
+                  </Button>
+                  {cooldownActive && hoursAgo !== null && (
+                    <span className="text-xs text-muted-foreground">Reminder sent {hoursAgo}h ago</span>
+                  )}
+                </div>
               )}
               {invoice.status !== 'voided' && invoice.status !== 'paid' && (
                 <>
@@ -260,6 +307,32 @@ export default function InvoiceDetail() {
                 Issued on {formatDateTime(invoice.issued_at || invoice.created_at)} and cannot be altered.
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Overdue Banner */}
+      {isOverdue && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center justify-between gap-4 py-4">
+            <div className="flex items-center gap-4">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+              <div>
+                <p className="font-medium text-destructive">This invoice is overdue</p>
+                <p className="text-sm text-muted-foreground">
+                  Due date was {formatDate(invoice.due_date)}
+                  {cooldownActive && hoursAgo !== null && ` · Reminder sent ${hoursAgo}h ago`}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleSendReminder}
+              disabled={sendingReminder || cooldownActive}
+              className="shrink-0"
+            >
+              {sendingReminder ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Bell className="h-4 w-4 mr-2" />}
+              Send Reminder
+            </Button>
           </CardContent>
         </Card>
       )}

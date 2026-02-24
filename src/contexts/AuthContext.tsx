@@ -70,6 +70,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const profileData = await fetchProfile(session.user.id);
             setProfile(profileData);
           }, 0);
+
+          // Fire-and-forget login tracking — no await, no retry, no blocking
+          Promise.resolve(
+            supabase
+              .from('user_activity_state')
+              .upsert(
+                { user_id: session.user.id, last_login_at: new Date().toISOString() },
+                { onConflict: 'user_id' }
+              )
+          ).catch(() => {});
         } else {
           setProfile(null);
         }

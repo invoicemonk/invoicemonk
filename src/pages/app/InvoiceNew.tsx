@@ -276,6 +276,8 @@ export default function InvoiceNew() {
       payment_method_id: null,
       payment_method_snapshot: null,
       regulatory_status: 'not_required',
+      reminder_count: 0,
+      last_reminder_sent_at: null,
       clients: selectedClient || null,
       invoice_items: validItems.map((item, index) => ({
         id: `item-${index}`,
