@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     // Fetch invoice with client
     const { data: invoice, error: invoiceError } = await adminClient
       .from('invoices')
-      .select('id, invoice_number, status, due_date, total_amount, currency, business_id, reminder_count, last_reminder_sent_at, client_id, clients(name, email)')
+      .select('id, invoice_number, status, due_date, total_amount, currency, business_id, reminder_count, last_reminder_sent_at, client_id, verification_id, clients(name, email)')
       .eq('id', invoice_id)
       .single()
 
@@ -137,7 +137,9 @@ Deno.serve(async (req) => {
     const businessName = business?.name || 'InvoiceMonk'
 
     // Build email
-    const publicInvoiceUrl = `https://app.invoicemonk.com/invoice/${invoice.id}`
+    const publicInvoiceUrl = invoice.verification_id 
+      ? `https://app.invoicemonk.com/invoice/view/${invoice.verification_id}`
+      : `https://app.invoicemonk.com/verify/invoice/${invoice.id}`
     const formattedAmount = `${invoice.currency} ${Number(invoice.total_amount).toLocaleString()}`
     const formattedDueDate = new Date(invoice.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
