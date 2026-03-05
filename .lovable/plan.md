@@ -1,114 +1,65 @@
 
-# Fix: Client Details and Payment Instructions Missing from Invoice
 
-## Problem Summary
+# Block Disposable/Temporary Email Signups
 
-Three issues are affecting invoices sent to customers:
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-| Issue | What's Happening | Where |
-|-------|-----------------|-------|
-| Client details show as "Client" | Recipient snapshot uses wrong field names | PDF + Online View |
-| No client email/phone/address | Same root cause as above | PDF + Online View |
-| Payment instructions missing | Not returned by API and not rendered | Online View only |
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-## Root Cause
+### Layer 1: Client-Side Disposable Email Check
 
-### Bug 1: Mismatched Snapshot Keys (Client Details)
+**File: `src/lib/disposable-emails.ts`** (new)
 
-The `issue_invoice` database function stores the recipient snapshot with **prefixed** keys:
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-```
-client_name, client_email, client_phone, client_address, contact_person
-```
+**File: `src/pages/app/Signup.tsx`**
 
-But every consumer expects **unprefixed** keys:
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-```
-name, email, phone, address
-```
+### Layer 2: Server-Side Validation (Database Trigger)
 
-So when the PDF generator does `recipientSnapshot?.name`, it gets `undefined` because the actual key is `client_name`. The fallback shows "Client" instead of the real name.
+**Migration SQL:**
 
-### Bug 2: Payment Instructions Not Shown Online
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-The `view-invoice` edge function does not include `payment_method_snapshot` in its response, and the `InvoiceView.tsx` page has no UI for rendering payment instructions.
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
 
-The PDF does render payment instructions correctly (it reads directly from the invoice record), so this only affects the online view.
+Actually, the most practical and effective approach for Supabase:
 
-## Fix Plan
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
 
-### 1. Fix `issue_invoice` Database Function
+### Layer 2 (revised): Profile Insert Trigger
 
-Update the recipient snapshot to use unprefixed keys that match what consumers expect:
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
 
-```sql
-recipient_snapshot = jsonb_build_object(
-  'name', _client.name,            -- was 'client_name'
-  'email', _client.email,           -- was 'client_email'
-  'phone', _client.phone,           -- was 'client_phone'
-  'address', _client.address,       -- was 'client_address'
-  'contact_person', _client.contact_person,
-  'tax_id', _client.tax_id,
-  'cac_number', _client.cac_number
-)
-```
-
-This is a **database migration** that replaces the function.
-
-### 2. Add Payment Method Snapshot to `view-invoice` Edge Function
-
-Update `supabase/functions/view-invoice/index.ts`:
-- Add `payment_method_snapshot` to the invoice select query
-- Include it in the response object
-- Update the TypeScript interfaces
-
-### 3. Add Payment Instructions UI to `InvoiceView.tsx`
-
-Update `src/pages/public/InvoiceView.tsx`:
-- Add `payment_method_snapshot` to the response interface
-- Add a "Payment Instructions" card after the totals section
-- Style it consistently with the rest of the invoice view (green-tinted card)
-
-### 4. Re-issue Existing Invoice
-
-Since INV-0002 was already issued with the wrong keys, the snapshot is frozen. After the fix:
-- **New invoices** will have correct snapshots automatically
-- **Existing invoices** (like INV-0002) will need to be voided and re-issued, OR a one-time data migration can fix them
-
-A migration query to fix existing snapshots:
-
-```sql
-UPDATE invoices
-SET recipient_snapshot = jsonb_build_object(
-  'name', recipient_snapshot->>'client_name',
-  'email', recipient_snapshot->>'client_email',
-  'phone', recipient_snapshot->>'client_phone',
-  'address', recipient_snapshot->'client_address',
-  'contact_person', recipient_snapshot->>'contact_person',
-  'tax_id', recipient_snapshot->>'tax_id',
-  'cac_number', recipient_snapshot->>'cac_number'
-)
-WHERE recipient_snapshot->>'client_name' IS NOT NULL
-  AND recipient_snapshot->>'name' IS NULL;
-```
-
-Also invalidate any cached PDFs so they regenerate with correct data:
-
-```sql
--- The PDF cache in storage will need clearing for affected invoices
-```
-
-## Files Changed
+### Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| Database migration | Fix `issue_invoice` recipient snapshot keys + backfill existing data |
-| `supabase/functions/view-invoice/index.ts` | Add `payment_method_snapshot` to query and response |
-| `src/pages/public/InvoiceView.tsx` | Add payment instructions card, update interface |
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
 
-## After the Fix
+### Disposable Domain Categories to Block
 
-- **Bill To** section will show client name, email, phone, and address
-- **Payment Instructions** card will appear on the online invoice view when a payment method is set
-- **PDF** will also show correct client details (after cache is cleared)
-- Existing invoices are fixed by the backfill migration
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
+
+### User Experience
+
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
+
