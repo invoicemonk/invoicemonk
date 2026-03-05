@@ -676,6 +676,18 @@ export type Database = {
           },
         ]
       }
+      disposable_email_domains: {
+        Row: {
+          domain: string
+        }
+        Insert: {
+          domain: string
+        }
+        Update: {
+          domain?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number

@@ -12,10 +12,14 @@ import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Shield, FileCheck } from 'lucide-react';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { isDisposableEmail } from '@/lib/disposable-emails';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
-  email: z.string().email('Please enter a valid email address').max(255),
+  email: z.string().email('Please enter a valid email address').max(255)
+    .refine((email) => !isDisposableEmail(email), {
+      message: 'Please use a permanent email address. Temporary/disposable emails are not allowed.',
+    }),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
