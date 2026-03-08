@@ -640,7 +640,7 @@ Deno.serve(async (req) => {
       // ── MODERN ──
       bodyHtml = `
         <div class="container">
-          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: -12mm -15mm 16px; border-radius: 0;">
+          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: 0 0 16px; border-radius: 0;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 80px; object-fit: contain; background: rgba(255,255,255,0.9); border-radius: 4px; padding: 4px;" />` : ''}
@@ -691,7 +691,7 @@ Deno.serve(async (req) => {
         <div class="container">
           <div style="text-align: center; padding: 16px 0; border-top: 2px solid ${tplPrimaryColor}; border-bottom: 2px solid ${tplPrimaryColor}; margin-bottom: 16px;">
             ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 45px; max-width: 120px; object-fit: contain; margin: 0 auto 8px;" />` : ''}
-            <div style="font-size: 16px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">${issuerName}</div>
+            <div style="font-size: 16px; font-weight: 700; text-transform: uppercase;">${issuerName}</div>
             ${issuerTaxId ? `<div style="font-size: 9px; color: #666;">TIN: ${issuerTaxId}</div>` : ''}
             ${issuerVatRegNumber ? `<div style="font-size: 9px; color: #666;">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
             ${issuerAddress ? `<div style="font-size: 9px; color: #666;">${issuerAddress}</div>` : ''}
@@ -790,7 +790,6 @@ Deno.serve(async (req) => {
             <div style="display: flex; justify-content: space-between; font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px; font-size: 10px;"><span>Grand Total</span><span>${formatCurrency(inv.total_amount, inv.currency)}</span></div>
             <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #1a1a1a; padding-top: 6px; margin-top: 4px; border-top: 1px solid #e5e7eb;"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
           </div>
-          ${totalsHtml}
           ${notesTermsHtml}
           ${paymentMethodHtml}
           ${footerHtml}
