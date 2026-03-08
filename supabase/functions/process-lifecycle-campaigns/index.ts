@@ -46,19 +46,20 @@ async function sendBrevoEmail(
 // Email Templates
 // =============================================
 
-function emailWrapper(title: string, headerColor: string, bodyHtml: string): string {
+function emailWrapper(title: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-  <div style="background: ${headerColor}; color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 32px; margin-bottom: 12px;" />
     <h1 style="margin: 0; font-size: 22px;">${title}</h1>
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     ${bodyHtml}
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by Invoicemonk · <a href="https://app.invoicemonk.com" style="color: #999;">app.invoicemonk.com</a>
+      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
