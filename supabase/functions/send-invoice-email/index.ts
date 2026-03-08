@@ -195,7 +195,8 @@ const generateProfessionalHtml = (
   showWatermark: boolean,
   canUseBranding: boolean,
   issuerLogoUrlParam: string | null = null,
-  paymentMethodSnapshot: Record<string, unknown> | null = null
+  paymentMethodSnapshot: Record<string, unknown> | null = null,
+  templateSnapshot: TemplateSnapshot | null = null
 ): string => {
   const currency = invoice.currency as string
   const balanceDue = (invoice.total_amount as number) - ((invoice.amount_paid as number) || 0)
