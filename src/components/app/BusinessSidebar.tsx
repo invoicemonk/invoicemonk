@@ -80,9 +80,6 @@ export function BusinessSidebar() {
     { title: 'Accounting', url: `${baseUrl}/accounting`, icon: Calculator },
     { title: 'Expenses', url: `${baseUrl}/expenses`, icon: Receipt },
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },
-    { title: 'Analytics', url: `${baseUrl}/analytics`, icon: PieChart },
-    { title: 'Notifications', url: `${baseUrl}/notifications`, icon: Bell, showBadge: true },
-    { title: 'Audit Logs', url: `${baseUrl}/audit-logs`, icon: History },
   ];
 
   // Only show Team link if tier allows team access AND user can manage team
