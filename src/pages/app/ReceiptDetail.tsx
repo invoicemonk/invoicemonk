@@ -388,6 +388,13 @@ export default function ReceiptDetail() {
         </div>
       </div>
     </motion.div>
+
+    {/* Send Receipt Dialog */}
+    <SendReceiptDialog
+      open={sendDialogOpen}
+      onOpenChange={setSendDialogOpen}
+      receipt={receipt}
+    />
     </BusinessAccessGuard>
   );
 }
