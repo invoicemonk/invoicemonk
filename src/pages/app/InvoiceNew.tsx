@@ -1190,9 +1190,11 @@ export default function InvoiceNew() {
         templateConfig={(() => {
           const selected = templates?.find(t => t.id === selectedTemplateId);
           if (!selected) return null;
+          const styles = (selected.styles as Record<string, unknown>) || {};
+          const effectiveBrandColor = brandColorOverride || (currentBusiness as any)?.brand_color || styles.primary_color;
           return {
             layout: selected.layout as Record<string, unknown>,
-            styles: selected.styles as Record<string, unknown>,
+            styles: { ...styles, primary_color: effectiveBrandColor },
           };
         })()}
       />
