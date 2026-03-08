@@ -607,17 +607,17 @@ function buildModernPdf(ctx: PdfBuildContext): unknown[] {
         stack: [
           {
             columns: [
+              ...(ctx.showLogo && ctx.logoDataUri ? [{ image: ctx.logoDataUri, width: 50, fit: [50, 35], margin: [0, 0, 10, 0] }] : []),
               { stack: [
-                ...(ctx.showLogo && ctx.logoDataUri ? [{ image: ctx.logoDataUri, width: 80, fit: [80, 35], margin: [0, 0, 8, 4] }] : []),
                 { text: 'INVOICE', fontSize: 20, bold: true, color: '#ffffff' },
-                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffffcc', margin: [0, 1, 0, 0] }
+                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffff', margin: [0, 1, 0, 0] }
               ], width: '*' },
               { stack: [
-                { text: `Issue: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
-                { text: `Due: ${formatDate(ctx.invoice.due_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
+                { text: `Issue: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#ffffff', alignment: 'right' },
+                { text: `Due: ${formatDate(ctx.invoice.due_date as string)}`, fontSize: 9, color: '#ffffff', alignment: 'right' },
                 {
-                  table: { widths: ['auto'], body: [[{ text: ctx.status.toUpperCase(), fontSize: 7, bold: true, color: '#ffffff', margin: [6, 2, 6, 2] }]] },
-                  layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0, fillColor: () => 'rgba(255,255,255,0.2)' },
+                  table: { widths: ['auto'], body: [[{ text: ctx.status.toUpperCase(), fontSize: 7, bold: true, color: brandColor, margin: [6, 2, 6, 2] }]] },
+                  layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0, fillColor: () => '#ffffff' },
                   alignment: 'right', margin: [0, 4, 0, 0]
                 }
               ], width: 'auto' }
