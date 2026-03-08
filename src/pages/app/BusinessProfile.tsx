@@ -91,6 +91,7 @@ export default function BusinessProfile() {
     vatRegistrationNumber: '',
     businessType: '',
     allowedCurrencies: [] as string[],
+    brandColor: '',
   });
 
   // Check for duplicate business name
