@@ -58,7 +58,7 @@ export function BusinessSidebar() {
   const { currentBusiness, tier, isFree, canManageTeam, isPlatformAdmin } = useBusiness();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
-  const { data: unreadCount = 0 } = useUnreadCount();
+  
   const { isPartner } = usePartnerRole();
   
   // Check if tier allows team access - platform admins always have access
