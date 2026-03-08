@@ -587,7 +587,8 @@ async function generateInvoicePdfBase64(
   recipientSnapshot: RecipientSnapshot | null,
   verificationUrl: string | null,
   showWatermark: boolean,
-  paymentMethodSnapshot: Record<string, unknown> | null
+  paymentMethodSnapshot: Record<string, unknown> | null,
+  templateSnapshot: TemplateSnapshot | null = null
 ): Promise<string> {
   // Dynamic imports for pdfmake using esm.sh with ?bundle=false to avoid bundle timeout
   // deno-lint-ignore no-explicit-any
