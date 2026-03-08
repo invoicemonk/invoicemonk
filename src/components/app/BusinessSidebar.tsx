@@ -154,16 +154,9 @@ export function BusinessSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center justify-between w-full">
-                      <span className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                      </span>
-                      {item.showBadge && unreadCount > 0 && !isCollapsed && (
-                        <Badge variant="default" className="h-5 px-1.5 text-xs">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </Badge>
-                      )}
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
