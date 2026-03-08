@@ -790,7 +790,6 @@ Deno.serve(async (req) => {
             <div style="display: flex; justify-content: space-between; font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px; font-size: 10px;"><span>Grand Total</span><span>${formatCurrency(inv.total_amount, inv.currency)}</span></div>
             <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #1a1a1a; padding-top: 6px; margin-top: 4px; border-top: 1px solid #e5e7eb;"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
           </div>
-          ${totalsHtml}
           ${notesTermsHtml}
           ${paymentMethodHtml}
           ${footerHtml}
