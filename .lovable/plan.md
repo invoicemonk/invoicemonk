@@ -1,65 +1,49 @@
 
 
-# Block Disposable/Temporary Email Signups
+# Implement Visual Differentiation for Invoice Templates
 
 ## Problem
-Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
+The 4 invoice templates (Basic, Professional, Modern, Enterprise) each have distinct `layout` and `styles` configurations stored in the database, but both the preview card (`InvoicePreviewCard.tsx`) and the PDF generator (`generate-pdf/index.ts`) use a single hardcoded HTML layout. The template data is saved on the invoice but never actually applied to rendering.
 
-## Approach
-Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
+## Current Template Differences (from DB)
 
-### Layer 1: Client-Side Disposable Email Check
+```text
+Template     | header_style | primary_color | show_logo | show_terms | show_qr | show_bank_details
+-------------|-------------|---------------|-----------|------------|---------|------------------
+Basic        | minimal     | #6B7280       | false     | false      | false   | -
+Professional | standard    | #1F2937       | true      | true       | true    | -
+Modern       | modern      | #4F46E5       | true      | true       | true    | -
+Enterprise   | enterprise  | #111827       | true      | true       | true    | true
+```
 
-**File: `src/lib/disposable-emails.ts`** (new)
+## Solution
 
-Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
+### 1. Update `InvoicePreviewCard.tsx`
+- Accept optional `templateSnapshot` prop (layout + styles from the selected template)
+- Apply template-driven conditional rendering:
+  - **show_logo**: Show/hide business logo
+  - **show_terms**: Show/hide terms section
+  - **show_verification_qr**: Show/hide QR code
+  - **primary_color**: Apply to header border, section labels, and accents
+  - **header_style**: Visual variations (minimal = compact no-border, standard = current, modern = indigo accent with larger typography, enterprise = double-border formal style)
 
-**File: `src/pages/app/Signup.tsx`**
+### 2. Update `InvoiceNew.tsx` and `InvoiceEdit.tsx`
+- When a template is selected, pass the template's layout/styles to the preview card
+- Build `template_snapshot` into the preview invoice object so the preview reflects the selected template
 
-Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
+### 3. Update `generate-pdf/index.ts` (Edge Function)
+- Read `template_snapshot` from the invoice (already fetched but ignored)
+- Apply layout flags: conditionally render logo, terms, QR code, bank details sections
+- Apply styles: use `primary_color` for header border, status badge, section labels
+- Apply `header_style` variations:
+  - **minimal**: No border, smaller header, gray tones
+  - **standard**: Current layout (no change needed)
+  - **modern**: Indigo/purple accent color, slightly larger fonts, rounded elements
+  - **enterprise**: Formal double-border header, structured sections with clear separators
 
-### Layer 2: Server-Side Validation (Database Trigger)
-
-**Migration SQL:**
-
-Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
-
-**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
-
-Actually, the most practical and effective approach for Supabase:
-
-1. **Client-side blocklist** (primary defense -- covers 95% of cases)
-2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
-
-### Layer 2 (revised): Profile Insert Trigger
-
-**Migration:**
-- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
-- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
-- This catches any bypass of the frontend check
-
-### Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
-| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
-| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
-| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
-
-### Disposable Domain Categories to Block
-
-The blocklist will include domains from these categories:
-- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
-- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
-- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
-- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
-- Total: ~250 domains covering the vast majority of disposable services
-
-### User Experience
-
-When a user enters a disposable email:
-- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
-- The submit button remains disabled
-- If somehow bypassed, the profile trigger suspends the account immediately
+### Files to modify
+- `src/components/invoices/InvoicePreviewCard.tsx` — template-aware rendering
+- `src/pages/app/InvoiceNew.tsx` — pass template data to preview
+- `src/pages/app/InvoiceEdit.tsx` — pass template data to preview
+- `supabase/functions/generate-pdf/index.ts` — template-aware PDF HTML generation
 
