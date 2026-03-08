@@ -46,19 +46,20 @@ async function sendBrevoEmail(
 // Email Templates
 // =============================================
 
-function emailWrapper(title: string, headerColor: string, bodyHtml: string): string {
+function emailWrapper(title: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-  <div style="background: ${headerColor}; color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 32px; margin-bottom: 12px;" />
     <h1 style="margin: 0; font-size: 22px;">${title}</h1>
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     ${bodyHtml}
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by Invoicemonk · <a href="https://app.invoicemonk.com" style="color: #999;">app.invoicemonk.com</a>
+      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -68,15 +69,14 @@ function emailWrapper(title: string, headerColor: string, bodyHtml: string): str
 function campaignATemplate(userName: string): string {
   return emailWrapper(
     'Complete Your Setup',
-    'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
     `<p>Hi ${userName},</p>
-    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of Invoicemonk:</p>
+    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of InvoiceMonk:</p>
     <ul style="color: #555;">
       <li>Issue professional invoices with compliance features</li>
       <li>Get notified when clients view your invoices</li>
       <li>Access your data across devices</li>
     </ul>
-    <p>Check your inbox for the verification email, or <a href="https://app.invoicemonk.com/settings" style="color: #d97706; font-weight: bold;">resend it from your settings</a>.</p>
+    <p>Check your inbox for the verification email, or <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a; font-weight: bold;">resend it from your settings</a>.</p>
     <p style="color: #888; font-size: 13px;">If you've already verified, you can ignore this email.</p>`
   )
 }
@@ -84,16 +84,15 @@ function campaignATemplate(userName: string): string {
 function campaignBTemplate(userName: string): string {
   return emailWrapper(
     'Ready to Send Your First Invoice?',
-    'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
     `<p>Hi ${userName},</p>
-    <p>Your Invoicemonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
+    <p>Your InvoiceMonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
     <ol style="color: #555;">
       <li><strong>Add a client</strong> — name and email is all you need</li>
       <li><strong>Create an invoice</strong> — add line items, set a due date</li>
       <li><strong>Issue &amp; send</strong> — your client gets a professional, verifiable invoice</li>
     </ol>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices/new" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
+      <a href="https://app.invoicemonk.com/invoices/new" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Every invoice includes a unique verification ID and tamper-proof hash — compliance built in.</p>`
   )
@@ -102,7 +101,6 @@ function campaignBTemplate(userName: string): string {
 function campaignCTemplate(userName: string, overdueCount: number): string {
   return emailWrapper(
     'You Have Overdue Invoices',
-    'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
     `<p>Hi ${userName},</p>
     <p>You currently have <strong>${overdueCount} overdue invoice${overdueCount > 1 ? 's' : ''}</strong> that ${overdueCount > 1 ? 'haven\'t' : 'hasn\'t'} been paid yet.</p>
     <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
@@ -111,7 +109,7 @@ function campaignCTemplate(userName: string, overdueCount: number): string {
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #ef4444; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Overdue Invoices →</a>
+      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Overdue Invoices →</a>
     </div>
     <p style="color: #888; font-size: 13px;">You can also enable automatic reminders in your notification settings.</p>`
   )
@@ -120,16 +118,15 @@ function campaignCTemplate(userName: string, overdueCount: number): string {
 function campaignDTemplate(userName: string): string {
   return emailWrapper(
     'We Miss You!',
-    'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
     `<p>Hi ${userName},</p>
-    <p>It's been a while since you logged into Invoicemonk. Your dashboard is ready and waiting — here's what you can do today:</p>
+    <p>It's been a while since you logged into InvoiceMonk. Your dashboard is ready and waiting — here's what you can do today:</p>
     <ul style="color: #555;">
       <li>Check on outstanding invoices and payments</li>
       <li>Send reminders to clients with overdue balances</li>
       <li>Create and issue a new invoice in under 2 minutes</li>
     </ul>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Your data is always secure and waiting for you.</p>`
   )
@@ -138,16 +135,15 @@ function campaignDTemplate(userName: string): string {
 function campaignETemplate(userName: string, invoiceNumber: string): string {
   return emailWrapper(
     'Your Draft Invoice is Waiting',
-    'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
     `<p>Hi ${userName},</p>
     <p>You started invoice <strong>${invoiceNumber}</strong> but haven't issued it yet. Completing and sending it only takes a moment.</p>
-    <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
-      <p style="margin: 0; color: #1e40af; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         📝 <strong>Quick tip:</strong> Review line items, set a due date, and hit "Issue" — your client will receive a professional, verifiable invoice.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Complete Your Invoice →</a>
+      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Complete Your Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Drafts are saved automatically — pick up right where you left off.</p>`
   )
@@ -168,22 +164,21 @@ function campaignFTemplate(
 
   return emailWrapper(
     'Your Weekly Revenue Summary',
-    'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     `<p>Hi ${userName},</p>
     <p>Here's your invoicing activity for the past 7 days:</p>
     <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
       <div style="display: inline-block; margin: 0 20px; text-align: center;">
-        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #059669;">${invoiceCount}</p>
+        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #1d6b5a;">${invoiceCount}</p>
         <p style="margin: 4px 0 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Invoices Issued</p>
       </div>
       <div style="display: inline-block; margin: 0 20px; text-align: center;">
-        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #059669;">${currency} ${totalAmount}</p>
+        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #1d6b5a;">${currency} ${totalAmount}</p>
         <p style="margin: 4px 0 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Total Revenue</p>
       </div>
     </div>
     ${overdueSection}
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Full Dashboard →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Full Dashboard →</a>
     </div>
     <p style="color: #888; font-size: 13px;">This summary is sent weekly. Keep up the great work!</p>`
   )
@@ -196,7 +191,6 @@ function campaignFTemplate(
 function campaignGTemplate(userName: string): string {
   return emailWrapper(
     'Set Up Your Business Profile',
-    'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
     `<p>Hi ${userName},</p>
     <p>Your email is verified — great start! Now set up your business profile to unlock invoicing:</p>
     <ul style="color: #555;">
@@ -204,13 +198,13 @@ function campaignGTemplate(userName: string): string {
       <li><strong>Choose your currency</strong> — we support multiple currencies</li>
       <li><strong>Start invoicing</strong> — create professional, compliant invoices</li>
     </ul>
-    <div style="background: #f5f3ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7c3aed;">
-      <p style="margin: 0; color: #5b21b6; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         🏢 <strong>It takes less than 2 minutes</strong> to set up your business profile and start sending invoices.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up Business Profile →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up Business Profile →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Your compliance-ready invoicing workspace is waiting.</p>`
   )
@@ -219,7 +213,6 @@ function campaignGTemplate(userName: string): string {
 function campaignHTemplate(userName: string): string {
   return emailWrapper(
     'Your Business is Ready — Create Your First Invoice',
-    'linear-gradient(135deg, #14b8a6 0%, #059669 100%)',
     `<p>Hi ${userName},</p>
     <p>Your business profile is set up and ready to go! Here's how to create your first invoice:</p>
     <ol style="color: #555;">
@@ -227,13 +220,13 @@ function campaignHTemplate(userName: string): string {
       <li><strong>Create an invoice</strong> — add line items, choose a template</li>
       <li><strong>Issue &amp; send</strong> — your client receives a professional, verifiable invoice</li>
     </ol>
-    <div style="background: #f0fdfa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #14b8a6;">
-      <p style="margin: 0; color: #0f766e; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         ✅ <strong>Every invoice</strong> includes a unique verification ID and tamper-proof hash — compliance is built in from day one.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #14b8a6, #059669); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Get paid faster with professional invoices.</p>`
   )
@@ -242,7 +235,6 @@ function campaignHTemplate(userName: string): string {
 function campaignITemplate(userName: string, invoiceCount: number): string {
   return emailWrapper(
     'Unlock Compliance Permanently',
-    'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
     `<p>Hi ${userName},</p>
     <p>You've issued <strong>${invoiceCount} invoices</strong> — nice work! You're clearly serious about your business. Here's what upgrading to <strong>Professional</strong> unlocks:</p>
     <ul style="color: #555;">
@@ -258,7 +250,7 @@ function campaignITemplate(userName: string, invoiceCount: number): string {
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/billing" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Upgrade to Professional →</a>
+      <a href="https://app.invoicemonk.com/billing" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Upgrade to Professional →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Compliance-grade invoicing for growing businesses.</p>`
   )
