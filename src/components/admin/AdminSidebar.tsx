@@ -163,6 +163,25 @@ export function AdminSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
+            Support
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Support Chat"
+                  onClick={openSupportChat}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Support Chat</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
             System
           </SidebarGroupLabel>
           <SidebarGroupContent>

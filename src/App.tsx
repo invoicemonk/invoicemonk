@@ -258,7 +258,7 @@ const App = () => (
             <Route path="/admin/country-modules" element={<AdminCountryModules />} />
             <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
             <Route path="/admin/templates" element={<AdminTemplates />} />
-            <Route path="/admin/support" element={<AdminSupport />} />
+            
             <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/regulatory-submissions" element={<AdminRegulatorySubmissions />} />

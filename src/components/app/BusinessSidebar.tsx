@@ -224,6 +224,15 @@ export function BusinessSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Contact Support"
+                  onClick={openSupportChat}
+                >
+                  <MessageCircle className="h-4 w-4 shrink-0" />
+                  <span className="group-data-[collapsible=icon]:hidden">Contact Support</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
