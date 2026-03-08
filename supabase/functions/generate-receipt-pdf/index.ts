@@ -118,8 +118,8 @@ async function generateReceiptPdfBase64(
     const pmRows = Object.entries(pmInstructions)
       .filter(([, v]) => v)
       .map(([k, v]) => [
-        { text: String(k).replace(/_/g, ' '), color: '#6b7280', textTransform: 'capitalize' },
-        { text: String(v), bold: true, font: 'Courier' }
+        { text: formatLabel(String(k)), color: '#6b7280' },
+        { text: String(v), bold: true }
       ])
     
     if (pmRows.length > 0) {
