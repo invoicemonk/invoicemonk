@@ -191,7 +191,6 @@ function campaignFTemplate(
 function campaignGTemplate(userName: string): string {
   return emailWrapper(
     'Set Up Your Business Profile',
-    'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
     `<p>Hi ${userName},</p>
     <p>Your email is verified — great start! Now set up your business profile to unlock invoicing:</p>
     <ul style="color: #555;">
@@ -199,13 +198,13 @@ function campaignGTemplate(userName: string): string {
       <li><strong>Choose your currency</strong> — we support multiple currencies</li>
       <li><strong>Start invoicing</strong> — create professional, compliant invoices</li>
     </ul>
-    <div style="background: #f5f3ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7c3aed;">
-      <p style="margin: 0; color: #5b21b6; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         🏢 <strong>It takes less than 2 minutes</strong> to set up your business profile and start sending invoices.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up Business Profile →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up Business Profile →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Your compliance-ready invoicing workspace is waiting.</p>`
   )
