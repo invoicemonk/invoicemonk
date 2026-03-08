@@ -311,24 +311,43 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // Step 1: Refresh overdue counts via CTE-style update
+    // Step 1: Refresh overdue counts via business_members join
     // =============================================
     console.log('Step 1: Refreshing overdue counts...')
 
     const { data: overdueData, error: overdueError } = await adminClient
       .from('invoices')
-      .select('user_id')
+      .select('business_id')
       .in('status', ['issued', 'sent', 'viewed'])
       .lt('due_date', now.toISOString().split('T')[0])
-      .not('user_id', 'is', null)
+      .not('business_id', 'is', null)
 
     if (overdueError) {
       console.error('Error fetching overdue invoices:', overdueError)
     } else if (overdueData) {
-      const overdueCounts: Record<string, number> = {}
+      // Group overdue counts by business_id
+      const overdueByBusiness: Record<string, number> = {}
       for (const row of overdueData) {
-        if (row.user_id) {
-          overdueCounts[row.user_id] = (overdueCounts[row.user_id] || 0) + 1
+        if (row.business_id) {
+          overdueByBusiness[row.business_id] = (overdueByBusiness[row.business_id] || 0) + 1
+        }
+      }
+
+      // Resolve business owners
+      const businessIds = Object.keys(overdueByBusiness)
+      const overdueCounts: Record<string, number> = {}
+      if (businessIds.length > 0) {
+        const { data: owners } = await adminClient
+          .from('business_members')
+          .select('user_id, business_id')
+          .in('business_id', businessIds)
+          .eq('role', 'owner')
+
+        if (owners) {
+          for (const owner of owners) {
+            const count = overdueByBusiness[owner.business_id] || 0
+            overdueCounts[owner.user_id] = (overdueCounts[owner.user_id] || 0) + count
+          }
         }
       }
 
@@ -660,13 +679,36 @@ Deno.serve(async (req) => {
         const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
         const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()
 
-        const { data: draftInvoices } = await adminClient
+        // Query draft invoices via business_id, then resolve owners
+        const { data: rawDraftInvoices } = await adminClient
           .from('invoices')
-          .select('id, user_id, invoice_number')
+          .select('id, business_id, invoice_number')
           .eq('status', 'draft')
           .lt('created_at', fortyEightHoursAgo)
-          .not('user_id', 'is', null)
+          .not('business_id', 'is', null)
           .limit(50)
+
+        // Resolve business owners for draft invoices
+        const draftInvoices: Array<{ id: string; user_id: string; invoice_number: string }> = []
+        if (rawDraftInvoices && rawDraftInvoices.length > 0) {
+          const draftBusinessIds = [...new Set(rawDraftInvoices.map(d => d.business_id).filter(Boolean))]
+          const { data: draftOwners } = await adminClient
+            .from('business_members')
+            .select('user_id, business_id')
+            .in('business_id', draftBusinessIds)
+            .eq('role', 'owner')
+
+          const ownerMap: Record<string, string> = {}
+          if (draftOwners) {
+            for (const o of draftOwners) ownerMap[o.business_id] = o.user_id
+          }
+          for (const draft of rawDraftInvoices) {
+            const ownerId = draft.business_id ? ownerMap[draft.business_id] : null
+            if (ownerId) {
+              draftInvoices.push({ id: draft.id, user_id: ownerId, invoice_number: draft.invoice_number })
+            }
+          }
+        }
 
         if (draftInvoices && draftInvoices.length > 0) {
           summary.campaign_e.targeted = draftInvoices.length
@@ -749,22 +791,37 @@ Deno.serve(async (req) => {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
         const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString()
 
+        // Query recent invoices via business_id, then resolve owners
         const { data: recentInvoices } = await adminClient
           .from('invoices')
-          .select('user_id, total_amount, currency')
+          .select('business_id, total_amount, currency')
           .in('status', ['issued', 'sent', 'viewed', 'paid', 'partially_paid'])
           .gte('issued_at', sevenDaysAgo)
-          .not('user_id', 'is', null)
+          .not('business_id', 'is', null)
 
         if (recentInvoices && recentInvoices.length > 0) {
+          // Resolve business owners
+          const recentBusinessIds = [...new Set(recentInvoices.map(i => i.business_id).filter(Boolean))]
+          const { data: recentOwners } = await adminClient
+            .from('business_members')
+            .select('user_id, business_id')
+            .in('business_id', recentBusinessIds)
+            .eq('role', 'owner')
+
+          const recentOwnerMap: Record<string, string> = {}
+          if (recentOwners) {
+            for (const o of recentOwners) recentOwnerMap[o.business_id] = o.user_id
+          }
+
           const userSummaries: Record<string, { count: number; total: number; currency: string }> = {}
           for (const inv of recentInvoices) {
-            if (!inv.user_id) continue
-            if (!userSummaries[inv.user_id]) {
-              userSummaries[inv.user_id] = { count: 0, total: 0, currency: inv.currency || 'NGN' }
+            const userId = inv.business_id ? recentOwnerMap[inv.business_id] : null
+            if (!userId) continue
+            if (!userSummaries[userId]) {
+              userSummaries[userId] = { count: 0, total: 0, currency: inv.currency || 'NGN' }
             }
-            userSummaries[inv.user_id].count++
-            userSummaries[inv.user_id].total += Number(inv.total_amount) || 0
+            userSummaries[userId].count++
+            userSummaries[userId].total += Number(inv.total_amount) || 0
           }
 
           const userIds = Object.keys(userSummaries).slice(0, 50)
@@ -795,14 +852,14 @@ Deno.serve(async (req) => {
                 continue
               }
 
-              const { data: overdueInvoices } = await adminClient
-                .from('invoices')
-                .select('id')
+              // Get overdue count from user_activity_state (already computed in Step 1)
+              const { data: overdueState } = await adminClient
+                .from('user_activity_state')
+                .select('overdue_count')
                 .eq('user_id', userId)
-                .in('status', ['issued', 'sent', 'viewed'])
-                .lt('due_date', now.toISOString().split('T')[0])
+                .single()
 
-              const overdueCount = overdueInvoices?.length || 0
+              const overdueCount = overdueState?.overdue_count || 0
               const userSum = userSummaries[userId]
               const formattedAmount = userSum.total.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
