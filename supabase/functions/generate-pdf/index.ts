@@ -842,7 +842,7 @@ Deno.serve(async (req) => {
     <!-- Footer with QR Code -->
     <div class="footer">
       <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
-        ${verificationUrl && qrCodeHtml ? `
+        ${showQr && verificationUrl && qrCodeHtml ? `
         <div style="display: flex; align-items: center; gap: 6px;">
           ${qrCodeHtml}
           <span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span>
