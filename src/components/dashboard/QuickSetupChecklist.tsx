@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Rocket, CheckCircle2, Circle, X, FileText, ExternalLink } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Rocket, CheckCircle2, Circle, X, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useQuickSetup } from '@/hooks/use-quick-setup';
@@ -30,11 +30,13 @@ export function QuickSetupChecklist() {
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-green-500/10 mx-auto"
             >
-              <CheckCircle2 className="h-7 w-7 text-green-600" />
+              <ShieldCheck className="h-7 w-7 text-green-600" />
             </motion.div>
             <div>
-              <p className="text-lg font-semibold">You just created a compliant invoice.</p>
-              <p className="text-sm text-muted-foreground mt-1">Your compliance infrastructure is ready.</p>
+              <p className="text-lg font-semibold">Your compliance infrastructure is live.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Every invoice is now tamper-evident with SHA-256 hashing, a unique verification ID, and a public verification page with QR code.
+              </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
               {firstIssuedInvoice.verification_id && (
@@ -63,12 +65,17 @@ export function QuickSetupChecklist() {
 
   return (
     <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Rocket className="h-5 w-5 text-primary" />
-          Get Ready to Issue Your First Invoice
-        </CardTitle>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={dismiss}>
+      <CardHeader className="pb-3 flex flex-row items-start justify-between">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Rocket className="h-5 w-5 text-primary" />
+            Get Ready to Issue Your First Invoice
+          </CardTitle>
+          <CardDescription>
+            Each step ensures your invoices meet legal requirements
+          </CardDescription>
+        </div>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={dismiss}>
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -124,12 +131,16 @@ export function QuickSetupChecklist() {
                 {item.complete ? (
                   <p className="text-sm text-muted-foreground line-through">{item.label}</p>
                 ) : (
-                  <Link to={item.href} className="text-sm font-medium hover:underline">
-                    {item.label}
-                  </Link>
-                )}
-                {!item.complete && (
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                  <>
+                    <Link to={item.href} className="text-sm font-medium hover:underline">
+                      {item.label}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                    <p className="text-xs text-muted-foreground/70 flex items-center gap-1 mt-0.5">
+                      <ShieldCheck className="h-3 w-3 shrink-0" />
+                      {item.complianceTip}
+                    </p>
+                  </>
                 )}
               </div>
             </div>
