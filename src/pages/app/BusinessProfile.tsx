@@ -46,6 +46,7 @@ import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
 import { useCheckDuplicateBusinessName } from '@/hooks/use-check-duplicate-business';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
