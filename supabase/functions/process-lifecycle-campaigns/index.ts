@@ -852,12 +852,12 @@ Deno.serve(async (req) => {
                 continue
               }
 
-              const { data: overdueInvoices } = await adminClient
-                .from('invoices')
-                .select('id')
+              // Get overdue count from user_activity_state (already computed in Step 1)
+              const { data: overdueState } = await adminClient
+                .from('user_activity_state')
+                .select('overdue_count')
                 .eq('user_id', userId)
-                .in('status', ['issued', 'sent', 'viewed'])
-                .lt('due_date', now.toISOString().split('T')[0])
+                .single()
 
               const overdueCount = overdueInvoices?.length || 0
               const userSum = userSummaries[userId]
