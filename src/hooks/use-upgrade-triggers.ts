@@ -57,6 +57,6 @@ export function useUpgradeTriggers() {
     showUpgradeModal,
     trigger: showUpgradeModal ? 'second_invoice' : null,
     dismiss,
-    isLoading: subLoading || invoicesLoading,
+    isLoading: subLoading || invoicesLoading || adminLoading,
   };
 }
