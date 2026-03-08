@@ -152,32 +152,6 @@ export function BusinessSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {teamNavItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
-              Team
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {teamNavItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.url)}
-                      tooltip={item.title}
-                    >
-                      <Link to={item.url}>
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
         <SidebarGroup>
           <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
             Settings
