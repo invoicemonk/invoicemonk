@@ -34,13 +34,25 @@ interface GenerateReceiptPdfResponse {
   error?: string
 }
 
+// Currency symbol map
+const currencySymbols: Record<string, string> = {
+  NGN: '\u20A6', USD: '$', EUR: '\u20AC', GBP: '\u00A3', KES: 'KSh', GHS: 'GH\u20B5',
+  ZAR: 'R', CAD: 'CA$', AUD: 'A$', JPY: '\u00A5', INR: '\u20B9', AED: 'AED',
+}
+
 // Format currency amount
 function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: currency || 'NGN',
-    minimumFractionDigits: 2
+  const symbol = currencySymbols[currency] || currency + ' '
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
+  return `${symbol}${formatted}`
+}
+
+// Format label keys
+function formatLabel(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 // Format date
@@ -106,8 +118,8 @@ async function generateReceiptPdfBase64(
     const pmRows = Object.entries(pmInstructions)
       .filter(([, v]) => v)
       .map(([k, v]) => [
-        { text: String(k).replace(/_/g, ' '), color: '#6b7280', textTransform: 'capitalize' },
-        { text: String(v), bold: true, font: 'Courier' }
+        { text: formatLabel(String(k)), color: '#6b7280' },
+        { text: String(v), bold: true }
       ])
     
     if (pmRows.length > 0) {
@@ -241,7 +253,7 @@ async function generateReceiptPdfBase64(
           {
             table: {
               widths: ['*'],
-              body: [[{ text: `SHA-256: ${receipt.receipt_hash}`, fontSize: 9, font: 'Courier', color: '#6b7280' }]]
+              body: [[{ text: `SHA-256: ${receipt.receipt_hash}`, fontSize: 9, color: '#6b7280' }]]
             },
             layout: {
               hLineWidth: () => 0.5,
