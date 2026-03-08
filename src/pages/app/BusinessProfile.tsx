@@ -80,7 +80,11 @@ export default function BusinessProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'audit-logs'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'billing' | 'audit-logs'>('profile');
+  
+  const { data: teamAccess } = useTeamAccess();
+  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
+  const showTeamTab = canManageTeam && hasTeamAccess;
 
   const [formData, setFormData] = useState({
     name: '',
