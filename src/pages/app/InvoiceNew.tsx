@@ -1153,6 +1153,14 @@ export default function InvoiceNew() {
           contact_phone: currentBusiness.contact_phone,
           logo_url: currentBusiness.logo_url,
         } : null}
+        templateConfig={(() => {
+          const selected = templates?.find(t => t.id === selectedTemplateId);
+          if (!selected) return null;
+          return {
+            layout: selected.layout as Record<string, unknown>,
+            styles: selected.styles as Record<string, unknown>,
+          };
+        })()}
       />
     </motion.div>
   );

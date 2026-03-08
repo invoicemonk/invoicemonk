@@ -97,6 +97,19 @@ interface TemplateSnapshot {
   watermark_required?: boolean
   supports_branding?: boolean
   tier_required?: string
+  layout?: {
+    header_style?: string
+    show_logo?: boolean
+    show_terms?: boolean
+    show_notes?: boolean
+    show_verification_qr?: boolean
+    show_bank_details?: boolean
+  }
+  styles?: {
+    primary_color?: string
+    font_family?: string
+    font_size?: string
+  }
 }
 
 Deno.serve(async (req) => {
@@ -314,6 +327,16 @@ Deno.serve(async (req) => {
     const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG'
     const isNigerianVatRegistered = isNigerianInvoice && issuerSnapshot?.is_vat_registered === true
 
+    // Template layout and styles
+    const tplLayout = templateSnapshot?.layout || {}
+    const tplStyles = templateSnapshot?.styles || {}
+    const tplPrimaryColor = tplStyles.primary_color || '#1a1a1a'
+    const tplHeaderStyle = tplLayout.header_style || 'standard'
+    const showLogo = tplLayout.show_logo !== false
+    const showTerms = tplLayout.show_terms !== false
+    const showNotes = tplLayout.show_notes !== false
+    const showQr = tplLayout.show_verification_qr !== false
+
     // Determine if watermark should be applied
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
@@ -484,16 +507,17 @@ Deno.serve(async (req) => {
     }
     .container { max-width: 100%; padding: 0; }
     
-    /* Header - Compact two-column */
+    /* Header - Template-driven */
     .header { 
       display: flex; 
       justify-content: space-between; 
       align-items: flex-start;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #1a1a1a;
+      padding-bottom: ${tplHeaderStyle === 'minimal' ? '8px' : '12px'};
+      border-bottom: ${tplHeaderStyle === 'minimal' ? '1px solid #e5e7eb' : tplHeaderStyle === 'modern' ? `3px solid ${tplPrimaryColor}` : tplHeaderStyle === 'enterprise' ? `2px double ${tplPrimaryColor}` : `2px solid ${tplPrimaryColor}`};
+      ${tplHeaderStyle === 'enterprise' ? `border-top: 2px double ${tplPrimaryColor}; padding-top: 12px;` : ''}
       margin-bottom: 16px;
     }
-    .brand { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    .brand { font-size: ${tplHeaderStyle === 'minimal' ? '15px' : tplHeaderStyle === 'modern' ? '20px' : '18px'}; font-weight: 700; color: ${tplPrimaryColor}; }
     .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
     .brand-tin { font-size: 9px; color: #444; margin-top: 2px; font-weight: 500; }
     .invoice-meta { text-align: right; }
@@ -519,7 +543,7 @@ Deno.serve(async (req) => {
     .party-label { 
       font-size: 9px; 
       font-weight: 600; 
-      color: #666; 
+      color: ${tplPrimaryColor === '#1a1a1a' ? '#666' : tplPrimaryColor}; 
       text-transform: uppercase; 
       letter-spacing: 0.5px;
       margin-bottom: 4px;
@@ -658,7 +682,7 @@ Deno.serve(async (req) => {
     <!-- Header -->
     <div class="header">
       <div style="display: flex; align-items: center; gap: 12px;">
-        ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
+        ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
         <div>
           <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
@@ -774,15 +798,15 @@ Deno.serve(async (req) => {
       </div>
     </div>
 
-    ${inv.notes || inv.terms ? `
+    ${((showNotes && inv.notes) || (showTerms && inv.terms)) ? `
     <!-- Notes/Terms -->
     <div class="notes-section no-break">
-      ${inv.notes ? `
+      ${showNotes && inv.notes ? `
       <div class="notes-label">Notes</div>
       <div class="notes-content">${inv.notes}</div>
       ` : ''}
-      ${inv.notes && inv.terms ? '<div style="height: 8px;"></div>' : ''}
-      ${inv.terms ? `
+      ${(showNotes && inv.notes) && (showTerms && inv.terms) ? '<div style="height: 8px;"></div>' : ''}
+      ${showTerms && inv.terms ? `
       <div class="notes-label">Terms</div>
       <div class="notes-content">${inv.terms}</div>
       ` : ''}
@@ -818,7 +842,7 @@ Deno.serve(async (req) => {
     <!-- Footer with QR Code -->
     <div class="footer">
       <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
-        ${verificationUrl && qrCodeHtml ? `
+        ${showQr && verificationUrl && qrCodeHtml ? `
         <div style="display: flex; align-items: center; gap: 6px;">
           ${qrCodeHtml}
           <span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span>

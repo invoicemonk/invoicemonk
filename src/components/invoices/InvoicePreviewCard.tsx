@@ -62,13 +62,51 @@ interface Business {
   logo_url?: string | null;
 }
 
+export interface TemplateConfig {
+  layout?: {
+    header_style?: string;
+    show_logo?: boolean;
+    show_terms?: boolean;
+    show_notes?: boolean;
+    show_verification_qr?: boolean;
+    show_issuer_details?: boolean;
+    show_recipient_details?: boolean;
+    show_line_items?: boolean;
+    show_totals?: boolean;
+    show_bank_details?: boolean;
+  };
+  styles?: {
+    primary_color?: string;
+    font_family?: string;
+    font_size?: string;
+  };
+}
+
 interface InvoicePreviewCardProps {
   invoice: Invoice;
   showWatermark?: boolean;
   business?: Business | null;
+  templateConfig?: TemplateConfig | null;
 }
 
-export function InvoicePreviewCard({ invoice, showWatermark = false, business }: InvoicePreviewCardProps) {
+// Default template config (matches "Professional/Standard" behavior)
+const DEFAULT_LAYOUT = {
+  header_style: 'standard',
+  show_logo: true,
+  show_terms: true,
+  show_notes: true,
+  show_verification_qr: true,
+  show_issuer_details: true,
+  show_recipient_details: true,
+  show_line_items: true,
+  show_totals: true,
+  show_bank_details: false,
+};
+
+export function InvoicePreviewCard({ invoice, showWatermark = false, business, templateConfig }: InvoicePreviewCardProps) {
+  const layout = { ...DEFAULT_LAYOUT, ...templateConfig?.layout };
+  const primaryColor = templateConfig?.styles?.primary_color || undefined;
+
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
   };
@@ -86,15 +124,11 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
   const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null;
   const isImmutable = invoice.status !== 'draft';
   
-  // Determine if this is a Nigerian invoice (for VAT display)
   const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG' || business?.jurisdiction === 'NG';
   const isVatRegistered = issuerSnapshot?.is_vat_registered || business?.is_vat_registered;
   
-  // For drafts, use live business data if no snapshot exists
-  // If snapshot exists but logo_url is missing, fall back to live business logo
   const displayIssuer = issuerSnapshot ? {
     ...issuerSnapshot,
-    // Always prefer snapshot logo, but fall back to live business logo if missing
     logo_url: issuerSnapshot.logo_url || business?.logo_url,
     vat_registration_number: issuerSnapshot.vat_registration_number || business?.vat_registration_number,
     is_vat_registered: issuerSnapshot.is_vat_registered ?? business?.is_vat_registered,
@@ -118,18 +152,45 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
     return parts.join(', ');
   };
 
-  // Check if all items have the same tax rate (for simplified VAT display)
   const taxRates = invoice.invoice_items?.map(item => item.tax_rate) || [];
   const uniqueTaxRates = [...new Set(taxRates)];
   const uniformTaxRate = uniqueTaxRates.length === 1 ? uniqueTaxRates[0] : null;
   const isStandardNigerianVat = isNigerianInvoice && uniformTaxRate === 7.5;
 
-  // Helper to format tax label for Nigerian VAT compliance
-  const getTaxLabel = (taxRate: number) => {
-    if (isNigerianInvoice && taxRate === 7.5) {
-      return 'VAT @ 7.5%';
+  // Header style classes
+  const headerStyle = layout.header_style;
+  const getHeaderClasses = () => {
+    switch (headerStyle) {
+      case 'minimal':
+        return 'pb-4';
+      case 'modern':
+        return 'pb-6 border-b-4';
+      case 'enterprise':
+        return 'pb-6 border-b-2 border-t-2';
+      default: // standard
+        return 'pb-6';
     }
-    return `Tax: ${taxRate}%`;
+  };
+
+  const getHeaderBorderStyle = () => {
+    if (!primaryColor) return {};
+    if (headerStyle === 'modern') return { borderBottomColor: primaryColor };
+    if (headerStyle === 'enterprise') return { borderBottomColor: primaryColor, borderTopColor: primaryColor };
+    return {};
+  };
+
+  const getLabelStyle = () => {
+    if (!primaryColor) return {};
+    return { color: primaryColor };
+  };
+
+  const getTitleSize = () => {
+    switch (headerStyle) {
+      case 'minimal': return 'text-2xl';
+      case 'modern': return 'text-4xl';
+      case 'enterprise': return 'text-3xl';
+      default: return 'text-3xl';
+    }
   };
 
   return (
@@ -143,11 +204,11 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
 
       <div className="relative z-10">
         {/* Invoice Header */}
-        <CardHeader className="pb-6">
+        <CardHeader className={getHeaderClasses()} style={getHeaderBorderStyle()}>
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
-              {/* Business Logo */}
-              {displayIssuer?.logo_url && (
+              {/* Business Logo - conditionally shown */}
+              {layout.show_logo && displayIssuer?.logo_url && (
                 <img 
                   src={displayIssuer.logo_url} 
                   alt="Business Logo" 
@@ -155,9 +216,13 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
                 />
               )}
               <div>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground">INVOICE</h2>
-                <p className="text-lg text-muted-foreground mt-1">{invoice.invoice_number}</p>
-                {invoice.summary && (
+                <h2 className={`${getTitleSize()} font-bold tracking-tight text-foreground`}>
+                  INVOICE
+                </h2>
+                <p className={`${headerStyle === 'minimal' ? 'text-sm' : 'text-lg'} text-muted-foreground mt-1`}>
+                  {invoice.invoice_number}
+                </p>
+                {invoice.summary && headerStyle !== 'minimal' && (
                   <p className="text-sm text-muted-foreground italic mt-2 max-w-md">
                     {invoice.summary}
                   </p>
@@ -187,182 +252,190 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
           {/* From / To Section */}
           <div className="grid md:grid-cols-2 gap-8">
             {/* From (Issuer) */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">From</p>
-              <div className="space-y-1">
-                <p className="font-semibold text-lg">
-                  {displayIssuer?.legal_name || displayIssuer?.name || 'Your Business'}
+            {layout.show_issuer_details && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider mb-2" style={getLabelStyle()}>
+                  {headerStyle === 'enterprise' ? 'Issuer' : 'From'}
                 </p>
-                {/* TIN - Always show for Nigerian businesses */}
-                {displayIssuer?.tax_id && (
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">TIN:</span>{' '}
-                    <span className="font-mono">{displayIssuer.tax_id}</span>
+                <div className="space-y-1">
+                  <p className="font-semibold text-lg">
+                    {displayIssuer?.legal_name || displayIssuer?.name || 'Your Business'}
                   </p>
-                )}
-                {/* VAT Registration Number - Show for VAT-registered Nigerian businesses */}
-                {displayIssuer?.is_vat_registered && displayIssuer?.vat_registration_number && (
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">VAT Reg:</span>{' '}
-                    <span className="font-mono">{displayIssuer.vat_registration_number}</span>
-                  </p>
-                )}
-                {displayIssuer?.address && (
-                  <p className="text-sm text-muted-foreground">{formatAddress(displayIssuer.address)}</p>
-                )}
-                {displayIssuer?.contact_email && (
-                  <p className="text-sm text-muted-foreground">{displayIssuer.contact_email}</p>
-                )}
-                {displayIssuer?.contact_phone && (
-                  <p className="text-sm text-muted-foreground">{displayIssuer.contact_phone}</p>
-                )}
+                  {displayIssuer?.tax_id && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium">TIN:</span>{' '}
+                      <span className="font-mono">{displayIssuer.tax_id}</span>
+                    </p>
+                  )}
+                  {displayIssuer?.is_vat_registered && displayIssuer?.vat_registration_number && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium">VAT Reg:</span>{' '}
+                      <span className="font-mono">{displayIssuer.vat_registration_number}</span>
+                    </p>
+                  )}
+                  {displayIssuer?.address && (
+                    <p className="text-sm text-muted-foreground">{formatAddress(displayIssuer.address)}</p>
+                  )}
+                  {displayIssuer?.contact_email && (
+                    <p className="text-sm text-muted-foreground">{displayIssuer.contact_email}</p>
+                  )}
+                  {displayIssuer?.contact_phone && (
+                    <p className="text-sm text-muted-foreground">{displayIssuer.contact_phone}</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* To (Recipient) */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Bill To</p>
-              <div className="space-y-1">
-                <p className="font-semibold text-lg">
-                  {recipientSnapshot?.name || invoice.clients?.name || 'Client'}
+            {layout.show_recipient_details && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider mb-2" style={getLabelStyle()}>
+                  {headerStyle === 'enterprise' ? 'Recipient' : 'Bill To'}
                 </p>
-                {/* Customer TIN - Important for B2B transactions */}
-                {(recipientSnapshot?.tax_id || invoice.clients?.tax_id) && (
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">TIN:</span>{' '}
-                    <span className="font-mono">
-                      {recipientSnapshot?.tax_id || invoice.clients?.tax_id}
-                    </span>
+                <div className="space-y-1">
+                  <p className="font-semibold text-lg">
+                    {recipientSnapshot?.name || invoice.clients?.name || 'Client'}
                   </p>
-                )}
-                {recipientSnapshot?.address && (
-                  <p className="text-sm text-muted-foreground">{formatAddress(recipientSnapshot.address)}</p>
-                )}
-                {(recipientSnapshot?.email || invoice.clients?.email) && (
-                  <p className="text-sm text-muted-foreground">
-                    {recipientSnapshot?.email || invoice.clients?.email}
-                  </p>
-                )}
-                {(recipientSnapshot?.phone || invoice.clients?.phone) && (
-                  <p className="text-sm text-muted-foreground">
-                    {recipientSnapshot?.phone || invoice.clients?.phone}
-                  </p>
-                )}
+                  {(recipientSnapshot?.tax_id || invoice.clients?.tax_id) && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium">TIN:</span>{' '}
+                      <span className="font-mono">
+                        {recipientSnapshot?.tax_id || invoice.clients?.tax_id}
+                      </span>
+                    </p>
+                  )}
+                  {recipientSnapshot?.address && (
+                    <p className="text-sm text-muted-foreground">{formatAddress(recipientSnapshot.address)}</p>
+                  )}
+                  {(recipientSnapshot?.email || invoice.clients?.email) && (
+                    <p className="text-sm text-muted-foreground">
+                      {recipientSnapshot?.email || invoice.clients?.email}
+                    </p>
+                  )}
+                  {(recipientSnapshot?.phone || invoice.clients?.phone) && (
+                    <p className="text-sm text-muted-foreground">
+                      {recipientSnapshot?.phone || invoice.clients?.phone}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          <Separator />
+          <Separator style={primaryColor ? { backgroundColor: primaryColor, opacity: 0.2 } : {}} />
 
           {/* Line Items */}
-          <div>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
-                  <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Qty</th>
-                  <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit Price</th>
-                  {isNigerianInvoice && (
-                    <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">VAT</th>
-                  )}
-                  <th className="text-right py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.invoice_items && invoice.invoice_items.length > 0 ? (
-                  invoice.invoice_items.map((item) => (
-                    <tr key={item.id} className="border-b border-border/50">
-                      <td className="py-4 pr-4">
-                        <p className="font-medium">{item.description}</p>
-                        {/* Show tax rate under description for non-Nigerian invoices */}
-                        {!isNigerianInvoice && item.tax_rate > 0 && (
-                          <p className="text-xs text-muted-foreground">Tax: {item.tax_rate}%</p>
-                        )}
-                      </td>
-                      <td className="py-4 text-right tabular-nums">{item.quantity}</td>
-                      <td className="py-4 text-right tabular-nums">
-                        {formatCurrency(Number(item.unit_price), invoice.currency)}
-                      </td>
-                      {isNigerianInvoice && (
-                        <td className="py-4 text-right tabular-nums text-muted-foreground">
-                          {item.tax_rate === 7.5 ? '7.5%' : item.tax_rate === 0 ? 'Exempt' : `${item.tax_rate}%`}
+          {layout.show_line_items && (
+            <div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 text-xs font-medium uppercase tracking-wider" style={getLabelStyle()}>Description</th>
+                    <th className="text-right py-3 text-xs font-medium uppercase tracking-wider" style={getLabelStyle()}>Qty</th>
+                    <th className="text-right py-3 text-xs font-medium uppercase tracking-wider" style={getLabelStyle()}>Unit Price</th>
+                    {isNigerianInvoice && (
+                      <th className="text-right py-3 text-xs font-medium uppercase tracking-wider" style={getLabelStyle()}>VAT</th>
+                    )}
+                    <th className="text-right py-3 text-xs font-medium uppercase tracking-wider" style={getLabelStyle()}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.invoice_items && invoice.invoice_items.length > 0 ? (
+                    invoice.invoice_items.map((item) => (
+                      <tr key={item.id} className="border-b border-border/50">
+                        <td className="py-4 pr-4">
+                          <p className="font-medium">{item.description}</p>
+                          {!isNigerianInvoice && item.tax_rate > 0 && (
+                            <p className="text-xs text-muted-foreground">Tax: {item.tax_rate}%</p>
+                          )}
                         </td>
-                      )}
-                      <td className="py-4 text-right tabular-nums font-medium">
-                        {formatCurrency(Number(item.amount), invoice.currency)}
+                        <td className="py-4 text-right tabular-nums">{item.quantity}</td>
+                        <td className="py-4 text-right tabular-nums">
+                          {formatCurrency(Number(item.unit_price), invoice.currency)}
+                        </td>
+                        {isNigerianInvoice && (
+                          <td className="py-4 text-right tabular-nums text-muted-foreground">
+                            {item.tax_rate === 7.5 ? '7.5%' : item.tax_rate === 0 ? 'Exempt' : `${item.tax_rate}%`}
+                          </td>
+                        )}
+                        <td className="py-4 text-right tabular-nums font-medium">
+                          {formatCurrency(Number(item.amount), invoice.currency)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={isNigerianInvoice ? 5 : 4} className="py-8 text-center text-muted-foreground">
+                        No line items
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={isNigerianInvoice ? 5 : 4} className="py-8 text-center text-muted-foreground">
-                      No line items
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-72 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {isNigerianInvoice ? 'Subtotal (excl. VAT)' : 'Subtotal'}
-                </span>
-                <span className="tabular-nums">{formatCurrency(Number(invoice.subtotal), invoice.currency)}</span>
-              </div>
-              {Number(invoice.discount_amount) > 0 && (
+          {layout.show_totals && (
+            <div className="flex justify-end">
+              <div className="w-72 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Discount</span>
-                  <span className="tabular-nums text-destructive">
-                    -{formatCurrency(Number(invoice.discount_amount), invoice.currency)}
+                  <span className="text-muted-foreground">
+                    {isNigerianInvoice ? 'Subtotal (excl. VAT)' : 'Subtotal'}
                   </span>
+                  <span className="tabular-nums">{formatCurrency(Number(invoice.subtotal), invoice.currency)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {isStandardNigerianVat ? 'VAT @ 7.5%' : isNigerianInvoice ? 'VAT' : 'Tax'}
-                </span>
-                <span className="tabular-nums">{formatCurrency(Number(invoice.tax_amount), invoice.currency)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>{isNigerianInvoice ? 'Total (incl. VAT)' : 'Total'}</span>
-                <span className="tabular-nums">{formatCurrency(Number(invoice.total_amount), invoice.currency)}</span>
-              </div>
-              {Number(invoice.amount_paid) > 0 && (
-                <>
-                  <div className="flex justify-between text-sm text-emerald-600">
-                    <span>Paid</span>
-                    <span className="tabular-nums">-{formatCurrency(Number(invoice.amount_paid), invoice.currency)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Balance Due</span>
-                    <span className="tabular-nums">
-                      {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
+                {Number(invoice.discount_amount) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Discount</span>
+                    <span className="tabular-nums text-destructive">
+                      -{formatCurrency(Number(invoice.discount_amount), invoice.currency)}
                     </span>
                   </div>
-                </>
-              )}
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {isStandardNigerianVat ? 'VAT @ 7.5%' : isNigerianInvoice ? 'VAT' : 'Tax'}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(Number(invoice.tax_amount), invoice.currency)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>{isNigerianInvoice ? 'Total (incl. VAT)' : 'Total'}</span>
+                  <span className="tabular-nums">{formatCurrency(Number(invoice.total_amount), invoice.currency)}</span>
+                </div>
+                {Number(invoice.amount_paid) > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-emerald-600">
+                      <span>Paid</span>
+                      <span className="tabular-nums">-{formatCurrency(Number(invoice.amount_paid), invoice.currency)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Balance Due</span>
+                      <span className="tabular-nums">
+                        {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Notes & Terms */}
-          {(invoice.notes || invoice.terms) && (
+          {(layout.show_notes || layout.show_terms) && (invoice.notes || invoice.terms) && (
             <>
               <Separator />
               <div className="grid md:grid-cols-2 gap-6">
-                {invoice.notes && (
+                {layout.show_notes && invoice.notes && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Notes</p>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-2" style={getLabelStyle()}>Notes</p>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
                   </div>
                 )}
-                {invoice.terms && (
+                {layout.show_terms && invoice.terms && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Terms & Conditions</p>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-2" style={getLabelStyle()}>Terms & Conditions</p>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.terms}</p>
                   </div>
                 )}
@@ -371,10 +444,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business }:
           )}
 
           {/* Verification Section with QR Code */}
-          {invoice.verification_id && (
+          {layout.show_verification_qr && invoice.verification_id && (
             <div className="pt-4 border-t border-dashed flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Verification</p>
+                <p className="text-xs font-medium uppercase tracking-wider mb-1" style={getLabelStyle()}>Verification</p>
                 <p className="text-xs text-muted-foreground">
                   ID: <span className="font-mono">{invoice.verification_id}</span>
                 </p>
