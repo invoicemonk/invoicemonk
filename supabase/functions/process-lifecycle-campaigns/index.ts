@@ -135,16 +135,15 @@ function campaignDTemplate(userName: string): string {
 function campaignETemplate(userName: string, invoiceNumber: string): string {
   return emailWrapper(
     'Your Draft Invoice is Waiting',
-    'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
     `<p>Hi ${userName},</p>
     <p>You started invoice <strong>${invoiceNumber}</strong> but haven't issued it yet. Completing and sending it only takes a moment.</p>
-    <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
-      <p style="margin: 0; color: #1e40af; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         📝 <strong>Quick tip:</strong> Review line items, set a due date, and hit "Issue" — your client will receive a professional, verifiable invoice.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Complete Your Invoice →</a>
+      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Complete Your Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Drafts are saved automatically — pick up right where you left off.</p>`
   )
