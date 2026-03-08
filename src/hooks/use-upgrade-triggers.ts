@@ -10,6 +10,7 @@ const DISMISS_KEY = 'upgrade-modal-dismissed-second_invoice';
 export function useUpgradeTriggers() {
   const { user } = useAuth();
   const { tier, isLoading: subLoading } = useSubscription();
+  const { isPlatformAdmin, loading: adminLoading } = usePlatformAdmin();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(DISMISS_KEY) === 'true';
