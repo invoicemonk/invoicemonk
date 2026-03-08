@@ -136,7 +136,7 @@ export function useQuickSetup(): QuickSetupState {
         href: `${base}/invoices/new`,
       },
     ];
-  }, [businessId, currentBusiness?.jurisdiction, paymentMethods.length, clients.length, products.length, issuedInvoiceData]);
+  }, [businessId, currentBusiness, paymentMethods.length, clients.length, products.length, issuedInvoiceData]);
 
   const completedCount = items.filter(i => i.complete).length;
   const allComplete = items.length > 0 && completedCount === items.length;
