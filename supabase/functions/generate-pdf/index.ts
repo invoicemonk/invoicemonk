@@ -691,7 +691,7 @@ Deno.serve(async (req) => {
         <div class="container">
           <div style="text-align: center; padding: 16px 0; border-top: 2px solid ${tplPrimaryColor}; border-bottom: 2px solid ${tplPrimaryColor}; margin-bottom: 16px;">
             ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 45px; max-width: 120px; object-fit: contain; margin: 0 auto 8px;" />` : ''}
-            <div style="font-size: 16px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">${issuerName}</div>
+            <div style="font-size: 16px; font-weight: 700; text-transform: uppercase;">${issuerName}</div>
             ${issuerTaxId ? `<div style="font-size: 9px; color: #666;">TIN: ${issuerTaxId}</div>` : ''}
             ${issuerVatRegNumber ? `<div style="font-size: 9px; color: #666;">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
             ${issuerAddress ? `<div style="font-size: 9px; color: #666;">${issuerAddress}</div>` : ''}
