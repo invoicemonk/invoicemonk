@@ -3,12 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 
 const DISMISS_KEY = 'upgrade-modal-dismissed-second_invoice';
 
 export function useUpgradeTriggers() {
   const { user } = useAuth();
   const { tier, isLoading: subLoading } = useSubscription();
+  const { isPlatformAdmin, loading: adminLoading } = usePlatformAdmin();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(DISMISS_KEY) === 'true';
@@ -28,14 +30,16 @@ export function useUpgradeTriggers() {
         .maybeSingle();
       return (data as any)?.total_invoices ?? 0;
     },
-    enabled: !!user?.id && tier === 'starter' && !dismissed,
+    enabled: !!user?.id && tier === 'starter' && !dismissed && !isPlatformAdmin,
     staleTime: 5 * 60 * 1000,
   });
 
   const showUpgradeModal =
     !subLoading &&
     !invoicesLoading &&
+    !adminLoading &&
     !dismissed &&
+    !isPlatformAdmin &&
     tier === 'starter' &&
     typeof totalInvoices === 'number' &&
     totalInvoices >= 2;
@@ -53,6 +57,6 @@ export function useUpgradeTriggers() {
     showUpgradeModal,
     trigger: showUpgradeModal ? 'second_invoice' : null,
     dismiss,
-    isLoading: subLoading || invoicesLoading,
+    isLoading: subLoading || invoicesLoading || adminLoading,
   };
 }
