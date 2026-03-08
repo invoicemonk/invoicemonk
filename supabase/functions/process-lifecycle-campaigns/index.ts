@@ -101,7 +101,6 @@ function campaignBTemplate(userName: string): string {
 function campaignCTemplate(userName: string, overdueCount: number): string {
   return emailWrapper(
     'You Have Overdue Invoices',
-    'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
     `<p>Hi ${userName},</p>
     <p>You currently have <strong>${overdueCount} overdue invoice${overdueCount > 1 ? 's' : ''}</strong> that ${overdueCount > 1 ? 'haven\'t' : 'hasn\'t'} been paid yet.</p>
     <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
@@ -110,7 +109,7 @@ function campaignCTemplate(userName: string, overdueCount: number): string {
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #ef4444; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Overdue Invoices →</a>
+      <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Overdue Invoices →</a>
     </div>
     <p style="color: #888; font-size: 13px;">You can also enable automatic reminders in your notification settings.</p>`
   )
