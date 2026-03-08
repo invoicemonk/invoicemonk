@@ -493,8 +493,11 @@ Deno.serve(async (req) => {
       : ''
 
     // Shared CSS used across all templates
+    const pageCss = tplHeaderStyle === 'modern'
+      ? '@page { size: A4; margin: 0; }'
+      : '@page { size: A4; margin: 12mm 15mm; }';
     const sharedCss = `
-      @page { size: A4; margin: 12mm 15mm; }
+      ${pageCss}
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-break { page-break-inside: avoid; }
@@ -641,8 +644,7 @@ Deno.serve(async (req) => {
     } else if (tplHeaderStyle === 'modern') {
       // ── MODERN ──
       bodyHtml = `
-        <div class="container">
-          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: 0 0 16px; border-radius: 0;">
+          <div style="background: ${tplPrimaryColor}; color: white; padding: 12mm 15mm 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 80px; object-fit: contain; background: rgba(255,255,255,0.9); border-radius: 4px; padding: 4px;" />` : ''}
@@ -658,6 +660,7 @@ Deno.serve(async (req) => {
               </div>
             </div>
           </div>
+          <div style="padding: 16px 15mm 12mm;">
           <div style="display: flex; gap: 16px; margin-bottom: 16px;">
             <div style="flex: 1; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa;">
               <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; margin-bottom: 4px;">From</div>
@@ -685,7 +688,7 @@ Deno.serve(async (req) => {
           ${paymentMethodHtml}
           ${notesTermsHtml}
           ${footerHtml}
-        </div>
+          </div>
       `
     } else if (tplHeaderStyle === 'enterprise') {
       // ── ENTERPRISE ──
