@@ -18,8 +18,11 @@ import {
   AlertCircle,
   Receipt,
   Plus,
-  Info
+  Info,
+  History,
+  Settings as SettingsIcon
 } from 'lucide-react';
+const AuditLogs = lazy(() => import('@/pages/app/AuditLogs'));
 import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
