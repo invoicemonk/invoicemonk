@@ -34,13 +34,25 @@ interface GenerateReceiptPdfResponse {
   error?: string
 }
 
+// Currency symbol map
+const currencySymbols: Record<string, string> = {
+  NGN: '\u20A6', USD: '$', EUR: '\u20AC', GBP: '\u00A3', KES: 'KSh', GHS: 'GH\u20B5',
+  ZAR: 'R', CAD: 'CA$', AUD: 'A$', JPY: '\u00A5', INR: '\u20B9', AED: 'AED',
+}
+
 // Format currency amount
 function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: currency || 'NGN',
-    minimumFractionDigits: 2
+  const symbol = currencySymbols[currency] || currency + ' '
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
+  return `${symbol}${formatted}`
+}
+
+// Format label keys
+function formatLabel(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 // Format date
