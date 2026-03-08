@@ -243,7 +243,11 @@ Deno.serve(async (req) => {
       invoice = invoiceData
 
       // Check for cached HTML in storage before regenerating
-      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}.html`
+      // Include template header_style in cache key so each template layout gets its own cache entry
+      const tplSnapshot = invoiceData.template_snapshot as Record<string, unknown> | null
+      const tplLayout = tplSnapshot?.layout as Record<string, unknown> | null
+      const cacheHeaderStyle = (tplLayout?.header_style as string) || 'standard'
+      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}.html`
       const supabaseAdminForCache = createClient(supabaseUrl, supabaseServiceKey)
       const { data: cachedFile } = await supabaseAdminForCache.storage
         .from('invoice-pdfs')
@@ -809,7 +813,7 @@ Deno.serve(async (req) => {
     // Cache the generated HTML to storage for subsequent requests (fire-and-forget)
     // Only cache for issued/paid/voided invoices (stable states)
     if (['issued', 'sent', 'viewed', 'paid', 'voided', 'credited'].includes(inv.status)) {
-      const cachePath = `${inv.business_id || 'personal'}/${inv.id}.html`
+      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}.html`
       supabaseAdmin.storage
         .from('invoice-pdfs')
         .upload(cachePath, new Blob([html], { type: 'text/html' }), { upsert: true })

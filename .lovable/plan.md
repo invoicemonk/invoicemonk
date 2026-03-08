@@ -1,45 +1,65 @@
 
 
-# Fix: Template Snapshot Missing + Cached Old PDFs + Email PDFs
+# Block Disposable/Temporary Email Signups
 
-## Root Causes
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-Three issues are preventing templates from working end-to-end:
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-### 1. `issue_invoice` DB function never saves `template_snapshot`
-The latest version of the `issue_invoice` function (migration `20260222...`) snapshots issuer, recipient, tax schema, and payment method — but **skips template_snapshot entirely**. Every issued invoice has `template_snapshot = NULL`, so the PDF generator falls back to the "standard" layout.
+### Layer 1: Client-Side Disposable Email Check
 
-### 2. PDF cache serves stale HTML
-The `generate-pdf` edge function caches generated HTML in Supabase Storage (`invoice-pdfs` bucket). Once cached, subsequent downloads return the old HTML without ever reaching the new template branching logic (lines 248-265). All previously-generated invoices are stuck with the old layout.
+**File: `src/lib/disposable-emails.ts`** (new)
 
-### 3. `send-invoice-email` uses hardcoded layout
-The email function has its own `generateProfessionalHtml()` and `generateInvoicePdfBase64()` functions that produce a single layout regardless of template.
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-## Fix Plan
+**File: `src/pages/app/Signup.tsx`**
 
-### Migration: Fix `issue_invoice` to snapshot template
-- Declare `_template invoice_templates%ROWTYPE`
-- Look up the template by `_invoice.template_id`
-- Add `template_snapshot = jsonb_build_object('name', layout, styles, watermark_required, supports_branding)` to the UPDATE statement
-- For invoices without a template_id, preserve existing value
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-### Edge Function: `generate-pdf` — invalidate stale cache
-- After fetching the invoice, compare `template_snapshot` hash against cached version
-- Simplest fix: skip cache when `template_snapshot` is present (the cache was designed for the old single-layout era)
-- Or: include template header_style in cache key path so each template gets its own cache entry
+### Layer 2: Server-Side Validation (Database Trigger)
 
-### Edge Function: `send-invoice-email` — template-aware HTML + PDF
-- Read `template_snapshot` from the fetched invoice
-- Update `generateProfessionalHtml()` to branch on `header_style` (minimal/standard/modern/enterprise), applying primary_color and layout flags
-- Update `generateInvoicePdfBase64()` (pdfmake) to produce different document definitions per template style
+**Migration SQL:**
 
-### Files to change
-1. **New DB migration** — fix `issue_invoice` to include template snapshot
-2. **`supabase/functions/generate-pdf/index.ts`** — bust stale cache (include header_style in cache path)
-3. **`supabase/functions/send-invoice-email/index.ts`** — make both HTML and PDF generators template-aware
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-### Backward compatibility
-- Invoices with `template_snapshot = NULL` fall back to "standard" layout (current behavior preserved)
-- New invoices issued after the migration will have proper snapshots
-- Stale cached PDFs will be bypassed via updated cache key
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
+
+Actually, the most practical and effective approach for Supabase:
+
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
+
+### Layer 2 (revised): Profile Insert Trigger
+
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
+
+### Files to Create/Modify
+
+| File | Change |
+|------|--------|
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
+
+### Disposable Domain Categories to Block
+
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
+
+### User Experience
+
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
 
