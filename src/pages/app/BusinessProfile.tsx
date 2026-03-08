@@ -144,6 +144,7 @@ export default function BusinessProfile() {
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
         businessType: businessExtended.business_type || '',
         allowedCurrencies: businessExtended.allowed_currencies || [],
+        brandColor: businessExtended.brand_color || '',
       });
     }
   }, [business]);
