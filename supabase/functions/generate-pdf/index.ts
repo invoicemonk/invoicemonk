@@ -493,8 +493,11 @@ Deno.serve(async (req) => {
       : ''
 
     // Shared CSS used across all templates
+    const pageCss = tplHeaderStyle === 'modern'
+      ? '@page { size: A4; margin: 0; }'
+      : '@page { size: A4; margin: 12mm 15mm; }';
     const sharedCss = `
-      @page { size: A4; margin: 12mm 15mm; }
+      ${pageCss}
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-break { page-break-inside: avoid; }
