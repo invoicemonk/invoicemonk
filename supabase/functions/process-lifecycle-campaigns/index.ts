@@ -118,16 +118,15 @@ function campaignCTemplate(userName: string, overdueCount: number): string {
 function campaignDTemplate(userName: string): string {
   return emailWrapper(
     'We Miss You!',
-    'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
     `<p>Hi ${userName},</p>
-    <p>It's been a while since you logged into Invoicemonk. Your dashboard is ready and waiting — here's what you can do today:</p>
+    <p>It's been a while since you logged into InvoiceMonk. Your dashboard is ready and waiting — here's what you can do today:</p>
     <ul style="color: #555;">
       <li>Check on outstanding invoices and payments</li>
       <li>Send reminders to clients with overdue balances</li>
       <li>Create and issue a new invoice in under 2 minutes</li>
     </ul>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Your data is always secure and waiting for you.</p>`
   )
