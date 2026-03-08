@@ -190,16 +190,18 @@ Deno.serve(async (req) => {
 
       // Verify user token
       const token = authHeader.replace('Bearer ', '')
-      const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token)
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token)
       
-      if (claimsError || !claimsData?.user) {
+      if (claimsError || !claimsData?.claims) {
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid authentication token' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      userId = claimsData.user.id
+      const userId_raw = claimsData.claims.sub as string
+
+      userId = userId_raw
 
       // Parse request body
       const body: GeneratePdfRequest = await req.json()
