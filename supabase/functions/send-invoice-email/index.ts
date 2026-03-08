@@ -313,7 +313,7 @@ function buildPaymentContent(ctx: PdfBuildContext): unknown[] {
   return [{ text: displayName, fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
     ...(instructions ? Object.entries(instructions).map(([k, v]) => ({
       columns: [
-        { text: k, fontSize: 8, color: '#666666', width: 80 },
+        { text: k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), fontSize: 8, color: '#666666', width: 100 },
         { text: String(v), fontSize: 9, bold: true, width: '*' }
       ], margin: [0, 1, 0, 1]
     })) : []),
