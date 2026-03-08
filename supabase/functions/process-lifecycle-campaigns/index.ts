@@ -69,15 +69,14 @@ function emailWrapper(title: string, bodyHtml: string): string {
 function campaignATemplate(userName: string): string {
   return emailWrapper(
     'Complete Your Setup',
-    'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
     `<p>Hi ${userName},</p>
-    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of Invoicemonk:</p>
+    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of InvoiceMonk:</p>
     <ul style="color: #555;">
       <li>Issue professional invoices with compliance features</li>
       <li>Get notified when clients view your invoices</li>
       <li>Access your data across devices</li>
     </ul>
-    <p>Check your inbox for the verification email, or <a href="https://app.invoicemonk.com/settings" style="color: #d97706; font-weight: bold;">resend it from your settings</a>.</p>
+    <p>Check your inbox for the verification email, or <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a; font-weight: bold;">resend it from your settings</a>.</p>
     <p style="color: #888; font-size: 13px;">If you've already verified, you can ignore this email.</p>`
   )
 }
