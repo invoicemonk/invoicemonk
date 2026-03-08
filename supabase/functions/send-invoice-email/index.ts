@@ -155,13 +155,15 @@ const formatCurrency = (amount: number, currency: string): string => {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
 }
 
-// Helper: Format currency for PDF (WinAnsi-safe)
+// Helper: Format currency for PDF (WinAnsi-safe, uses symbols)
+const currencySymbols: Record<string, string> = { NGN: '\u20A6', USD: '$', EUR: '\u20AC', GBP: '\u00A3', KES: 'KSh', GHS: 'GH\u20B5', ZAR: 'R', CAD: 'CA$', AUD: 'A$', INR: '\u20B9', JPY: '\u00A5', CNY: '\u00A5' }
 const formatCurrencyPdf = (amount: number, currency: string): string => {
+  const symbol = currencySymbols[currency] || currency + ' '
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
-  return `${currency} ${formatted}`
+  return `${symbol}${formatted}`
 }
 
 const formatDate = (date: string | null): string => {
@@ -311,7 +313,7 @@ function buildPaymentContent(ctx: PdfBuildContext): unknown[] {
   return [{ text: displayName, fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
     ...(instructions ? Object.entries(instructions).map(([k, v]) => ({
       columns: [
-        { text: k, fontSize: 8, color: '#666666', width: 80 },
+        { text: k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), fontSize: 8, color: '#666666', width: 100 },
         { text: String(v), fontSize: 9, bold: true, width: '*' }
       ], margin: [0, 1, 0, 1]
     })) : []),
@@ -605,17 +607,17 @@ function buildModernPdf(ctx: PdfBuildContext): unknown[] {
         stack: [
           {
             columns: [
+              ...(ctx.showLogo && ctx.logoDataUri ? [{ image: ctx.logoDataUri, width: 50, fit: [50, 35], margin: [0, 0, 10, 0] }] : []),
               { stack: [
-                ...(ctx.showLogo && ctx.logoDataUri ? [{ image: ctx.logoDataUri, width: 80, fit: [80, 35], margin: [0, 0, 8, 4] }] : []),
                 { text: 'INVOICE', fontSize: 20, bold: true, color: '#ffffff' },
-                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffffcc', margin: [0, 1, 0, 0] }
+                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffff', margin: [0, 1, 0, 0] }
               ], width: '*' },
               { stack: [
-                { text: `Issue: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
-                { text: `Due: ${formatDate(ctx.invoice.due_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
+                { text: `Issue: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#ffffff', alignment: 'right' },
+                { text: `Due: ${formatDate(ctx.invoice.due_date as string)}`, fontSize: 9, color: '#ffffff', alignment: 'right' },
                 {
-                  table: { widths: ['auto'], body: [[{ text: ctx.status.toUpperCase(), fontSize: 7, bold: true, color: '#ffffff', margin: [6, 2, 6, 2] }]] },
-                  layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0, fillColor: () => 'rgba(255,255,255,0.2)' },
+                  table: { widths: ['auto'], body: [[{ text: ctx.status.toUpperCase(), fontSize: 7, bold: true, color: brandColor, margin: [6, 2, 6, 2] }]] },
+                  layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0, fillColor: () => '#ffffff' },
                   alignment: 'right', margin: [0, 4, 0, 0]
                 }
               ], width: 'auto' }
