@@ -116,6 +116,10 @@ export default function ReceiptDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+            <Mail className="h-4 w-4 mr-2" />
+            Send Email
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloadPdf.isPending}>
             {downloadPdf.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
