@@ -36,6 +36,17 @@ const Login = () => {
   const location = useLocation();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+  const searchParams = new URLSearchParams(location.search);
+  const idleLogout = searchParams.get('reason') === 'idle';
+
+  useEffect(() => {
+    if (idleLogout) {
+      toast({
+        title: 'Session expired',
+        description: 'You were logged out due to inactivity. Please sign in again.',
+      });
+    }
+  }, [idleLogout]);
 
   useEffect(() => {
     return () => {

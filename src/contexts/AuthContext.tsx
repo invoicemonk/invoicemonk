@@ -172,6 +172,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: error as Error | null };
   };
 
+  useIdleTimeout();
+
   return (
     <AuthContext.Provider
       value={{
