@@ -35,6 +35,7 @@ const TIER_ORDER: Record<SubscriptionTier, number> = {
 
 export function useInvoiceTemplates() {
   const { tier } = useSubscription();
+  const { isPlatformAdmin } = usePlatformAdmin();
 
   return useQuery({
     queryKey: ['invoice-templates'],
