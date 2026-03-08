@@ -213,7 +213,6 @@ function campaignGTemplate(userName: string): string {
 function campaignHTemplate(userName: string): string {
   return emailWrapper(
     'Your Business is Ready — Create Your First Invoice',
-    'linear-gradient(135deg, #14b8a6 0%, #059669 100%)',
     `<p>Hi ${userName},</p>
     <p>Your business profile is set up and ready to go! Here's how to create your first invoice:</p>
     <ol style="color: #555;">
@@ -221,13 +220,13 @@ function campaignHTemplate(userName: string): string {
       <li><strong>Create an invoice</strong> — add line items, choose a template</li>
       <li><strong>Issue &amp; send</strong> — your client receives a professional, verifiable invoice</li>
     </ol>
-    <div style="background: #f0fdfa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #14b8a6;">
-      <p style="margin: 0; color: #0f766e; font-size: 14px;">
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
         ✅ <strong>Every invoice</strong> includes a unique verification ID and tamper-proof hash — compliance is built in from day one.
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #14b8a6, #059669); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Get paid faster with professional invoices.</p>`
   )
