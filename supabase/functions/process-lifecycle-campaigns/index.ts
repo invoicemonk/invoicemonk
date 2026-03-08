@@ -164,22 +164,21 @@ function campaignFTemplate(
 
   return emailWrapper(
     'Your Weekly Revenue Summary',
-    'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     `<p>Hi ${userName},</p>
     <p>Here's your invoicing activity for the past 7 days:</p>
     <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
       <div style="display: inline-block; margin: 0 20px; text-align: center;">
-        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #059669;">${invoiceCount}</p>
+        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #1d6b5a;">${invoiceCount}</p>
         <p style="margin: 4px 0 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Invoices Issued</p>
       </div>
       <div style="display: inline-block; margin: 0 20px; text-align: center;">
-        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #059669;">${currency} ${totalAmount}</p>
+        <p style="margin: 0; font-size: 28px; font-weight: bold; color: #1d6b5a;">${currency} ${totalAmount}</p>
         <p style="margin: 4px 0 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Total Revenue</p>
       </div>
     </div>
     ${overdueSection}
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Full Dashboard →</a>
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Full Dashboard →</a>
     </div>
     <p style="color: #888; font-size: 13px;">This summary is sent weekly. Keep up the great work!</p>`
   )
