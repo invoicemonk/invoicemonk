@@ -507,16 +507,17 @@ Deno.serve(async (req) => {
     }
     .container { max-width: 100%; padding: 0; }
     
-    /* Header - Compact two-column */
+    /* Header - Template-driven */
     .header { 
       display: flex; 
       justify-content: space-between; 
       align-items: flex-start;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #1a1a1a;
+      padding-bottom: ${tplHeaderStyle === 'minimal' ? '8px' : '12px'};
+      border-bottom: ${tplHeaderStyle === 'minimal' ? '1px solid #e5e7eb' : tplHeaderStyle === 'modern' ? `3px solid ${tplPrimaryColor}` : tplHeaderStyle === 'enterprise' ? `2px double ${tplPrimaryColor}` : `2px solid ${tplPrimaryColor}`};
+      ${tplHeaderStyle === 'enterprise' ? `border-top: 2px double ${tplPrimaryColor}; padding-top: 12px;` : ''}
       margin-bottom: 16px;
     }
-    .brand { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    .brand { font-size: ${tplHeaderStyle === 'minimal' ? '15px' : tplHeaderStyle === 'modern' ? '20px' : '18px'}; font-weight: 700; color: ${tplPrimaryColor}; }
     .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
     .brand-tin { font-size: 9px; color: #444; margin-top: 2px; font-weight: 500; }
     .invoice-meta { text-align: right; }
