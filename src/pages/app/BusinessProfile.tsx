@@ -316,7 +316,7 @@ export default function BusinessProfile() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Business Settings</h1>
             {business && (
               <IdentityLevelBadge 
                 level={(business as any).business_identity_level || 'unverified'} 
@@ -327,15 +327,36 @@ export default function BusinessProfile() {
             Configure your legal business details for invoicing
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isLoading}>
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          {isLoading ? 'Saving...' : 'Save Changes'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'profile' | 'audit-logs')}>
+            <TabsList>
+              <TabsTrigger value="profile" className="gap-1.5">
+                <SettingsIcon className="h-4 w-4" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="audit-logs" className="gap-1.5">
+                <History className="h-4 w-4" />
+                Audit Logs
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {activeTab === 'audit-logs' ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <AuditLogs />
+        </Suspense>
+      ) : (
+      <>
+      <Button onClick={handleSave} disabled={isLoading} className="w-fit">
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4 mr-2" />
+        )}
+        {isLoading ? 'Saving...' : 'Save Changes'}
+      </Button>
 
       {/* Duplicate Business Name Warning */}
       {duplicateCheck?.hasDuplicate && (
