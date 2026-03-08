@@ -640,7 +640,7 @@ Deno.serve(async (req) => {
       // ── MODERN ──
       bodyHtml = `
         <div class="container">
-          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: -12mm -15mm 16px; border-radius: 0;">
+          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: 0 0 16px; border-radius: 0;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 80px; object-fit: contain; background: rgba(255,255,255,0.9); border-radius: 4px; padding: 4px;" />` : ''}
