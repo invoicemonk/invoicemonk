@@ -51,7 +51,7 @@ export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('revenue');
-
+  const [activeView, setActiveView] = useState<'reports' | 'analytics'>('reports');
   const { canAccess, loading: isLoading, currentBusiness, hasTier, isPlatformAdmin } = useBusiness();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const hasReportsAccess = canAccess('reports_enabled');
