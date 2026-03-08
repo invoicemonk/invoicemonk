@@ -52,15 +52,11 @@ import logoIcon from '@/assets/invoicemonk-icon.png';
 export function BusinessSidebar() {
   const { signOut, profile } = useAuth();
   const { businessId } = useParams<{ businessId: string }>();
-  const { currentBusiness, tier, isFree, canManageTeam, isPlatformAdmin } = useBusiness();
+  const { currentBusiness, tier, isFree, isPlatformAdmin } = useBusiness();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   
   const { isPartner } = usePartnerRole();
-  
-  // Check if tier allows team access - platform admins always have access
-  const { data: teamAccess } = useTeamAccess();
-  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
 
   const baseUrl = `/b/${businessId}`;
 
