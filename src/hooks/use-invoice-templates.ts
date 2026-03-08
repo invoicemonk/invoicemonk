@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription, SubscriptionTier } from './use-subscription';
+import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 import { toast } from '@/hooks/use-toast';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -34,6 +35,7 @@ const TIER_ORDER: Record<SubscriptionTier, number> = {
 
 export function useInvoiceTemplates() {
   const { tier } = useSubscription();
+  const { isPlatformAdmin } = usePlatformAdmin();
 
   return useQuery({
     queryKey: ['invoice-templates'],
@@ -51,7 +53,7 @@ export function useInvoiceTemplates() {
 
       // Map templates with availability based on user's tier
       return (data || []).map((template): TemplateWithAccess => {
-        const available = TIER_ORDER[tier] >= TIER_ORDER[template.tier_required as SubscriptionTier];
+        const available = isPlatformAdmin || TIER_ORDER[tier] >= TIER_ORDER[template.tier_required as SubscriptionTier];
         return {
           ...template,
           tier_required: template.tier_required as SubscriptionTier,
