@@ -113,6 +113,7 @@ export default function InvoiceEdit() {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [summary, setSummary] = useState('');
+  const [brandColorOverride, setBrandColorOverride] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
