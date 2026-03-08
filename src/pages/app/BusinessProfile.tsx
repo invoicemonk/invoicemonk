@@ -178,6 +178,8 @@ export default function BusinessProfile() {
       business_type: formData.businessType || null,
       // Multi-currency: allowed currencies
       allowed_currencies: formData.allowedCurrencies || [],
+      // Brand color
+      brand_color: formData.brandColor || null,
     };
 
     if (business) {
