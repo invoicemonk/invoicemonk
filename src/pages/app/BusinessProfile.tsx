@@ -91,6 +91,7 @@ export default function BusinessProfile() {
     vatRegistrationNumber: '',
     businessType: '',
     allowedCurrencies: [] as string[],
+    brandColor: '',
   });
 
   // Check for duplicate business name
@@ -121,6 +122,7 @@ export default function BusinessProfile() {
         cac_number?: string;
         business_type?: string;
         allowed_currencies?: string[];
+        brand_color?: string;
       };
 
       setFormData({
@@ -142,6 +144,7 @@ export default function BusinessProfile() {
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
         businessType: businessExtended.business_type || '',
         allowedCurrencies: businessExtended.allowed_currencies || [],
+        brandColor: businessExtended.brand_color || '',
       });
     }
   }, [business]);
@@ -175,6 +178,8 @@ export default function BusinessProfile() {
       business_type: formData.businessType || null,
       // Multi-currency: allowed currencies
       allowed_currencies: formData.allowedCurrencies || [],
+      // Brand color
+      brand_color: formData.brandColor || null,
     };
 
     if (business) {
@@ -373,18 +378,18 @@ export default function BusinessProfile() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Business Logo */}
+        {/* Business Logo & Branding */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ImageIcon className="h-5 w-5" />
-              Business Logo
+              Branding
             </CardTitle>
             <CardDescription>
-              Upload your business logo to display on invoices (max 500KB, PNG/JPEG/SVG/WebP)
+              Upload your business logo and set your brand color for invoices
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
               {/* Logo Preview */}
               <div className="shrink-0">
@@ -442,7 +447,7 @@ export default function BusinessProfile() {
                 </Button>
 
                 <p className="text-xs text-muted-foreground">
-                  Your logo will appear on generated invoices and PDF exports.
+                  Your logo will appear on generated invoices and PDF exports. Max 500KB, PNG/JPEG/SVG/WebP.
                 </p>
                 
                 {!business && (
@@ -452,6 +457,41 @@ export default function BusinessProfile() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Brand Color */}
+            <div className="border-t pt-4 space-y-2">
+              <Label htmlFor="brandColor">Brand Color</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  id="brandColor"
+                  value={formData.brandColor || '#1d6b5a'}
+                  onChange={(e) => setFormData({ ...formData, brandColor: e.target.value })}
+                  className="h-10 w-12 rounded border border-input cursor-pointer bg-transparent p-0.5"
+                />
+                <Input
+                  value={formData.brandColor}
+                  onChange={(e) => setFormData({ ...formData, brandColor: e.target.value })}
+                  placeholder="#1d6b5a"
+                  className="w-32 font-mono text-sm"
+                  maxLength={7}
+                />
+                {formData.brandColor && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, brandColor: '' })}
+                    className="text-muted-foreground"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Used as the accent color on your invoices. You can override this per-invoice.
+              </p>
             </div>
           </CardContent>
         </Card>

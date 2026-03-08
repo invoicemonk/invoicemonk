@@ -113,6 +113,7 @@ export default function InvoiceEdit() {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [summary, setSummary] = useState('');
+  const [brandColorOverride, setBrandColorOverride] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
@@ -849,6 +850,39 @@ export default function InvoiceEdit() {
                   value={terms}
                   onChange={(e) => setTerms(e.target.value)}
                 />
+              </div>
+
+              {/* Brand Color Override */}
+              <div className="space-y-2">
+                <Label>Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={brandColorOverride || (currentBusiness as any)?.brand_color || '#1d6b5a'}
+                    onChange={(e) => setBrandColorOverride(e.target.value)}
+                    className="h-10 w-12 rounded border border-input cursor-pointer bg-transparent p-0.5"
+                  />
+                  <Input
+                    value={brandColorOverride}
+                    onChange={(e) => setBrandColorOverride(e.target.value)}
+                    placeholder={(currentBusiness as any)?.brand_color || 'Default'}
+                    className="w-32 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  {brandColorOverride && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setBrandColorOverride('')}
+                      className="text-muted-foreground"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Override the accent color for this invoice only.
+                </p>
               </div>
             </CardContent>
           </Card>

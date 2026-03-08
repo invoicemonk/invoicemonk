@@ -187,6 +187,7 @@ export type Database = {
         Row: {
           address: Json | null
           allowed_currencies: string[] | null
+          brand_color: string | null
           business_identity_level: string | null
           business_type: string | null
           cac_number: string | null
@@ -217,6 +218,7 @@ export type Database = {
         Insert: {
           address?: Json | null
           allowed_currencies?: string[] | null
+          brand_color?: string | null
           business_identity_level?: string | null
           business_type?: string | null
           cac_number?: string | null
@@ -247,6 +249,7 @@ export type Database = {
         Update: {
           address?: Json | null
           allowed_currencies?: string[] | null
+          brand_color?: string | null
           business_identity_level?: string | null
           business_type?: string | null
           cac_number?: string | null

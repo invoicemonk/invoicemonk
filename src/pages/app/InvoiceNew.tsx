@@ -149,6 +149,7 @@ export default function InvoiceNew() {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [summary, setSummary] = useState('');
+  const [brandColorOverride, setBrandColorOverride] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: defaultVatRate, isVatExempt: false }
   ]);
@@ -584,8 +585,41 @@ export default function InvoiceNew() {
               <p className="text-sm text-muted-foreground">
                 You can save drafts, but issuing requires email verification.
               </p>
-            </div>
-          </CardContent>
+              </div>
+
+              {/* Brand Color Override */}
+              <div className="space-y-2">
+                <Label>Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={brandColorOverride || (currentBusiness as any)?.brand_color || '#1d6b5a'}
+                    onChange={(e) => setBrandColorOverride(e.target.value)}
+                    className="h-10 w-12 rounded border border-input cursor-pointer bg-transparent p-0.5"
+                  />
+                  <Input
+                    value={brandColorOverride}
+                    onChange={(e) => setBrandColorOverride(e.target.value)}
+                    placeholder={(currentBusiness as any)?.brand_color || 'Default'}
+                    className="w-32 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  {brandColorOverride && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setBrandColorOverride('')}
+                      className="text-muted-foreground"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Override the accent color for this invoice only.
+                </p>
+              </div>
+            </CardContent>
         </Card>
       )}
 
@@ -1156,9 +1190,11 @@ export default function InvoiceNew() {
         templateConfig={(() => {
           const selected = templates?.find(t => t.id === selectedTemplateId);
           if (!selected) return null;
+          const styles = (selected.styles as Record<string, unknown>) || {};
+          const effectiveBrandColor = brandColorOverride || (currentBusiness as any)?.brand_color || styles.primary_color;
           return {
             layout: selected.layout as Record<string, unknown>,
-            styles: selected.styles as Record<string, unknown>,
+            styles: { ...styles, primary_color: effectiveBrandColor },
           };
         })()}
       />

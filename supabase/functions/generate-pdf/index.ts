@@ -486,381 +486,323 @@ Deno.serve(async (req) => {
       ? `Hash: ${inv.invoice_hash.substring(0, 12)}...` 
       : ''
 
-    // Generate compact HTML document
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Invoice ${invoice.invoice_number}</title>
-  <style>
-    @page { size: A4; margin: 12mm 15mm; }
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .no-break { page-break-inside: avoid; }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-      color: #1a1a1a; 
-      font-size: 11px; 
-      line-height: 1.35; 
-    }
-    .container { max-width: 100%; padding: 0; }
-    
-    /* Header - Template-driven */
-    .header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: flex-start;
-      padding-bottom: ${tplHeaderStyle === 'minimal' ? '8px' : '12px'};
-      border-bottom: ${tplHeaderStyle === 'minimal' ? '1px solid #e5e7eb' : tplHeaderStyle === 'modern' ? `3px solid ${tplPrimaryColor}` : tplHeaderStyle === 'enterprise' ? `2px double ${tplPrimaryColor}` : `2px solid ${tplPrimaryColor}`};
-      ${tplHeaderStyle === 'enterprise' ? `border-top: 2px double ${tplPrimaryColor}; padding-top: 12px;` : ''}
-      margin-bottom: 16px;
-    }
-    .brand { font-size: ${tplHeaderStyle === 'minimal' ? '15px' : tplHeaderStyle === 'modern' ? '20px' : '18px'}; font-weight: 700; color: ${tplPrimaryColor}; }
-    .brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
-    .brand-tin { font-size: 9px; color: #444; margin-top: 2px; font-weight: 500; }
-    .invoice-meta { text-align: right; }
-    .invoice-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a; }
-    .invoice-number { font-size: 12px; color: #666; margin-top: 2px; }
-    .status { 
-      display: inline-block; 
-      padding: 2px 8px; 
-      border-radius: 3px; 
-      font-size: 9px; 
-      font-weight: 600; 
-      text-transform: uppercase; 
-      margin-top: 4px;
-    }
-    
-    /* Two-column layout for parties */
-    .parties { 
-      display: flex; 
-      gap: 24px; 
-      margin-bottom: 16px;
-    }
-    .party { flex: 1; }
-    .party-label { 
-      font-size: 9px; 
-      font-weight: 600; 
-      color: ${tplPrimaryColor === '#1a1a1a' ? '#666' : tplPrimaryColor}; 
-      text-transform: uppercase; 
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-    .party-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
-    .party-details { font-size: 10px; color: #444; line-height: 1.4; }
-    .party-tin { font-size: 10px; color: #333; font-weight: 500; margin-top: 4px; }
-    
-    /* Invoice summary box */
-    .summary-box {
-      background: #f8f9fa;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      padding: 10px 12px;
-      margin-bottom: 16px;
-    }
-    .summary-row { 
-      display: flex; 
-      justify-content: space-between; 
-      font-size: 10px; 
-      color: #444;
-      padding: 2px 0;
-    }
-    .summary-row.amount-due {
-      font-size: 14px;
-      font-weight: 700;
-      color: #1a1a1a;
-      padding-top: 6px;
-      margin-top: 4px;
-      border-top: 1px solid #e5e7eb;
-    }
-    
-    /* Table - Compact styling */
-    table { 
-      width: 100%; 
-      border-collapse: collapse; 
-      margin-bottom: 12px;
-      font-size: 10px;
-    }
-    th { 
-      background: #f8f9fa; 
-      padding: 6px 8px; 
-      text-align: left; 
-      font-weight: 600; 
-      font-size: 9px; 
-      text-transform: uppercase; 
-      color: #666;
-      border-bottom: 1px solid #d1d5db;
-    }
-    td { 
-      padding: 6px 8px; 
-      border-bottom: 1px solid #f0f0f0;
-      vertical-align: top;
-    }
-    th.right, td.right { text-align: right; }
-    tr:last-child td { border-bottom: 1px solid #d1d5db; }
-    
-    /* Totals - Right-aligned, compact */
-    .totals-wrapper { 
-      display: flex; 
-      justify-content: flex-end; 
-      margin-bottom: 16px;
-    }
-    .totals { width: 240px; }
-    .total-row { 
-      display: flex; 
-      justify-content: space-between; 
-      padding: 3px 0; 
-      font-size: 10px;
-      color: #444;
-    }
-    .total-row.grand { 
-      font-size: 13px; 
-      font-weight: 700; 
-      color: #1a1a1a;
-      border-top: 2px solid #1a1a1a; 
-      padding-top: 6px; 
-      margin-top: 4px; 
-    }
-    .total-row.paid { color: #059669; }
-    .total-row.balance { 
-      font-weight: 600; 
-      background: #fef3c7;
-      padding: 4px 6px;
-      margin: 4px -6px 0;
-      border-radius: 3px;
-    }
-    
-    /* Notes section - compact */
-    .notes-section { 
-      margin-bottom: 12px;
-      padding: 8px 10px;
-      background: #fafafa;
-      border-radius: 4px;
-    }
-    .notes-label { 
-      font-size: 9px; 
-      font-weight: 600; 
-      color: #666; 
-      text-transform: uppercase;
-      margin-bottom: 3px;
-    }
-    .notes-content { font-size: 10px; color: #444; }
-    
-    /* Footer - Single compact line */
-    .footer { 
-      margin-top: auto;
-      padding-top: 12px;
-      border-top: 1px solid #e5e7eb; 
-      font-size: 8px; 
-      color: #888;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .footer-left { }
-    .footer-right { text-align: right; }
-    
-    /* Subtle footer branding for free/starter tiers */
-    .footer-branding {
-      text-align: center;
-      font-size: 8px;
-      color: #aaa;
-      padding: 10px 0 0;
-      margin-top: 16px;
-      border-top: 1px solid #eee;
-    }
-    .footer-branding a {
-      color: #888;
-      text-decoration: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
-        <div>
-          <div class="brand">${issuerName}</div>
-          ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
-          ${issuerAddress ? `<div class="brand-sub">${issuerAddress}</div>` : ''}
-          ${issuerTaxId ? `<div class="brand-tin">TIN: ${issuerTaxId}</div>` : ''}
-          ${issuerCacNumber ? `<div class="brand-tin">${issuerCacLabel}: ${issuerCacNumber}</div>` : ''}
-          ${issuerVatRegNumber ? `<div class="brand-tin">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
-        </div>
-      </div>
-      <div class="invoice-meta">
-        <div class="invoice-title">INVOICE</div>
-        <div class="invoice-number">${inv.invoice_number}</div>
-        <div class="status" style="background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div>
-      </div>
-    </div>
+    // Shared CSS used across all templates
+    const sharedCss = `
+      @page { size: A4; margin: 12mm 15mm; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .no-break { page-break-inside: avoid; }
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        color: #1a1a1a; 
+        font-size: 11px; 
+        line-height: 1.35; 
+      }
+      .container { max-width: 100%; padding: 0; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
+      th { background: #f8f9fa; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #d1d5db; }
+      td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+      th.right, td.right { text-align: right; }
+      tr:last-child td { border-bottom: 1px solid #d1d5db; }
+      .footer-branding { text-align: center; font-size: 8px; color: #aaa; padding: 10px 0 0; margin-top: 16px; border-top: 1px solid #eee; }
+      .footer-branding a { color: #888; text-decoration: none; }
+    `
 
-    <!-- Two-column: Bill To + Invoice Summary -->
-    <div class="parties">
-      <div class="party">
-        <div class="party-label">Bill To</div>
-        <div class="party-name">${recipientName}</div>
-        <div class="party-details">
-          ${recipientAddress ? `${recipientAddress}<br>` : ''}
-          ${recipientEmail ? `${recipientEmail}` : ''}
-        </div>
-        ${recipientTaxId ? `<div class="party-tin">TIN: ${recipientTaxId}</div>` : ''}
-        ${recipientCacNumber ? `<div class="party-tin">CAC: ${recipientCacNumber}</div>` : ''}
-      </div>
-      <div class="party">
-        <div class="summary-box">
-          <div class="summary-row">
-            <span>Invoice Date</span>
-            <span>${formatDate(inv.issue_date)}</span>
-          </div>
-          <div class="summary-row">
-            <span>Due Date</span>
-            <span>${formatDate(inv.due_date)}</span>
-          </div>
-          <div class="summary-row">
-            <span>Currency</span>
-            <span>${inv.currency}</span>
-          </div>
-          <div class="summary-row amount-due">
-            <span>Amount Due</span>
-            <span>${formatCurrency(balanceDue, inv.currency)}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Items Table -->
-    <table class="no-break">
-      <thead>
-        <tr>
+    // Items table HTML
+    const itemsTableHtml = `
+      <table class="no-break">
+        <thead><tr>
           <th style="width: ${isNigerianVatRegistered ? '45%' : '55%'};">Description</th>
           <th class="right" style="width: 10%;">Qty</th>
           <th class="right" style="width: 17%;">Rate</th>
           ${isNigerianVatRegistered ? '<th class="right" style="width: 10%;">VAT</th>' : ''}
           <th class="right" style="width: 18%;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemsHtml}
-      </tbody>
-    </table>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+    `
 
-    <!-- Financial Summary -->
-    <div class="no-break" style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
-      <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 6px;">Invoice Summary</div>
-      <div class="summary-row"><span>Total Items</span><span>${items.length}</span></div>
-      <div class="summary-row"><span>Subtotal</span><span>${formatCurrency(inv.subtotal, inv.currency)}</span></div>
-      ${inv.tax_amount > 0 ? `<div class="summary-row"><span>${isNigerianVatRegistered ? 'VAT' : 'Tax'}</span><span>${formatCurrency(inv.tax_amount, inv.currency)}</span></div>` : ''}
-      ${inv.discount_amount > 0 ? `<div class="summary-row"><span>Discount</span><span>-${formatCurrency(inv.discount_amount, inv.currency)}</span></div>` : ''}
-      <div class="summary-row" style="font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px;">
-        <span>Grand Total</span><span>${formatCurrency(inv.total_amount, inv.currency)}</span>
+    // Totals HTML
+    const totalsHtml = `
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;" class="no-break">
+        <div style="width: 240px;">
+          <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
+            <span>${isNigerianVatRegistered ? 'Subtotal (excl. VAT)' : 'Subtotal'}</span>
+            <span>${formatCurrency(inv.subtotal, inv.currency)}</span>
+          </div>
+          ${inv.tax_amount > 0 ? `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
+            <span>${isNigerianVatRegistered ? 'VAT @ 7.5%' : 'Tax'}</span>
+            <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
+          </div>` : ''}
+          ${inv.discount_amount > 0 ? `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
+            <span>Discount</span><span>-${formatCurrency(inv.discount_amount, inv.currency)}</span>
+          </div>` : ''}
+          <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #1a1a1a; border-top: 2px solid #1a1a1a; padding-top: 6px; margin-top: 4px;">
+            <span>${isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>
+            <span>${formatCurrency(inv.total_amount, inv.currency)}</span>
+          </div>
+          ${inv.amount_paid > 0 ? `
+          <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #059669;">
+            <span>Paid</span><span>-${formatCurrency(inv.amount_paid, inv.currency)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: 600; background: #fef3c7; padding: 4px 6px; margin: 4px -6px 0; border-radius: 3px;">
+            <span>Balance Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span>
+          </div>` : ''}
+        </div>
       </div>
-      <div class="summary-row amount-due"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
-    </div>
+    `
 
-    <!-- Totals -->
-    <div class="totals-wrapper no-break">
-      <div class="totals">
-        <div class="total-row">
-          <span>${isNigerianVatRegistered ? 'Subtotal (excl. VAT)' : 'Subtotal'}</span>
-          <span>${formatCurrency(inv.subtotal, inv.currency)}</span>
-        </div>
-        ${inv.tax_amount > 0 ? `
-        <div class="total-row">
-          <span>${isNigerianVatRegistered ? 'VAT @ 7.5%' : 'Tax'}</span>
-          <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
-        </div>
-        ` : ''}
-        ${inv.discount_amount > 0 ? `
-        <div class="total-row">
-          <span>Discount</span>
-          <span>-${formatCurrency(inv.discount_amount, inv.currency)}</span>
-        </div>
-        ` : ''}
-        <div class="total-row grand">
-          <span>${isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>
-          <span>${formatCurrency(inv.total_amount, inv.currency)}</span>
-        </div>
-        ${inv.amount_paid > 0 ? `
-        <div class="total-row paid">
-          <span>Paid</span>
-          <span>-${formatCurrency(inv.amount_paid, inv.currency)}</span>
-        </div>
-        <div class="total-row balance">
-          <span>Balance Due</span>
-          <span>${formatCurrency(balanceDue, inv.currency)}</span>
-        </div>
-        ` : ''}
+    // Notes/Terms HTML
+    const notesTermsHtml = ((showNotes && inv.notes) || (showTerms && inv.terms)) ? `
+      <div style="margin-bottom: 12px; padding: 8px 10px; background: #fafafa; border-radius: 4px;" class="no-break">
+        ${showNotes && inv.notes ? `<div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 3px;">Notes</div><div style="font-size: 10px; color: #444;">${inv.notes}</div>` : ''}
+        ${(showNotes && inv.notes) && (showTerms && inv.terms) ? '<div style="height: 8px;"></div>' : ''}
+        ${showTerms && inv.terms ? `<div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 3px;">Terms</div><div style="font-size: 10px; color: #444;">${inv.terms}</div>` : ''}
       </div>
-    </div>
+    ` : ''
 
-    ${((showNotes && inv.notes) || (showTerms && inv.terms)) ? `
-    <!-- Notes/Terms -->
-    <div class="notes-section no-break">
-      ${showNotes && inv.notes ? `
-      <div class="notes-label">Notes</div>
-      <div class="notes-content">${inv.notes}</div>
-      ` : ''}
-      ${(showNotes && inv.notes) && (showTerms && inv.terms) ? '<div style="height: 8px;"></div>' : ''}
-      ${showTerms && inv.terms ? `
-      <div class="notes-label">Terms</div>
-      <div class="notes-content">${inv.terms}</div>
-      ` : ''}
-    </div>
-    ` : ''}
-
-    ${(() => {
+    // Payment method HTML
+    const paymentMethodHtml = (() => {
       const pm = inv.payment_method_snapshot
       if (!pm) return ''
       const instructions = (pm as Record<string, unknown>).instructions as Record<string, string> || {}
       const displayName = (pm as Record<string, unknown>).display_name as string || (pm as Record<string, unknown>).provider_type as string || 'Payment Method'
       const instructionRows = Object.entries(instructions)
         .filter(([, v]) => v)
-        .map(([k, v]) => `
-          <div style="display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0;">
-            <span style="color: #666; text-transform: capitalize;">${String(k).replace(/_/g, ' ')}</span>
-            <span style="font-family: monospace; font-size: 10px;">${String(v)}</span>
-          </div>
-        `).join('')
-      return `
-      <div class="notes-section no-break" style="margin-bottom: 12px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
+        .map(([k, v]) => `<div style="display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0;"><span style="color: #666; text-transform: capitalize;">${String(k).replace(/_/g, ' ')}</span><span style="font-family: monospace; font-size: 10px;">${String(v)}</span></div>`).join('')
+      return `<div class="no-break" style="margin-bottom: 12px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
         <div style="font-size: 9px; font-weight: 600; color: #166534; text-transform: uppercase; margin-bottom: 6px;">Payment Instructions</div>
-        <div style="font-size: 10px; color: #333; margin-bottom: 4px;">
-          <strong>${displayName}</strong>
-        </div>
+        <div style="font-size: 10px; color: #333; margin-bottom: 4px;"><strong>${displayName}</strong></div>
         ${instructionRows}
-        <div style="margin-top: 6px; font-size: 9px; color: #666; border-top: 1px solid #dcfce7; padding-top: 4px;">
-          Reference: <strong>${inv.invoice_number}</strong>
-        </div>
+        <div style="margin-top: 6px; font-size: 9px; color: #666; border-top: 1px solid #dcfce7; padding-top: 4px;">Reference: <strong>${inv.invoice_number}</strong></div>
       </div>`
-    })()}
+    })()
 
-    <!-- Footer with QR Code -->
-    <div class="footer">
-      <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
-        ${showQr && verificationUrl && qrCodeHtml ? `
-        <div style="display: flex; align-items: center; gap: 6px;">
-          ${qrCodeHtml}
-          <span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span>
+    // Footer HTML
+    const footerHtml = `
+      <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 8px; color: #888; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${showQr && verificationUrl && qrCodeHtml ? `<div style="display: flex; align-items: center; gap: 6px;">${qrCodeHtml}<span style="font-size: 7px; max-width: 80px;">Scan to verify invoice authenticity</span></div>` : ''}
         </div>
-        ` : ''}
+        <div style="text-align: right;">
+          ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}<br>
+          ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}
+        </div>
       </div>
-      <div class="footer-right">
-        ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
-        <br>
-        ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}
-      </div>
-    </div>
-    ${showWatermark ? `
-    <div class="footer-branding">
-      Generated with <a href="https://invoicemonk.com">Invoicemonk</a> – Smart invoicing for modern businesses
-    </div>
-    ` : ''}
-  </div>
+      ${showWatermark ? `<div class="footer-branding">Generated with <a href="https://invoicemonk.com">Invoicemonk</a> – Smart invoicing for modern businesses</div>` : ''}
+    `
+
+    // Generate template-specific body HTML
+    let bodyHtml = ''
+
+    if (tplHeaderStyle === 'minimal') {
+      // ── MINIMAL (Basic) ──
+      bodyHtml = `
+        <div class="container">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px;">
+            <div>
+              <div style="font-size: 18px; font-weight: 700; color: #4b5563;">INVOICE</div>
+              <div style="font-size: 11px; color: #9ca3af;">${inv.invoice_number}</div>
+            </div>
+            <div style="text-align: right; font-size: 10px; color: #6b7280;">
+              <div>Issued: ${formatDate(inv.issue_date)}</div>
+              ${inv.due_date ? `<div>Due: ${formatDate(inv.due_date)}</div>` : ''}
+            </div>
+          </div>
+          <div style="display: flex; gap: 24px; margin-bottom: 16px;">
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 600; color: #9ca3af; text-transform: uppercase; margin-bottom: 4px;">From</div>
+              <div style="font-size: 12px; font-weight: 600;">${issuerName}</div>
+              ${issuerEmail ? `<div style="font-size: 10px; color: #666;">${issuerEmail}</div>` : ''}
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 600; color: #9ca3af; text-transform: uppercase; margin-bottom: 4px;">To</div>
+              <div style="font-size: 12px; font-weight: 600;">${recipientName}</div>
+              ${recipientEmail ? `<div style="font-size: 10px; color: #666;">${recipientEmail}</div>` : ''}
+            </div>
+          </div>
+          ${itemsTableHtml}
+          ${totalsHtml}
+          ${paymentMethodHtml}
+          <div style="margin-top: auto; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 8px; color: #aaa; text-align: right;">
+            ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
+          </div>
+          ${showWatermark ? `<div class="footer-branding">Generated with <a href="https://invoicemonk.com">Invoicemonk</a></div>` : ''}
+        </div>
+      `
+    } else if (tplHeaderStyle === 'modern') {
+      // ── MODERN ──
+      bodyHtml = `
+        <div class="container">
+          <div style="background: ${tplPrimaryColor}; color: white; padding: 20px 24px; margin: -12mm -15mm 16px; border-radius: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 80px; object-fit: contain; background: rgba(255,255,255,0.9); border-radius: 4px; padding: 4px;" />` : ''}
+                <div>
+                  <div style="font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">INVOICE</div>
+                  <div style="font-size: 11px; opacity: 0.8;">${inv.invoice_number}</div>
+                </div>
+              </div>
+              <div style="text-align: right; font-size: 10px; opacity: 0.9;">
+                <div>Issue: ${formatDate(inv.issue_date)}</div>
+                ${inv.due_date ? `<div>Due: ${formatDate(inv.due_date)}</div>` : ''}
+                <div style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 4px; background: rgba(255,255,255,0.2);">${inv.status.toUpperCase()}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div style="flex: 1; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa;">
+              <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; margin-bottom: 4px;">From</div>
+              <div style="font-size: 12px; font-weight: 600;">${issuerName}</div>
+              ${issuerAddress ? `<div style="font-size: 10px; color: #666;">${issuerAddress}</div>` : ''}
+              ${issuerTaxId ? `<div style="font-size: 10px; color: #444; font-weight: 500;">TIN: ${issuerTaxId}</div>` : ''}
+              ${issuerEmail ? `<div style="font-size: 10px; color: #666;">${issuerEmail}</div>` : ''}
+            </div>
+            <div style="flex: 1; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa;">
+              <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; margin-bottom: 4px;">Bill To</div>
+              <div style="font-size: 12px; font-weight: 600;">${recipientName}</div>
+              ${recipientAddress ? `<div style="font-size: 10px; color: #666;">${recipientAddress}</div>` : ''}
+              ${recipientTaxId ? `<div style="font-size: 10px; color: #444; font-weight: 500;">TIN: ${recipientTaxId}</div>` : ''}
+              ${recipientEmail ? `<div style="font-size: 10px; color: #666;">${recipientEmail}</div>` : ''}
+            </div>
+          </div>
+          <div style="border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; margin-bottom: 16px;">
+            ${itemsTableHtml}
+          </div>
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <div style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa;">
+              ${totalsHtml}
+            </div>
+          </div>
+          ${paymentMethodHtml}
+          ${notesTermsHtml}
+          ${footerHtml}
+        </div>
+      `
+    } else if (tplHeaderStyle === 'enterprise') {
+      // ── ENTERPRISE ──
+      bodyHtml = `
+        <div class="container">
+          <div style="text-align: center; padding: 16px 0; border-top: 2px solid ${tplPrimaryColor}; border-bottom: 2px solid ${tplPrimaryColor}; margin-bottom: 16px;">
+            ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 45px; max-width: 120px; object-fit: contain; margin: 0 auto 8px;" />` : ''}
+            <div style="font-size: 16px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">${issuerName}</div>
+            ${issuerTaxId ? `<div style="font-size: 9px; color: #666;">TIN: ${issuerTaxId}</div>` : ''}
+            ${issuerVatRegNumber ? `<div style="font-size: 9px; color: #666;">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
+            ${issuerAddress ? `<div style="font-size: 9px; color: #666;">${issuerAddress}</div>` : ''}
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid ${tplPrimaryColor}30;">
+            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Invoice No</div><div style="font-weight: 600; font-family: monospace;">${inv.invoice_number}</div></div>
+            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Date</div><div style="font-weight: 500;">${formatDate(inv.issue_date)}</div></div>
+            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Due Date</div><div style="font-weight: 500;">${formatDate(inv.due_date)}</div></div>
+            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Status</div><div style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div></div>
+          </div>
+          <div style="display: flex; gap: 24px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid ${tplPrimaryColor}30;">
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Issuer</div>
+              <div style="font-size: 12px; font-weight: 600;">${issuerName}</div>
+              ${issuerAddress ? `<div style="font-size: 10px; color: #444;">${issuerAddress}</div>` : ''}
+              ${issuerEmail ? `<div style="font-size: 10px; color: #444;">${issuerEmail}</div>` : ''}
+              ${issuerPhone ? `<div style="font-size: 10px; color: #444;">${issuerPhone}</div>` : ''}
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Recipient</div>
+              <div style="font-size: 12px; font-weight: 600;">${recipientName}</div>
+              ${recipientAddress ? `<div style="font-size: 10px; color: #444;">${recipientAddress}</div>` : ''}
+              ${recipientEmail ? `<div style="font-size: 10px; color: #444;">${recipientEmail}</div>` : ''}
+              ${recipientTaxId ? `<div style="font-size: 10px; color: #333; font-weight: 500;">TIN: ${recipientTaxId}</div>` : ''}
+            </div>
+          </div>
+          <div style="border: 1px solid ${tplPrimaryColor}30; border-radius: 4px; overflow: hidden; margin-bottom: 16px;">
+            ${itemsTableHtml}
+          </div>
+          ${totalsHtml}
+          ${paymentMethodHtml}
+          ${notesTermsHtml}
+          <div style="border-top: 2px solid ${tplPrimaryColor}; border-bottom: 2px solid ${tplPrimaryColor}; padding: 8px 0; margin-top: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #888;">
+              <div>
+                ${showQr && verificationUrl && qrCodeHtml ? `<div style="display: flex; align-items: center; gap: 6px;">${qrCodeHtml}<span style="font-size: 7px; max-width: 80px;">Scan to verify</span></div>` : ''}
+              </div>
+              <div style="text-align: right;">
+                ${verificationLine}${verificationLine && hashLine ? ' • ' : ''}${hashLine}<br>
+                ${issuerName}${issuerEmail ? ` • ${issuerEmail}` : ''}
+              </div>
+            </div>
+          </div>
+          ${showWatermark ? `<div class="footer-branding">Generated with <a href="https://invoicemonk.com">Invoicemonk</a> – Smart invoicing for modern businesses</div>` : ''}
+        </div>
+      `
+    } else {
+      // ── STANDARD (Professional) — default ──
+      bodyHtml = `
+        <div class="container">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; border-bottom: 2px solid ${tplPrimaryColor}; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
+              <div>
+                <div style="font-size: 18px; font-weight: 700; color: ${tplPrimaryColor};">${issuerName}</div>
+                ${!canUseBranding ? '<div style="font-size: 9px; color: #666; margin-top: 2px;">Powered by Invoicemonk</div>' : ''}
+                ${issuerAddress ? `<div style="font-size: 9px; color: #666; margin-top: 2px;">${issuerAddress}</div>` : ''}
+                ${issuerTaxId ? `<div style="font-size: 9px; color: #444; margin-top: 2px; font-weight: 500;">TIN: ${issuerTaxId}</div>` : ''}
+                ${issuerCacNumber ? `<div style="font-size: 9px; color: #444; font-weight: 500;">${issuerCacLabel}: ${issuerCacNumber}</div>` : ''}
+                ${issuerVatRegNumber ? `<div style="font-size: 9px; color: #444; font-weight: 500;">VAT Reg: ${issuerVatRegNumber}</div>` : ''}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a;">INVOICE</div>
+              <div style="font-size: 12px; color: #666; margin-top: 2px;">${inv.invoice_number}</div>
+              <div style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 4px; background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 24px; margin-bottom: 16px;">
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor === '#1a1a1a' ? '#666' : tplPrimaryColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Bill To</div>
+              <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">${recipientName}</div>
+              <div style="font-size: 10px; color: #444; line-height: 1.4;">
+                ${recipientAddress ? `${recipientAddress}<br>` : ''}
+                ${recipientEmail ? `${recipientEmail}` : ''}
+              </div>
+              ${recipientTaxId ? `<div style="font-size: 10px; color: #333; font-weight: 500; margin-top: 4px;">TIN: ${recipientTaxId}</div>` : ''}
+              ${recipientCacNumber ? `<div style="font-size: 10px; color: #333; font-weight: 500;">CAC: ${recipientCacNumber}</div>` : ''}
+            </div>
+            <div style="flex: 1;">
+              <div style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Invoice Date</span><span>${formatDate(inv.issue_date)}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Due Date</span><span>${formatDate(inv.due_date)}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Currency</span><span>${inv.currency}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #1a1a1a; padding-top: 6px; margin-top: 4px; border-top: 1px solid #e5e7eb;"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
+              </div>
+            </div>
+          </div>
+          ${itemsTableHtml}
+          <div class="no-break" style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
+            <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 6px;">Invoice Summary</div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Total Items</span><span>${items.length}</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Subtotal</span><span>${formatCurrency(inv.subtotal, inv.currency)}</span></div>
+            ${inv.tax_amount > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>${isNigerianVatRegistered ? 'VAT' : 'Tax'}</span><span>${formatCurrency(inv.tax_amount, inv.currency)}</span></div>` : ''}
+            ${inv.discount_amount > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 10px; color: #444; padding: 2px 0;"><span>Discount</span><span>-${formatCurrency(inv.discount_amount, inv.currency)}</span></div>` : ''}
+            <div style="display: flex; justify-content: space-between; font-weight: 600; padding-top: 4px; border-top: 1px solid #e5e7eb; margin-top: 4px; font-size: 10px;"><span>Grand Total</span><span>${formatCurrency(inv.total_amount, inv.currency)}</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #1a1a1a; padding-top: 6px; margin-top: 4px; border-top: 1px solid #e5e7eb;"><span>Amount Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span></div>
+          </div>
+          ${totalsHtml}
+          ${notesTermsHtml}
+          ${paymentMethodHtml}
+          ${footerHtml}
+        </div>
+      `
+    }
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice ${inv.invoice_number}</title>
+  <style>${sharedCss}</style>
+</head>
+<body>
+  ${bodyHtml}
 </body>
 </html>`
 

@@ -1,135 +1,65 @@
 
 
-# Brand Colors & Distinct Template Layouts
+# Block Disposable/Temporary Email Signups
 
-## Overview
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-Two connected features: (1) let users set a brand color on their business with per-invoice override, and (2) make the 4 templates visually distinct with completely different HTML layouts in both the preview card and PDF generator.
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-## Part 1: Brand Color
+### Layer 1: Client-Side Disposable Email Check
 
-### Database
-- Add `brand_color TEXT` column to `businesses` table (nullable, default null)
-- No RLS changes needed (existing policies cover updates)
+**File: `src/lib/disposable-emails.ts`** (new)
 
-### Business Profile (`BusinessProfile.tsx`)
-- Add a color picker input in the branding section (near logo upload)
-- Simple `<input type="color">` with a hex text input beside it
-- Saves to `brand_color` on the business record
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-### Invoice Form (`InvoiceNew.tsx` + `InvoiceEdit.tsx`)
-- Add an optional "Brand Color" override field below template selection
-- Pre-fills from `currentBusiness.brand_color`
-- User can change it per-invoice
-- The chosen color feeds into `templateConfig.styles.primary_color` for preview
-- On save/issue, stored in `template_snapshot.styles.primary_color`
+**File: `src/pages/app/Signup.tsx`**
 
-## Part 2: Fully Distinct Template Layouts
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-Each template will have a completely different arrangement — not just color/border tweaks.
+### Layer 2: Server-Side Validation (Database Trigger)
 
-```text
-┌─────────────────────────────────────────────────┐
-│ BASIC (Minimal)                                 │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ INVOICE #INV-001          Issue: Jan 1 2026 │ │
-│ │                            Due: Feb 1 2026  │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │ From: Business Name    To: Client Name      │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │ Items table (compact, no background)        │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │                          Subtotal: $500     │ │
-│ │                          Total:    $540     │ │
-│ └─────────────────────────────────────────────┘ │
-│ No logo, no QR, no terms. Gray accents only.    │
-└─────────────────────────────────────────────────┘
+**Migration SQL:**
 
-┌─────────────────────────────────────────────────┐
-│ PROFESSIONAL (Standard) — current layout        │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ [Logo] Business Name        INVOICE         │ │
-│ │ Address / TIN              #INV-001         │ │
-│ │                            Date / Due       │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │ From: ...             Bill To: ...          │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │ Items table with brand-colored headers      │ │
-│ ├─────────────────────────────────────────────┤ │
-│ │                    Totals (right-aligned)   │ │
-│ │ Notes / Terms              QR verification  │ │
-│ └─────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────┘
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-┌─────────────────────────────────────────────────┐
-│ MODERN                                          │
-│ ┌─────────────────────────────────────────────┐ │
-│ │▓▓▓▓▓▓▓▓ FULL-WIDTH BRAND COLOR BAR ▓▓▓▓▓▓▓▓│ │
-│ │▓▓ [Logo centered]   INVOICE #INV-001     ▓▓▓│ │
-│ │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│ │
-│ │                                             │ │
-│ │ ┌──────────────┐   ┌──────────────────────┐ │ │
-│ │ │ FROM (card)  │   │ TO (card)            │ │ │
-│ │ └──────────────┘   └──────────────────────┘ │ │
-│ │                                             │ │
-│ │ Items (rounded rows, alternating bg)        │ │
-│ │                                             │ │
-│ │ ┌──────────── Totals card ────────────────┐ │ │
-│ │ │ Subtotal / Tax / Grand Total            │ │ │
-│ │ └────────────────────────────────────────┘  │ │
-│ │                                             │ │
-│ │ Notes in card    │    QR + Verification     │ │
-│ └─────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────┘
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
 
-┌─────────────────────────────────────────────────┐
-│ ENTERPRISE                                      │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ ═══════════════════════════════════════════ │ │
-│ │          [Logo centered]                    │ │
-│ │          BUSINESS LEGAL NAME                │ │
-│ │          TIN / VAT / Registration           │ │
-│ │ ═══════════════════════════════════════════ │ │
-│ │                                             │ │
-│ │ INVOICE NO: INV-001   DATE: Jan 1, 2026    │ │
-│ │ STATUS: ISSUED         DUE: Feb 1, 2026    │ │
-│ │ ─────────────────────────────────────────── │ │
-│ │                                             │ │
-│ │ ISSUER              │  RECIPIENT            │ │
-│ │ Full details...     │  Full details...      │ │
-│ │ ─────────────────────────────────────────── │ │
-│ │                                             │ │
-│ │ Items (formal table with borders)           │ │
-│ │ ─────────────────────────────────────────── │ │
-│ │                                             │ │
-│ │ Totals (boxed, right)  │  Bank Details      │ │
-│ │                        │  (if available)    │ │
-│ │ ─────────────────────────────────────────── │ │
-│ │ Terms │ Notes │ QR + Hash + Verification    │ │
-│ │ ═══════════════════════════════════════════ │ │
-│ └─────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────┘
-```
+Actually, the most practical and effective approach for Supabase:
 
-## Files to Change
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
 
-### Database Migration
-- Add `brand_color` to `businesses`
+### Layer 2 (revised): Profile Insert Trigger
 
-### Frontend (5 files)
-1. **`BusinessProfile.tsx`** — Add color picker field, save `brand_color`
-2. **`InvoiceNew.tsx`** — Add brand color override, pass to preview
-3. **`InvoiceEdit.tsx`** — Same as above
-4. **`InvoicePreviewCard.tsx`** — Rewrite to render 4 distinct layout structures based on `header_style` (minimal/standard/modern/enterprise), each with different DOM arrangement, logo position, section styling
-5. **`InvoicePreviewDialog.tsx`** — No structural changes, just passes props through
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
 
-### Edge Function (1 file)
-6. **`generate-pdf/index.ts`** — Rewrite HTML generation to produce 4 distinct PDF layouts matching the preview designs. Each `header_style` gets its own HTML template block with unique CSS and structure.
+### Files to Create/Modify
 
-## Technical Notes
+| File | Change |
+|------|--------|
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
 
-- Brand color flows: `business.brand_color` → invoice form default → `template_snapshot.styles.primary_color` on issue → PDF uses snapshotted color
-- The `TemplateConfig` interface already supports `styles.primary_color`, so no type changes needed
-- Each template layout in the preview will be a conditional render block (not just CSS class swaps — different DOM structure)
-- PDF HTML will use a switch on `tplHeaderStyle` to output completely different `<body>` content per template
+### Disposable Domain Categories to Block
+
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
+
+### User Experience
+
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
 
