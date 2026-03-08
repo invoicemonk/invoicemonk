@@ -91,7 +91,7 @@ export function useQuickSetup(): QuickSetupState {
         key: 'address',
         label: 'Add business address',
         description: 'Your address must appear on every invoice',
-        complianceTip: 'You'll need: street address, city, and country at minimum',
+        complianceTip: "You'll need: street address, city, and country at minimum",
         complete: !!address?.city && !!address?.country,
         href: `${base}/settings`,
       },
