@@ -923,12 +923,12 @@ async function generateInvoicePdfBase64(
     content.push({ stack: pmLines })
   }
 
-  // --- 6. NOTES & TERMS (minimal spacing) ---
-  if (invoice.notes) {
+  // --- 6. NOTES & TERMS (minimal spacing, respecting template flags) ---
+  if (showNotes && invoice.notes) {
     content.push({ text: 'NOTES', fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] })
     content.push({ text: invoice.notes as string, fontSize: 9, color: '#444444', margin: [0, 0, 0, 6] })
   }
-  if (invoice.terms) {
+  if (showTerms && invoice.terms) {
     content.push({ text: 'TERMS', fontSize: 8, bold: true, color: '#999999', margin: [0, 8, 0, 3] })
     content.push({ text: invoice.terms as string, fontSize: 9, color: '#444444', margin: [0, 0, 0, 6] })
   }
