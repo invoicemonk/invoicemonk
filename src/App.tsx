@@ -58,9 +58,6 @@ import Expenses from "./pages/app/Expenses";
 import Receipts from "./pages/app/Receipts";
 import ReceiptDetail from "./pages/app/ReceiptDetail";
 
-// Support pages
-import Support from "./pages/app/Support";
-import SupportTicket from "./pages/app/SupportTicket";
 
 // Legacy org route redirect component
 function OrgRedirect() {
