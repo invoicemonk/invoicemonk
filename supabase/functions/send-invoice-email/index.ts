@@ -635,16 +635,106 @@ async function generateInvoicePdfBase64(
     qrDataUri = await fetchImageAsBase64(qrApiUrl)
   }
 
-  // === BUILD CONTENT ARRAY (compact single-page layout) ===
+  // Template layout and styles
+  const tplLayout = templateSnapshot?.layout || {}
+  const tplStyles = templateSnapshot?.styles || {}
+  const tplPrimaryColor = tplStyles.primary_color || '#1a1a1a'
+  const tplHeaderStyle = tplLayout.header_style || 'standard'
+  const showLogo = tplLayout.show_logo !== false
+  const showTerms = tplLayout.show_terms !== false
+  const showNotes = tplLayout.show_notes !== false
+  const showQr = tplLayout.show_verification_qr !== false
+
+  // === BUILD CONTENT ARRAY ===
   const content: unknown[] = []
 
-  // --- 1. HEADER (compact two-column) ---
-  const leftHeaderStack: unknown[] = []
-  if (logoDataUri) {
-    leftHeaderStack.push({ image: logoDataUri, width: 120, fit: [120, 45], margin: [0, 0, 0, 4] })
+  // --- 1. HEADER ---
+  if (tplHeaderStyle === 'minimal') {
+    // MINIMAL: Simple header, no logo
+    content.push({
+      columns: [
+        { stack: [
+          { text: 'INVOICE', fontSize: 16, bold: true, color: '#4b5563' },
+          { text: invoice.invoice_number as string, fontSize: 10, color: '#9ca3af', margin: [0, 1, 0, 0] }
+        ], width: '*' },
+        { stack: [
+          { text: `Issued: ${formatDate(invoice.issue_date as string)}`, fontSize: 9, color: '#6b7280', alignment: 'right' },
+          { text: `Due: ${formatDate(invoice.due_date as string)}`, fontSize: 9, color: '#6b7280', alignment: 'right' }
+        ], width: 'auto' }
+      ],
+      margin: [0, 0, 0, 8]
+    })
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }], margin: [0, 0, 0, 10] })
+  } else if (tplHeaderStyle === 'modern') {
+    // MODERN: Brand-colored header bar
+    content.push({
+      table: {
+        widths: ['*'],
+        body: [[{
+          stack: [
+            {
+              columns: [
+                { stack: [
+                  ...(showLogo && logoDataUri ? [{ image: logoDataUri, width: 80, fit: [80, 35], margin: [0, 0, 8, 0] }] : []),
+                  { text: 'INVOICE', fontSize: 20, bold: true, color: '#ffffff' },
+                  { text: invoice.invoice_number as string, fontSize: 10, color: '#ffffffcc', margin: [0, 1, 0, 0] }
+                ], width: '*' },
+                { stack: [
+                  { text: `Issue: ${formatDate(invoice.issue_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
+                  { text: `Due: ${formatDate(invoice.due_date as string)}`, fontSize: 9, color: '#ffffffdd', alignment: 'right' },
+                  { text: status.toUpperCase(), fontSize: 7, bold: true, color: '#ffffff', alignment: 'right', margin: [0, 3, 0, 0] }
+                ], width: 'auto' }
+              ]
+            }
+          ],
+          fillColor: tplPrimaryColor,
+          margin: [12, 10, 12, 10]
+        }]]
+      },
+      layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+      margin: [0, 0, 0, 12]
+    })
+  } else if (tplHeaderStyle === 'enterprise') {
+    // ENTERPRISE: Centered letterhead with double-border
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 2, lineColor: tplPrimaryColor }], margin: [0, 0, 0, 8] })
+    const letterheadStack: unknown[] = []
+    if (showLogo && logoDataUri) {
+      letterheadStack.push({ image: logoDataUri, width: 100, fit: [100, 40], alignment: 'center', margin: [0, 0, 0, 4] })
+    }
+    letterheadStack.push({ text: issuerName, fontSize: 14, bold: true, alignment: 'center', margin: [0, 0, 0, 2] })
+    if (issuerTaxId) letterheadStack.push({ text: `TIN: ${issuerTaxId}`, fontSize: 8, color: '#666666', alignment: 'center' })
+    if (issuerVatReg) letterheadStack.push({ text: `VAT: ${issuerVatReg}`, fontSize: 8, color: '#666666', alignment: 'center' })
+    if (issuerAddress) letterheadStack.push({ text: issuerAddress, fontSize: 8, color: '#666666', alignment: 'center' })
+    content.push({ stack: letterheadStack, margin: [0, 0, 0, 8] })
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 2, lineColor: tplPrimaryColor }], margin: [0, 0, 0, 10] })
+
+    // Metadata grid
+    content.push({
+      columns: [
+        { stack: [{ text: 'INVOICE NO', fontSize: 7, bold: true, color: '#999999' }, { text: invoice.invoice_number as string, fontSize: 9, bold: true }], width: '*' },
+        { stack: [{ text: 'DATE', fontSize: 7, bold: true, color: '#999999' }, { text: formatDate(invoice.issue_date as string), fontSize: 9 }], width: '*' },
+        { stack: [{ text: 'DUE DATE', fontSize: 7, bold: true, color: '#999999' }, { text: formatDate(invoice.due_date as string), fontSize: 9 }], width: '*' },
+        {
+          stack: [
+            { text: 'STATUS', fontSize: 7, bold: true, color: '#999999' },
+            {
+              table: { widths: ['auto'], body: [[{ text: status.toUpperCase(), fontSize: 7, bold: true, color: statusColors[status] || '#1d4ed8', fillColor: statusBgColors[status] || '#dbeafe', margin: [4, 1, 4, 1] }]] },
+              layout: 'noBorders'
+            }
+          ], width: '*'
+        }
+      ],
+      margin: [0, 0, 0, 10]
+    })
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }], margin: [0, 0, 0, 10] })
   } else {
-    leftHeaderStack.push({ text: issuerName, style: 'businessName', margin: [0, 0, 0, 2] })
-  }
+    // STANDARD: Default professional layout
+    const leftHeaderStack: unknown[] = []
+    if (showLogo && logoDataUri) {
+      leftHeaderStack.push({ image: logoDataUri, width: 120, fit: [120, 45], margin: [0, 0, 0, 4] })
+    } else {
+      leftHeaderStack.push({ text: issuerName, style: 'businessName', margin: [0, 0, 0, 2] })
+    }
 
   const metaLine = `${formatDate(invoice.issue_date as string)}  •  Due: ${formatDate(invoice.due_date as string)}  •  ${currency}`
   const rightHeaderStack: unknown[] = [
