@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useIdleTimeout } from '@/hooks/use-idle-timeout';
 
 interface Profile {
   id: string;
@@ -170,6 +171,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     return { error: error as Error | null };
   };
+
+  useIdleTimeout();
 
   return (
     <AuthContext.Provider
