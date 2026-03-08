@@ -1,65 +1,37 @@
 
 
-# Block Disposable/Temporary Email Signups
-
-## Problem
-Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
+# Auto-Logout After 30 Minutes of Inactivity
 
 ## Approach
-Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-### Layer 1: Client-Side Disposable Email Check
+Create a custom hook `useIdleTimeout` that tracks user activity (mouse, keyboard, scroll, touch) and automatically logs the user out after 30 minutes of inactivity, redirecting them to the login page with a message explaining why.
 
-**File: `src/lib/disposable-emails.ts`** (new)
+## Changes
 
-Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
+### 1. Create `src/hooks/use-idle-timeout.ts` (new)
 
-**File: `src/pages/app/Signup.tsx`**
+- Track last activity timestamp via `mousemove`, `keydown`, `scroll`, `touchstart` events
+- Use throttled event listeners (update at most every 30 seconds to avoid performance overhead)
+- Run a check interval every 60 seconds comparing `Date.now()` against last activity
+- When idle time exceeds 30 minutes:
+  - Call `signOut()` from AuthContext
+  - Navigate to `/login?reason=idle` 
+- Clean up listeners and interval on unmount
 
-Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
+### 2. Update `src/contexts/AuthContext.tsx`
 
-### Layer 2: Server-Side Validation (Database Trigger)
+- Import and invoke `useIdleTimeout` inside `AuthProvider`, so it runs globally for all authenticated users
+- Only activate when `user` is not null
 
-**Migration SQL:**
+### 3. Update `src/pages/app/Login.tsx`
 
-Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
+- Check URL for `?reason=idle` query parameter
+- If present, show an info toast or inline message: "You were logged out due to inactivity. Please sign in again."
 
-**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
+### Technical Notes
 
-Actually, the most practical and effective approach for Supabase:
-
-1. **Client-side blocklist** (primary defense -- covers 95% of cases)
-2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
-
-### Layer 2 (revised): Profile Insert Trigger
-
-**Migration:**
-- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
-- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
-- This catches any bypass of the frontend check
-
-### Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
-| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
-| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
-| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
-
-### Disposable Domain Categories to Block
-
-The blocklist will include domains from these categories:
-- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
-- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
-- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
-- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
-- Total: ~250 domains covering the vast majority of disposable services
-
-### User Experience
-
-When a user enters a disposable email:
-- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
-- The submit button remains disabled
-- If somehow bypassed, the profile trigger suspends the account immediately
+- The 30-minute timeout is client-side only (no server changes needed)
+- Supabase's `autoRefreshToken` keeps the session alive server-side while the tab is open, so this complements that by handling true user inactivity
+- Events are throttled to minimize performance impact
+- The hook is a no-op when the user is not authenticated
 
