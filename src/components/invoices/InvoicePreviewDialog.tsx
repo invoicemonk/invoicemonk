@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { InvoicePreviewCard } from './InvoicePreviewCard';
+import { InvoicePreviewCard, TemplateConfig } from './InvoicePreviewCard';
 import { Eye } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -32,6 +32,7 @@ interface InvoicePreviewDialogProps {
   invoice: Invoice;
   showWatermark?: boolean;
   business?: Business | null;
+  templateConfig?: TemplateConfig | null;
 }
 
 export function InvoicePreviewDialog({ 
@@ -39,7 +40,8 @@ export function InvoicePreviewDialog({
   onOpenChange, 
   invoice,
   showWatermark = false,
-  business
+  business,
+  templateConfig
 }: InvoicePreviewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,7 +58,12 @@ export function InvoicePreviewDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="mt-4">
-          <InvoicePreviewCard invoice={invoice} showWatermark={showWatermark} business={business} />
+          <InvoicePreviewCard 
+            invoice={invoice} 
+            showWatermark={showWatermark} 
+            business={business} 
+            templateConfig={templateConfig}
+          />
         </div>
       </DialogContent>
     </Dialog>
