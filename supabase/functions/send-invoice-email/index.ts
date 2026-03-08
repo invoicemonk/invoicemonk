@@ -944,7 +944,7 @@ async function generateInvoicePdfBase64(
 
   const footerLeft: unknown[] = footerLines.map(l => ({ text: l, fontSize: 8, color: '#888888' }))
 
-  if (qrDataUri) {
+  if (showQr && qrDataUri) {
     content.push({
       columns: [
         { stack: footerLeft, width: '*' },
