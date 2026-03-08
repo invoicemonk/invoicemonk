@@ -327,6 +327,16 @@ Deno.serve(async (req) => {
     const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG'
     const isNigerianVatRegistered = isNigerianInvoice && issuerSnapshot?.is_vat_registered === true
 
+    // Template layout and styles
+    const tplLayout = templateSnapshot?.layout || {}
+    const tplStyles = templateSnapshot?.styles || {}
+    const tplPrimaryColor = tplStyles.primary_color || '#1a1a1a'
+    const tplHeaderStyle = tplLayout.header_style || 'standard'
+    const showLogo = tplLayout.show_logo !== false
+    const showTerms = tplLayout.show_terms !== false
+    const showNotes = tplLayout.show_notes !== false
+    const showQr = tplLayout.show_verification_qr !== false
+
     // Determine if watermark should be applied
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
     const showWatermark = templateRequiresWatermark && !canRemoveWatermark
