@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 export function TawkTo() {
   useEffect(() => {
     // Initialize Tawk_API before script loads to configure onLoad
-    window.Tawk_API = window.Tawk_API || {};
+    (window as any).Tawk_API = (window as any).Tawk_API || {};
     window.Tawk_API.onLoad = function () {
       window.Tawk_API?.hideWidget();
     };
