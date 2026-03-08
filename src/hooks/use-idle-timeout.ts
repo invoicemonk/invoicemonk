@@ -1,13 +1,12 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { User } from '@supabase/supabase-js';
 
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-const CHECK_INTERVAL_MS = 60 * 1000; // check every 60s
-const THROTTLE_MS = 30 * 1000; // throttle activity updates to every 30s
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const CHECK_INTERVAL_MS = 60 * 1000;
+const THROTTLE_MS = 30 * 1000;
 
-export const useIdleTimeout = () => {
-  const { user, signOut } = useAuth();
+export const useIdleTimeout = (user: User | null, signOut: () => Promise<void>) => {
   const navigate = useNavigate();
   const lastActivityRef = useRef(Date.now());
   const throttleRef = useRef(0);
