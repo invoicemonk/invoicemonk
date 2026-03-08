@@ -58,9 +58,6 @@ import Expenses from "./pages/app/Expenses";
 import Receipts from "./pages/app/Receipts";
 import ReceiptDetail from "./pages/app/ReceiptDetail";
 
-// Support pages
-import Support from "./pages/app/Support";
-import SupportTicket from "./pages/app/SupportTicket";
 
 // Legacy org route redirect component
 function OrgRedirect() {
@@ -82,7 +79,7 @@ import AdminCountryModules from "./pages/admin/AdminCountryModules";
 import AdminSystem from "./pages/admin/AdminSystem";
 import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
-import AdminSupport from "./pages/admin/AdminSupport";
+
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPartners from "./pages/admin/AdminPartners";
 import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions";
@@ -217,9 +214,6 @@ const App = () => (
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />
             
-            {/* Support routes */}
-            <Route path="/b/:businessId/support" element={<Support />} />
-            <Route path="/b/:businessId/support/:ticketId" element={<SupportTicket />} />
           </Route>
 
           {/* User-level settings (not business-scoped) */}
@@ -264,7 +258,7 @@ const App = () => (
             <Route path="/admin/country-modules" element={<AdminCountryModules />} />
             <Route path="/admin/retention-policies" element={<AdminRetentionPolicies />} />
             <Route path="/admin/templates" element={<AdminTemplates />} />
-            <Route path="/admin/support" element={<AdminSupport />} />
+            
             <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/regulatory-submissions" element={<AdminRegulatorySubmissions />} />
