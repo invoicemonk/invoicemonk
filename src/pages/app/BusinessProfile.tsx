@@ -23,6 +23,8 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react';
 const AuditLogs = lazy(() => import('@/pages/app/AuditLogs'));
+const Team = lazy(() => import('@/pages/app/Team'));
+const Billing = lazy(() => import('@/pages/app/Billing'));
 import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
