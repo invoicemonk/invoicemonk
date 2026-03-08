@@ -20,7 +20,9 @@ import {
   Plus,
   Info,
   History,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  UserPlus,
+  CreditCard
 } from 'lucide-react';
 const AuditLogs = lazy(() => import('@/pages/app/AuditLogs'));
 const Team = lazy(() => import('@/pages/app/Team'));
