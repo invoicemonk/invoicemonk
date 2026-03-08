@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/sidebar';
 import { BusinessSwitcher } from './BusinessSwitcher';
 import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
-import { useUnreadCount } from '@/hooks/use-notifications';
+
 import { useTeamAccess } from '@/hooks/use-tier-features';
 import { usePartnerRole } from '@/hooks/use-partner-role';
 import logo from '@/assets/invoicemonk-logo.png';
