@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: error as Error | null };
   };
 
-  useIdleTimeout();
+  useIdleTimeout(user, signOut);
 
   return (
     <AuthContext.Provider
