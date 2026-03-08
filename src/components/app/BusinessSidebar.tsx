@@ -4,14 +4,12 @@ import {
   FileText, 
   Users, 
   BarChart3, 
-  CreditCard, 
   Settings,
   LogOut,
   Shield,
   ShieldCheck,
   FileX,
   Calculator,
-  UserPlus,
   ArrowUpRight,
   ChevronDown,
   User,
@@ -47,7 +45,6 @@ import {
 import { BusinessSwitcher } from './BusinessSwitcher';
 import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
 
-import { useTeamAccess } from '@/hooks/use-tier-features';
 import { usePartnerRole } from '@/hooks/use-partner-role';
 import logo from '@/assets/invoicemonk-logo.png';
 import logoIcon from '@/assets/invoicemonk-icon.png';
@@ -55,15 +52,11 @@ import logoIcon from '@/assets/invoicemonk-icon.png';
 export function BusinessSidebar() {
   const { signOut, profile } = useAuth();
   const { businessId } = useParams<{ businessId: string }>();
-  const { currentBusiness, tier, isFree, canManageTeam, isPlatformAdmin } = useBusiness();
+  const { currentBusiness, tier, isFree, isPlatformAdmin } = useBusiness();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   
   const { isPartner } = usePartnerRole();
-  
-  // Check if tier allows team access - platform admins always have access
-  const { data: teamAccess } = useTeamAccess();
-  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
 
   const baseUrl = `/b/${businessId}`;
 
@@ -79,14 +72,8 @@ export function BusinessSidebar() {
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },
   ];
 
-  // Only show Team link if tier allows team access AND user can manage team
-  const teamNavItems = canManageTeam && hasTeamAccess ? [
-    { title: 'Team', url: `${baseUrl}/team`, icon: UserPlus },
-  ] : [];
-
   const settingsNavItems = [
     { title: 'Business Settings', url: `${baseUrl}/settings`, icon: Settings },
-    { title: 'Billing', url: `${baseUrl}/billing`, icon: CreditCard },
   ];
 
   const openSupportChat = () => {
@@ -164,32 +151,6 @@ export function BusinessSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {teamNavItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>
-              Team
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {teamNavItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.url)}
-                      tooltip={item.title}
-                    >
-                      <Link to={item.url}>
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className={cn(isCollapsed && "sr-only")}>

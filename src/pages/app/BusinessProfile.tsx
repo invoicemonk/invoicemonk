@@ -20,9 +20,13 @@ import {
   Plus,
   Info,
   History,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  UserPlus,
+  CreditCard
 } from 'lucide-react';
 const AuditLogs = lazy(() => import('@/pages/app/AuditLogs'));
+const Team = lazy(() => import('@/pages/app/Team'));
+const Billing = lazy(() => import('@/pages/app/Billing'));
 import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +46,7 @@ import {
 import { useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
 import { useDeleteBusiness } from '@/hooks/use-delete-business';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useTeamAccess } from '@/hooks/use-tier-features';
 import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
@@ -64,7 +69,7 @@ interface AddressData {
 }
 
 export default function BusinessProfile() {
-  const { currentBusiness: business, loading: isLoadingBusiness } = useBusiness();
+  const { currentBusiness: business, loading: isLoadingBusiness, canManageTeam, isPlatformAdmin } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();
@@ -75,7 +80,11 @@ export default function BusinessProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'audit-logs'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'billing' | 'audit-logs'>('profile');
+  
+  const { data: teamAccess } = useTeamAccess();
+  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
+  const showTeamTab = canManageTeam && hasTeamAccess;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -328,11 +337,21 @@ export default function BusinessProfile() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'profile' | 'audit-logs')}>
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
             <TabsList>
               <TabsTrigger value="profile" className="gap-1.5">
                 <SettingsIcon className="h-4 w-4" />
                 Profile
+              </TabsTrigger>
+              {showTeamTab && (
+                <TabsTrigger value="team" className="gap-1.5">
+                  <UserPlus className="h-4 w-4" />
+                  Team
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="billing" className="gap-1.5">
+                <CreditCard className="h-4 w-4" />
+                Billing
               </TabsTrigger>
               <TabsTrigger value="audit-logs" className="gap-1.5">
                 <History className="h-4 w-4" />
@@ -346,6 +365,14 @@ export default function BusinessProfile() {
       {activeTab === 'audit-logs' ? (
         <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
           <AuditLogs />
+        </Suspense>
+      ) : activeTab === 'team' && showTeamTab ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <Team />
+        </Suspense>
+      ) : activeTab === 'billing' ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <Billing />
         </Suspense>
       ) : (
       <>
