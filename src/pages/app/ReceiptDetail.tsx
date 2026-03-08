@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   ArrowLeft, Download, Lock, Shield, FileText, 
   Building2, User, Calendar, CreditCard, ExternalLink, 
-  Loader2, CheckCircle2, Receipt as ReceiptIcon, Copy
+  Loader2, CheckCircle2, Receipt as ReceiptIcon, Copy, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
