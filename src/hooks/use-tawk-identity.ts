@@ -13,7 +13,11 @@ declare global {
       logout?: () => void;
       hideWidget: () => void;
       showWidget: () => void;
+      maximize: () => void;
+      minimize: () => void;
       onLoad?: () => void;
+      onChatMinimized?: () => void;
+      customStyle?: any;
       visitor?: { email?: string };
     };
   }
