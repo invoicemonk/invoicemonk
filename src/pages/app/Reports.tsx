@@ -266,6 +266,8 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
     </motion.div>
   );
 }
