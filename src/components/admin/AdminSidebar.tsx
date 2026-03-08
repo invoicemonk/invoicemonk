@@ -64,6 +64,10 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
+  const openSupportChat = () => {
+    (window as any).Tawk_API?.maximize();
+  };
+
   const isActive = (path: string) => {
     if (path === '/admin') {
       return location.pathname === '/admin';
