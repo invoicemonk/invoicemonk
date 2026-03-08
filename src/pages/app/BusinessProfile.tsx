@@ -1001,6 +1001,8 @@ export default function BusinessProfile() {
           isPending={deleteBusiness.isPending}
         />
       )}
+      </>
+      )}
     </motion.div>
   );
 }
