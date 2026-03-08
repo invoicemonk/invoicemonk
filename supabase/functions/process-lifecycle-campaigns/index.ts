@@ -235,7 +235,6 @@ function campaignHTemplate(userName: string): string {
 function campaignITemplate(userName: string, invoiceCount: number): string {
   return emailWrapper(
     'Unlock Compliance Permanently',
-    'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
     `<p>Hi ${userName},</p>
     <p>You've issued <strong>${invoiceCount} invoices</strong> — nice work! You're clearly serious about your business. Here's what upgrading to <strong>Professional</strong> unlocks:</p>
     <ul style="color: #555;">
@@ -251,7 +250,7 @@ function campaignITemplate(userName: string, invoiceCount: number): string {
       </p>
     </div>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/billing" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Upgrade to Professional →</a>
+      <a href="https://app.invoicemonk.com/billing" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Upgrade to Professional →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Compliance-grade invoicing for growing businesses.</p>`
   )
