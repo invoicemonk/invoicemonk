@@ -311,24 +311,43 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // Step 1: Refresh overdue counts via CTE-style update
+    // Step 1: Refresh overdue counts via business_members join
     // =============================================
     console.log('Step 1: Refreshing overdue counts...')
 
     const { data: overdueData, error: overdueError } = await adminClient
       .from('invoices')
-      .select('user_id')
+      .select('business_id')
       .in('status', ['issued', 'sent', 'viewed'])
       .lt('due_date', now.toISOString().split('T')[0])
-      .not('user_id', 'is', null)
+      .not('business_id', 'is', null)
 
     if (overdueError) {
       console.error('Error fetching overdue invoices:', overdueError)
     } else if (overdueData) {
-      const overdueCounts: Record<string, number> = {}
+      // Group overdue counts by business_id
+      const overdueByBusiness: Record<string, number> = {}
       for (const row of overdueData) {
-        if (row.user_id) {
-          overdueCounts[row.user_id] = (overdueCounts[row.user_id] || 0) + 1
+        if (row.business_id) {
+          overdueByBusiness[row.business_id] = (overdueByBusiness[row.business_id] || 0) + 1
+        }
+      }
+
+      // Resolve business owners
+      const businessIds = Object.keys(overdueByBusiness)
+      const overdueCounts: Record<string, number> = {}
+      if (businessIds.length > 0) {
+        const { data: owners } = await adminClient
+          .from('business_members')
+          .select('user_id, business_id')
+          .in('business_id', businessIds)
+          .eq('role', 'owner')
+
+        if (owners) {
+          for (const owner of owners) {
+            const count = overdueByBusiness[owner.business_id] || 0
+            overdueCounts[owner.user_id] = (overdueCounts[owner.user_id] || 0) + count
+          }
         }
       }
 
