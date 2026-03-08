@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
 
       const userId_raw = claimsData.claims.sub as string
 
-      userId = claimsData.user.id
+      userId = userId_raw
 
       // Parse request body
       const body: GeneratePdfRequest = await req.json()
