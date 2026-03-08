@@ -37,7 +37,9 @@ export function useUpgradeTriggers() {
   const showUpgradeModal =
     !subLoading &&
     !invoicesLoading &&
+    !adminLoading &&
     !dismissed &&
+    !isPlatformAdmin &&
     tier === 'starter' &&
     typeof totalInvoices === 'number' &&
     totalInvoices >= 2;
