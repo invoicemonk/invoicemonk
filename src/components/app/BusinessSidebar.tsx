@@ -72,14 +72,8 @@ export function BusinessSidebar() {
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },
   ];
 
-  // Only show Team link if tier allows team access AND user can manage team
-  const teamNavItems = canManageTeam && hasTeamAccess ? [
-    { title: 'Team', url: `${baseUrl}/team`, icon: UserPlus },
-  ] : [];
-
   const settingsNavItems = [
     { title: 'Business Settings', url: `${baseUrl}/settings`, icon: Settings },
-    { title: 'Billing', url: `${baseUrl}/billing`, icon: CreditCard },
   ];
 
   const openSupportChat = () => {
