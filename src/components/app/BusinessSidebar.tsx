@@ -45,7 +45,6 @@ import {
 import { BusinessSwitcher } from './BusinessSwitcher';
 import { CurrencyAccountSwitcher } from './CurrencyAccountSwitcher';
 
-import { useTeamAccess } from '@/hooks/use-tier-features';
 import { usePartnerRole } from '@/hooks/use-partner-role';
 import logo from '@/assets/invoicemonk-logo.png';
 import logoIcon from '@/assets/invoicemonk-icon.png';
