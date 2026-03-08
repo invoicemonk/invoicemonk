@@ -84,16 +84,15 @@ function campaignATemplate(userName: string): string {
 function campaignBTemplate(userName: string): string {
   return emailWrapper(
     'Ready to Send Your First Invoice?',
-    'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
     `<p>Hi ${userName},</p>
-    <p>Your Invoicemonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
+    <p>Your InvoiceMonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
     <ol style="color: #555;">
       <li><strong>Add a client</strong> — name and email is all you need</li>
       <li><strong>Create an invoice</strong> — add line items, set a due date</li>
       <li><strong>Issue &amp; send</strong> — your client gets a professional, verifiable invoice</li>
     </ol>
     <div style="text-align: center; margin: 25px 0;">
-      <a href="https://app.invoicemonk.com/invoices/new" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
+      <a href="https://app.invoicemonk.com/invoices/new" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Create Your First Invoice →</a>
     </div>
     <p style="color: #888; font-size: 13px;">Every invoice includes a unique verification ID and tamper-proof hash — compliance built in.</p>`
   )
