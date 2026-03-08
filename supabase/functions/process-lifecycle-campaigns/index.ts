@@ -791,22 +791,37 @@ Deno.serve(async (req) => {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
         const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString()
 
+        // Query recent invoices via business_id, then resolve owners
         const { data: recentInvoices } = await adminClient
           .from('invoices')
-          .select('user_id, total_amount, currency')
+          .select('business_id, total_amount, currency')
           .in('status', ['issued', 'sent', 'viewed', 'paid', 'partially_paid'])
           .gte('issued_at', sevenDaysAgo)
-          .not('user_id', 'is', null)
+          .not('business_id', 'is', null)
 
         if (recentInvoices && recentInvoices.length > 0) {
+          // Resolve business owners
+          const recentBusinessIds = [...new Set(recentInvoices.map(i => i.business_id).filter(Boolean))]
+          const { data: recentOwners } = await adminClient
+            .from('business_members')
+            .select('user_id, business_id')
+            .in('business_id', recentBusinessIds)
+            .eq('role', 'owner')
+
+          const recentOwnerMap: Record<string, string> = {}
+          if (recentOwners) {
+            for (const o of recentOwners) recentOwnerMap[o.business_id] = o.user_id
+          }
+
           const userSummaries: Record<string, { count: number; total: number; currency: string }> = {}
           for (const inv of recentInvoices) {
-            if (!inv.user_id) continue
-            if (!userSummaries[inv.user_id]) {
-              userSummaries[inv.user_id] = { count: 0, total: 0, currency: inv.currency || 'NGN' }
+            const userId = inv.business_id ? recentOwnerMap[inv.business_id] : null
+            if (!userId) continue
+            if (!userSummaries[userId]) {
+              userSummaries[userId] = { count: 0, total: 0, currency: inv.currency || 'NGN' }
             }
-            userSummaries[inv.user_id].count++
-            userSummaries[inv.user_id].total += Number(inv.total_amount) || 0
+            userSummaries[userId].count++
+            userSummaries[userId].total += Number(inv.total_amount) || 0
           }
 
           const userIds = Object.keys(userSummaries).slice(0, 50)
