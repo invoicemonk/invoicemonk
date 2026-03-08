@@ -214,9 +214,6 @@ const App = () => (
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />
             
-            {/* Support routes */}
-            <Route path="/b/:businessId/support" element={<Support />} />
-            <Route path="/b/:businessId/support/:ticketId" element={<SupportTicket />} />
           </Route>
 
           {/* User-level settings (not business-scoped) */}
