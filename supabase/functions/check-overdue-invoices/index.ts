@@ -195,7 +195,8 @@ Deno.serve(async (req) => {
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   </head>
                   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                    <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                      <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 32px; margin-bottom: 12px;" />
                       <h1 style="margin: 0; font-size: 24px;">⚠️ Overdue Invoice Alert</h1>
                     </div>
                     <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
@@ -228,7 +229,7 @@ Deno.serve(async (req) => {
                       <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
                       <p style="color: #888; font-size: 12px; text-align: center;">
                         You can manage your email notification preferences in Settings.<br>
-                        This email was sent by InvoiceMonk.
+                        Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #888;">invoicemonk.com</a>
                       </p>
                     </div>
                   </body>
