@@ -46,6 +46,7 @@ import {
 import { useUpdateBusiness, useCreateBusiness, useUploadBusinessLogo, useDeleteBusinessLogo } from '@/hooks/use-business';
 import { useDeleteBusiness } from '@/hooks/use-delete-business';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useTeamAccess } from '@/hooks/use-tier-features';
 import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
