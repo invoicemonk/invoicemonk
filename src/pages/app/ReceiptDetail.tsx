@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useReceipt, useDownloadReceiptPdf } from '@/hooks/use-receipts';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
+import { SendReceiptDialog } from '@/components/receipts/SendReceiptDialog';
 import { toast } from 'sonner';
 
 export default function ReceiptDetail() {
