@@ -1101,7 +1101,8 @@ Deno.serve(async (req) => {
       showWatermark,
       canUseBranding,
       issuerLogoUrl,
-      paymentMethodSnapshot
+      paymentMethodSnapshot,
+      templateSnapshot
     )
     
     // Generate PDF using pdf-lib (pure JS, free, no external API)
