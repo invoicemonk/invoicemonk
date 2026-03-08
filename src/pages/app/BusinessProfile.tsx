@@ -122,6 +122,7 @@ export default function BusinessProfile() {
         cac_number?: string;
         business_type?: string;
         allowed_currencies?: string[];
+        brand_color?: string;
       };
 
       setFormData({
