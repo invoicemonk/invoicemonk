@@ -21,6 +21,7 @@ export default function ReceiptDetail() {
   const navigate = useNavigate();
   const { data: receipt, isLoading, error } = useReceipt(id);
   const downloadPdf = useDownloadReceiptPdf();
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
