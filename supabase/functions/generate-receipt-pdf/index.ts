@@ -53,12 +53,21 @@ function formatDate(dateStr: string): string {
   })
 }
 
-// Generate HTML for receipt PDF
-function generateReceiptHtml(
+// Generate receipt PDF as base64 using pdfmake
+async function generateReceiptPdfBase64(
   receipt: Record<string, unknown>,
   showWatermark: boolean,
   paymentMethodSnapshot?: Record<string, unknown> | null
-): string {
+): Promise<string> {
+  // Dynamic imports for pdfmake
+  // deno-lint-ignore no-explicit-any
+  const pdfMakeModule: any = await import('https://esm.sh/pdfmake@0.2.13/build/pdfmake.js?bundle=false')
+  // deno-lint-ignore no-explicit-any
+  const pdfFontsModule: any = await import('https://esm.sh/pdfmake@0.2.13/build/vfs_fonts.js?bundle=false')
+  const pdfMake = pdfMakeModule.default || pdfMakeModule
+  const vfsData = pdfFontsModule?.pdfMake?.vfs || pdfFontsModule?.default?.pdfMake?.vfs
+  if (vfsData) pdfMake.vfs = vfsData
+
   const issuer = receipt.issuer_snapshot as Record<string, unknown> || {}
   const payer = receipt.payer_snapshot as Record<string, unknown> || {}
   const invoice = receipt.invoice_snapshot as Record<string, unknown> || {}
@@ -69,260 +78,234 @@ function generateReceiptHtml(
   const formattedDate = formatDate(receipt.issued_at as string)
   const paymentDate = formatDate(payment.payment_date as string || receipt.issued_at as string)
 
-  const watermarkFooter = showWatermark 
-    ? `<div style="text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 10px;">
-         Generated with Invoicemonk
-       </div>`
-    : ''
+  // Build payment details rows
+  // deno-lint-ignore no-explicit-any
+  const paymentDetailsRows: any[] = [
+    [{ text: 'Date', color: '#6b7280' }, { text: paymentDate, bold: true }],
+    [{ text: 'Method', color: '#6b7280' }, { text: payment.payment_method || 'Not specified', bold: true }],
+  ]
+  if (payment.payment_reference) {
+    paymentDetailsRows.push([
+      { text: 'Reference', color: '#6b7280' },
+      { text: payment.payment_reference, bold: true }
+    ])
+  }
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-          font-family: 'Helvetica Neue', Arial, sans-serif; 
-          font-size: 13px; 
-          line-height: 1.4; 
-          color: #1f2937;
-          padding: 30px;
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        .header { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: flex-start;
-          margin-bottom: 24px;
-          padding-bottom: 14px;
-          border-bottom: 2px solid #e5e7eb;
-        }
-        .receipt-title { 
-          font-size: 22px; 
-          font-weight: 700; 
-          color: #111827;
-          text-transform: uppercase;
-          letter-spacing: 2px;
-        }
-        .receipt-number { 
-          font-size: 14px; 
-          color: #6b7280;
-          margin-top: 4px;
-        }
-        .issuer-info { 
-          text-align: right;
-        }
-        .issuer-name { 
-          font-size: 16px; 
-          font-weight: 600; 
-          color: #111827;
-        }
-        .issuer-details { 
-          color: #6b7280; 
-          font-size: 12px;
-          margin-top: 4px;
-        }
-        .section { 
-          margin-bottom: 18px;
-        }
-        .section-title { 
-          font-size: 11px; 
-          font-weight: 600; 
-          color: #9ca3af; 
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          margin-bottom: 6px;
-        }
-        .amount-box {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: white;
-          padding: 18px;
-          border-radius: 12px;
-          text-align: center;
-          margin: 20px 0;
-        }
-        .amount-label {
-          font-size: 13px;
-          opacity: 0.9;
-          margin-bottom: 4px;
-        }
-        .amount-value {
-          font-size: 28px;
-          font-weight: 700;
-        }
-        .details-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-        }
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 6px 0;
-          border-bottom: 1px solid #f3f4f6;
-        }
-        .detail-label {
-          color: #6b7280;
-        }
-        .detail-value {
-          font-weight: 500;
-          color: #111827;
-        }
-        .verification-section {
-          background: #f9fafb;
-          padding: 14px;
-          border-radius: 8px;
-          margin-top: 20px;
-        }
-        .verification-title {
-          font-size: 12px;
-          font-weight: 600;
-          color: #374151;
-          margin-bottom: 8px;
-        }
-        .verification-hash {
-          font-family: 'Courier New', monospace;
-          font-size: 10px;
-          color: #6b7280;
-          word-break: break-all;
-          background: white;
-          padding: 8px;
-          border-radius: 4px;
-          border: 1px solid #e5e7eb;
-        }
-        .verification-id {
-          font-size: 11px;
-          color: #6b7280;
-          margin-top: 6px;
-        }
-        .paid-stamp {
-          display: inline-block;
-          background: #dcfce7;
-          color: #166534;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <div class="receipt-title">Payment Receipt</div>
-          <div class="receipt-number">${receipt.receipt_number}</div>
-        </div>
-        <div class="issuer-info">
-          <div class="issuer-name">${issuer.legal_name || issuer.name || 'Business'}</div>
-          <div class="issuer-details">
-            ${issuer.contact_email || ''}<br>
-            ${issuerAddress.street || ''} ${issuerAddress.city || ''}<br>
-            ${issuer.tax_id ? `Tax ID: ${issuer.tax_id}` : ''}
-          </div>
-        </div>
-      </div>
+  // Build payment method section if available
+  // deno-lint-ignore no-explicit-any
+  const paymentMethodSection: any[] = []
+  if (paymentMethodSnapshot) {
+    const pmInstructions = paymentMethodSnapshot.instructions as Record<string, string> || {}
+    const pmDisplayName = (paymentMethodSnapshot.display_name as string) || (paymentMethodSnapshot.provider_type as string) || 'Payment Method'
+    
+    paymentMethodSection.push(
+      { text: 'PAYMENT METHOD', style: 'sectionTitle', margin: [0, 16, 0, 6] },
+      { text: pmDisplayName, fontSize: 13, bold: true, margin: [0, 0, 0, 6] }
+    )
 
-      <div class="amount-box">
-        <div class="amount-label">Amount Received</div>
-        <div class="amount-value">${formattedAmount}</div>
-      </div>
+    const pmRows = Object.entries(pmInstructions)
+      .filter(([, v]) => v)
+      .map(([k, v]) => [
+        { text: String(k).replace(/_/g, ' '), color: '#6b7280', textTransform: 'capitalize' },
+        { text: String(v), bold: true, font: 'Courier' }
+      ])
+    
+    if (pmRows.length > 0) {
+      paymentMethodSection.push({
+        table: {
+          widths: ['auto', '*'],
+          body: pmRows
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0,
+          hLineColor: () => '#f3f4f6',
+          paddingTop: () => 4,
+          paddingBottom: () => 4,
+        }
+      })
+    }
+  }
 
-      <div class="details-grid">
-        <div class="section">
-          <div class="section-title">Received From</div>
-          <div style="font-weight: 500; font-size: 16px; margin-bottom: 4px;">${payer.name || 'Customer'}</div>
-          <div style="color: #6b7280; font-size: 13px;">
-            ${payer.email || ''}<br>
-            ${payer.tax_id ? `Tax ID: ${payer.tax_id}` : ''}
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Payment Details</div>
-          <div class="detail-row">
-            <span class="detail-label">Date</span>
-            <span class="detail-value">${paymentDate}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Method</span>
-            <span class="detail-value">${payment.payment_method || 'Not specified'}</span>
-          </div>
-          ${payment.payment_reference ? `
-          <div class="detail-row">
-            <span class="detail-label">Reference</span>
-            <span class="detail-value">${payment.payment_reference}</span>
-          </div>
-          ` : ''}
-        </div>
-      </div>
+  // deno-lint-ignore no-explicit-any
+  const docDefinition: any = {
+    pageSize: 'A4',
+    pageMargins: [40, 40, 40, 40],
+    ...(showWatermark ? { watermark: { text: 'Invoicemonk', color: '#e5e7eb', opacity: 0.15, bold: true } } : {}),
+    content: [
+      // Header
+      {
+        columns: [
+          {
+            stack: [
+              { text: 'PAYMENT RECEIPT', fontSize: 20, bold: true, color: '#111827', letterSpacing: 2 },
+              { text: receipt.receipt_number, fontSize: 12, color: '#6b7280', margin: [0, 4, 0, 0] },
+            ]
+          },
+          {
+            stack: [
+              { text: issuer.legal_name || issuer.name || 'Business', fontSize: 14, bold: true, color: '#111827', alignment: 'right' },
+              { text: issuer.contact_email || '', fontSize: 10, color: '#6b7280', alignment: 'right', margin: [0, 3, 0, 0] },
+              { text: `${issuerAddress.street || ''} ${issuerAddress.city || ''}`.trim(), fontSize: 10, color: '#6b7280', alignment: 'right' },
+              ...(issuer.tax_id ? [{ text: `Tax ID: ${issuer.tax_id}`, fontSize: 10, color: '#6b7280', alignment: 'right' }] : []),
+            ]
+          }
+        ]
+      },
+      // Divider
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#e5e7eb' }], margin: [0, 14, 0, 14] },
 
-      <div class="section">
-        <div class="section-title">Invoice Reference</div>
-        <div class="detail-row">
-          <span class="detail-label">Invoice Number</span>
-          <span class="detail-value">${invoice.invoice_number || 'N/A'}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Invoice Amount</span>
-          <span class="detail-value">${formatCurrency(invoice.total_amount as number || 0, receipt.currency as string)}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Status</span>
-          <span class="detail-value"><span class="paid-stamp">Paid</span></span>
-        </div>
-      </div>
+      // Amount box
+      {
+        table: {
+          widths: ['*'],
+          body: [[
+            {
+              stack: [
+                { text: 'Amount Received', fontSize: 11, color: 'white', alignment: 'center', opacity: 0.9, margin: [0, 0, 0, 4] },
+                { text: formattedAmount, fontSize: 24, bold: true, color: 'white', alignment: 'center' },
+              ],
+              fillColor: '#10b981',
+              margin: [0, 14, 0, 14],
+            }
+          ]]
+        },
+        layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 16, paddingRight: () => 16 },
+        margin: [0, 6, 0, 16],
+      },
 
-      ${(() => {
-        if (!paymentMethodSnapshot) return ''
-        const pmInstructions = paymentMethodSnapshot.instructions as Record<string, string> || {}
-        const pmDisplayName = (paymentMethodSnapshot.display_name as string) || (paymentMethodSnapshot.provider_type as string) || 'Payment Method'
-        const pmRows = Object.entries(pmInstructions)
-          .filter(([, v]) => v)
-          .map(([k, v]) => `
-            <div class="detail-row">
-              <span class="detail-label" style="text-transform: capitalize;">${String(k).replace(/_/g, ' ')}</span>
-              <span class="detail-value" style="font-family: 'Courier New', monospace; font-size: 13px;">${String(v)}</span>
-            </div>
-          `).join('')
-        return `
-        <div class="section">
-          <div class="section-title">Payment Method</div>
-          <div style="font-weight: 500; font-size: 15px; margin-bottom: 8px;">${pmDisplayName}</div>
-          ${pmRows}
-        </div>`
-      })()}
+      // Received From + Payment Details
+      {
+        columns: [
+          {
+            width: '50%',
+            stack: [
+              { text: 'RECEIVED FROM', style: 'sectionTitle' },
+              { text: payer.name || 'Customer', fontSize: 14, bold: true, margin: [0, 4, 0, 2] },
+              { text: payer.email || '', fontSize: 11, color: '#6b7280' },
+              ...(payer.tax_id ? [{ text: `Tax ID: ${payer.tax_id}`, fontSize: 11, color: '#6b7280' }] : []),
+            ]
+          },
+          {
+            width: '50%',
+            stack: [
+              { text: 'PAYMENT DETAILS', style: 'sectionTitle' },
+              {
+                table: {
+                  widths: ['auto', '*'],
+                  body: paymentDetailsRows
+                },
+                layout: {
+                  hLineWidth: () => 0.5,
+                  vLineWidth: () => 0,
+                  hLineColor: () => '#f3f4f6',
+                  paddingTop: () => 4,
+                  paddingBottom: () => 4,
+                },
+                margin: [0, 4, 0, 0],
+              }
+            ]
+          }
+        ],
+        columnGap: 20,
+      },
 
-      <div class="verification-section">
-        <div class="verification-title">Verification Information</div>
-        <div class="verification-id">
-          Verification ID: ${receipt.verification_id}
-        </div>
-        <div class="verification-hash">
-          SHA-256: ${receipt.receipt_hash}
-        </div>
-        <div style="margin-top: 6px; font-size: 11px; color: #6b7280;">
-          Verify this receipt at: invoicemonk.com/verify/receipt/${receipt.verification_id}
-        </div>
-      </div>
+      // Invoice Reference
+      { text: 'INVOICE REFERENCE', style: 'sectionTitle', margin: [0, 18, 0, 6] },
+      {
+        table: {
+          widths: ['auto', '*'],
+          body: [
+            [{ text: 'Invoice Number', color: '#6b7280' }, { text: invoice.invoice_number || 'N/A', bold: true }],
+            [{ text: 'Invoice Amount', color: '#6b7280' }, { text: formatCurrency(invoice.total_amount as number || 0, receipt.currency as string), bold: true }],
+            [{ text: 'Status', color: '#6b7280' }, { text: 'PAID', bold: true, color: '#166534', fontSize: 11 }],
+          ]
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0,
+          hLineColor: () => '#f3f4f6',
+          paddingTop: () => 4,
+          paddingBottom: () => 4,
+        }
+      },
 
-      ${watermarkFooter}
-    </body>
-    </html>
-  `
+      // Payment Method section (if available)
+      ...paymentMethodSection,
+
+      // Verification section
+      {
+        stack: [
+          { text: 'Verification Information', fontSize: 11, bold: true, color: '#374151', margin: [0, 0, 0, 6] },
+          { text: `Verification ID: ${receipt.verification_id}`, fontSize: 10, color: '#6b7280', margin: [0, 0, 0, 4] },
+          {
+            table: {
+              widths: ['*'],
+              body: [[{ text: `SHA-256: ${receipt.receipt_hash}`, fontSize: 9, font: 'Courier', color: '#6b7280' }]]
+            },
+            layout: {
+              hLineWidth: () => 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => '#e5e7eb',
+              vLineColor: () => '#e5e7eb',
+              paddingLeft: () => 8,
+              paddingRight: () => 8,
+              paddingTop: () => 6,
+              paddingBottom: () => 6,
+            },
+            margin: [0, 0, 0, 4],
+          },
+          { text: `Verify this receipt at: invoicemonk.com/verify/receipt/${receipt.verification_id}`, fontSize: 10, color: '#6b7280', margin: [0, 4, 0, 0] },
+        ],
+        fillColor: '#f9fafb',
+        margin: [0, 20, 0, 0],
+        padding: [14, 14, 14, 14],
+      },
+
+      // Watermark footer
+      ...(showWatermark ? [{
+        text: 'Generated with Invoicemonk',
+        fontSize: 9,
+        color: '#9ca3af',
+        alignment: 'center' as const,
+        margin: [0, 20, 0, 0] as [number, number, number, number],
+      }] : []),
+    ],
+    styles: {
+      sectionTitle: {
+        fontSize: 10,
+        bold: true,
+        color: '#9ca3af',
+        letterSpacing: 1,
+      }
+    },
+    defaultStyle: {
+      fontSize: 11,
+      color: '#1f2937',
+    }
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    try {
+      // deno-lint-ignore no-explicit-any
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition as any)
+      pdfDocGenerator.getBase64((base64: string) => {
+        resolve(base64)
+      })
+    } catch (err) {
+      reject(err)
+    }
+  })
 }
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req)
   
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Only allow POST requests
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ success: false, error: 'Method not allowed' } as GenerateReceiptPdfResponse),
@@ -330,7 +313,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Validate authorization
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -342,17 +324,12 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const pdfShiftApiKey = Deno.env.get('PDFSHIFT_API_KEY')
 
-    // User client for auth validation
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     })
-
-    // Service client for privileged operations
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verify user token
     const token = authHeader.replace('Bearer ', '')
     const { data: userData, error: userError } = await supabaseUser.auth.getUser(token)
     
@@ -364,8 +341,6 @@ Deno.serve(async (req) => {
     }
 
     const userId = userData.user.id
-
-    // Parse request body
     const body: GenerateReceiptPdfRequest = await req.json()
     
     if (!body.receipt_id) {
@@ -375,7 +350,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Fetch receipt (RLS will enforce access)
+    // Fetch receipt (RLS enforces access)
     const { data: receipt, error: receiptError } = await supabaseUser
       .from('receipts')
       .select('*')
@@ -389,7 +364,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Fetch payment method snapshot from the related invoice
+    // Fetch payment method snapshot from related invoice
     let paymentMethodSnapshot: Record<string, unknown> | null = null
     if (receipt.invoice_id) {
       const { data: invoiceData } = await supabaseService
@@ -400,7 +375,7 @@ Deno.serve(async (req) => {
       paymentMethodSnapshot = invoiceData?.payment_method_snapshot as Record<string, unknown> | null
     }
 
-    // Check user's subscription tier for watermark decision
+    // Check subscription tier for watermark
     const { data: subscription } = await supabaseService
       .from('subscriptions')
       .select('tier')
@@ -413,50 +388,11 @@ Deno.serve(async (req) => {
     const tier = subscription?.tier || 'starter'
     const showWatermark = tier === 'starter' || tier === 'starter_paid'
 
-    // Generate HTML
-    const html = generateReceiptHtml(receipt, showWatermark, paymentMethodSnapshot)
+    // Generate PDF using pdfmake
+    console.log('Generating receipt PDF using pdfmake...')
+    const pdfBase64 = await generateReceiptPdfBase64(receipt, showWatermark, paymentMethodSnapshot)
 
-    // Generate PDF using PDFShift
-    if (!pdfShiftApiKey) {
-      // Fallback: return HTML if no PDF service configured
-      console.warn('PDFSHIFT_API_KEY not configured, returning HTML')
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          pdf: btoa(html),
-          filename: `${receipt.receipt_number}.html`
-        } as GenerateReceiptPdfResponse),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Call PDFShift API
-    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${btoa(`api:${pdfShiftApiKey}`)}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        source: html,
-        format: 'A4',
-        margin: '15mm'
-      })
-    })
-
-    if (!pdfResponse.ok) {
-      const errorText = await pdfResponse.text()
-      console.error('PDFShift error:', errorText)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to generate PDF' } as GenerateReceiptPdfResponse),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const pdfBuffer = await pdfResponse.arrayBuffer()
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)))
-
-    // Log RECEIPT_EXPORTED audit event
+    // Log audit event
     try {
       await supabaseService.rpc('log_audit_event', {
         _event_type: 'RECEIPT_EXPORTED',
