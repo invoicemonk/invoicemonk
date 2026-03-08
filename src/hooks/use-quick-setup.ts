@@ -107,7 +107,7 @@ export function useQuickSetup(): QuickSetupState {
         key: 'payment_method',
         label: 'Add payment method',
         description: 'Bank details or payment instructions must appear on invoices',
-        complianceTip: 'You'll need: bank name, account number/IBAN, and routing/sort code',
+        complianceTip: "You'll need: bank name, account number/IBAN, and routing/sort code",
         complete: paymentMethods.length > 0,
         href: `${base}/settings`,
       },
