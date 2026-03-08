@@ -11,6 +11,7 @@ export interface ChecklistItem {
   key: string;
   label: string;
   description: string;
+  complianceTip: string;
   complete: boolean;
   href: string;
 }
