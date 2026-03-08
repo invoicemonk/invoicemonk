@@ -337,11 +337,21 @@ export default function BusinessProfile() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'profile' | 'audit-logs')}>
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
             <TabsList>
               <TabsTrigger value="profile" className="gap-1.5">
                 <SettingsIcon className="h-4 w-4" />
                 Profile
+              </TabsTrigger>
+              {showTeamTab && (
+                <TabsTrigger value="team" className="gap-1.5">
+                  <UserPlus className="h-4 w-4" />
+                  Team
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="billing" className="gap-1.5">
+                <CreditCard className="h-4 w-4" />
+                Billing
               </TabsTrigger>
               <TabsTrigger value="audit-logs" className="gap-1.5">
                 <History className="h-4 w-4" />
