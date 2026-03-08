@@ -77,39 +77,61 @@ export function useQuickSetup(): QuickSetupState {
   const items = useMemo((): ChecklistItem[] => {
     if (!businessId) return [];
     const base = `/b/${businessId}`;
+    const address = currentBusiness?.address as { city?: string; country?: string } | null;
     return [
       {
         key: 'country',
         label: 'Confirm business country',
-        description: 'Set your jurisdiction for compliant invoicing',
+        description: 'Required on every invoice by law in most jurisdictions',
+        complianceTip: 'Your country determines tax rules, invoice numbering, and required fields',
         complete: !!currentBusiness?.jurisdiction,
+        href: `${base}/settings`,
+      },
+      {
+        key: 'address',
+        label: 'Add business address',
+        description: 'Your address must appear on every invoice',
+        complianceTip: 'You'll need: street address, city, and country at minimum',
+        complete: !!address?.city && !!address?.country,
+        href: `${base}/settings`,
+      },
+      {
+        key: 'tax_id',
+        label: 'Enter your Tax ID',
+        description: 'Required for tax-compliant invoicing',
+        complianceTip: 'Your tax registration number (TIN, VAT, EIN) must appear on B2B invoices',
+        complete: !!currentBusiness?.tax_id,
         href: `${base}/settings`,
       },
       {
         key: 'payment_method',
         label: 'Add payment method',
-        description: 'Tell clients how to pay you',
+        description: 'Bank details or payment instructions must appear on invoices',
+        complianceTip: 'You'll need: bank name, account number/IBAN, and routing/sort code',
         complete: paymentMethods.length > 0,
         href: `${base}/settings`,
       },
       {
         key: 'client',
         label: 'Create first client',
-        description: 'Add your first customer',
+        description: 'Recipient details are legally required on invoices',
+        complianceTip: 'Collect from your customer: legal name, address, and tax ID (if B2B)',
         complete: clients.length > 0,
         href: `${base}/clients`,
       },
       {
         key: 'product',
         label: 'Add product or service',
-        description: 'Define what you sell',
+        description: 'Line items need clear descriptions and unit prices',
+        complianceTip: 'Include: item name, quantity, unit price, and applicable tax rate',
         complete: products.length > 0,
         href: `${base}/products`,
       },
       {
         key: 'invoice',
         label: 'Issue first invoice',
-        description: 'Create and issue a compliant invoice',
+        description: 'Issue a tamper-evident invoice with a unique number and QR code',
+        complianceTip: 'Each invoice gets a verification ID, SHA-256 hash, and public verification page',
         complete: !!issuedInvoiceData,
         href: `${base}/invoices/new`,
       },
