@@ -1,65 +1,37 @@
 
 
-# Block Disposable/Temporary Email Signups
-
-## Problem
-Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
+# Replace Support Pages with Tawk.to Chat Trigger
 
 ## Approach
-Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
+Remove the support ticket pages and replace the sidebar "Support" link with a button that opens the Tawk.to chat widget via `window.Tawk_API.maximize()`. This simplifies the support flow — one channel instead of two.
 
-### Layer 1: Client-Side Disposable Email Check
+## Changes
 
-**File: `src/lib/disposable-emails.ts`** (new)
+### 1. Business Sidebar (`src/components/app/BusinessSidebar.tsx`)
+- Replace the Support `<Link>` with an `onClick` handler that calls `window.Tawk_API?.maximize()`
+- Keep the icon and label unchanged
 
-Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
+### 2. Admin Sidebar (`src/components/admin/AdminSidebar.tsx`)
+- Remove "Support Tickets" from `mainNavItems`
+- Add a standalone "Support Chat" button that triggers `window.Tawk_API?.maximize()`
 
-**File: `src/pages/app/Signup.tsx`**
+### 3. Remove Support Pages & Components
+- Delete `src/pages/app/Support.tsx`
+- Delete `src/pages/app/SupportTicket.tsx`
+- Delete `src/components/support/SupportTicketForm.tsx`
+- Delete `src/components/support/SupportTicketDetail.tsx`
+- Delete `src/pages/admin/AdminSupport.tsx`
 
-Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
+### 4. Remove Routes (`src/App.tsx`)
+- Remove `/b/:businessId/support` and `/b/:businessId/support/:ticketId` routes
+- Remove `/admin/support` route
+- Remove corresponding imports
 
-### Layer 2: Server-Side Validation (Database Trigger)
+### 5. Hooks Cleanup
+- Keep `src/hooks/use-support-tickets.ts` for now (the DB tables and edge functions remain intact — existing tickets aren't lost). Can be removed in a future cleanup pass.
 
-**Migration SQL:**
-
-Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
-
-**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
-
-Actually, the most practical and effective approach for Supabase:
-
-1. **Client-side blocklist** (primary defense -- covers 95% of cases)
-2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
-
-### Layer 2 (revised): Profile Insert Trigger
-
-**Migration:**
-- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
-- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
-- This catches any bypass of the frontend check
-
-### Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
-| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
-| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
-| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
-
-### Disposable Domain Categories to Block
-
-The blocklist will include domains from these categories:
-- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
-- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
-- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
-- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
-- Total: ~250 domains covering the vast majority of disposable services
-
-### User Experience
-
-When a user enters a disposable email:
-- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
-- The submit button remains disabled
-- If somehow bypassed, the profile trigger suspends the account immediately
+### Notes
+- Existing support ticket data in Supabase remains untouched — no migrations needed
+- The Tawk.to widget is already loaded globally via `TawkTo` component in `App.tsx`
+- `window.Tawk_API.maximize()` is the standard API call to open the chat window
 
