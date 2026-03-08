@@ -253,7 +253,7 @@ async function generateReceiptPdfBase64(
           {
             table: {
               widths: ['*'],
-              body: [[{ text: `SHA-256: ${receipt.receipt_hash}`, fontSize: 9, font: 'Courier', color: '#6b7280' }]]
+              body: [[{ text: `SHA-256: ${receipt.receipt_hash}`, fontSize: 9, color: '#6b7280' }]]
             },
             layout: {
               hLineWidth: () => 0.5,
