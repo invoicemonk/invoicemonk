@@ -1115,7 +1115,8 @@ Deno.serve(async (req) => {
       recipientSnapshot,
       verificationUrl,
       showWatermark,
-      paymentMethodSnapshot
+      paymentMethodSnapshot,
+      templateSnapshot
     )
     const attachmentName = `Invoice-${invoice.invoice_number}.pdf`
     console.log(`PDF attachment generated: ${attachmentName}`)
