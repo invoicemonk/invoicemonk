@@ -679,13 +679,36 @@ Deno.serve(async (req) => {
         const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
         const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()
 
-        const { data: draftInvoices } = await adminClient
+        // Query draft invoices via business_id, then resolve owners
+        const { data: rawDraftInvoices } = await adminClient
           .from('invoices')
-          .select('id, user_id, invoice_number')
+          .select('id, business_id, invoice_number')
           .eq('status', 'draft')
           .lt('created_at', fortyEightHoursAgo)
-          .not('user_id', 'is', null)
+          .not('business_id', 'is', null)
           .limit(50)
+
+        // Resolve business owners for draft invoices
+        const draftInvoices: Array<{ id: string; user_id: string; invoice_number: string }> = []
+        if (rawDraftInvoices && rawDraftInvoices.length > 0) {
+          const draftBusinessIds = [...new Set(rawDraftInvoices.map(d => d.business_id).filter(Boolean))]
+          const { data: draftOwners } = await adminClient
+            .from('business_members')
+            .select('user_id, business_id')
+            .in('business_id', draftBusinessIds)
+            .eq('role', 'owner')
+
+          const ownerMap: Record<string, string> = {}
+          if (draftOwners) {
+            for (const o of draftOwners) ownerMap[o.business_id] = o.user_id
+          }
+          for (const draft of rawDraftInvoices) {
+            const ownerId = draft.business_id ? ownerMap[draft.business_id] : null
+            if (ownerId) {
+              draftInvoices.push({ id: draft.id, user_id: ownerId, invoice_number: draft.invoice_number })
+            }
+          }
+        }
 
         if (draftInvoices && draftInvoices.length > 0) {
           summary.campaign_e.targeted = draftInvoices.length
