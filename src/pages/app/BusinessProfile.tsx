@@ -69,7 +69,7 @@ interface AddressData {
 }
 
 export default function BusinessProfile() {
-  const { currentBusiness: business, loading: isLoadingBusiness } = useBusiness();
+  const { currentBusiness: business, loading: isLoadingBusiness, canManageTeam, isPlatformAdmin } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();
