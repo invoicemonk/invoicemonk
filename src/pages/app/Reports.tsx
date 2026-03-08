@@ -12,7 +12,10 @@ import {
   Calculator,
   ShieldCheck,
   AlertCircle,
+  BarChart3,
+  PieChart,
 } from 'lucide-react';
+import Analytics from '@/pages/app/Analytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +51,7 @@ export default function Reports() {
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('revenue');
-
+  const [activeView, setActiveView] = useState<'reports' | 'analytics'>('reports');
   const { canAccess, loading: isLoading, currentBusiness, hasTier, isPlatformAdmin } = useBusiness();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const hasReportsAccess = canAccess('reports_enabled');
@@ -104,28 +107,48 @@ export default function Reports() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header */}
+      {/* Top-level view switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground mt-1">
-            Compliance-ready reports scoped by currency account
+            Compliance-ready reports and analytics
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 5 }, (_, i) => currentYear - i).map(y => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Tabs value={activeView} onValueChange={v => setActiveView(v as 'reports' | 'analytics')}>
+            <TabsList>
+              <TabsTrigger value="reports" className="gap-1.5">
+                <BarChart3 className="h-4 w-4" />
+                Reports
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1.5">
+                <PieChart className="h-4 w-4" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
+
+      {activeView === 'analytics' ? (
+        <Analytics />
+      ) : (
+        <div className="space-y-6">
+          {/* Year selector */}
+          <div className="flex items-center justify-end gap-2">
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[120px]">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 5 }, (_, i) => currentYear - i).map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
       {/* Currency Account Indicator */}
       {currentCurrencyAccount ? (
@@ -243,6 +266,8 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
     </motion.div>
   );
 }

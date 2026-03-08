@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -18,8 +18,11 @@ import {
   AlertCircle,
   Receipt,
   Plus,
-  Info
+  Info,
+  History,
+  Settings as SettingsIcon
 } from 'lucide-react';
+const AuditLogs = lazy(() => import('@/pages/app/AuditLogs'));
 import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +46,7 @@ import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
 import { useCheckDuplicateBusinessName } from '@/hooks/use-check-duplicate-business';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
@@ -71,6 +75,7 @@ export default function BusinessProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'audit-logs'>('profile');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -311,7 +316,7 @@ export default function BusinessProfile() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Business Settings</h1>
             {business && (
               <IdentityLevelBadge 
                 level={(business as any).business_identity_level || 'unverified'} 
@@ -322,15 +327,36 @@ export default function BusinessProfile() {
             Configure your legal business details for invoicing
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isLoading}>
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          {isLoading ? 'Saving...' : 'Save Changes'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'profile' | 'audit-logs')}>
+            <TabsList>
+              <TabsTrigger value="profile" className="gap-1.5">
+                <SettingsIcon className="h-4 w-4" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="audit-logs" className="gap-1.5">
+                <History className="h-4 w-4" />
+                Audit Logs
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {activeTab === 'audit-logs' ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <AuditLogs />
+        </Suspense>
+      ) : (
+      <>
+      <Button onClick={handleSave} disabled={isLoading} className="w-fit">
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4 mr-2" />
+        )}
+        {isLoading ? 'Saving...' : 'Save Changes'}
+      </Button>
 
       {/* Duplicate Business Name Warning */}
       {duplicateCheck?.hasDuplicate && (
@@ -974,6 +1000,8 @@ export default function BusinessProfile() {
           onConfirm={() => deleteBusiness.mutate(business.id)}
           isPending={deleteBusiness.isPending}
         />
+      )}
+      </>
       )}
     </motion.div>
   );
