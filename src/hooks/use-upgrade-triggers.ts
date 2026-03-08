@@ -30,7 +30,7 @@ export function useUpgradeTriggers() {
         .maybeSingle();
       return (data as any)?.total_invoices ?? 0;
     },
-    enabled: !!user?.id && tier === 'starter' && !dismissed,
+    enabled: !!user?.id && tier === 'starter' && !dismissed && !isPlatformAdmin,
     staleTime: 5 * 60 * 1000,
   });
 
