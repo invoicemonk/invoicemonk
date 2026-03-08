@@ -682,7 +682,7 @@ Deno.serve(async (req) => {
     <!-- Header -->
     <div class="header">
       <div style="display: flex; align-items: center; gap: 12px;">
-        ${issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
+        ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 100px; object-fit: contain;" />` : ''}
         <div>
           <div class="brand">${issuerName}</div>
           ${!canUseBranding ? '<div class="brand-sub">Powered by Invoicemonk</div>' : ''}
