@@ -155,13 +155,15 @@ const formatCurrency = (amount: number, currency: string): string => {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
 }
 
-// Helper: Format currency for PDF (WinAnsi-safe)
+// Helper: Format currency for PDF (WinAnsi-safe, uses symbols)
+const currencySymbols: Record<string, string> = { NGN: '\u20A6', USD: '$', EUR: '\u20AC', GBP: '\u00A3', KES: 'KSh', GHS: 'GH\u20B5', ZAR: 'R', CAD: 'CA$', AUD: 'A$', INR: '\u20B9', JPY: '\u00A5', CNY: '\u00A5' }
 const formatCurrencyPdf = (amount: number, currency: string): string => {
+  const symbol = currencySymbols[currency] || currency + ' '
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
-  return `${currency} ${formatted}`
+  return `${symbol}${formatted}`
 }
 
 const formatDate = (date: string | null): string => {
