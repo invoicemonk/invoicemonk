@@ -736,32 +736,33 @@ async function generateInvoicePdfBase64(
       leftHeaderStack.push({ text: issuerName, style: 'businessName', margin: [0, 0, 0, 2] })
     }
 
-  const metaLine = `${formatDate(invoice.issue_date as string)}  •  Due: ${formatDate(invoice.due_date as string)}  •  ${currency}`
-  const rightHeaderStack: unknown[] = [
-    { text: 'INVOICE', style: 'headerTitle', alignment: 'right' },
-    { text: invoice.invoice_number as string, fontSize: 10, color: '#666666', alignment: 'right', margin: [0, 1, 0, 3] },
-    {
-      table: {
-        widths: ['auto'],
-        body: [[{ text: status.toUpperCase(), fontSize: 7, bold: true, color: statusColors[status] || '#1d4ed8', fillColor: statusBgColors[status] || '#dbeafe', margin: [5, 1, 5, 1] }]]
+    const metaLine = `${formatDate(invoice.issue_date as string)}  •  Due: ${formatDate(invoice.due_date as string)}  •  ${currency}`
+    const rightHeaderStack: unknown[] = [
+      { text: 'INVOICE', style: 'headerTitle', alignment: 'right' },
+      { text: invoice.invoice_number as string, fontSize: 10, color: '#666666', alignment: 'right', margin: [0, 1, 0, 3] },
+      {
+        table: {
+          widths: ['auto'],
+          body: [[{ text: status.toUpperCase(), fontSize: 7, bold: true, color: statusColors[status] || '#1d4ed8', fillColor: statusBgColors[status] || '#dbeafe', margin: [5, 1, 5, 1] }]]
+        },
+        layout: 'noBorders',
+        alignment: 'right',
+        margin: [0, 0, 0, 3]
       },
-      layout: 'noBorders',
-      alignment: 'right',
-      margin: [0, 0, 0, 3]
-    },
-    { text: metaLine, fontSize: 8, color: '#666666', alignment: 'right' },
-  ]
+      { text: metaLine, fontSize: 8, color: '#666666', alignment: 'right' },
+    ]
 
-  content.push({
-    columns: [
-      { stack: leftHeaderStack, width: '*' },
-      { stack: rightHeaderStack, width: 'auto' }
-    ],
-    margin: [0, 0, 0, 8]
-  })
+    content.push({
+      columns: [
+        { stack: leftHeaderStack, width: '*' },
+        { stack: rightHeaderStack, width: 'auto' }
+      ],
+      margin: [0, 0, 0, 8]
+    })
 
-  // Separator line (1px)
-  content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 1, lineColor: '#d1d5db' }], margin: [0, 0, 0, 10] })
+    // Separator line (1px)
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 1, lineColor: '#d1d5db' }], margin: [0, 0, 0, 10] })
+  } // end standard header
 
   // --- 2. BILLING SECTION (two-column: FROM + BILL TO) ---
   const fromStack: unknown[] = [
