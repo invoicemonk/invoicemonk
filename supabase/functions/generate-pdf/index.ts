@@ -97,6 +97,19 @@ interface TemplateSnapshot {
   watermark_required?: boolean
   supports_branding?: boolean
   tier_required?: string
+  layout?: {
+    header_style?: string
+    show_logo?: boolean
+    show_terms?: boolean
+    show_notes?: boolean
+    show_verification_qr?: boolean
+    show_bank_details?: boolean
+  }
+  styles?: {
+    primary_color?: string
+    font_family?: string
+    font_size?: string
+  }
 }
 
 Deno.serve(async (req) => {
