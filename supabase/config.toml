@@ -42,3 +42,6 @@ verify_jwt = false
 [functions.generate-pdf]
 verify_jwt = false
 
+[functions.send-receipt-email]
+verify_jwt = false
+

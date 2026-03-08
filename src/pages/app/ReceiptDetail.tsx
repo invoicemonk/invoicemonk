@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   ArrowLeft, Download, Lock, Shield, FileText, 
   Building2, User, Calendar, CreditCard, ExternalLink, 
-  Loader2, CheckCircle2, Receipt as ReceiptIcon, Copy
+  Loader2, CheckCircle2, Receipt as ReceiptIcon, Copy, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useReceipt, useDownloadReceiptPdf } from '@/hooks/use-receipts';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
+import { SendReceiptDialog } from '@/components/receipts/SendReceiptDialog';
 import { toast } from 'sonner';
 
 export default function ReceiptDetail() {
@@ -19,6 +21,7 @@ export default function ReceiptDetail() {
   const navigate = useNavigate();
   const { data: receipt, isLoading, error } = useReceipt(id);
   const downloadPdf = useDownloadReceiptPdf();
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
@@ -113,6 +116,10 @@ export default function ReceiptDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+            <Mail className="h-4 w-4 mr-2" />
+            Send Email
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloadPdf.isPending}>
             {downloadPdf.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -381,6 +388,13 @@ export default function ReceiptDetail() {
         </div>
       </div>
     </motion.div>
+
+    {/* Send Receipt Dialog */}
+    <SendReceiptDialog
+      open={sendDialogOpen}
+      onOpenChange={setSendDialogOpen}
+      receipt={receipt}
+    />
     </BusinessAccessGuard>
   );
 }
