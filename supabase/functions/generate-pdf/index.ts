@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
     .party-label { 
       font-size: 9px; 
       font-weight: 600; 
-      color: #666; 
+      color: ${tplPrimaryColor === '#1a1a1a' ? '#666' : tplPrimaryColor}; 
       text-transform: uppercase; 
       letter-spacing: 0.5px;
       margin-bottom: 4px;
