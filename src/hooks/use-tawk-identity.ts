@@ -75,6 +75,8 @@ export function useTawkIdentity() {
             }
           }
         );
+        // Keep widget hidden after identity injection
+        tawk.hideWidget();
       } catch (e) {
         // Tawk not loaded — silent fail
       }

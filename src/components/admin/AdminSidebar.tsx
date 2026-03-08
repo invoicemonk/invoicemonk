@@ -65,7 +65,13 @@ export function AdminSidebar() {
   const isCollapsed = state === 'collapsed';
 
   const openSupportChat = () => {
-    (window as any).Tawk_API?.maximize();
+    if (window.Tawk_API) {
+      window.Tawk_API.showWidget();
+      window.Tawk_API.maximize();
+      window.Tawk_API.onChatMinimized = () => {
+        window.Tawk_API?.hideWidget();
+      };
+    }
   };
 
   const isActive = (path: string) => {
