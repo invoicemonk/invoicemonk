@@ -79,7 +79,7 @@ import AdminCountryModules from "./pages/admin/AdminCountryModules";
 import AdminSystem from "./pages/admin/AdminSystem";
 import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
 import AdminTemplates from "./pages/admin/AdminTemplates";
-import AdminSupport from "./pages/admin/AdminSupport";
+
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPartners from "./pages/admin/AdminPartners";
 import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions";
