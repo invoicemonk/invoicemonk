@@ -366,6 +366,14 @@ export default function BusinessProfile() {
         <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
           <AuditLogs />
         </Suspense>
+      ) : activeTab === 'team' && showTeamTab ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <Team />
+        </Suspense>
+      ) : activeTab === 'billing' ? (
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          <Billing />
+        </Suspense>
       ) : (
       <>
       <Button onClick={handleSave} disabled={isLoading} className="w-fit">
