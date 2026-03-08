@@ -93,8 +93,11 @@ export function BusinessSidebar() {
   const settingsNavItems = [
     { title: 'Business Settings', url: `${baseUrl}/settings`, icon: Settings },
     { title: 'Billing', url: `${baseUrl}/billing`, icon: CreditCard },
-    { title: 'Contact Support', url: `${baseUrl}/support`, icon: MessageCircle },
   ];
+
+  const openSupportChat = () => {
+    (window as any).Tawk_API?.maximize();
+  };
 
   const isActive = (path: string) => {
     if (path === `${baseUrl}/dashboard`) {
