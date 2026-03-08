@@ -813,7 +813,7 @@ Deno.serve(async (req) => {
     // Cache the generated HTML to storage for subsequent requests (fire-and-forget)
     // Only cache for issued/paid/voided invoices (stable states)
     if (['issued', 'sent', 'viewed', 'paid', 'voided', 'credited'].includes(inv.status)) {
-      const cachePath = `${inv.business_id || 'personal'}/${inv.id}.html`
+      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}.html`
       supabaseAdmin.storage
         .from('invoice-pdfs')
         .upload(cachePath, new Blob([html], { type: 'text/html' }), { upsert: true })
