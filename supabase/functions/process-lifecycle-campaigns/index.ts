@@ -859,7 +859,7 @@ Deno.serve(async (req) => {
                 .eq('user_id', userId)
                 .single()
 
-              const overdueCount = overdueInvoices?.length || 0
+              const overdueCount = overdueState?.overdue_count || 0
               const userSum = userSummaries[userId]
               const formattedAmount = userSum.total.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
