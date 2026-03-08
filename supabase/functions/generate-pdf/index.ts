@@ -798,15 +798,15 @@ Deno.serve(async (req) => {
       </div>
     </div>
 
-    ${inv.notes || inv.terms ? `
+    ${((showNotes && inv.notes) || (showTerms && inv.terms)) ? `
     <!-- Notes/Terms -->
     <div class="notes-section no-break">
-      ${inv.notes ? `
+      ${showNotes && inv.notes ? `
       <div class="notes-label">Notes</div>
       <div class="notes-content">${inv.notes}</div>
       ` : ''}
-      ${inv.notes && inv.terms ? '<div style="height: 8px;"></div>' : ''}
-      ${inv.terms ? `
+      ${(showNotes && inv.notes) && (showTerms && inv.terms) ? '<div style="height: 8px;"></div>' : ''}
+      ${showTerms && inv.terms ? `
       <div class="notes-label">Terms</div>
       <div class="notes-content">${inv.terms}</div>
       ` : ''}
