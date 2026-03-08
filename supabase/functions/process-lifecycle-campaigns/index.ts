@@ -52,7 +52,7 @@ function emailWrapper(title: string, bodyHtml: string): string {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 32px; margin-bottom: 12px;" />
+    <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: white;">invoiceMonk</span>
     <h1 style="margin: 0; font-size: 22px;">${title}</h1>
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
