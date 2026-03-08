@@ -149,6 +149,7 @@ export default function InvoiceNew() {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [summary, setSummary] = useState('');
+  const [brandColorOverride, setBrandColorOverride] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: defaultVatRate, isVatExempt: false }
   ]);
