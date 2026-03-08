@@ -52,7 +52,7 @@ export function useInvoiceTemplates() {
 
       // Map templates with availability based on user's tier
       return (data || []).map((template): TemplateWithAccess => {
-        const available = TIER_ORDER[tier] >= TIER_ORDER[template.tier_required as SubscriptionTier];
+        const available = isPlatformAdmin || TIER_ORDER[tier] >= TIER_ORDER[template.tier_required as SubscriptionTier];
         return {
           ...template,
           tier_required: template.tier_required as SubscriptionTier,
