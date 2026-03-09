@@ -1584,6 +1584,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_log: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          key: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          key: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          key?: string
+        }
+        Relationships: []
+      }
       receipts: {
         Row: {
           amount: number
@@ -2475,6 +2496,15 @@ export type Database = {
         Args: { _business_id: string; _currency_account_id: string }
         Returns: Json
       }
+      check_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_key: string
+          p_max_requests: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       check_tier_limit: {
         Args: { _feature: string; _user_id: string }
         Returns: Json
@@ -2483,6 +2513,7 @@ export type Database = {
         Args: { _business_id: string; _feature: string }
         Returns: Json
       }
+      cleanup_rate_limit_log: { Args: never; Returns: number }
       close_account: {
         Args: { _reason?: string; _user_id: string }
         Returns: undefined
