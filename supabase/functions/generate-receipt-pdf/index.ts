@@ -1,27 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// Dynamic CORS configuration
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return false
-  return (
-    origin.endsWith('.lovable.app') ||
-    origin.endsWith('.lovableproject.com') ||
-    origin === 'https://app.invoicemonk.com' ||
-    origin === 'https://invoicemonk.com' ||
-    origin.startsWith('http://localhost:')
-  )
-}
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin') || ''
-  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com'
-  
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
-}
+import { getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface GenerateReceiptPdfRequest {
   receipt_id: string

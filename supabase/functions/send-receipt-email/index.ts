@@ -1,55 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// Validation utilities
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function validateUUID(value: unknown, fieldName: string): string | null {
-  if (value === null || value === undefined || value === '') return `${fieldName} is required`;
-  if (typeof value !== 'string') return `${fieldName} must be a string`;
-  if (!UUID_REGEX.test(value)) return `${fieldName} must be a valid UUID`;
-  return null;
-}
-
-function validateEmail(value: unknown, fieldName: string): string | null {
-  if (value === null || value === undefined || value === '') return `${fieldName} is required`;
-  if (typeof value !== 'string') return `${fieldName} must be a string`;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(value) || value.length > 254) return `${fieldName} must be a valid email address`;
-  return null;
-}
-
-function validateString(value: unknown, fieldName: string, maxLength = 1000): string | null {
-  if (value === null || value === undefined || value === '') return null;
-  if (typeof value !== 'string') return `${fieldName} must be a string`;
-  if (value.length > maxLength) return `${fieldName} must be at most ${maxLength} characters`;
-  return null;
-}
-
-function sanitizeString(value: string): string {
-  return value.replace(/<[^>]*>/g, '').replace(/[<>]/g, '').trim();
-}
-
-// Dynamic CORS
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return false;
-  return (
-    origin.endsWith('.lovable.app') ||
-    origin.endsWith('.lovableproject.com') ||
-    origin === 'https://app.invoicemonk.com' ||
-    origin === 'https://invoicemonk.com' ||
-    origin.startsWith('http://localhost:')
-  );
-}
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin') || '';
-  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  };
-}
+import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface SendReceiptRequest {
   receipt_id: string;
