@@ -1,45 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { validateEnumStr as validateEnum, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
-// Validation utilities
 const VALID_ACTIONS = ['portal', 'cancel', 'reactivate'] as const;
-
-function validateEnum<T extends string>(value: unknown, fieldName: string, allowedValues: readonly T[]): string | null {
-  if (value === null || value === undefined || value === '') {
-    return `${fieldName} is required`;
-  }
-  if (typeof value !== 'string') {
-    return `${fieldName} must be a string`;
-  }
-  if (!allowedValues.includes(value as T)) {
-    return `${fieldName} must be one of: ${allowedValues.join(', ')}`;
-  }
-  return null;
-}
-
-// Dynamic CORS configuration - allows any Lovable preview domain + production
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return false;
-  return (
-    origin.endsWith('.lovable.app') ||
-    origin.endsWith('.lovableproject.com') ||
-    origin === 'https://app.invoicemonk.com' ||
-    origin === 'https://invoicemonk.com' ||
-    origin.startsWith('http://localhost:')
-  );
-}
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin') || '';
-  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://app.invoicemonk.com';
-  
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  };
-}
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
