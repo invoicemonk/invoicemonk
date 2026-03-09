@@ -1,8 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateUUIDStr as validateUUID, getCorsHeaders as getCorsHeadersFn, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
-
-// Public endpoint - use public CORS
-function getCorsHeadersPublic(req: Request) { return getCorsHeadersFn(req, true); }
+import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface InvoiceItem {
   id: string
