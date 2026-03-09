@@ -1,9 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-}
+import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 // Compliance adapter configs (mirrors src/lib/compliance-adapters.ts)
 const COMPLIANCE_ADAPTERS: Record<string, { regulatorCode: string; countryCode: string; supportedArtifacts: string[]; regulatorName: string }> = {

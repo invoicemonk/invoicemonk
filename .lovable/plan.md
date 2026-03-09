@@ -1,115 +1,65 @@
 
 
-# Standardize Input Sanitization + Add Rate Limiting
+# Block Disposable/Temporary Email Signups
 
-## Problem Summary
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-1. **Input Sanitization**: The shared `_shared/validation.ts` module exists but **no edge function imports from it**. Instead, 10+ functions duplicate `validateUUID`, `sanitizeString`, `isAllowedOrigin`, `getCorsHeaders`, etc. inline. Some functions that accept user text input (e.g., `attribute-referral`, `send-support-notification`, `submit-invoice-to-regulator`) lack sanitization entirely.
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-2. **Rate Limiting**: No rate limiting exists anywhere in the stack. Any authenticated user can call edge functions at unlimited rates.
+### Layer 1: Client-Side Disposable Email Check
 
----
+**File: `src/lib/disposable-emails.ts`** (new)
 
-## Plan
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-### Part 1: Standardize Shared Validation Imports
+**File: `src/pages/app/Signup.tsx`**
 
-**Approach**: Deno edge functions in Supabase can import from relative paths within the `supabase/functions/` directory. We will update all edge functions to import from `../_shared/validation.ts` instead of re-declaring utilities inline.
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-**Shared module update** (`_shared/validation.ts`):
-- Add a `checkRateLimit` helper (see Part 2)
-- Keep existing exports: `validateUUID`, `validateString`, `validateAmount`, `validateEnum`, `validateDate`, `validateEmail`, `sanitizeString`, `isAllowedOrigin`, `getCorsHeaders`, `corsHeaders`
-- Normalize the return type: currently the shared module returns `ValidationError | null` (object) while inline copies return `string | null`. We will add a `validateUUIDSimple` variant that returns `string | null` for backward compatibility, OR update all functions to use the object form. The simpler path: add string-returning wrappers to the shared module.
+### Layer 2: Server-Side Validation (Database Trigger)
 
-**Functions to update** (remove inline duplicates, import from shared):
+**Migration SQL:**
 
-| Function | Duplicated utilities |
-|---|---|
-| `issue-invoice` | validateUUID, isAllowedOrigin, getCorsHeaders |
-| `manage-subscription` | validateEnum, isAllowedOrigin, getCorsHeaders |
-| `record-payment` | validateUUID, validateAmount, validateString, sanitizeString, isAllowedOrigin, getCorsHeaders |
-| `void-invoice` | validateUUID, validateString, sanitizeString, isAllowedOrigin, getCorsHeaders |
-| `send-invoice-email` | validateUUID, validateEmail, validateString, sanitizeString, isAllowedOrigin, getCorsHeaders |
-| `send-receipt-email` | validateUUID, validateEmail, validateString, sanitizeString, isAllowedOrigin, getCorsHeaders |
-| `generate-pdf` | validateUUID, isAllowedOrigin, getCorsHeaders |
-| `generate-receipt-pdf` | isAllowedOrigin, getCorsHeaders |
-| `generate-report` | isAllowedOrigin, getCorsHeaders |
-| `generate-xml-artifact` | corsHeaders (legacy wildcard) |
-| `export-records` | validateUUID, validateDate, isAllowedOrigin, getCorsHeaders |
-| `create-checkout-session` | validateEnum, validateString, isAllowedOrigin, getCorsHeaders |
-| `check-overdue-invoices` | isAllowedOrigin, getCorsHeaders |
-| `send-due-date-reminders` | isAllowedOrigin, getCorsHeaders |
-| `send-invoice-reminder` | isAllowedOrigin, getCorsHeaders |
-| `send-support-notification` | isAllowedOrigin, getCorsHeaders |
-| `cleanup-expired-records` | isAllowedOrigin, getCorsHeaders |
-| `attribute-referral` | corsHeaders (legacy wildcard — upgrade to dynamic) |
-| `submit-invoice-to-regulator` | corsHeaders (legacy wildcard — upgrade to dynamic) |
-| `generate-artifacts` | corsHeaders (legacy wildcard — upgrade to dynamic) |
-| `verify-invoice` | validateUUID, corsHeaders |
-| `verify-receipt` | corsHeaders |
-| `view-invoice` | validateUUID, corsHeaders |
-| `tawk-identity` | corsHeaders (legacy wildcard) |
-| `stripe-webhook` | none needed (webhook, not user-facing) |
-| `lock-commissions` | corsHeaders (service-role only) |
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-**Key decisions**:
-- Add string-returning wrapper functions to `_shared/validation.ts` (e.g., `validateUUIDStr`) so existing function code needs minimal changes
-- Functions that currently use legacy wildcard `corsHeaders` will be upgraded to use dynamic `getCorsHeaders(req)` (except public endpoints which use `getCorsHeaders(req, true)`)
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
 
-### Part 2: Postgres-Based Rate Limiting
+Actually, the most practical and effective approach for Supabase:
 
-**Database migration** — create a `rate_limit_log` table and a checking function:
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
 
-```text
-┌─────────────────────────────────────┐
-│         rate_limit_log              │
-├─────────────────────────────────────┤
-│ id          UUID PK                 │
-│ key         TEXT (user_id or IP)    │
-│ endpoint    TEXT (function name)    │
-│ created_at  TIMESTAMPTZ DEFAULT NOW │
-└─────────────────────────────────────┘
+### Layer 2 (revised): Profile Insert Trigger
 
-+ Function: check_rate_limit(key, endpoint, window_seconds, max_requests)
-  → Returns BOOLEAN (true = allowed)
-  → Cleans up old entries automatically
-```
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
 
-**Shared helper** in `_shared/validation.ts`:
+### Files to Create/Modify
 
-```typescript
-export async function checkRateLimit(
-  supabase: SupabaseClient,
-  key: string,
-  endpoint: string,
-  windowSeconds: number,
-  maxRequests: number
-): Promise<boolean>
-```
+| File | Change |
+|------|--------|
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
 
-**Rate limit tiers** (requests per minute):
+### Disposable Domain Categories to Block
 
-| Endpoint category | Limit |
-|---|---|
-| Invoice issue/void/send | 30/min |
-| PDF generation | 20/min |
-| Payment recording | 30/min |
-| Email sending | 10/min |
-| Report generation | 10/min |
-| Public verification | 60/min (by IP) |
-| Checkout/subscription | 10/min |
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
 
-**Integration**: Each edge function calls `checkRateLimit()` early in its handler, after authentication (using `user.id` as key) or before authentication for public endpoints (using IP hash as key). Returns `429 Too Many Requests` if exceeded.
+### User Experience
 
-### Part 3: Cleanup of Legacy CORS
-
-Four functions still use the legacy wildcard `corsHeaders` (`attribute-referral`, `submit-invoice-to-regulator`, `generate-artifacts`, `tawk-identity`). These will be updated to use the shared dynamic CORS.
-
----
-
-## Files Changed
-
-- `supabase/functions/_shared/validation.ts` — add string-returning wrappers, rate limit helper
-- 1 new migration — `rate_limit_log` table + `check_rate_limit` function
-- ~25 edge function files — replace inline utilities with imports from shared module, add rate limiting calls
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
 
