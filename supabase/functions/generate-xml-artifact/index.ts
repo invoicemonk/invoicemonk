@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 function jsonToUblXml(data: Record<string, unknown>): string {
   const ns = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2'

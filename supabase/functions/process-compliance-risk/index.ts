@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders } from '../_shared/validation.ts'
+import { corsHeaders } from '../_shared/validation.ts'
 
 interface ComplianceRisk {
   invoice_id: string

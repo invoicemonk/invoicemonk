@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 const ADAPTERS: Record<string, { submissionRequired: boolean; regulatorCode: string }> = {
   NG: { submissionRequired: false, regulatorCode: 'NGA-NRS' },
