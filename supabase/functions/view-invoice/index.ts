@@ -1,26 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateUUIDStr as validateUUID, getCorsHeaders as getCorsHeadersFn, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
-// Validation utilities
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function validateUUID(value: unknown, fieldName: string): string | null {
-  if (value === null || value === undefined || value === '') {
-    return `${fieldName} is required`;
-  }
-  if (typeof value !== 'string') {
-    return `${fieldName} must be a string`;
-  }
-  if (!UUID_REGEX.test(value)) {
-    return `${fieldName} must be a valid UUID`;
-  }
-  return null;
-}
-
-// Public endpoint CORS - allows broader access for public invoice viewing
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-}
+// Public endpoint - use public CORS
+function getCorsHeadersPublic(req: Request) { return getCorsHeadersFn(req, true); }
 
 interface InvoiceItem {
   id: string
