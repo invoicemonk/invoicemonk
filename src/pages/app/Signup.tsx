@@ -111,6 +111,9 @@ const Signup = () => {
   const password = form.watch('password');
   const passwordStrength = getPasswordStrength(password || '');
 
+  const watchedEmail = form.watch('email');
+  const isDisposable = watchedEmail?.includes('@') && isDisposableEmail(watchedEmail);
+
   return (
     <AuthLayout variant="signup">
       {/* Header */}
@@ -144,16 +147,22 @@ const Signup = () => {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDisposable ? 'text-destructive' : 'text-muted-foreground'}`} />
               <Input
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                className="pl-10"
+                className={`pl-10 ${isDisposable ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 {...form.register('email')}
               />
             </div>
-            {form.formState.errors.email && (
+            {isDisposable && (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <Shield className="w-4 h-4 shrink-0" />
+                <span>Temporary/disposable emails are not allowed. Please use a permanent email address.</span>
+              </div>
+            )}
+            {!isDisposable && form.formState.errors.email && (
               <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
             )}
           </div>
@@ -238,7 +247,7 @@ const Signup = () => {
             <p className="text-sm text-destructive">{form.formState.errors.acceptTerms.message}</p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || isDisposable}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
