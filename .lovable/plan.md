@@ -1,49 +1,65 @@
 
 
-# Animated Hero Dashboard Preview Component
+# Block Disposable/Temporary Email Signups
 
-## What We're Building
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-A self-contained, animated dashboard mockup component (`HeroDashboardPreview`) designed to be embedded in the Invoicemonk marketing site hero section. It will show a miniaturized, non-interactive dashboard with animated elements that bring it to life: counting numbers, staggered card entrances, animated chart bars, and a live invoice notification toast.
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-## Component Design
+### Layer 1: Client-Side Disposable Email Check
 
-**New file**: `src/components/public/HeroDashboardPreview.tsx`
+**File: `src/lib/disposable-emails.ts`** (new)
 
-A standalone component with no backend dependencies, using only static data and Framer Motion animations:
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-### Visual Elements (scaled-down dashboard mockup)
-1. **Mini sidebar** — slim left bar with logo and nav icons (decorative only)
-2. **4 stat cards** — Revenue, Outstanding, Paid, Drafts with animated counting numbers (count up from 0 on mount)
-3. **Mini bar chart** — 6 bars that animate upward with staggered delays (pure CSS/framer-motion, no recharts dependency to keep it lightweight)
-4. **Recent invoices list** — 3-4 rows that slide in sequentially
-5. **Floating notification toast** — appears after ~2s showing "Invoice INV-007 paid — ₦1,250,000" with a green check, then fades
+**File: `src/pages/app/Signup.tsx`**
 
-### Animations (Framer Motion)
-- **Container**: Perspective tilt on mount (subtle 3D effect), slight floating hover
-- **Stat cards**: Staggered fade-up entrance (0.1s delay each), numbers count up over 1.5s
-- **Chart bars**: Each bar grows from height 0 to final height with spring physics, staggered 0.08s
-- **Invoice rows**: Slide in from right, staggered 0.15s
-- **Notification**: Slides in from top-right at 2.5s delay, auto-dismisses at 5s
-- **Outer wrapper**: Subtle shadow glow pulse, rounded border with gradient
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-### Styling
-- Wrapped in a rounded card with `overflow-hidden`, border, and shadow
-- Uses existing design tokens (--primary, --card, --border, etc.)
-- Responsive: scales proportionally, hidden details on mobile (show simplified version)
-- Non-interactive (pointer-events-none on inner content to prevent confusion)
+### Layer 2: Server-Side Validation (Database Trigger)
 
-## Route / Integration
+**Migration SQL:**
 
-**New page**: `src/pages/demo/HeroPreview.tsx` — a standalone page at `/demo/hero-preview` that renders the component centered on a dark/gradient background, useful for previewing and for iframe embedding on the marketing site.
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-**App.tsx**: Add route `/demo/hero-preview` pointing to the new page.
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
 
-## Files Changed
+Actually, the most practical and effective approach for Supabase:
+
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
+
+### Layer 2 (revised): Profile Insert Trigger
+
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
+
+### Files to Create/Modify
 
 | File | Change |
-|---|---|
-| `src/components/public/HeroDashboardPreview.tsx` | **New** — main animated dashboard preview component |
-| `src/pages/demo/HeroPreview.tsx` | **New** — standalone preview page |
-| `src/App.tsx` | Add `/demo/hero-preview` route |
+|------|--------|
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
+
+### Disposable Domain Categories to Block
+
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
+
+### User Experience
+
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
 
