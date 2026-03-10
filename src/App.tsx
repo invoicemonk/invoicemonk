@@ -292,6 +292,7 @@ const App = () => (
           <Route path="/demo/expenses" element={<DemoExpenses />} />
           <Route path="/demo/clients" element={<DemoClients />} />
           <Route path="/demo/accounting" element={<DemoAccounting />} />
+          <Route path="/demo/hero-preview" element={<HeroPreview />} />
           
           {/* Referral tracking redirect */}
           <Route path="/r/:code" element={<ReferralRedirect />} />
