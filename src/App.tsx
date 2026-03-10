@@ -112,6 +112,7 @@ import {
 // Legal and Documentation pages
 import SLA from "./pages/legal/SLA";
 import { APIDocumentation } from "./pages/docs";
+import HeroPreview from "./pages/demo/HeroPreview";
 
 // Onboarding pages
 import CountryConfirmation from "./pages/app/CountryConfirmation";
