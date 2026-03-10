@@ -111,6 +111,9 @@ const Signup = () => {
   const password = form.watch('password');
   const passwordStrength = getPasswordStrength(password || '');
 
+  const watchedEmail = form.watch('email');
+  const isDisposable = watchedEmail?.includes('@') && isDisposableEmail(watchedEmail);
+
   return (
     <AuthLayout variant="signup">
       {/* Header */}
