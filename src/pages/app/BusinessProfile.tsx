@@ -184,7 +184,7 @@ export default function BusinessProfile() {
       contact_phone: formData.phone || null,
       address: Object.values(addressData).some(Boolean) ? addressData : null,
       invoice_prefix: formData.invoicePrefix || 'INV',
-      default_currency: formData.defaultCurrency || 'NGN',
+      invoice_number_digits: formData.invoiceNumberDigits || 4,
       // VAT fields - only save if jurisdiction supports VAT
       is_vat_registered: jurisdictionConfig.showVat ? formData.isVatRegistered : false,
       vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 
