@@ -835,7 +835,7 @@ export default function BusinessProfile() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="invoicePrefix">Invoice Prefix</Label>
                 <Input
@@ -845,14 +845,31 @@ export default function BusinessProfile() {
                   onChange={(e) => setFormData({ ...formData, invoicePrefix: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Your invoices will be numbered as {formData.invoicePrefix || 'INV'}-0001, {formData.invoicePrefix || 'INV'}-0002, etc.
+                  Prefix for your invoice numbers
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoiceNumberDigits">Number of Digits</Label>
+                <Input
+                  id="invoiceNumberDigits"
+                  type="number"
+                  min={1}
+                  max={15}
+                  value={formData.invoiceNumberDigits}
+                  onChange={(e) => {
+                    const val = Math.min(15, Math.max(1, parseInt(e.target.value) || 4));
+                    setFormData({ ...formData, invoiceNumberDigits: val });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  How many digits in the number (e.g., 10 for Bulgaria)
                 </p>
               </div>
               <div className="space-y-2">
                 <Label>Next Invoice Number</Label>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-lg font-mono">
-                    {formData.invoicePrefix || 'INV'}-{String(nextInvoiceNumber).padStart(4, '0')}
+                    {formData.invoicePrefix || 'INV'}-{String(nextInvoiceNumber).padStart(formData.invoiceNumberDigits || 4, '0')}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
