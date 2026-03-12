@@ -36,6 +36,8 @@ export interface JurisdictionConfig {
   postalCodePlaceholder: string;
   postalCodeLabel: string;
   countryName: string;
+  // Invoice number formatting
+  invoiceNumberDigits?: number;
 }
 
 // Detailed configurations for Tier 1 markets (full compliance labels)

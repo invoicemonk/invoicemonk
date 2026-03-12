@@ -78,12 +78,17 @@ export default function CountryConfirmation() {
 
     setIsSaving(true);
     try {
+      const updatePayload: Record<string, any> = {
+        jurisdiction: selectedCountry,
+        default_currency: currency,
+      };
+      // Set jurisdiction-aware invoice number digits default
+      if (jurisdictionConfig?.invoiceNumberDigits) {
+        updatePayload.invoice_number_digits = jurisdictionConfig.invoiceNumberDigits;
+      }
       const { error } = await supabase
         .from('businesses')
-        .update({
-          jurisdiction: selectedCountry,
-          default_currency: currency,
-        })
+        .update(updatePayload)
         .eq('id', businessId);
 
       if (error) throw error;

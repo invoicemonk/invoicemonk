@@ -100,6 +100,7 @@ export default function BusinessProfile() {
     postalCode: '',
     country: '',
     invoicePrefix: 'INV',
+    invoiceNumberDigits: 4,
     defaultCurrency: 'NGN',
     isVatRegistered: false,
     vatRegistrationNumber: '',
