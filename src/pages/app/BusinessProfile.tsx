@@ -154,6 +154,7 @@ export default function BusinessProfile() {
         postalCode: addressData?.postal_code || '',
         country: addressData?.country || '',
         invoicePrefix: business.invoice_prefix || 'INV',
+        invoiceNumberDigits: (business as any).invoice_number_digits || 4,
         defaultCurrency: business.default_currency || 'NGN',
         isVatRegistered: businessExtended.is_vat_registered || false,
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
