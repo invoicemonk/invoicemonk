@@ -200,6 +200,7 @@ export type Database = {
           currency_locked_at: string | null
           default_currency: string | null
           id: string
+          invoice_number_digits: number
           invoice_prefix: string | null
           is_default: boolean | null
           is_vat_registered: boolean | null
@@ -231,6 +232,7 @@ export type Database = {
           currency_locked_at?: string | null
           default_currency?: string | null
           id?: string
+          invoice_number_digits?: number
           invoice_prefix?: string | null
           is_default?: boolean | null
           is_vat_registered?: boolean | null
@@ -262,6 +264,7 @@ export type Database = {
           currency_locked_at?: string | null
           default_currency?: string | null
           id?: string
+          invoice_number_digits?: number
           invoice_prefix?: string | null
           is_default?: boolean | null
           is_vat_registered?: boolean | null

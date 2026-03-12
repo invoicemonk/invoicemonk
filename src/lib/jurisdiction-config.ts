@@ -36,6 +36,8 @@ export interface JurisdictionConfig {
   postalCodePlaceholder: string;
   postalCodeLabel: string;
   countryName: string;
+  // Invoice number formatting
+  invoiceNumberDigits?: number;
 }
 
 // Detailed configurations for Tier 1 markets (full compliance labels)
@@ -1044,6 +1046,14 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
   },
 };
 
+// Invoice number digit requirements by jurisdiction
+// Countries where regulations mandate specific digit counts
+const JURISDICTION_INVOICE_DIGITS: Record<string, number> = {
+  BG: 10, // Bulgaria: 10-digit sequential invoice numbers required
+  RO: 10, // Romania: minimum 10-digit invoice numbers
+  PL: 10, // Poland: typically 10-digit numbering
+};
+
 // Default config for unknown jurisdictions
 export const DEFAULT_JURISDICTION_CONFIG: JurisdictionConfig = {
   name: 'International',
@@ -1073,7 +1083,12 @@ export const DEFAULT_JURISDICTION_CONFIG: JurisdictionConfig = {
 export function getJurisdictionConfig(jurisdiction: string): JurisdictionConfig {
   // First check for specific detailed config
   if (JURISDICTION_CONFIG[jurisdiction]) {
-    return JURISDICTION_CONFIG[jurisdiction];
+    const config = JURISDICTION_CONFIG[jurisdiction];
+    // Apply invoice digit override if not already set
+    if (!config.invoiceNumberDigits && JURISDICTION_INVOICE_DIGITS[jurisdiction]) {
+      return { ...config, invoiceNumberDigits: JURISDICTION_INVOICE_DIGITS[jurisdiction] };
+    }
+    return config;
   }
   
   // Build smart default from country data
@@ -1088,6 +1103,8 @@ export function getJurisdictionConfig(jurisdiction: string): JurisdictionConfig 
       // Generic but country-aware hints
       taxIdHint: `Your ${country.name} tax identification number`,
       clientTaxIdHint: `Tax ID for ${country.name} compliance`,
+      // Apply jurisdiction-specific invoice digit requirements
+      invoiceNumberDigits: JURISDICTION_INVOICE_DIGITS[jurisdiction],
     };
   }
   
