@@ -1,5 +1,8 @@
 project_id = "skcxogeaerudoadluexz"
 
+[functions.stripe-webhook]
+verify_jwt = false
+
 [functions.verify-invoice]
 verify_jwt = false
 
