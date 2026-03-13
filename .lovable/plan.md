@@ -1,65 +1,72 @@
 
 
-# Block Disposable/Temporary Email Signups
+# Fix: Subscription Not Updating After Payment + Add Upgrade Email
 
-## Problem
-Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
+## Three Issues
 
-## Approach
-Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
+### Issue 1 (Critical): Stripe webhook is silently rejected
 
-### Layer 1: Client-Side Disposable Email Check
+The `stripe-webhook` function is **not listed in `supabase/config.toml`** with `verify_jwt = false`. Stripe sends webhook requests without a Supabase JWT, so Supabase's default JWT enforcement rejects every request before the function code runs. This is confirmed by zero webhook logs and zero subscriptions with a `stripe_subscription_id` set in the database.
 
-**File: `src/lib/disposable-emails.ts`** (new)
+**Fix**: Add `[functions.stripe-webhook] verify_jwt = false` to `config.toml` and redeploy.
 
-Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
+### Issue 1b: CheckoutSuccess doesn't refresh business subscription
 
-**File: `src/pages/app/Signup.tsx`**
+After checkout, `CheckoutSuccess.tsx` only invalidates `['subscription', user.id]` (the legacy user-based query). The Billing page and access control use `['business-subscription', businessId]` from `BusinessContext`. The business subscription cache is never refreshed, so even if the webhook worked, the UI would still show "starter" until the user manually refreshes.
 
-Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
+**Fix**: Also invalidate business subscription queries and navigate to the business billing page.
 
-### Layer 2: Server-Side Validation (Database Trigger)
+### Issue 2: No upgrade confirmation email
 
-**Migration SQL:**
+There is no code that sends a confirmation email when a subscription is upgraded. The webhook should send one after successfully updating the subscription.
 
-Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
+**Fix**: Add email sending to the `checkout.session.completed` handler in the stripe webhook, using Brevo (already used for lifecycle campaigns).
 
-**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
+### Issue 3: Verification email not received
 
-Actually, the most practical and effective approach for Supabase:
+The signup code correctly calls `supabase.auth.signUp()` which triggers Supabase's built-in verification email. This is a **Supabase Auth configuration issue** — check:
+- Authentication → SMTP settings in Supabase dashboard
+- Email rate limits
+- Whether the email landed in spam
+- Whether the custom SMTP provider (if any) is working
 
-1. **Client-side blocklist** (primary defense -- covers 95% of cases)
-2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
+This is not a code fix — it requires checking Supabase dashboard settings.
 
-### Layer 2 (revised): Profile Insert Trigger
+## Changes
 
-**Migration:**
-- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
-- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
-- This catches any bypass of the frontend check
+### 1. `supabase/config.toml`
+Add:
+```toml
+[functions.stripe-webhook]
+verify_jwt = false
+```
 
-### Files to Create/Modify
+### 2. `supabase/functions/stripe-webhook/index.ts`
+In the `checkout.session.completed` handler, after successfully updating/creating the subscription:
+- Fetch the business owner's email and name
+- Send an upgrade confirmation email via Brevo (reuse the pattern from `process-lifecycle-campaigns`)
+- Include tier name, next billing date, and a link to the billing page
+
+### 3. `src/pages/app/CheckoutSuccess.tsx`
+- Invalidate `['business-subscription']` and `['user-businesses']` query keys (broad invalidation)
+- Navigate to `/b/{businessId}/billing` instead of `/dashboard` (requires reading businessId from stored state or URL)
+- Add a polling mechanism: retry fetching subscription status for up to 30 seconds to account for webhook processing delay
+
+### 4. Redeploy `stripe-webhook` edge function
+Required after config.toml change.
+
+## Files Changed
 
 | File | Change |
-|------|--------|
-| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
-| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
-| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
-| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
+|---|---|
+| `supabase/config.toml` | Add `stripe-webhook` with `verify_jwt = false` |
+| `supabase/functions/stripe-webhook/index.ts` | Add upgrade confirmation email via Brevo |
+| `src/pages/app/CheckoutSuccess.tsx` | Fix query invalidation, add polling, improve redirect |
 
-### Disposable Domain Categories to Block
+## Note on Verification Emails
 
-The blocklist will include domains from these categories:
-- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
-- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
-- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
-- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
-- Total: ~250 domains covering the vast majority of disposable services
-
-### User Experience
-
-When a user enters a disposable email:
-- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
-- The submit button remains disabled
-- If somehow bypassed, the profile trigger suspends the account immediately
+This is a Supabase Auth platform issue, not a code issue. Check:
+1. Supabase Dashboard → Authentication → Email Templates (ensure verification template exists)
+2. Supabase Dashboard → Authentication → SMTP Settings (ensure custom SMTP or default Supabase email is configured)
+3. Check if the user's email provider is blocking or spam-filtering the email
 
