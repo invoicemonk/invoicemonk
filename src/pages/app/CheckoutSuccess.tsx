@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Loader2 } from 'lucide-react';
@@ -14,22 +14,53 @@ export default function CheckoutSuccess() {
   const sessionId = searchParams.get('session_id');
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [redirectCountdown, setRedirectCountdown] = useState(8);
 
   useEffect(() => {
     const init = async () => {
       if (user?.id) {
         // Mark plan as selected after successful checkout
         await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
-        queryClient.invalidateQueries({ queryKey: ['subscription', user.id] });
+        
+        // Broadly invalidate all subscription and business queries
+        queryClient.invalidateQueries({ queryKey: ['subscription'] });
+        queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
+        queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
+        queryClient.invalidateQueries({ queryKey: ['tier-features'] });
       }
     };
     init();
 
-    const timer = setTimeout(() => {
-      navigate('/dashboard');
-    }, 5000);
+    // Poll for subscription update (webhook may take a few seconds)
+    let pollCount = 0;
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+      if (pollCount > 10 || !user?.id) {
+        clearInterval(pollInterval);
+        return;
+      }
+      // Re-invalidate to pick up webhook changes
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['tier-features'] });
+    }, 3000);
 
-    return () => clearTimeout(timer);
+    // Countdown timer for redirect
+    const countdownInterval = setInterval(() => {
+      setRedirectCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          navigate('/dashboard');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(countdownInterval);
+    };
   }, [navigate, queryClient, user?.id]);
 
   return (
@@ -78,7 +109,7 @@ export default function CheckoutSuccess() {
 
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Redirecting to dashboard in 5 seconds...
+              Redirecting to dashboard in {redirectCountdown} seconds...
             </div>
           </CardContent>
         </Card>

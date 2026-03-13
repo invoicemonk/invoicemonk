@@ -2,11 +2,141 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Stripe webhook needs permissive CORS for Stripe's servers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
 };
+
+// Send email via Brevo
+async function sendBrevoEmail(
+  brevoApiKey: string,
+  toEmail: string,
+  toName: string,
+  subject: string,
+  htmlContent: string
+): Promise<boolean> {
+  try {
+    const smtpFrom = Deno.env.get("SMTP_FROM") || "noreply@invoicemonk.com";
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: "InvoiceMonk", email: smtpFrom },
+        to: [{ email: toEmail, name: toName }],
+        subject,
+        htmlContent,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Brevo API error (${response.status}):`, errorText);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Brevo email send error:", err);
+    return false;
+  }
+}
+
+function upgradeEmailTemplate(userName: string, tierName: string, nextBillingDate: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: white;">invoiceMonk</span>
+    <h1 style="margin: 10px 0 0; font-size: 22px;">🎉 Upgrade Confirmed!</h1>
+  </div>
+  <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
+    <p>Hi ${userName},</p>
+    <p>Thank you for upgrading to the <strong>${tierName}</strong> plan! Your subscription is now active.</p>
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
+        <strong>Plan:</strong> ${tierName}<br>
+        <strong>Next billing date:</strong> ${nextBillingDate}
+      </p>
+    </div>
+    <p>You now have access to all the features included in your plan. Here are some things you can do:</p>
+    <ul style="color: #555;">
+      <li>Create unlimited invoices and receipts</li>
+      <li>Add team members to your business</li>
+      <li>Use custom branding on your invoices</li>
+      <li>Access audit logs and data exports</li>
+    </ul>
+    <div style="text-align: center; margin: 25px 0;">
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
+    </div>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #999; font-size: 11px; text-align: center;">
+      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+async function sendUpgradeEmail(
+  supabase: any,
+  businessId: string,
+  tier: string,
+  periodEnd: string
+) {
+  const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+  if (!brevoApiKey) {
+    console.log("BREVO_API_KEY not configured, skipping upgrade email");
+    return;
+  }
+
+  try {
+    // Find business owner
+    const { data: ownerMember } = await supabase
+      .from("business_members")
+      .select("user_id")
+      .eq("business_id", businessId)
+      .eq("role", "owner")
+      .maybeSingle();
+
+    if (!ownerMember?.user_id) {
+      console.log("No owner found for business:", businessId);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", ownerMember.user_id)
+      .maybeSingle();
+
+    if (!profile?.email) {
+      console.log("No email found for owner:", ownerMember.user_id);
+      return;
+    }
+
+    const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const nextBilling = new Date(periodEnd).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const sent = await sendBrevoEmail(
+      brevoApiKey,
+      profile.email,
+      profile.full_name || "there",
+      `Your InvoiceMonk ${tierName} plan is now active!`,
+      upgradeEmailTemplate(profile.full_name || "there", tierName, nextBilling)
+    );
+
+    console.log(sent ? "Upgrade email sent to:" : "Failed to send upgrade email to:", profile.email);
+  } catch (err) {
+    console.error("Error sending upgrade email:", err);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -32,7 +162,6 @@ serve(async (req) => {
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
 
-    // SECURITY: Enforce signature verification
     let event: Stripe.Event;
     
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
@@ -54,7 +183,8 @@ serve(async (req) => {
     }
     
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      // Use constructEventAsync for Deno's async SubtleCrypto
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
       return new Response(
@@ -81,10 +211,10 @@ serve(async (req) => {
           const tier = session.metadata?.tier || subscription.metadata?.tier || "professional";
           const pricingRegion = subscription.metadata?.pricing_region;
           const billingCurrency = subscription.metadata?.billing_currency;
+          const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
 
           if (!businessId) {
             console.error("No business_id in metadata - falling back to user_id lookup");
-            // Fallback: try to find business by user_id
             if (userId) {
               const { data: userBusiness } = await supabase
                 .from("business_members")
@@ -95,6 +225,7 @@ serve(async (req) => {
               const defaultBusiness = userBusiness?.find((m: any) => m.businesses?.is_default) || userBusiness?.[0];
               if (defaultBusiness) {
                 await updateSubscriptionByBusiness(supabase, subscription, defaultBusiness.business_id, tier, pricingRegion, billingCurrency, session.customer as string);
+                await sendUpgradeEmail(supabase, defaultBusiness.business_id, tier, periodEnd);
               }
             }
             break;
@@ -108,7 +239,6 @@ serve(async (req) => {
             .maybeSingle();
 
           if (existingSub) {
-            // Update existing subscription
             await supabase
               .from("subscriptions")
               .update({
@@ -117,7 +247,7 @@ serve(async (req) => {
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: subscriptionId,
                 current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                current_period_end: periodEnd,
                 pricing_region: pricingRegion,
                 billing_currency: billingCurrency,
                 updated_at: new Date().toISOString(),
@@ -126,7 +256,6 @@ serve(async (req) => {
 
             console.log("Updated subscription for business:", businessId);
           } else {
-            // Create new subscription for business
             await supabase
               .from("subscriptions")
               .insert({
@@ -136,13 +265,16 @@ serve(async (req) => {
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: subscriptionId,
                 current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                current_period_end: periodEnd,
                 pricing_region: pricingRegion,
                 billing_currency: billingCurrency,
               });
 
             console.log("Created subscription for business:", businessId);
           }
+
+          // Send upgrade confirmation email
+          await sendUpgradeEmail(supabase, businessId, tier, periodEnd);
 
           // Log audit event
           await supabase.rpc("log_audit_event", {
@@ -166,7 +298,6 @@ serve(async (req) => {
         if (businessId) {
           await doUpdateSubscriptionByBusiness(supabase, subscription, businessId);
         } else if (userId) {
-          // Fallback: find business by user_id
           const { data: sub } = await supabase
             .from("subscriptions")
             .select("business_id")
@@ -176,11 +307,9 @@ serve(async (req) => {
           if (sub?.business_id) {
             await doUpdateSubscriptionByBusiness(supabase, subscription, sub.business_id);
           } else {
-            // Legacy: update by user_id
             await doUpdateSubscription(supabase, subscription, userId);
           }
         } else {
-          // Find by stripe_subscription_id
           const { data: sub } = await supabase
             .from("subscriptions")
             .select("business_id, user_id")
@@ -200,7 +329,6 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription deleted:", subscription.id);
 
-        // Mark subscription as cancelled and revert to starter
         const { error } = await supabase
           .from("subscriptions")
           .update({
@@ -229,7 +357,6 @@ serve(async (req) => {
             ? invoice.subscription
             : invoice.subscription.id;
 
-          // Get subscription details for admin notification
           const { data: subData } = await supabase
             .from("subscriptions")
             .select("id, business_id, businesses(name)")
@@ -244,7 +371,6 @@ serve(async (req) => {
             })
             .eq("stripe_subscription_id", subscriptionId);
 
-          // Create admin notification for payment failure
           if (subData?.id) {
             const businessName = (subData.businesses as any)?.name || 'Unknown business';
             await supabase.rpc('notify_admin_payment_failed', {
@@ -266,7 +392,6 @@ serve(async (req) => {
             ? invoice.subscription
             : invoice.subscription.id;
 
-          // Ensure subscription is active
           await supabase
             .from("subscriptions")
             .update({
@@ -277,7 +402,6 @@ serve(async (req) => {
 
           // --- REFERRAL COMMISSION LOGIC ---
           try {
-            // Find our subscription record
             const { data: subRecord } = await supabase
               .from("subscriptions")
               .select("id, business_id, tier, billing_currency")
@@ -285,7 +409,6 @@ serve(async (req) => {
               .maybeSingle();
 
             if (subRecord?.business_id) {
-              // Find the business owner
               const { data: ownerMember } = await supabase
                 .from("business_members")
                 .select("user_id")
@@ -294,7 +417,6 @@ serve(async (req) => {
                 .maybeSingle();
 
               if (ownerMember?.user_id) {
-                // Check if this user has a referral
                 const { data: referral } = await supabase
                   .from("referrals")
                   .select("id, partner_id, commission_business_id, is_self_referral")
@@ -302,7 +424,6 @@ serve(async (req) => {
                   .maybeSingle();
 
                 if (referral && !referral.is_self_referral) {
-                  // Lock commission_business_id on first billing event
                   if (!referral.commission_business_id) {
                     await supabase
                       .from("referrals")
@@ -312,9 +433,7 @@ serve(async (req) => {
                     console.log("Locked commission_business_id:", subRecord.business_id);
                   }
 
-                  // Only generate commission if this is the commission-bearing business
                   if (referral.commission_business_id === subRecord.business_id) {
-                    // Check partner is still active
                     const { data: partner } = await supabase
                       .from("referral_partners")
                       .select("id, commission_rate, status")
@@ -322,12 +441,11 @@ serve(async (req) => {
                       .maybeSingle();
 
                     if (partner && partner.status === "active") {
-                      const grossAmount = (invoice.amount_paid || 0) / 100; // Stripe amounts in cents
+                      const grossAmount = (invoice.amount_paid || 0) / 100;
                       const commissionRate = Number(partner.commission_rate);
                       const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
                       const currency = subRecord.billing_currency || invoice.currency?.toUpperCase() || "USD";
 
-                      // Avoid duplicate commissions for same billing event
                       const { data: existingComm } = await supabase
                         .from("commissions")
                         .select("id")
@@ -354,7 +472,6 @@ serve(async (req) => {
               }
             }
           } catch (commErr) {
-            // Don't fail the webhook for commission errors
             console.error("Commission processing error:", commErr);
           }
         }
@@ -383,7 +500,6 @@ serve(async (req) => {
 });
 
 async function doUpdateSubscription(
-  // deno-lint-ignore no-explicit-any
   supabase: any,
   subscription: Stripe.Subscription,
   userId: string
@@ -410,7 +526,6 @@ async function doUpdateSubscription(
 }
 
 async function doUpdateSubscriptionByBusiness(
-  // deno-lint-ignore no-explicit-any
   supabase: any,
   subscription: Stripe.Subscription,
   businessId: string
@@ -437,7 +552,6 @@ async function doUpdateSubscriptionByBusiness(
 }
 
 async function updateSubscriptionByBusiness(
-  // deno-lint-ignore no-explicit-any
   supabase: any,
   subscription: Stripe.Subscription,
   businessId: string,
