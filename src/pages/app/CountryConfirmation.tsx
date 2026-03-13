@@ -93,6 +93,17 @@ export default function CountryConfirmation() {
 
       if (error) throw error;
 
+      // Update the default currency account to match the new currency
+      const { error: currencyAccountError } = await supabase
+        .from('currency_accounts')
+        .update({ currency, name: `${currency} Account` })
+        .eq('business_id', businessId)
+        .eq('is_default', true);
+
+      if (currencyAccountError) {
+        console.error('Failed to update default currency account:', currencyAccountError);
+      }
+
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
       queryClient.invalidateQueries({ queryKey: ['user-businesses'] });

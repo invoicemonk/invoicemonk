@@ -258,6 +258,28 @@ serve(async (req) => {
     // Get the app URL for redirects
     const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
+    // Cancel any existing free subscriptions with conflicting currency
+    // This prevents Stripe's "cannot combine currencies on a single customer" error
+    try {
+      const existingStripeSubs = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 10,
+      });
+
+      const checkoutCurrency = finalPricing.currency.toLowerCase();
+      for (const sub of existingStripeSubs.data) {
+        const subCurrency = sub.currency?.toLowerCase();
+        if (subCurrency && subCurrency !== checkoutCurrency) {
+          console.log(`Cancelling conflicting subscription ${sub.id} (currency: ${subCurrency}) to allow ${checkoutCurrency} checkout`);
+          await stripe.subscriptions.cancel(sub.id, { prorate: false });
+        }
+      }
+    } catch (cancelErr) {
+      console.error("Error cancelling conflicting subscriptions:", cancelErr);
+      // Continue anyway — the checkout may still work if there's no actual conflict
+    }
+
     // Create checkout session with business_id in metadata
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
