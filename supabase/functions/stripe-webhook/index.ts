@@ -231,6 +231,18 @@ serve(async (req) => {
             break;
           }
 
+          // Resolve the business owner's user_id to populate on the subscription
+          let resolvedUserId = userId;
+          if (!resolvedUserId) {
+            const { data: ownerMember } = await supabase
+              .from("business_members")
+              .select("user_id")
+              .eq("business_id", businessId)
+              .eq("role", "owner")
+              .maybeSingle();
+            resolvedUserId = ownerMember?.user_id || null;
+          }
+
           // Check if business has existing subscription
           const { data: existingSub } = await supabase
             .from("subscriptions")
@@ -244,6 +256,7 @@ serve(async (req) => {
               .update({
                 tier,
                 status: "active",
+                user_id: resolvedUserId,
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: subscriptionId,
                 current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
@@ -254,12 +267,13 @@ serve(async (req) => {
               })
               .eq("id", existingSub.id);
 
-            console.log("Updated subscription for business:", businessId);
+            console.log("Updated subscription for business:", businessId, "user_id:", resolvedUserId);
           } else {
             await supabase
               .from("subscriptions")
               .insert({
                 business_id: businessId,
+                user_id: resolvedUserId,
                 tier,
                 status: "active",
                 stripe_customer_id: session.customer as string,
@@ -270,7 +284,7 @@ serve(async (req) => {
                 billing_currency: billingCurrency,
               });
 
-            console.log("Created subscription for business:", businessId);
+            console.log("Created subscription for business:", businessId, "user_id:", resolvedUserId);
           }
 
           // Send upgrade confirmation email
