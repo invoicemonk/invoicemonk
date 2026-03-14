@@ -37,17 +37,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-  const symbols: Record<string, string> = {
-    NGN: '₦',
-    USD: '$',
-    GBP: '£',
-    EUR: '€',
-  };
-  
-  const symbol = symbols[currency] || currency;
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+import { formatCurrency } from '@/lib/utils';
 
 const getCategoryLabel = (value: string) => {
   const category = EXPENSE_CATEGORIES.find(c => c.value === value);

@@ -10,29 +10,90 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function getCurrencySymbol(currency: string): string {
   const symbols: Record<string, string> = {
-    NGN: '₦',
+    // Major currencies
     USD: '$',
-    GBP: '£',
     EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    CNY: '¥',
+    // Americas
+    CAD: 'C$',
+    MXN: 'MX$',
+    BRL: 'R$',
+    ARS: '$',
+    CLP: '$',
+    COP: '$',
+    PEN: 'S/',
+    UYU: '$U',
+    // Europe
+    CHF: 'CHF',
+    SEK: 'kr',
+    NOK: 'kr',
+    DKK: 'kr',
+    PLN: 'zł',
+    CZK: 'Kč',
+    HUF: 'Ft',
+    RON: 'lei',
+    BGN: 'лв',
+    RSD: 'din.',
+    RUB: '₽',
+    UAH: '₴',
+    // Africa
+    NGN: '₦',
+    ZAR: 'R',
     GHS: 'GH₵',
     KES: 'KSh',
-    ZAR: 'R',
-    CAD: 'C$',
+    EGP: 'E£',
+    MAD: 'DH',
+    TZS: 'TSh',
+    UGX: 'USh',
+    RWF: 'FRw',
+    XOF: 'CFA',
+    XAF: 'FCFA',
+    // Asia-Pacific
+    INR: '₹',
+    SGD: 'S$',
+    HKD: 'HK$',
+    TWD: 'NT$',
+    KRW: '₩',
+    THB: '฿',
+    MYR: 'RM',
+    IDR: 'Rp',
+    PHP: '₱',
+    VND: '₫',
+    PKR: '₨',
+    BDT: '৳',
+    LKR: 'Rs',
+    // Middle East
+    AED: 'د.إ',
+    SAR: '﷼',
+    QAR: 'QR',
+    KWD: 'KD',
+    BHD: 'BD',
+    OMR: 'OMR',
+    JOD: 'JD',
+    ILS: '₪',
+    TRY: '₺',
+    // Oceania
     AUD: 'A$',
+    NZD: 'NZ$',
+    FJD: 'FJ$',
   };
   return symbols[currency] || currency;
 }
 
 /**
- * Format a number as currency with proper symbol
+ * Format a number as currency with proper symbol.
+ * Handles negative amounts with a leading minus sign.
  */
 export function formatCurrency(amount: number, currency: string = 'NGN'): string {
   const symbol = getCurrencySymbol(currency);
-  const formatted = amount.toLocaleString('en-US', {
+  const prefix = amount < 0 ? '-' : '';
+  const formatted = Math.abs(amount).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${symbol}${formatted}`;
+  return `${prefix}${symbol}${formatted}`;
 }
 
 /**

@@ -43,15 +43,48 @@ import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 
 const AVAILABLE_CURRENCIES = [
+  // Africa
   { code: 'NGN', name: 'Nigerian Naira', symbol: '₦' },
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
   { code: 'GHS', name: 'Ghanaian Cedi', symbol: 'GH₵' },
   { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh' },
-  { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
+  { code: 'EGP', name: 'Egyptian Pound', symbol: 'E£' },
+  { code: 'TZS', name: 'Tanzanian Shilling', symbol: 'TSh' },
+  { code: 'UGX', name: 'Ugandan Shilling', symbol: 'USh' },
+  { code: 'RWF', name: 'Rwandan Franc', symbol: 'FRw' },
+  { code: 'XOF', name: 'CFA Franc (West Africa)', symbol: 'CFA' },
+  // Americas
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
   { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'MXN', name: 'Mexican Peso', symbol: 'MX$' },
+  { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
+  { code: 'ARS', name: 'Argentine Peso', symbol: '$' },
+  { code: 'CLP', name: 'Chilean Peso', symbol: '$' },
+  { code: 'COP', name: 'Colombian Peso', symbol: '$' },
+  // Europe
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'SEK', name: 'Swedish Krona', symbol: 'kr' },
+  { code: 'PLN', name: 'Polish Zloty', symbol: 'zł' },
+  { code: 'HUF', name: 'Hungarian Forint', symbol: 'Ft' },
+  { code: 'RON', name: 'Romanian Leu', symbol: 'lei' },
+  { code: 'BGN', name: 'Bulgarian Lev', symbol: 'лв' },
+  { code: 'RSD', name: 'Serbian Dinar', symbol: 'din.' },
+  // Asia-Pacific
+  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$' },
+  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
+  { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
+  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
+  // Middle East
+  { code: 'AED', name: 'UAE Dirham', symbol: 'د.إ' },
+  { code: 'SAR', name: 'Saudi Riyal', symbol: '﷼' },
+  // Oceania
   { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'NZD', name: 'New Zealand Dollar', symbol: 'NZ$' },
 ];
 
 interface Props {

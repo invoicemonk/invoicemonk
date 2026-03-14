@@ -127,11 +127,7 @@ const sampleInvoices = [
   },
 ];
 
-const formatCurrency = (amount: number, currency: string = 'NGN') => {
-  const symbols: Record<string, string> = { NGN: '₦', USD: '$', GBP: '£', EUR: '€' };
-  const symbol = symbols[currency] || currency;
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+import { formatCurrency } from '@/lib/utils';
 
 const formatDate = (date: string | null) => {
   if (!date) return '-';

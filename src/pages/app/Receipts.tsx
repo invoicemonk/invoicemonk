@@ -15,16 +15,6 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { formatCompactCurrency, formatCurrency } from '@/lib/utils';
 
-const formatCurrencyAmount = (amount: number, currency: string): string => {
-  const symbols: Record<string, string> = {
-    NGN: '₦',
-    USD: '$',
-    GBP: '£',
-    EUR: '€',
-  };
-  const symbol = symbols[currency] || currency;
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
 
 export default function Receipts() {
   const { businessId } = useParams<{ businessId: string }>();
@@ -200,7 +190,7 @@ export default function Receipts() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-right font-medium text-emerald-600">
-                      {formatCurrencyAmount(Number(receipt.amount), receipt.currency)}
+                      {formatCurrency(Number(receipt.amount), receipt.currency)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(receipt.issued_at)}

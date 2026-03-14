@@ -10,19 +10,7 @@ import { useAccountingStats } from '@/hooks/use-accounting-stats';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-
-const formatCurrencyValue = (amount: number, currency: string) => {
-  const symbols: Record<string, string> = {
-    NGN: '₦',
-    USD: '$',
-    GBP: '£',
-    EUR: '€',
-  };
-  const symbol = symbols[currency] || currency;
-  const prefix = amount < 0 ? '-' : '';
-  return `${prefix}${symbol}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default function AccountingResult() {
   const { data: preferences } = useAccountingPreferences();
@@ -79,7 +67,7 @@ export default function AccountingResult() {
                   <span className="text-sm font-medium">Money In</span>
                 </div>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {formatCurrencyValue(moneyIn, currency)}
+                  {formatCurrency(moneyIn, currency)}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {stats?.moneyInCount || 0} paid invoices
@@ -99,7 +87,7 @@ export default function AccountingResult() {
                   <span className="text-sm font-medium">Money Out</span>
                 </div>
                 <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                  {formatCurrencyValue(moneyOut, currency)}
+                  {formatCurrency(moneyOut, currency)}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {stats?.expenseCount || 0} expenses
@@ -130,7 +118,7 @@ export default function AccountingResult() {
                     ? "text-emerald-600 dark:text-emerald-400"
                     : "text-red-600 dark:text-red-400"
                 )}>
-                  {formatCurrencyValue(whatsLeft, currency)}
+                  {formatCurrency(whatsLeft, currency)}
                 </p>
                 <p className="text-muted-foreground mt-3">
                   {isPositive 
@@ -197,7 +185,7 @@ export default function AccountingResult() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">
-                {formatCurrencyValue(stats?.outstanding || 0, currency)}
+                {formatCurrency(stats?.outstanding || 0, currency)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats?.outstandingCount || 0} unpaid invoices
