@@ -1,41 +1,65 @@
 
 
-# Fix: Professional Tier Benefits Not Accessible After Upgrade
+# Block Disposable/Temporary Email Signups
 
-## Root Cause Analysis
+## Problem
+Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
 
-**Two separate bugs are causing this:**
+## Approach
+Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
 
-### Bug 1: Subscription record has no `user_id`
-The subscription for the upgraded business (`87d2b8b8-...`) has `user_id: NULL`. This is because the webhook/manual upgrade only sets `business_id` on the subscription record.
+### Layer 1: Client-Side Disposable Email Check
 
-**Impact**: Three hooks query subscriptions by `user_id` instead of `business_id`, so they always see the user as "starter":
-- `use-subscription.ts` → queries `.eq('user_id', user.id)` → returns null → defaults to "starter"
-- `use-invoice-templates.ts` → uses `useSubscription()` → thinks user is "starter" → locks premium templates
-- `use-upgrade-triggers.ts` → uses `useSubscription()` → thinks user is "starter" → keeps showing upgrade modal
+**File: `src/lib/disposable-emails.ts`** (new)
 
-### Bug 2: Stripe webhook has zero logs
-The `stripe-webhook` edge function has **zero logs ever**, meaning Stripe events are never reaching the function. The config.toml is correct (`verify_jwt = false`), so the function is either not deployed or Stripe's webhook endpoint URL is not configured. This needs to be verified in the Stripe Dashboard.
+Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
 
-## Fix Plan
+**File: `src/pages/app/Signup.tsx`**
 
-### 1. Fix `use-subscription.ts` to check business-level subscriptions
-The hook currently only queries by `user_id`. Update it to **also** query subscriptions by the user's business memberships as a fallback, so it picks up business-scoped subscriptions.
+Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
 
-### 2. Backfill `user_id` on existing subscriptions (migration)
-Set `user_id` on the professional subscription record from the business owner's `business_members` entry. Also update the webhook to always set `user_id` when creating/updating subscriptions.
+### Layer 2: Server-Side Validation (Database Trigger)
 
-### 3. Update `stripe-webhook/index.ts` to always set `user_id`
-In the `checkout.session.completed` handler, look up the business owner and set `user_id` on the subscription record.
+**Migration SQL:**
 
-### 4. Deploy the stripe-webhook function
-Redeploy the edge function and instruct the user to verify the Stripe webhook URL is configured.
+Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
 
-## Files Changed
+**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
+
+Actually, the most practical and effective approach for Supabase:
+
+1. **Client-side blocklist** (primary defense -- covers 95% of cases)
+2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
+
+### Layer 2 (revised): Profile Insert Trigger
+
+**Migration:**
+- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
+- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
+- This catches any bypass of the frontend check
+
+### Files to Create/Modify
 
 | File | Change |
-|---|---|
-| `src/hooks/use-subscription.ts` | Fall back to business-level subscription query when user-level returns null |
-| `supabase/functions/stripe-webhook/index.ts` | Always set `user_id` on subscription records |
-| New migration | Backfill `user_id` on existing subscriptions from business owners |
+|------|--------|
+| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
+| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
+| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
+| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
+
+### Disposable Domain Categories to Block
+
+The blocklist will include domains from these categories:
+- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
+- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
+- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
+- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
+- Total: ~250 domains covering the vast majority of disposable services
+
+### User Experience
+
+When a user enters a disposable email:
+- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
+- The submit button remains disabled
+- If somehow bypassed, the profile trigger suspends the account immediately
 

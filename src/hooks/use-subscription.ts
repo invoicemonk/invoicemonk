@@ -49,7 +49,8 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
+      // First try user-level subscription
+      const { data: userSub, error: userError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
@@ -58,15 +59,39 @@ export function useSubscription() {
         .limit(1)
         .maybeSingle();
 
-      if (error) {
-        console.error('Subscription fetch error:', error);
+      if (userError) {
+        console.error('User subscription fetch error:', userError);
+      }
+
+      if (userSub) return userSub as Subscription;
+
+      // Fallback: check subscriptions via user's business memberships
+      const { data: memberships } = await supabase
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', user.id);
+
+      if (!memberships || memberships.length === 0) return null;
+
+      const businessIds = memberships.map(m => m.business_id);
+      const { data: bizSub, error: bizError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .in('business_id', businessIds)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (bizError) {
+        console.error('Business subscription fetch error:', bizError);
         return null;
       }
 
-      return data as Subscription | null;
+      return bizSub as Subscription | null;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   const limitsQuery = useQuery({
