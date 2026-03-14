@@ -54,6 +54,7 @@ import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
 import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -82,6 +83,7 @@ export default function InvoiceEdit() {
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: templates } = useInvoiceTemplates();
   const { currentBusiness, isStarter, checkTierLimit } = useBusiness();
+  const { activeCurrency } = useCurrencyAccount();
   // Pre-fetch products for the combobox (cached — no extra calls per line item interaction)
   useProductsServices(currentBusiness?.id);
   const { data: businessCurrency } = useBusinessCurrency(currentBusiness?.id);
@@ -107,7 +109,7 @@ export default function InvoiceEdit() {
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [currency, setCurrency] = useState('NGN');
+  const [currency, setCurrency] = useState(activeCurrency || 'NGN');
   const [issueDate, setIssueDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -248,7 +250,7 @@ export default function InvoiceEdit() {
   };
 
   const formatCurrency = (amount: number) => {
-    const currencyCode = currency || 'NGN';
+    const currencyCode = currency || activeCurrency || 'NGN';
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: currencyCode,

@@ -143,7 +143,7 @@ export default function InvoiceNew() {
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [currency, setCurrency] = useState('NGN');
+  const [currency, setCurrency] = useState(activeCurrency || 'NGN');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -163,6 +163,13 @@ export default function InvoiceNew() {
       ));
     }
   }, [isNigerianVatRegistered, activeTaxSchema]);
+
+  // Sync currency state when active currency account changes
+  useEffect(() => {
+    if (activeCurrency) {
+      setCurrency(activeCurrency);
+    }
+  }, [activeCurrency]);
 
   // First invoice prefill: populate a sample line item for new users
   const [prefillApplied, setPrefillApplied] = useState(false);
@@ -351,7 +358,7 @@ export default function InvoiceNew() {
   };
 
   const formatCurrency = (amount: number) => {
-    const currencyCode = currency || 'NGN';
+    const currencyCode = currency || activeCurrency || 'NGN';
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: currencyCode,
@@ -394,6 +401,7 @@ export default function InvoiceNew() {
       name: newClient.name,
       email: newClient.email,
       phone: newClient.phone || null,
+      business_id: currentBusiness?.id,
     });
 
     if (result) {
