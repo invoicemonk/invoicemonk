@@ -62,6 +62,7 @@ import { toast } from '@/hooks/use-toast';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
+import { AddClientDialog } from '@/components/clients/AddClientDialog';
 
 interface InvoiceItem {
   id: string;
@@ -121,11 +122,6 @@ export default function InvoiceEdit() {
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
-  const [newClient, setNewClient] = useState({
-    name: '',
-    email: '',
-    phone: '',
-  });
 
   // Fetch payment methods for the invoice's currency account
   const { data: paymentMethods } = usePaymentMethods(invoice?.currency_account_id || undefined);
@@ -286,20 +282,8 @@ export default function InvoiceEdit() {
     return true;
   };
 
-  const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email) return;
-
-    const result = await createClient.mutateAsync({
-      name: newClient.name,
-      email: newClient.email,
-      phone: newClient.phone || null,
-    });
-
-    if (result) {
-      setSelectedClientId(result.id);
-      setIsAddClientDialogOpen(false);
-      setNewClient({ name: '', email: '', phone: '' });
-    }
+  const handleClientCreated = (clientId: string) => {
+    setSelectedClientId(clientId);
   };
 
   const handleSave = async () => {
@@ -959,62 +943,11 @@ export default function InvoiceEdit() {
       </div>
 
       {/* Add Client Dialog */}
-      <Dialog open={isAddClientDialogOpen} onOpenChange={setIsAddClientDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
-            <DialogDescription>
-              Create a new client to add to this invoice.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="clientName">Name *</Label>
-              <Input
-                id="clientName"
-                placeholder="Client name"
-                value={newClient.name}
-                onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="clientEmail">Email *</Label>
-              <Input
-                id="clientEmail"
-                type="email"
-                placeholder="client@example.com"
-                value={newClient.email}
-                onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="clientPhone">Phone</Label>
-              <Input
-                id="clientPhone"
-                type="tel"
-                placeholder="+234 800 000 0000"
-                value={newClient.phone}
-                onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddClientDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddClient}
-              disabled={!newClient.name || !newClient.email || createClient.isPending}
-            >
-              {createClient.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Add Client'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddClientDialog
+        open={isAddClientDialogOpen}
+        onOpenChange={setIsAddClientDialogOpen}
+        onClientCreated={handleClientCreated}
+      />
     </motion.div>
     </BusinessAccessGuard>
   );

@@ -77,7 +77,7 @@ export default function InvoiceDetail() {
   const recordPayment = useRecordPayment();
   const downloadPdf = useDownloadInvoicePdf();
   const uploadProof = useUploadPaymentProof();
-  const { isStarter } = useBusiness();
+  const { isStarter, currentBusiness } = useBusiness();
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -809,13 +809,22 @@ export default function InvoiceDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invoice Preview Dialog - for issued invoices, logo comes from issuer_snapshot */}
+      {/* Invoice Preview Dialog - passes business and template snapshot for accurate preview */}
       {invoice && (
         <InvoicePreviewDialog
           open={previewOpen}
           onOpenChange={setPreviewOpen}
           invoice={invoice}
           showWatermark={isStarter}
+          business={currentBusiness ? {
+            name: currentBusiness.name,
+            legal_name: currentBusiness.legal_name,
+            tax_id: currentBusiness.tax_id,
+            address: currentBusiness.address as any,
+            contact_email: currentBusiness.contact_email,
+            contact_phone: currentBusiness.contact_phone,
+            logo_url: currentBusiness.logo_url,
+          } : undefined}
         />
       )}
 

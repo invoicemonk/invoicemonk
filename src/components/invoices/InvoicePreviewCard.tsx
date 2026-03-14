@@ -102,12 +102,17 @@ const DEFAULT_LAYOUT = {
   show_bank_details: false,
 };
 
-export function InvoicePreviewCard({ invoice, showWatermark = false, business, templateConfig }: InvoicePreviewCardProps) {
+export function InvoicePreviewCard({ invoice, showWatermark = false, business, templateConfig: templateConfigProp }: InvoicePreviewCardProps) {
+  // Auto-derive templateConfig from invoice.template_snapshot when no explicit prop is passed
+  const templateConfig = templateConfigProp ?? (invoice.template_snapshot ? {
+    layout: (invoice.template_snapshot as Record<string, unknown>).layout as TemplateConfig['layout'],
+    styles: (invoice.template_snapshot as Record<string, unknown>).styles as TemplateConfig['styles'],
+  } : null);
   const layout = { ...DEFAULT_LAYOUT, ...templateConfig?.layout };
   const primaryColor = templateConfig?.styles?.primary_color || '#1d6b5a';
   const headerStyle = layout.header_style || 'standard';
 
-  const formatCurrency = (amount: number, currency: string = 'NGN') => {
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
   };
 
@@ -264,6 +269,31 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
     );
   };
 
+  const renderPaymentMethod = (accentColor?: string) => {
+    const pm = invoice.payment_method_snapshot as { provider_type?: string; display_name?: string; instructions?: Record<string, string> } | null;
+    if (!pm?.instructions) return null;
+    const entries = Object.entries(pm.instructions).filter(([, v]) => v);
+    if (entries.length === 0) return null;
+    const color = accentColor || primaryColor;
+    return (
+      <div className="rounded-lg border border-border bg-muted/30 p-4">
+        <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color }}>Payment Instructions</p>
+        <p className="text-sm font-medium mb-2">{pm.display_name || pm.provider_type}</p>
+        <div className="space-y-1">
+          {entries.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-4 text-sm">
+              <span className="text-muted-foreground capitalize shrink-0">{k.replace(/_/g, ' ')}</span>
+              <span className="font-mono text-right truncate">{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
+          Reference: <span className="font-mono font-medium text-foreground">{invoice.invoice_number}</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderIssuerDetails = () => {
     if (!layout.show_issuer_details || !displayIssuer) return null;
     return (
@@ -364,6 +394,38 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
               {renderTotals()}
             </div>
           )}
+
+          {/* Payment Instructions */}
+          {renderPaymentMethod()}
+
+          {/* Notes & Terms */}
+          {(layout.show_notes || layout.show_terms) && (invoice.notes || invoice.terms) && (
+            <div className="grid md:grid-cols-2 gap-4 pt-4">
+              {layout.show_notes && invoice.notes && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
+                </div>
+              )}
+              {layout.show_terms && invoice.terms && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Terms</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.terms}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* QR + Verification */}
+          {layout.show_verification_qr && invoice.verification_id && (
+            <div className="flex items-center justify-between pt-4 border-t border-dashed">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Verification</p>
+                <p className="text-xs text-muted-foreground">ID: <span className="font-mono">{invoice.verification_id}</span></p>
+              </div>
+              {renderQR()}
+            </div>
+          )}
         </div>
       </Card>
     );
@@ -442,6 +504,9 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
                 </div>
               </div>
             )}
+
+            {/* Payment Instructions */}
+            {renderPaymentMethod(primaryColor)}
 
             {/* Notes & Terms in cards */}
             {(layout.show_notes || layout.show_terms) && (invoice.notes || invoice.terms) && (
@@ -556,16 +621,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
             </div>
           )}
 
-          {/* Totals + Bank Details side by side */}
+          {/* Totals + Payment Instructions side by side */}
           <div className="grid md:grid-cols-2 gap-8">
             <div>
-              {/* Bank details placeholder */}
-              {layout.show_bank_details && (
-                <div className="p-4 rounded border bg-muted/20">
-                  <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: primaryColor }}>Bank Details</p>
-                  <p className="text-sm text-muted-foreground italic">Payment instructions will appear here when configured.</p>
-                </div>
-              )}
+              {renderPaymentMethod(primaryColor)}
             </div>
             {layout.show_totals && (
               <div className="flex justify-end">
@@ -688,6 +747,9 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
               {renderTotals()}
             </div>
           )}
+
+          {/* Payment Instructions */}
+          {renderPaymentMethod(primaryColor)}
 
           {/* Notes & Terms */}
           {(layout.show_notes || layout.show_terms) && (invoice.notes || invoice.terms) && (

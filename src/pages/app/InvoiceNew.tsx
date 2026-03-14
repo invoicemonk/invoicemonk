@@ -67,6 +67,7 @@ import { ProductServiceCombobox } from '@/components/products/ProductServiceComb
 import { useProductsServices } from '@/hooks/use-products-services';
 import { supabase } from '@/integrations/supabase/client';
 import { getCountryName } from '@/lib/countries';
+import { AddClientDialog } from '@/components/clients/AddClientDialog';
 
 function getSmartPrefillAmount(currency: string): number {
   const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
@@ -191,11 +192,6 @@ export default function InvoiceNew() {
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
-  const [newClient, setNewClient] = useState({
-    name: '',
-    email: '',
-    phone: '',
-  });
 
   // Fetch payment methods for the active currency account
   const { data: paymentMethods } = usePaymentMethods(currentCurrencyAccount?.id);
@@ -394,21 +390,8 @@ export default function InvoiceNew() {
     return true;
   };
 
-  const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email) return;
-
-    const result = await createClient.mutateAsync({
-      name: newClient.name,
-      email: newClient.email,
-      phone: newClient.phone || null,
-      business_id: currentBusiness?.id,
-    });
-
-    if (result) {
-      setSelectedClientId(result.id);
-      setIsAddClientDialogOpen(false);
-      setNewClient({ name: '', email: '', phone: '' });
-    }
+  const handleClientCreated = (clientId: string) => {
+    setSelectedClientId(clientId);
   };
 
   const handleSaveDraft = async () => {
@@ -1123,62 +1106,11 @@ export default function InvoiceNew() {
       </div>
 
       {/* Add Client Dialog */}
-      <Dialog open={isAddClientDialogOpen} onOpenChange={setIsAddClientDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
-            <DialogDescription>
-              Create a new client to add to this invoice.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="clientName">Name *</Label>
-              <Input
-                id="clientName"
-                placeholder="Client name"
-                value={newClient.name}
-                onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="clientEmail">Email *</Label>
-              <Input
-                id="clientEmail"
-                type="email"
-                placeholder="client@example.com"
-                value={newClient.email}
-                onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="clientPhone">Phone</Label>
-              <Input
-                id="clientPhone"
-                type="tel"
-                placeholder="+234 800 000 0000"
-                value={newClient.phone}
-                onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddClientDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddClient}
-              disabled={!newClient.name || !newClient.email || createClient.isPending}
-            >
-              {createClient.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Add Client'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddClientDialog
+        open={isAddClientDialogOpen}
+        onOpenChange={setIsAddClientDialogOpen}
+        onClientCreated={handleClientCreated}
+      />
 
       {/* Invoice Preview Dialog */}
       <InvoicePreviewDialog

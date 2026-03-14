@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useSubscription, SubscriptionTier } from './use-subscription';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 import { toast } from '@/hooks/use-toast';
 import type { Json } from '@/integrations/supabase/types';
+
+export type SubscriptionTier = 'starter' | 'starter_paid' | 'professional' | 'business';
 
 export interface InvoiceTemplate {
   id: string;
@@ -34,7 +36,7 @@ const TIER_ORDER: Record<SubscriptionTier, number> = {
 };
 
 export function useInvoiceTemplates() {
-  const { tier } = useSubscription();
+  const { tier } = useBusiness();
   const { isPlatformAdmin } = usePlatformAdmin();
 
   return useQuery({
