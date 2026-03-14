@@ -34,7 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatCompactCurrency } from '@/lib/utils';
 import { getCountryName } from '@/lib/countries';
 
 const container = {
@@ -161,25 +161,29 @@ export default function Dashboard() {
   const statsCards = [
     {
       title: 'Total Revenue',
-      value: statsLoading ? null : formatCurrency(stats?.totalRevenue || 0, stats?.currency),
+      value: statsLoading ? null : formatCompactCurrency(stats?.totalRevenue || 0, stats?.currency),
+      fullValue: statsLoading ? null : formatCurrency(stats?.totalRevenue || 0, stats?.currency),
       change: dateRangePreset === 'all_time' ? 'All time revenue' : 'In selected period',
       icon: DollarSign,
     },
     {
       title: 'Outstanding',
-      value: statsLoading ? null : formatCurrency(stats?.outstanding || 0, stats?.currency),
+      value: statsLoading ? null : formatCompactCurrency(stats?.outstanding || 0, stats?.currency),
+      fullValue: statsLoading ? null : formatCurrency(stats?.outstanding || 0, stats?.currency),
       change: `${stats?.outstandingCount || 0} invoice${stats?.outstandingCount !== 1 ? 's' : ''}`,
       icon: Clock,
     },
     {
       title: 'Paid This Month',
-      value: statsLoading ? null : formatCurrency(stats?.paidThisMonth || 0, stats?.currency),
+      value: statsLoading ? null : formatCompactCurrency(stats?.paidThisMonth || 0, stats?.currency),
+      fullValue: statsLoading ? null : formatCurrency(stats?.paidThisMonth || 0, stats?.currency),
       change: `${stats?.paidThisMonthCount || 0} invoice${stats?.paidThisMonthCount !== 1 ? 's' : ''}`,
       icon: CheckCircle2,
     },
     {
       title: 'Draft Invoices',
       value: statsLoading ? null : String(stats?.draftCount || 0),
+      fullValue: null,
       change: 'Ready to issue',
       icon: FileText,
     },
@@ -329,11 +333,11 @@ export default function Dashboard() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
                   <stat.icon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="min-w-0">
                   {stat.value === null ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-xl md:text-2xl font-bold truncate" title={stat.fullValue || stat.value}>{stat.value}</div>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
                 </CardContent>
@@ -402,7 +406,7 @@ export default function Dashboard() {
                         <Skeleton className="h-7 w-32" />
                       ) : dueDateStats?.overdueCount > 0 ? (
                         <>
-                          <p className="text-2xl font-bold text-destructive">{formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}</p>
+                          <p className="text-xl md:text-2xl font-bold text-destructive truncate" title={formatCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}>{formatCompactCurrency(dueDateStats.overdueAmount, dueDateStats.currency)}</p>
                           <p className="text-sm text-muted-foreground mt-1">{dueDateStats.overdueCount} invoice{dueDateStats.overdueCount !== 1 ? 's' : ''} past due</p>
                          <div className="flex gap-2 mt-3">
                             <Button variant="outline" size="sm" asChild>
@@ -429,7 +433,7 @@ export default function Dashboard() {
                         <Skeleton className="h-7 w-32" />
                       ) : dueDateStats?.upcomingCount > 0 ? (
                         <>
-                          <p className="text-2xl font-bold text-amber-600">{formatCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}</p>
+                          <p className="text-xl md:text-2xl font-bold text-amber-600 truncate" title={formatCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}>{formatCompactCurrency(dueDateStats.upcomingAmount, dueDateStats.currency)}</p>
                           <p className="text-sm text-muted-foreground mt-1">{dueDateStats.upcomingCount} invoice{dueDateStats.upcomingCount !== 1 ? 's' : ''} due soon</p>
                         </>
                       ) : (

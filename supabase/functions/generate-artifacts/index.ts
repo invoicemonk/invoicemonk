@@ -21,6 +21,42 @@ const COMPLIANCE_ADAPTERS: Record<string, { regulatorCode: string; countryCode: 
     supportedArtifacts: ['XRECHNUNG', 'ZUGFERD'],
     regulatorName: 'Bundesfinanzministerium',
   },
+  'BGR-NRA': {
+    regulatorCode: 'BGR-NRA',
+    countryCode: 'BG',
+    supportedArtifacts: ['EN_16931', 'SAF_T'],
+    regulatorName: 'National Revenue Agency (НАП)',
+  },
+  'ROU-ANAF': {
+    regulatorCode: 'ROU-ANAF',
+    countryCode: 'RO',
+    supportedArtifacts: ['E_FACTURA'],
+    regulatorName: 'ANAF',
+  },
+  'HUN-NAV': {
+    regulatorCode: 'HUN-NAV',
+    countryCode: 'HU',
+    supportedArtifacts: ['ONLINE_SZAMLA'],
+    regulatorName: 'NAV',
+  },
+  'SRB-SEF': {
+    regulatorCode: 'SRB-SEF',
+    countryCode: 'RS',
+    supportedArtifacts: ['SEF_INVOICE'],
+    regulatorName: 'SEF',
+  },
+  'FRA-DGFIP': {
+    regulatorCode: 'FRA-DGFIP',
+    countryCode: 'FR',
+    supportedArtifacts: ['FACTUR_X', 'CHORUS_PRO'],
+    regulatorName: 'DGFiP',
+  },
+  'ITA-SDI': {
+    regulatorCode: 'ITA-SDI',
+    countryCode: 'IT',
+    supportedArtifacts: ['FE_SDI'],
+    regulatorName: 'Sistema di Interscambio',
+  },
 }
 
 function getAdapterByCountry(countryCode: string) {
@@ -34,6 +70,8 @@ interface ArtifactBuilderInput {
   taxSchemaSnapshot: Record<string, unknown> | null
   items: Record<string, unknown>[]
 }
+
+// ---- Existing artifact builders ----
 
 function buildIRNArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
   return {
@@ -194,6 +232,357 @@ function buildCryptoStampArtifact(input: ArtifactBuilderInput): Record<string, u
   }
 }
 
+// ---- New EU artifact builders ----
+
+function buildEN16931Artifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'EN_16931',
+    version: '1.0.0',
+    standard: 'EN 16931-1:2017',
+    InvoiceNumber: input.invoice.invoice_number,
+    IssueDate: input.invoice.issue_date,
+    DueDate: input.invoice.due_date,
+    InvoiceTypeCode: '380',
+    DocumentCurrencyCode: input.invoice.currency,
+    Seller: {
+      Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+      TradingName: input.issuerSnapshot.business_name,
+      VATIdentifier: input.issuerSnapshot.vat_registration_number || input.issuerSnapshot.tax_id,
+      Address: input.issuerSnapshot.address,
+      CountryCode: 'BG',
+    },
+    Buyer: {
+      Name: input.recipientSnapshot.name,
+      VATIdentifier: input.recipientSnapshot.tax_id,
+      Address: input.recipientSnapshot.address,
+    },
+    MonetaryTotals: {
+      LineExtensionAmount: input.invoice.subtotal,
+      TaxExclusiveAmount: input.invoice.subtotal,
+      TaxInclusiveAmount: input.invoice.total_amount,
+      PayableAmount: input.invoice.total_amount,
+    },
+    TaxBreakdown: {
+      TaxableAmount: input.invoice.subtotal,
+      TaxAmount: input.invoice.tax_amount,
+      TaxCategoryCode: 'S',
+      TaxRate: 20,
+    },
+    InvoiceLines: input.items.map((item, idx) => ({
+      ID: String(idx + 1),
+      Quantity: item.quantity,
+      NetAmount: item.amount,
+      ItemName: item.description,
+      UnitPrice: item.unit_price,
+      TaxRate: item.tax_rate,
+      TaxAmount: item.tax_amount,
+    })),
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildSAFTArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'SAF_T',
+    version: '2.0',
+    standard: 'SAF-T (BG)',
+    Header: {
+      AuditFileVersion: '2.0',
+      AuditFileCountry: 'BG',
+      AuditFileDateCreated: new Date().toISOString().split('T')[0],
+      SoftwareCompanyName: 'InvoiceMonk',
+      SoftwareID: 'InvoiceMonk',
+      SoftwareVersion: '1.0',
+      Company: {
+        Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+        TaxRegistrationNumber: input.issuerSnapshot.tax_id,
+        Address: input.issuerSnapshot.address,
+      },
+      DefaultCurrencyCode: input.invoice.currency,
+      SelectionCriteria: {
+        SelectionStartDate: input.invoice.issue_date,
+        SelectionEndDate: input.invoice.issue_date,
+      },
+    },
+    SourceDocuments: {
+      SalesInvoices: [{
+        InvoiceNo: input.invoice.invoice_number,
+        InvoiceDate: input.invoice.issue_date,
+        CustomerID: input.recipientSnapshot.tax_id,
+        CustomerName: input.recipientSnapshot.name,
+        GrossTotal: input.invoice.total_amount,
+        NetTotal: input.invoice.subtotal,
+        TaxTotal: input.invoice.tax_amount,
+        Lines: input.items.map((item, idx) => ({
+          LineNumber: idx + 1,
+          Description: item.description,
+          Quantity: item.quantity,
+          UnitPrice: item.unit_price,
+          TaxRate: item.tax_rate,
+          Amount: item.amount,
+        })),
+      }],
+    },
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildEFacturaArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'E_FACTURA',
+    version: '1.0',
+    standard: 'RO e-Factura (ANAF)',
+    CustomizationID: 'urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1',
+    ID: input.invoice.invoice_number,
+    IssueDate: input.invoice.issue_date,
+    DueDate: input.invoice.due_date,
+    InvoiceTypeCode: '380',
+    DocumentCurrencyCode: input.invoice.currency,
+    AccountingSupplierParty: {
+      RegistrationName: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+      CompanyID: input.issuerSnapshot.tax_id,
+      TaxScheme: { CompanyID: input.issuerSnapshot.vat_registration_number || input.issuerSnapshot.tax_id },
+      PostalAddress: input.issuerSnapshot.address,
+      CountryCode: 'RO',
+    },
+    AccountingCustomerParty: {
+      RegistrationName: input.recipientSnapshot.name,
+      CompanyID: input.recipientSnapshot.tax_id,
+      PostalAddress: input.recipientSnapshot.address,
+    },
+    LegalMonetaryTotal: {
+      LineExtensionAmount: input.invoice.subtotal,
+      TaxExclusiveAmount: input.invoice.subtotal,
+      TaxInclusiveAmount: input.invoice.total_amount,
+      PayableAmount: input.invoice.total_amount,
+    },
+    TaxTotal: { TaxAmount: input.invoice.tax_amount },
+    InvoiceLine: input.items.map((item, idx) => ({
+      ID: String(idx + 1),
+      InvoicedQuantity: item.quantity,
+      LineExtensionAmount: item.amount,
+      Item: { Name: item.description },
+      Price: { PriceAmount: item.unit_price },
+      TaxTotal: { TaxAmount: item.tax_amount, TaxRate: item.tax_rate },
+    })),
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildOnlineSzamlaArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'ONLINE_SZAMLA',
+    version: '3.0',
+    standard: 'NAV Online Számla v3.0',
+    invoiceNumber: input.invoice.invoice_number,
+    invoiceIssueDate: input.invoice.issue_date,
+    completenessIndicator: false,
+    invoiceCategory: 'NORMAL',
+    paymentDate: input.invoice.due_date,
+    currencyCode: input.invoice.currency,
+    supplierInfo: {
+      supplierTaxNumber: {
+        taxpayerId: input.issuerSnapshot.tax_id,
+        vatCode: (input.issuerSnapshot.vat_registration_number as string)?.replace('HU', '') || '',
+      },
+      supplierName: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+      supplierAddress: input.issuerSnapshot.address,
+      groupMemberTaxNumber: null,
+    },
+    customerInfo: {
+      customerTaxNumber: input.recipientSnapshot.tax_id,
+      customerName: input.recipientSnapshot.name,
+      customerAddress: input.recipientSnapshot.address,
+    },
+    invoiceSummary: {
+      invoiceNetAmount: input.invoice.subtotal,
+      invoiceVatAmount: input.invoice.tax_amount,
+      invoiceGrossAmount: input.invoice.total_amount,
+      summaryByVatRate: [{
+        vatRateNetData: { vatRateNetAmount: input.invoice.subtotal },
+        vatRateVatData: { vatRateVatAmount: input.invoice.tax_amount },
+        vatPercentage: 27,
+      }],
+    },
+    invoiceLines: input.items.map((item, idx) => ({
+      lineNumber: idx + 1,
+      lineDescription: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      lineNetAmount: item.amount,
+      lineVatRate: item.tax_rate,
+      lineVatAmount: item.tax_amount,
+    })),
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildSEFArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'SEF_INVOICE',
+    version: '1.0',
+    standard: 'Serbian SEF (Sistem Elektronskih Faktura)',
+    CustomizationID: 'urn:cen.eu:en16931:2017#compliant#urn:mfin.gov.rs:sef:1.0',
+    ID: input.invoice.invoice_number,
+    IssueDate: input.invoice.issue_date,
+    DueDate: input.invoice.due_date,
+    InvoiceTypeCode: '380',
+    DocumentCurrencyCode: input.invoice.currency,
+    Seller: {
+      Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+      PIB: input.issuerSnapshot.tax_id,
+      MaticniBroj: input.issuerSnapshot.cac_number,
+      Address: input.issuerSnapshot.address,
+      CountryCode: 'RS',
+    },
+    Buyer: {
+      Name: input.recipientSnapshot.name,
+      PIB: input.recipientSnapshot.tax_id,
+      Address: input.recipientSnapshot.address,
+    },
+    MonetaryTotals: {
+      LineExtensionAmount: input.invoice.subtotal,
+      TaxExclusiveAmount: input.invoice.subtotal,
+      TaxInclusiveAmount: input.invoice.total_amount,
+      PayableAmount: input.invoice.total_amount,
+    },
+    TaxTotal: { TaxAmount: input.invoice.tax_amount },
+    InvoiceLines: input.items.map((item, idx) => ({
+      ID: String(idx + 1),
+      Quantity: item.quantity,
+      NetAmount: item.amount,
+      ItemName: item.description,
+      UnitPrice: item.unit_price,
+      TaxRate: item.tax_rate,
+      TaxAmount: item.tax_amount,
+    })),
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildFacturXArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'FACTUR_X',
+    version: '1.0',
+    standard: 'Factur-X / ZUGFeRD (French profile)',
+    profile: 'EN16931',
+    ExchangedDocument: {
+      ID: input.invoice.invoice_number,
+      IssueDateTime: input.invoice.issue_date,
+      TypeCode: '380',
+    },
+    SupplyChainTradeTransaction: {
+      ApplicableHeaderTradeAgreement: {
+        SellerTradeParty: {
+          Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+          SIREN: input.issuerSnapshot.tax_id,
+          SIRET: input.issuerSnapshot.cac_number,
+          TaxRegistration: { ID: input.issuerSnapshot.vat_registration_number },
+        },
+        BuyerTradeParty: {
+          Name: input.recipientSnapshot.name,
+          TaxRegistration: { ID: input.recipientSnapshot.tax_id },
+        },
+      },
+      ApplicableHeaderTradeSettlement: {
+        InvoiceCurrencyCode: input.invoice.currency,
+        SpecifiedTradeSettlementHeaderMonetarySummation: {
+          LineTotalAmount: input.invoice.subtotal,
+          TaxTotalAmount: input.invoice.tax_amount,
+          GrandTotalAmount: input.invoice.total_amount,
+          DuePayableAmount: input.invoice.total_amount,
+        },
+      },
+    },
+    generated_at: new Date().toISOString(),
+  }
+}
+
+function buildChorusProArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const facturX = buildFacturXArtifact(input)
+  return {
+    ...facturX,
+    schema: 'CHORUS_PRO',
+    standard: 'Chorus Pro (French B2G)',
+    ChorusMetadata: {
+      ServiceCode: null,
+      EngagementNumber: null,
+      ContractNumber: null,
+    },
+  }
+}
+
+function buildFatturaElettronicaArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  return {
+    schema: 'FE_SDI',
+    version: '1.2.2',
+    standard: 'FatturaPA (SDI)',
+    FatturaElettronicaHeader: {
+      DatiTrasmissione: {
+        FormatoTrasmissione: 'FPR12',
+        CodiceDestinatario: '0000000',
+      },
+      CedentePrestatore: {
+        DatiAnagrafici: {
+          IdFiscaleIVA: {
+            IdPaese: 'IT',
+            IdCodice: input.issuerSnapshot.vat_registration_number || input.issuerSnapshot.tax_id,
+          },
+          CodiceFiscale: input.issuerSnapshot.tax_id,
+          Anagrafica: {
+            Denominazione: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
+          },
+        },
+        Sede: input.issuerSnapshot.address,
+      },
+      CessionarioCommittente: {
+        DatiAnagrafici: {
+          CodiceFiscale: input.recipientSnapshot.tax_id,
+          Anagrafica: {
+            Denominazione: input.recipientSnapshot.name,
+          },
+        },
+        Sede: input.recipientSnapshot.address,
+      },
+    },
+    FatturaElettronicaBody: {
+      DatiGenerali: {
+        DatiGeneraliDocumento: {
+          TipoDocumento: 'TD01',
+          Divisa: input.invoice.currency,
+          Data: input.invoice.issue_date,
+          Numero: input.invoice.invoice_number,
+          ImportoTotaleDocumento: input.invoice.total_amount,
+        },
+      },
+      DatiBeniServizi: {
+        DettaglioLinee: input.items.map((item, idx) => ({
+          NumeroLinea: idx + 1,
+          Descrizione: item.description,
+          Quantita: item.quantity,
+          PrezzoUnitario: item.unit_price,
+          PrezzoTotale: item.amount,
+          AliquotaIVA: item.tax_rate,
+        })),
+        DatiRiepilogo: [{
+          AliquotaIVA: 22,
+          ImponibileImporto: input.invoice.subtotal,
+          Imposta: input.invoice.tax_amount,
+        }],
+      },
+      DatiPagamento: {
+        CondizioniPagamento: 'TP02',
+        DettaglioPagamento: {
+          ModalitaPagamento: 'MP05',
+          DataScadenzaPagamento: input.invoice.due_date,
+          ImportoPagamento: input.invoice.total_amount,
+        },
+      },
+    },
+    generated_at: new Date().toISOString(),
+  }
+}
+
 function buildArtifact(type: string, input: ArtifactBuilderInput): Record<string, unknown> | null {
   switch (type) {
     case 'IRN': return buildIRNArtifact(input)
@@ -202,6 +591,14 @@ function buildArtifact(type: string, input: ArtifactBuilderInput): Record<string
     case 'MTD_VAT': return buildMTDVATArtifact(input)
     case 'ZUGFERD': return buildZugferdArtifact(input)
     case 'CRYPTO_STAMP': return buildCryptoStampArtifact(input)
+    case 'EN_16931': return buildEN16931Artifact(input)
+    case 'SAF_T': return buildSAFTArtifact(input)
+    case 'E_FACTURA': return buildEFacturaArtifact(input)
+    case 'ONLINE_SZAMLA': return buildOnlineSzamlaArtifact(input)
+    case 'SEF_INVOICE': return buildSEFArtifact(input)
+    case 'FACTUR_X': return buildFacturXArtifact(input)
+    case 'CHORUS_PRO': return buildChorusProArtifact(input)
+    case 'FE_SDI': return buildFatturaElettronicaArtifact(input)
     default: return null
   }
 }

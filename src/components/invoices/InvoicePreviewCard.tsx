@@ -255,7 +255,18 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   );
 
   const renderQR = () => {
-    if (!layout.show_verification_qr || !invoice.verification_id) return null;
+    if (!layout.show_verification_qr) return null;
+    if (!invoice.verification_id) {
+      // Draft placeholder
+      return (
+        <div className="flex flex-col items-center gap-1 opacity-40">
+          <div className="h-[80px] w-[80px] border-2 border-dashed border-muted-foreground/50 rounded flex items-center justify-center">
+            <span className="text-[9px] text-muted-foreground text-center leading-tight px-1">QR generated<br/>on issue</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground">Verification QR</span>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center gap-1">
         <QRCodeSVG 
@@ -417,11 +428,13 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           )}
 
           {/* QR + Verification */}
-          {layout.show_verification_qr && invoice.verification_id && (
+          {layout.show_verification_qr && (
             <div className="flex items-center justify-between pt-4 border-t border-dashed">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Verification</p>
-                <p className="text-xs text-muted-foreground">ID: <span className="font-mono">{invoice.verification_id}</span></p>
+                {invoice.verification_id && (
+                  <p className="text-xs text-muted-foreground">ID: <span className="font-mono">{invoice.verification_id}</span></p>
+                )}
               </div>
               {renderQR()}
             </div>
@@ -527,11 +540,13 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
             )}
 
             {/* QR + Verification */}
-            {layout.show_verification_qr && invoice.verification_id && (
+            {layout.show_verification_qr && (
               <div className="flex items-center justify-between pt-4 border-t border-dashed">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: primaryColor }}>Verification</p>
-                  <p className="text-xs text-muted-foreground">ID: <span className="font-mono">{invoice.verification_id}</span></p>
+                  {invoice.verification_id && (
+                    <p className="text-xs text-muted-foreground">ID: <span className="font-mono">{invoice.verification_id}</span></p>
+                  )}
                 </div>
                 {renderQR()}
               </div>
@@ -636,7 +651,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           </div>
 
           {/* Notes, Terms, Verification in bottom section */}
-          {((layout.show_notes && invoice.notes) || (layout.show_terms && invoice.terms) || (layout.show_verification_qr && invoice.verification_id)) && (
+          {((layout.show_notes && invoice.notes) || (layout.show_terms && invoice.terms) || layout.show_verification_qr) && (
             <div className="border-t-2 border-b-2 py-4 space-y-4" style={{ borderColor: primaryColor }}>
               <div className="grid md:grid-cols-3 gap-4">
                 {layout.show_terms && invoice.terms && (
@@ -651,10 +666,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
                   </div>
                 )}
-                {layout.show_verification_qr && invoice.verification_id && (
+                {layout.show_verification_qr && (
                   <div className="flex flex-col items-center justify-center">
                     {renderQR()}
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">{invoice.verification_id}</p>
+                    {invoice.verification_id && <p className="text-xs text-muted-foreground mt-1 font-mono">{invoice.verification_id}</p>}
                     {invoice.invoice_hash && (
                       <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px]">
                         Hash: {invoice.invoice_hash}
@@ -773,15 +788,17 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           )}
 
           {/* Verification */}
-          {layout.show_verification_qr && invoice.verification_id && (
+          {layout.show_verification_qr && (
             <div className="pt-4 border-t border-dashed flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: primaryColor }}>Verification</p>
-                <p className="text-xs text-muted-foreground">
-                  ID: <span className="font-mono">{invoice.verification_id}</span>
-                </p>
+                {invoice.verification_id && (
+                  <p className="text-xs text-muted-foreground">
+                    ID: <span className="font-mono">{invoice.verification_id}</span>
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Scan QR code or visit the verification portal to verify this invoice
+                  {invoice.verification_id ? 'Scan QR code or visit the verification portal to verify this invoice' : 'Verification QR will be generated on issue'}
                 </p>
               </div>
               {renderQR()}

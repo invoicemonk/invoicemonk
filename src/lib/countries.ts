@@ -164,7 +164,7 @@ export const COUNTRIES: Country[] = [
   { code: 'BY', name: 'Belarus', currency: 'BYN', phonePrefix: '+375', region: 'europe' },
   { code: 'BE', name: 'Belgium', currency: 'EUR', phonePrefix: '+32', region: 'europe' },
   { code: 'BA', name: 'Bosnia and Herzegovina', currency: 'BAM', phonePrefix: '+387', region: 'europe' },
-  { code: 'BG', name: 'Bulgaria', currency: 'BGN', phonePrefix: '+359', region: 'europe' },
+  { code: 'BG', name: 'Bulgaria', currency: 'EUR', phonePrefix: '+359', region: 'europe' },
   { code: 'HR', name: 'Croatia', currency: 'EUR', phonePrefix: '+385', region: 'europe' },
   { code: 'CZ', name: 'Czech Republic', currency: 'CZK', phonePrefix: '+420', region: 'europe' },
   { code: 'DK', name: 'Denmark', currency: 'DKK', phonePrefix: '+45', region: 'europe' },

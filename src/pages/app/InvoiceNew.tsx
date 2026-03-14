@@ -277,8 +277,15 @@ export default function InvoiceNew() {
       retention_locked_until: null,
       currency_locked_at: null,
       currency_account_id: null,
-      payment_method_id: null,
-      payment_method_snapshot: null,
+      payment_method_id: selectedPaymentMethodId || null,
+      payment_method_snapshot: (() => {
+        const pm = paymentMethods?.find(m => m.id === selectedPaymentMethodId);
+        return pm ? {
+          provider_type: pm.provider_type,
+          display_name: pm.display_name,
+          instructions: pm.instructions,
+        } : null;
+      })(),
       regulatory_status: 'not_required',
       reminder_count: 0,
       last_reminder_sent_at: null,

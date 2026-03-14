@@ -238,12 +238,12 @@ export default function InvoiceDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
+            <Eye className="h-4 w-4 mr-2" />
+            Preview
+          </Button>
           {invoice.status === 'draft' && (
             <>
-              <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
               <Button variant="outline" onClick={() => navigate(`/invoices/${id}/edit`)}>
                 Edit Draft
               </Button>

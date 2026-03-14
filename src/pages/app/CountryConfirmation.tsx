@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTRY_OPTIONS, getCountryByCode, getCountryCurrency } from '@/lib/countries';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
+import { getComplianceAdapterByCountry } from '@/lib/compliance-adapters';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -71,6 +72,8 @@ export default function CountryConfirmation() {
   const country = selectedCountry ? getCountryByCode(selectedCountry) : null;
   const currency = country ? getCountryCurrency(selectedCountry) : null;
   const jurisdictionConfig = selectedCountry ? getJurisdictionConfig(selectedCountry) : null;
+  const adapter = selectedCountry ? getComplianceAdapterByCountry(selectedCountry) : null;
+  const defaultTaxRate = adapter?.defaultTaxRate ? adapter.defaultTaxRate / 100 : 0.075;
   const sampleAmount = currency ? getSmartPrefillAmount(currency) : 100;
 
   const handleContinue = async () => {
@@ -196,15 +199,15 @@ export default function CountryConfirmation() {
                   </div>
                   {jurisdictionConfig.showVat && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>{jurisdictionConfig.vatLabel || 'VAT'}</span>
-                      <span>{formatCurrency(sampleAmount * 0.075, currency)}</span>
+                      <span>{jurisdictionConfig.vatLabel || 'VAT'} ({(defaultTaxRate * 100).toFixed(1)}%)</span>
+                      <span>{formatCurrency(sampleAmount * defaultTaxRate, currency)}</span>
                     </div>
                   )}
                   <div className="border-t pt-2 flex justify-between font-semibold">
                     <span>Total</span>
                     <span>
                       {formatCurrency(
-                        jurisdictionConfig.showVat ? sampleAmount * 1.075 : sampleAmount,
+                        jurisdictionConfig.showVat ? sampleAmount * (1 + defaultTaxRate) : sampleAmount,
                         currency
                       )}
                     </span>

@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useReceipts, useDownloadReceiptPdf } from '@/hooks/use-receipts';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
+import { formatCompactCurrency, formatCurrency } from '@/lib/utils';
 
 const formatCurrencyAmount = (amount: number, currency: string): string => {
   const symbols: Record<string, string> = {
@@ -111,8 +112,8 @@ export default function Receipts() {
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrencyAmount(totalAmount, activeCurrency)}
+            <div className="text-xl md:text-2xl font-bold truncate min-w-0" title={formatCurrency(totalAmount, activeCurrency)}>
+              {formatCompactCurrency(totalAmount, activeCurrency)}
             </div>
           </CardContent>
         </Card>

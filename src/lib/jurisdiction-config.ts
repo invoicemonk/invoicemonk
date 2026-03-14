@@ -1044,6 +1044,117 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodeLabel: 'Postcode',
     countryName: 'New Zealand',
   },
+  // ============= EU HIGH-ENFORCEMENT =============
+  BG: {
+    name: 'Bulgaria',
+    currency: 'EUR',
+    taxIdLabel: 'ЕИК/БУЛСТАТ (EIK)',
+    taxIdPlaceholder: '123456789',
+    taxIdHint: 'Your Unified Identification Code (9 or 13 digits)',
+    showCac: false,
+    showVat: true,
+    vatLabel: 'VAT Number (ДДС)',
+    vatPlaceholder: 'BG123456789',
+    vatHint: 'Your NRA-issued VAT number (BG + 9 or 10 digits)',
+    clientTaxIdLabel: 'EIK / VAT Number',
+    clientTaxIdPlaceholder: 'BG123456789',
+    clientTaxIdHint: 'Required for all B2B invoices per NRA regulations',
+    showClientReg: false,
+    phonePrefix: '+359',
+    cityPlaceholder: 'Sofia',
+    statePlaceholder: 'Sofia-City',
+    stateLabel: 'Oblast',
+    postalCodePlaceholder: '1000',
+    postalCodeLabel: 'Postal Code',
+    countryName: 'Bulgaria',
+  },
+  RO: {
+    name: 'Romania',
+    currency: 'RON',
+    taxIdLabel: 'CUI (Cod Unic de Înregistrare)',
+    taxIdPlaceholder: '12345678',
+    taxIdHint: 'Your unique tax registration code (CUI)',
+    showCac: true,
+    cacLabel: 'Trade Register Number',
+    cacPlaceholder: 'J40/1234/2020',
+    cacHint: 'Your ONRC trade register number',
+    showVat: true,
+    vatLabel: 'VAT Number (CIF)',
+    vatPlaceholder: 'RO12345678',
+    vatHint: 'Your ANAF-issued VAT number (RO + 2-10 digits)',
+    clientTaxIdLabel: 'CUI / CIF',
+    clientTaxIdPlaceholder: 'RO12345678',
+    clientTaxIdHint: 'Required for e-Factura compliance',
+    showClientReg: true,
+    clientRegLabel: 'Trade Register Number',
+    clientRegPlaceholder: 'J40/1234/2020',
+    clientRegHint: 'ONRC registration number',
+    phonePrefix: '+40',
+    cityPlaceholder: 'București',
+    statePlaceholder: 'București',
+    stateLabel: 'Județ',
+    postalCodePlaceholder: '010101',
+    postalCodeLabel: 'Cod Poștal',
+    countryName: 'Romania',
+  },
+  HU: {
+    name: 'Hungary',
+    currency: 'HUF',
+    taxIdLabel: 'Adószám (Tax Number)',
+    taxIdPlaceholder: '12345678-1-23',
+    taxIdHint: 'Your NAV-issued tax number (8+1+2 digits)',
+    showCac: true,
+    cacLabel: 'Cégjegyzékszám (Company Reg)',
+    cacPlaceholder: '01-09-123456',
+    cacHint: 'Your company court registration number',
+    showVat: true,
+    vatLabel: 'EU VAT Number',
+    vatPlaceholder: 'HU12345678',
+    vatHint: 'Your Hungarian EU VAT number (HU + 8 digits)',
+    clientTaxIdLabel: 'Adószám / EU VAT',
+    clientTaxIdPlaceholder: 'HU12345678',
+    clientTaxIdHint: 'Required for Online Számla real-time reporting',
+    showClientReg: true,
+    clientRegLabel: 'Cégjegyzékszám',
+    clientRegPlaceholder: '01-09-123456',
+    clientRegHint: 'Company court registration number',
+    phonePrefix: '+36',
+    cityPlaceholder: 'Budapest',
+    statePlaceholder: 'Budapest',
+    stateLabel: 'Megye',
+    postalCodePlaceholder: '1011',
+    postalCodeLabel: 'Irányítószám',
+    countryName: 'Hungary',
+  },
+  RS: {
+    name: 'Serbia',
+    currency: 'RSD',
+    taxIdLabel: 'PIB (Poreski Identifikacioni Broj)',
+    taxIdPlaceholder: '123456789',
+    taxIdHint: 'Your Tax Administration-issued PIB (9 digits)',
+    showCac: true,
+    cacLabel: 'Matični Broj',
+    cacPlaceholder: '12345678',
+    cacHint: 'Your company registration number (8 digits)',
+    showVat: true,
+    vatLabel: 'PIB',
+    vatPlaceholder: '123456789',
+    vatHint: 'Your Serbian VAT number (same as PIB)',
+    clientTaxIdLabel: 'PIB',
+    clientTaxIdPlaceholder: '123456789',
+    clientTaxIdHint: 'Required for SEF e-invoicing',
+    showClientReg: true,
+    clientRegLabel: 'Matični Broj',
+    clientRegPlaceholder: '12345678',
+    clientRegHint: 'Company registration number',
+    phonePrefix: '+381',
+    cityPlaceholder: 'Beograd',
+    statePlaceholder: 'Beograd',
+    stateLabel: 'Okrug',
+    postalCodePlaceholder: '11000',
+    postalCodeLabel: 'Poštanski Broj',
+    countryName: 'Serbia',
+  },
 };
 
 // Invoice number digit requirements by jurisdiction
@@ -1052,6 +1163,8 @@ const JURISDICTION_INVOICE_DIGITS: Record<string, number> = {
   BG: 10, // Bulgaria: 10-digit sequential invoice numbers required
   RO: 10, // Romania: minimum 10-digit invoice numbers
   PL: 10, // Poland: typically 10-digit numbering
+  HU: 8,  // Hungary: 8-digit invoice numbering convention
+  RS: 10, // Serbia: SEF 10-digit requirement
 };
 
 // Default config for unknown jurisdictions
@@ -1132,6 +1245,14 @@ export function getCacDisplayLabel(jurisdiction: string): string {
     case 'AE':
     case 'SA':
       return 'CR';
+    case 'RO':
+      return 'Reg. Com.';
+    case 'HU':
+      return 'Cgj.sz.';
+    case 'RS':
+      return 'MB';
+    case 'IT':
+      return 'P.IVA';
     default:
       return 'Reg No';
   }

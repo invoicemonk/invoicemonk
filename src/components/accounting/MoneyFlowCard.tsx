@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatCompactCurrency, getCurrencySymbol } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
 interface Props {
@@ -13,17 +13,6 @@ interface Props {
   className?: string;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-  const symbols: Record<string, string> = {
-    NGN: '₦',
-    USD: '$',
-    GBP: '£',
-    EUR: '€',
-  };
-  
-  const symbol = symbols[currency] || currency;
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
 
 const variantStyles = {
   default: 'text-foreground',
@@ -60,10 +49,10 @@ export function MoneyFlowCard({
     <Card className={cn("overflow-hidden", className)}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className={cn("text-2xl font-bold tracking-tight", variantStyles[variant])}>
-              {formatCurrency(amount, currency)}
+            <p className={cn("text-xl md:text-2xl font-bold tracking-tight truncate", variantStyles[variant])} title={formatCurrency(amount, currency)}>
+              {formatCompactCurrency(amount, currency)}
             </p>
             {count !== undefined && (
               <p className="text-xs text-muted-foreground">

@@ -1,3 +1,5 @@
+import { getJurisdictionConfig } from './jurisdiction-config';
+
 interface AddressData {
   street?: string;
   city?: string;
@@ -45,7 +47,7 @@ const REQUIRED_FIELDS: ProfileField[] = [
     label: 'VAT Registration Number', 
     getValue: (d) => !!d.vatRegistrationNumber?.trim(),
     // Required for businesses that are VAT registered (Nigeria and others with VAT)
-    condition: (d) => ['NG', 'GB', 'DE', 'FR', 'CA'].includes(d.jurisdiction || '') && d.isVatRegistered === true
+    condition: (d) => getJurisdictionConfig(d.jurisdiction || '').showVat && d.isVatRegistered === true
   },
 ];
 

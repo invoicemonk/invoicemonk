@@ -34,3 +34,21 @@ export function formatCurrency(amount: number, currency: string = 'NGN'): string
   });
   return `${symbol}${formatted}`;
 }
+
+/**
+ * Format currency with smart abbreviation for large values
+ */
+export function formatCompactCurrency(amount: number, currency: string = 'NGN'): string {
+  const symbol = getCurrencySymbol(currency);
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000_000) {
+    return `${symbol}${(amount / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${symbol}${(amount / 1_000_000).toFixed(2)}M`;
+  }
+  if (abs >= 100_000) {
+    return `${symbol}${(amount / 1_000).toFixed(1)}K`;
+  }
+  return formatCurrency(amount, currency);
+}
