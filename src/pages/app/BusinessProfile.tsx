@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
 import { motion } from 'framer-motion';
 import { 
   Building2, 
@@ -119,12 +120,7 @@ export default function BusinessProfile() {
   // Get jurisdiction-specific configuration
   const jurisdictionConfig = getJurisdictionConfig(formData.jurisdiction);
 
-  const currencies = [
-    { value: 'NGN', label: 'Nigerian Naira (₦)' },
-    { value: 'USD', label: 'US Dollar ($)' },
-    { value: 'GBP', label: 'British Pound (£)' },
-    { value: 'EUR', label: 'Euro (€)' },
-  ];
+  const currencies = ALL_CURRENCIES;
 
   // Load business data into form when it arrives
   useEffect(() => {
