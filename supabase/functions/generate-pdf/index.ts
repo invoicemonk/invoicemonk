@@ -15,6 +15,7 @@ interface InvoiceItem {
   amount: number
   tax_rate: number
   tax_amount: number
+  tax_label: string | null
   discount_percent: number
 }
 
@@ -371,11 +372,30 @@ Deno.serve(async (req) => {
     }
     const issuerCacLabel = getCacLabel(issuerSnapshot?.jurisdiction)
 
+    // Detect reverse charge and multi-country VAT
+    const isReverseCharge = (inv as Record<string, unknown>).is_reverse_charge === true
+
     // Generate compact line items HTML with VAT-specific labels for Nigerian invoices
     const items = (inv.invoice_items || []) as InvoiceItem[]
+
+    // Build grouped tax breakdown
+    const taxGroupMap: Record<string, { label: string; rate: number; amount: number }> = {}
+    items.forEach(item => {
+      if (item.tax_rate > 0) {
+        const label = item.tax_label || (isNigerianVatRegistered ? 'VAT' : 'Tax')
+        const key = `${label}@${item.tax_rate}`
+        if (!taxGroupMap[key]) {
+          taxGroupMap[key] = { label, rate: item.tax_rate, amount: 0 }
+        }
+        taxGroupMap[key].amount += item.tax_amount
+      }
+    })
+    const taxGroups = Object.values(taxGroupMap)
+    const hasMultipleTaxGroups = taxGroups.length > 1
+
     const itemsHtml = items.map(item => `
       <tr>
-        <td>${item.description}</td>
+        <td>${item.description}${!isNigerianVatRegistered && item.tax_label && item.tax_rate > 0 ? `<br><span style="font-size:8px;color:#888;">${item.tax_label}: ${item.tax_rate}%</span>` : ''}</td>
         <td class="right">${item.quantity}</td>
         <td class="right">${formatCurrency(item.unit_price, inv.currency)}</td>
         ${isNigerianVatRegistered ? `<td class="right">${item.tax_rate === 0 ? 'Exempt' : item.tax_rate + '%'}</td>` : ''}
@@ -485,18 +505,30 @@ Deno.serve(async (req) => {
       </table>
     `
 
-    // Totals HTML
+    // Totals HTML with grouped VAT breakdown
+    const taxLinesHtml = hasMultipleTaxGroups
+      ? taxGroups.map(g => `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
+            <span>${g.label} @ ${g.rate}%</span>
+            <span>${formatCurrency(g.amount, inv.currency)}</span>
+          </div>`).join('')
+      : (inv.tax_amount > 0 ? `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
+            <span>${isNigerianVatRegistered ? 'VAT @ 7.5%' : taxGroups.length === 1 ? `${taxGroups[0].label} @ ${taxGroups[0].rate}%` : 'Tax'}</span>
+            <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
+          </div>` : '')
+
+    const reverseChargeHtml = isReverseCharge
+      ? `<div style="text-align: center; padding: 4px 8px; margin-bottom: 6px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 3px; font-size: 9px; font-weight: 600; color: #92400e;">REVERSE CHARGE — Recipient liable for VAT</div>`
+      : ''
+
     const totalsHtml = `
       <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;" class="no-break">
         <div style="width: 240px;">
+          ${reverseChargeHtml}
           <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
             <span>${isNigerianVatRegistered ? 'Subtotal (excl. VAT)' : 'Subtotal'}</span>
             <span>${formatCurrency(inv.subtotal, inv.currency)}</span>
           </div>
-          ${inv.tax_amount > 0 ? `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
-            <span>${isNigerianVatRegistered ? 'VAT @ 7.5%' : 'Tax'}</span>
-            <span>${formatCurrency(inv.tax_amount, inv.currency)}</span>
-          </div>` : ''}
+          ${taxLinesHtml}
           ${inv.discount_amount > 0 ? `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #444;">
             <span>Discount</span><span>-${formatCurrency(inv.discount_amount, inv.currency)}</span>
           </div>` : ''}

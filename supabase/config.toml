@@ -48,3 +48,6 @@ verify_jwt = false
 [functions.send-receipt-email]
 verify_jwt = false
 
+[functions.sync-subscriptions]
+verify_jwt = false
+

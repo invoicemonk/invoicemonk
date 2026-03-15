@@ -71,6 +71,7 @@ interface InvoiceItem {
   quantity: number;
   unitPrice: number;
   taxRate: number;
+  taxLabel?: string;
   isVatExempt?: boolean;
 }
 
@@ -103,6 +104,12 @@ export default function InvoiceEdit() {
 
   // B2B Transaction state
   const [isB2BTransaction, setIsB2BTransaction] = useState(false);
+
+  // Reverse Charge state
+  const [isReverseCharge, setIsReverseCharge] = useState(false);
+
+  // Show tax label for non-Nigerian businesses
+  const showTaxLabel = !isNigerianBusiness;
 
   // Currency lock state
   const isCurrencyLocked = businessCurrency?.currency_locked || false;
@@ -164,6 +171,7 @@ export default function InvoiceEdit() {
           quantity: item.quantity,
           unitPrice: Number(item.unit_price),
           taxRate: item.tax_rate,
+          taxLabel: (item as any).tax_label || '',
           isVatExempt: item.tax_rate === 0 && isNigerianVatRegistered,
         })));
       } else {
@@ -176,6 +184,7 @@ export default function InvoiceEdit() {
           isVatExempt: false
         }]);
       }
+      setIsReverseCharge((invoice as any).is_reverse_charge || false);
       setIsInitialized(true);
     }
   }, [invoice, isInitialized, isNigerianVatRegistered, defaultVatRate]);
@@ -308,12 +317,14 @@ export default function InvoiceEdit() {
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
+        is_reverse_charge: isReverseCharge,
       },
       items: validItems.map(item => ({
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
+        tax_label: item.taxLabel || null,
         tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
         amount: item.quantity * item.unitPrice,
         product_service_id: item.productServiceId || null,
@@ -366,12 +377,14 @@ export default function InvoiceEdit() {
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
+        is_reverse_charge: isReverseCharge,
       },
       items: validItems.map(item => ({
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
+        tax_label: item.taxLabel || null,
         tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
         amount: item.quantity * item.unitPrice,
         product_service_id: item.productServiceId || null,
@@ -731,6 +744,17 @@ export default function InvoiceEdit() {
                           />
                         </div>
                       </div>
+                      {/* Tax Label for multi-country VAT (non-Nigerian businesses) */}
+                      {showTaxLabel && item.taxRate > 0 && (
+                        <div className="space-y-2">
+                          <Label>Tax Label</Label>
+                          <Input
+                            placeholder="e.g. DE VAT, NL BTW"
+                            value={item.taxLabel || ''}
+                            onChange={(e) => updateItem(item.id, 'taxLabel', e.target.value)}
+                          />
+                        </div>
+                      )}
                       {/* VAT Exempt toggle for Nigerian businesses */}
                       {isNigerianVatRegistered && (
                         <div className="flex items-center space-x-2">
@@ -810,6 +834,38 @@ export default function InvoiceEdit() {
             </Alert>
           )}
 
+          {/* Reverse Charge Toggle (non-Nigerian businesses) */}
+          {showTaxLabel && (
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="reverse-charge-toggle" className="flex items-center gap-2">
+                      Reverse Charge
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enable for B2B cross-border EU transactions where the recipient is liable for VAT
+                    </p>
+                  </div>
+                  <Switch 
+                    id="reverse-charge-toggle"
+                    checked={isReverseCharge}
+                    onCheckedChange={(checked) => {
+                      setIsReverseCharge(checked);
+                      if (checked) {
+                        setItems(prev => prev.map(item => ({ ...item, taxRate: 0, taxLabel: item.taxLabel || '' })));
+                        const reverseChargeNote = 'VAT reverse charge applies per EU Directive 2006/112/EC, Article 196. The recipient is liable for VAT.';
+                        if (!notes.includes(reverseChargeNote)) {
+                          setNotes(prev => prev ? `${prev}\n\n${reverseChargeNote}` : reverseChargeNote);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Notes & Terms */}
           <Card>
             <CardHeader>
@@ -884,6 +940,11 @@ export default function InvoiceEdit() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isReverseCharge && (
+                <Badge variant="outline" className="w-full justify-center text-amber-600 border-amber-300">
+                  Reverse Charge
+                </Badge>
+              )}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
@@ -891,12 +952,36 @@ export default function InvoiceEdit() {
                   </span>
                   <span>{formatCurrency(calculateSubtotal())}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {isNigerianVatRegistered ? `VAT @ ${defaultVatRate}%` : 'Tax'}
-                  </span>
-                  <span>{formatCurrency(calculateTax())}</span>
-                </div>
+                {/* Grouped VAT breakdown by tax label */}
+                {(() => {
+                  const taxGroups: Record<string, { label: string; rate: number; amount: number }> = {};
+                  items.forEach(item => {
+                    if (item.taxRate > 0) {
+                      const key = item.taxLabel || `Tax @ ${item.taxRate}%`;
+                      if (!taxGroups[key]) {
+                        taxGroups[key] = { label: key, rate: item.taxRate, amount: 0 };
+                      }
+                      taxGroups[key].amount += (item.quantity * item.unitPrice * item.taxRate) / 100;
+                    }
+                  });
+                  const groups = Object.values(taxGroups);
+                  if (groups.length <= 1) {
+                    return (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {isNigerianVatRegistered ? `VAT @ ${defaultVatRate}%` : groups.length === 1 ? `${groups[0].label} @ ${groups[0].rate}%` : 'Tax'}
+                        </span>
+                        <span>{formatCurrency(calculateTax())}</span>
+                      </div>
+                    );
+                  }
+                  return groups.map((g, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{g.label} @ {g.rate}%</span>
+                      <span>{formatCurrency(g.amount)}</span>
+                    </div>
+                  ));
+                })()}
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>{isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>

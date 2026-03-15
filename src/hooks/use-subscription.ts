@@ -49,12 +49,18 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user?.id) return null;
 
+      // Calculate grace period date (3 days ago) for expiration check
+      const gracePeriodDate = new Date();
+      gracePeriodDate.setDate(gracePeriodDate.getDate() - 3);
+      const graceISO = gracePeriodDate.toISOString();
+
       // First try user-level subscription
       const { data: userSub, error: userError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
+        .or(`current_period_end.is.null,current_period_end.gte.${graceISO}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -79,6 +85,7 @@ export function useSubscription() {
         .select('*')
         .in('business_id', businessIds)
         .eq('status', 'active')
+        .or(`current_period_end.is.null,current_period_end.gte.${graceISO}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

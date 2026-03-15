@@ -513,12 +513,29 @@ serve(async (req) => {
   }
 });
 
+const TIER_ORDER: Record<string, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+
 async function doUpdateSubscription(
   supabase: any,
   subscription: Stripe.Subscription,
   userId: string
 ) {
-  const tier = subscription.metadata?.tier || "professional";
+  const metadataTier = subscription.metadata?.tier || "professional";
+
+  // Check current DB tier to prevent downgrading manual upgrades
+  const { data: currentSub } = await supabase
+    .from("subscriptions")
+    .select("tier")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const dbTier = currentSub?.tier || "starter";
+  const tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+
+  if (tier !== metadataTier) {
+    console.log("Tier-downgrade protection: keeping DB tier", dbTier, "instead of metadata tier", metadataTier);
+  }
+
   const status = subscription.status === "active" ? "active" 
     : subscription.status === "past_due" ? "past_due"
     : subscription.status === "canceled" ? "cancelled"
@@ -544,7 +561,22 @@ async function doUpdateSubscriptionByBusiness(
   subscription: Stripe.Subscription,
   businessId: string
 ) {
-  const tier = subscription.metadata?.tier || "professional";
+  const metadataTier = subscription.metadata?.tier || "professional";
+
+  // Check current DB tier to prevent downgrading manual upgrades
+  const { data: currentSub } = await supabase
+    .from("subscriptions")
+    .select("tier")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const dbTier = currentSub?.tier || "starter";
+  const tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+
+  if (tier !== metadataTier) {
+    console.log("Tier-downgrade protection: keeping DB tier", dbTier, "instead of metadata tier", metadataTier);
+  }
+
   const status = subscription.status === "active" ? "active" 
     : subscription.status === "past_due" ? "past_due"
     : subscription.status === "canceled" ? "cancelled"

@@ -157,6 +157,25 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   const uniqueTaxRates = [...new Set(taxRates)];
   const uniformTaxRate = uniqueTaxRates.length === 1 ? uniqueTaxRates[0] : null;
   const isStandardNigerianVat = isNigerianInvoice && uniformTaxRate === 7.5;
+  const isReverseCharge = (invoice as any).is_reverse_charge === true;
+
+  // Group taxes by label for multi-country VAT breakdown
+  const taxGroups: { label: string; rate: number; amount: number }[] = [];
+  if (invoice.invoice_items) {
+    const groupMap: Record<string, { label: string; rate: number; amount: number }> = {};
+    invoice.invoice_items.forEach(item => {
+      if (item.tax_rate > 0) {
+        const label = (item as any).tax_label || `Tax`;
+        const key = `${label}@${item.tax_rate}`;
+        if (!groupMap[key]) {
+          groupMap[key] = { label, rate: item.tax_rate, amount: 0 };
+        }
+        groupMap[key].amount += Number(item.tax_amount);
+      }
+    });
+    taxGroups.push(...Object.values(groupMap));
+  }
+  const hasMultipleTaxGroups = taxGroups.length > 1;
 
   const issuerName = displayIssuer?.legal_name || displayIssuer?.name || 'Your Business';
   const recipientName = recipientSnapshot?.name || invoice.clients?.name || 'Client';
@@ -182,7 +201,9 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
               <td className="py-3 px-2">
                 <p className="font-medium text-sm">{item.description}</p>
                 {!isNigerianInvoice && item.tax_rate > 0 && (
-                  <p className="text-xs text-muted-foreground">Tax: {item.tax_rate}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(item as any).tax_label ? `${(item as any).tax_label}: ${item.tax_rate}%` : `Tax: ${item.tax_rate}%`}
+                  </p>
                 )}
               </td>
               <td className="py-3 px-2 text-right tabular-nums text-sm">{item.quantity}</td>
@@ -226,12 +247,26 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           </span>
         </div>
       )}
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">
-          {isStandardNigerianVat ? 'VAT @ 7.5%' : isNigerianInvoice ? 'VAT' : 'Tax'}
-        </span>
-        <span className="tabular-nums">{formatCurrency(Number(invoice.tax_amount), invoice.currency)}</span>
-      </div>
+      {isReverseCharge && (
+        <Badge variant="outline" className="w-full justify-center text-amber-600 border-amber-300 text-xs">
+          Reverse Charge — recipient liable for VAT
+        </Badge>
+      )}
+      {hasMultipleTaxGroups ? (
+        taxGroups.map((g, i) => (
+          <div key={i} className="flex justify-between text-sm">
+            <span className="text-muted-foreground">{g.label} @ {g.rate}%</span>
+            <span className="tabular-nums">{formatCurrency(g.amount, invoice.currency)}</span>
+          </div>
+        ))
+      ) : (
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">
+            {isStandardNigerianVat ? 'VAT @ 7.5%' : isNigerianInvoice ? 'VAT' : taxGroups.length === 1 ? `${taxGroups[0].label} @ ${taxGroups[0].rate}%` : 'Tax'}
+          </span>
+          <span className="tabular-nums">{formatCurrency(Number(invoice.tax_amount), invoice.currency)}</span>
+        </div>
+      )}
       <Separator />
       <div className="flex justify-between text-lg font-bold">
         <span>{isNigerianInvoice ? 'Total (incl. VAT)' : 'Total'}</span>

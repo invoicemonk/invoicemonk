@@ -836,6 +836,7 @@ export type Database = {
           quantity: number
           sort_order: number
           tax_amount: number
+          tax_label: string | null
           tax_rate: number
           unit_price: number
         }
@@ -850,6 +851,7 @@ export type Database = {
           quantity?: number
           sort_order?: number
           tax_amount?: number
+          tax_label?: string | null
           tax_rate?: number
           unit_price: number
         }
@@ -864,6 +866,7 @@ export type Database = {
           quantity?: number
           sort_order?: number
           tax_amount?: number
+          tax_label?: string | null
           tax_rate?: number
           unit_price?: number
         }
@@ -953,6 +956,7 @@ export type Database = {
           id: string
           invoice_hash: string | null
           invoice_number: string
+          is_reverse_charge: boolean
           issue_date: string | null
           issued_at: string | null
           issued_by: string | null
@@ -1000,6 +1004,7 @@ export type Database = {
           id?: string
           invoice_hash?: string | null
           invoice_number: string
+          is_reverse_charge?: boolean
           issue_date?: string | null
           issued_at?: string | null
           issued_by?: string | null
@@ -1047,6 +1052,7 @@ export type Database = {
           id?: string
           invoice_hash?: string | null
           invoice_number?: string
+          is_reverse_charge?: boolean
           issue_date?: string | null
           issued_at?: string | null
           issued_by?: string | null
@@ -2656,6 +2662,7 @@ export type Database = {
           id: string
           invoice_hash: string | null
           invoice_number: string
+          is_reverse_charge: boolean
           issue_date: string | null
           issued_at: string | null
           issued_by: string | null

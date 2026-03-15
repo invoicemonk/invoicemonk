@@ -139,11 +139,16 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     queryFn: async () => {
       if (!currentBusiness?.id) return null;
       
+      // Calculate grace period date (3 days ago) for expiration check
+      const gracePeriodDate = new Date();
+      gracePeriodDate.setDate(gracePeriodDate.getDate() - 3);
+
       const { data, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('business_id', currentBusiness.id)
         .eq('status', 'active')
+        .or(`current_period_end.is.null,current_period_end.gte.${gracePeriodDate.toISOString()}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
