@@ -315,7 +315,7 @@ export function useIssueInvoice() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      const issued = Array.isArray(data) ? data[0] : data;
+      const issued = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
       queryClient.invalidateQueries({ queryKey: ['invoice', issued?.id] });
       queryClient.invalidateQueries({ queryKey: ['invoice-limit-check'] });
       // Accounting cache invalidations

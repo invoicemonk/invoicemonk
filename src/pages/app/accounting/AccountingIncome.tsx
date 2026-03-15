@@ -94,7 +94,7 @@ export default function AccountingIncome() {
           <MoneyFlowCard
             title="Total Revenue"
             amount={stats?.revenue || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency || ''}
             count={stats?.revenueCount}
             countLabel="invoices"
             icon={FileText}
@@ -103,7 +103,7 @@ export default function AccountingIncome() {
           <MoneyFlowCard
             title="Money In (Paid)"
             amount={stats?.moneyIn || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency || ''}
             count={stats?.moneyInCount}
             countLabel="paid"
             icon={CheckCircle}
@@ -112,7 +112,7 @@ export default function AccountingIncome() {
           <MoneyFlowCard
             title="Outstanding"
             amount={stats?.outstanding || 0}
-            currency={stats?.currency || 'NGN'}
+            currency={stats?.currency || activeCurrency || ''}
             count={stats?.outstandingCount}
             countLabel="unpaid"
             icon={Eye}

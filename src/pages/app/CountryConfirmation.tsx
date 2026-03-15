@@ -96,10 +96,28 @@ export default function CountryConfirmation() {
 
       if (error) throw error;
 
-      // Invalidate relevant queries (default currency account is synced automatically by DB trigger)
+      // Create default currency account since the INSERT trigger skipped it (currency was NULL at creation)
+      const { data: existingAccounts } = await supabase
+        .from('currency_accounts')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('is_default', true)
+        .limit(1);
+
+      if (!existingAccounts || existingAccounts.length === 0) {
+        await supabase.from('currency_accounts').insert({
+          business_id: businessId,
+          currency: currency,
+          is_default: true,
+          name: `${currency} Account`,
+        });
+      }
+
+      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
       queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
+      queryClient.invalidateQueries({ queryKey: ['currency-accounts'] });
 
       const countryName = country?.name || selectedCountry;
       toast({

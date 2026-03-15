@@ -26,7 +26,7 @@ export default function AccountingResult() {
     dateRange
   );
 
-  const currency = stats?.currency || activeCurrency || 'NGN';
+  const currency = stats?.currency || activeCurrency || '';
   const moneyIn = stats?.moneyIn || 0;
   const moneyOut = stats?.moneyOut || 0;
   const whatsLeft = stats?.whatsLeft || 0;

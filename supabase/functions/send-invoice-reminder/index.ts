@@ -64,6 +64,12 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string
 
+    // Rate limit: max 5 reminders/hour, 50 emails/day per user
+    const hourlyAllowed = await checkRateLimit(serviceRoleKey, userId, 'send-invoice-reminder', 3600, 5)
+    if (!hourlyAllowed) return rateLimitResponse(corsHeaders)
+    const dailyAllowed = await checkRateLimit(serviceRoleKey, userId, 'email-daily', 86400, 50)
+    if (!dailyAllowed) return rateLimitResponse(corsHeaders)
+
     // Parse body
     const { invoice_id } = await req.json()
     if (!invoice_id) {

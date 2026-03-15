@@ -166,7 +166,7 @@ export default function CreditNoteDetail() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Amount Credited</p>
                   <p className="font-bold text-lg text-destructive">
-                    -{formatCurrency(Number(creditNote.amount), originalInvoice?.currency || 'NGN')}
+                    -{formatCurrency(Number(creditNote.amount), originalInvoice?.currency || creditNote.currency || '')}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -265,7 +265,7 @@ export default function CreditNoteDetail() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Currency</span>
-                <span>{originalInvoice?.currency || 'NGN'}</span>
+                <span>{originalInvoice?.currency || creditNote.currency || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Client</span>
@@ -275,7 +275,7 @@ export default function CreditNoteDetail() {
               <div className="flex justify-between font-bold">
                 <span>Amount Credited</span>
                 <span className="text-destructive">
-                  -{formatCurrency(Number(creditNote.amount), originalInvoice?.currency || 'NGN')}
+                  -{formatCurrency(Number(creditNote.amount), originalInvoice?.currency || creditNote.currency || '')}
                 </span>
               </div>
             </CardContent>

@@ -142,7 +142,7 @@ export default function CreditNotes() {
                   </TableCell>
                   <TableCell>{cn.original_invoice?.clients?.name || 'Unknown'}</TableCell>
                   <TableCell className="text-destructive font-medium">
-                    -{formatCurrency(Number(cn.amount), cn.original_invoice?.currency || 'NGN')}
+                    -{formatCurrency(Number(cn.amount), cn.original_invoice?.currency || cn.currency || '')}
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" title={cn.reason}>
                     {cn.reason}

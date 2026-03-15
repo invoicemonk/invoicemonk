@@ -42,7 +42,7 @@ export default function AccountingExpenses() {
     dateRange
   );
 
-  const currency = activeCurrency || business?.default_currency || 'NGN';
+  const currency = activeCurrency || business?.default_currency || '';
 
   // Calculate total
   const totalExpenses = useMemo(() => {

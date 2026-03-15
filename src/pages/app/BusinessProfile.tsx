@@ -90,7 +90,7 @@ export default function BusinessProfile() {
   const [formData, setFormData] = useState({
     name: '',
     legalName: '',
-    jurisdiction: 'NG',
+    jurisdiction: '',
     taxId: '',
     cacNumber: '',
     email: '',
@@ -102,7 +102,7 @@ export default function BusinessProfile() {
     country: '',
     invoicePrefix: 'INV',
     invoiceNumberDigits: 4,
-    defaultCurrency: 'NGN',
+    defaultCurrency: '',
     isVatRegistered: false,
     vatRegistrationNumber: '',
     businessType: '',
@@ -139,7 +139,7 @@ export default function BusinessProfile() {
       setFormData({
         name: business.name || '',
         legalName: business.legal_name || '',
-        jurisdiction: business.jurisdiction || 'NG',
+        jurisdiction: business.jurisdiction || '',
         taxId: business.tax_id || '',
         cacNumber: businessExtended.cac_number || '',
         email: business.contact_email || '',
@@ -151,7 +151,7 @@ export default function BusinessProfile() {
         country: addressData?.country || '',
         invoicePrefix: business.invoice_prefix || 'INV',
         invoiceNumberDigits: (business as any).invoice_number_digits || 4,
-        defaultCurrency: business.default_currency || 'NGN',
+        defaultCurrency: business.default_currency || '',
         isVatRegistered: businessExtended.is_vat_registered || false,
         vatRegistrationNumber: businessExtended.vat_registration_number || '',
         businessType: businessExtended.business_type || '',
@@ -181,7 +181,7 @@ export default function BusinessProfile() {
       address: Object.values(addressData).some(Boolean) ? addressData : null,
       invoice_prefix: formData.invoicePrefix || 'INV',
       invoice_number_digits: formData.invoiceNumberDigits || 4,
-      default_currency: formData.defaultCurrency || 'NGN',
+      default_currency: formData.defaultCurrency || null,
       // VAT fields - only save if jurisdiction supports VAT
       is_vat_registered: jurisdictionConfig.showVat ? formData.isVatRegistered : false,
       vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 

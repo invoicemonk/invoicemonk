@@ -134,7 +134,7 @@ export const CurrencyAccountProvider = ({ children }: { children: ReactNode }) =
   }, [currentBusiness?.id]);
 
   // Derived active currency
-  const activeCurrency = currentCurrencyAccount?.currency || currentBusiness?.default_currency || 'NGN';
+  const activeCurrency = currentCurrencyAccount?.currency || currentBusiness?.default_currency || '';
 
   return (
     <CurrencyAccountContext.Provider

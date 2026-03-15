@@ -2643,63 +2643,7 @@ export type Database = {
         Args: { _business_id: string; _user_id: string }
         Returns: boolean
       }
-      issue_invoice: {
-        Args: { _invoice_id: string }
-        Returns: {
-          amount_paid: number
-          business_id: string | null
-          client_id: string
-          compliance_hash: string | null
-          compliance_result: Json | null
-          created_at: string
-          currency: string
-          currency_account_id: string | null
-          currency_locked_at: string | null
-          discount_amount: number
-          due_date: string | null
-          exchange_rate_snapshot: Json | null
-          exchange_rate_to_primary: number | null
-          id: string
-          invoice_hash: string | null
-          invoice_number: string
-          is_reverse_charge: boolean
-          issue_date: string | null
-          issued_at: string | null
-          issued_by: string | null
-          issuer_snapshot: Json | null
-          last_reminder_sent_at: string | null
-          notes: string | null
-          payment_method_id: string | null
-          payment_method_snapshot: Json | null
-          recipient_snapshot: Json | null
-          regulatory_status: string
-          reminder_count: number
-          retention_locked_until: string | null
-          status: Database["public"]["Enums"]["invoice_status"]
-          subtotal: number
-          summary: string | null
-          tax_amount: number
-          tax_schema_id: string | null
-          tax_schema_snapshot: Json | null
-          tax_schema_version: string | null
-          template_id: string | null
-          template_snapshot: Json | null
-          terms: string | null
-          total_amount: number
-          updated_at: string
-          user_id: string | null
-          verification_id: string | null
-          void_reason: string | null
-          voided_at: string | null
-          voided_by: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "invoices"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
+      issue_invoice: { Args: { _invoice_id: string }; Returns: Json }
       log_audit_event: {
         Args: {
           _business_id?: string

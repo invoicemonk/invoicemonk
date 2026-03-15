@@ -35,7 +35,7 @@ export function useAccountingStats(
       if (!user) throw new Error('Not authenticated');
       if (!businessId) throw new Error('No business ID');
 
-      const defaultCurrency = currency || 'NGN';
+      const defaultCurrency = currency || '';
 
       const { data, error } = await supabase.rpc('get_accounting_stats', {
         _business_id: businessId,
@@ -92,7 +92,7 @@ export function useExpensesByCategory(
       if (!user) throw new Error('Not authenticated');
       if (!businessId) throw new Error('No business ID');
 
-      const defaultCurrency = currency || 'NGN';
+      const defaultCurrency = currency || '';
 
       const { data, error } = await supabase.rpc('get_expenses_by_category', {
         _business_id: businessId,

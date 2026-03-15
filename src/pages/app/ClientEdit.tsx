@@ -41,7 +41,7 @@ export default function ClientEdit() {
   const updateClient = useUpdateClient();
 
   // Client country for dynamic placeholders
-  const [clientCountry, setClientCountry] = useState('NG');
+  const [clientCountry, setClientCountry] = useState(business?.jurisdiction || '');
   
   // Get jurisdiction config based on selected client country
   const jurisdictionConfig = getJurisdictionConfig(clientCountry);
@@ -87,7 +87,7 @@ export default function ClientEdit() {
       // Try to detect client country from address
       const detectedCountry = COUNTRY_OPTIONS_WITH_OTHER.find(c => 
         c.name.toLowerCase() === address.country?.toLowerCase()
-      )?.code || (business?.jurisdiction || 'NG');
+      )?.code || (business?.jurisdiction || '');
       setClientCountry(detectedCountry);
     }
   }, [client, business?.jurisdiction]);

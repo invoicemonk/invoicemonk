@@ -122,7 +122,7 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
 
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Currency</p>
-                <span className="font-medium">{business.default_currency || 'NGN'}</span>
+                <span className="font-medium">{business.default_currency || 'Not set'}</span>
               </div>
             </div>
           </div>

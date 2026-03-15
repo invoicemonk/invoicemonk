@@ -69,6 +69,12 @@ Deno.serve(async (req) => {
     }
     const userId = userData.user.id;
 
+    // Rate limit: max 10 receipts/hour, 50 emails/day per user
+    const hourlyAllowed = await checkRateLimit(serviceRoleKey, userId, 'send-receipt-email', 3600, 10);
+    if (!hourlyAllowed) return rateLimitResponse(corsHeaders);
+    const dailyAllowed = await checkRateLimit(serviceRoleKey, userId, 'email-daily', 86400, 50);
+    if (!dailyAllowed) return rateLimitResponse(corsHeaders);
+
     // Validate body
     const body: SendReceiptRequest = await req.json();
 

@@ -398,6 +398,52 @@ export function useAdminCloseAccount() {
   });
 }
 
+// Ban user (admin action)
+export function useBanUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      if (!reason || reason.trim().length < 10) {
+        throw new Error('A detailed reason (minimum 10 characters) is required for banning a user');
+      }
+      const { error } = await supabase.rpc('ban_user' as any, {
+        _user_id: userId,
+        _reason: reason,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('User has been suspended');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to suspend user');
+    },
+  });
+}
+
+// Unban user (admin action)
+export function useUnbanUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      const { error } = await supabase.rpc('unban_user' as any, {
+        _user_id: userId,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('User has been reactivated');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to reactivate user');
+    },
+  });
+}
+
 // NOTE: The following hooks have been intentionally REMOVED for compliance:
 // - useAdminUpdateInvoice - Platform admins cannot modify invoices (DB-enforced)
 // - useAdminDeleteInvoice - No one can delete issued invoices (DB-enforced)

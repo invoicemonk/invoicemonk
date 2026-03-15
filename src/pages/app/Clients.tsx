@@ -62,7 +62,7 @@ export default function Clients() {
   const createClient = useCreateClient();
   
   // Default to business jurisdiction
-  const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || 'NG');
+  const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || '');
   
   // Get jurisdiction config based on selected client country
   const jurisdictionConfig = getJurisdictionConfig(clientCountry);
@@ -91,7 +91,7 @@ export default function Clients() {
   // Reset client country when dialog opens
   useEffect(() => {
     if (isAddDialogOpen) {
-      setClientCountry(currentBusiness?.jurisdiction || 'NG');
+      setClientCountry(currentBusiness?.jurisdiction || '');
     }
   }, [isAddDialogOpen, currentBusiness?.jurisdiction]);
 

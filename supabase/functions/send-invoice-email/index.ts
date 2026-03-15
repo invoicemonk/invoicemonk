@@ -957,6 +957,12 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.user.id
 
+    // Rate limit: max 10 emails/hour, 50 emails/day per user
+    const hourlyAllowed = await checkRateLimit(serviceRoleKey, userId, 'send-invoice-email', 3600, 10)
+    if (!hourlyAllowed) return rateLimitResponse(corsHeaders)
+    const dailyAllowed = await checkRateLimit(serviceRoleKey, userId, 'email-daily', 86400, 50)
+    if (!dailyAllowed) return rateLimitResponse(corsHeaders)
+
     const body: SendInvoiceRequest = await req.json()
     
     const invoiceIdError = validateUUID(body.invoice_id, 'invoice_id');

@@ -117,7 +117,7 @@ export default function InvoiceEdit() {
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [currency, setCurrency] = useState(activeCurrency || 'NGN');
+  const [currency, setCurrency] = useState(activeCurrency || '');
   const [issueDate, setIssueDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -255,7 +255,7 @@ export default function InvoiceEdit() {
   };
 
   const formatCurrency = (amount: number) => {
-    const currencyCode = currency || activeCurrency || 'NGN';
+    const currencyCode = currency || activeCurrency || 'USD';
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: currencyCode,

@@ -39,7 +39,7 @@ const JURISDICTION_NAMES: Record<string, string> = {
   FR: 'French',
 };
 
-export function AccountClosureSection({ userJurisdiction = 'NG' }: AccountClosureSectionProps) {
+export function AccountClosureSection({ userJurisdiction }: AccountClosureSectionProps) {
   const [showDialog, setShowDialog] = useState(false);
   const { data: policies, isLoading } = useRetentionPoliciesByJurisdiction(userJurisdiction);
 

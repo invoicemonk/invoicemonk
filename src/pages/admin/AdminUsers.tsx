@@ -9,7 +9,9 @@ import {
   Shield,
   UserCog,
   Eye,
-  AlertCircle
+  AlertCircle,
+  Ban,
+  UserCheck
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,9 +30,22 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAdminUsers } from '@/hooks/use-admin';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useAdminUsers, useBanUser, useUnbanUser } from '@/hooks/use-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
@@ -40,11 +55,15 @@ export default function AdminUsers() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: users, isLoading } = useAdminUsers(searchQuery || undefined);
+  const banUser = useBanUser();
+  const unbanUser = useUnbanUser();
 
   // Dialog/Sheet state
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banReason, setBanReason] = useState('');
 
   const getInitials = (name: string | null, email: string) => {
     if (name) {
@@ -63,6 +82,19 @@ export default function AdminUsers() {
     return <Badge variant={variant}>{role}</Badge>;
   };
 
+  const getStatusBadge = (status: string | null) => {
+    if (status === 'suspended') {
+      return <Badge variant="destructive">Suspended</Badge>;
+    }
+    if (status === 'closed') {
+      return <Badge variant="destructive">Closed</Badge>;
+    }
+    return null;
+  };
+
+  const isSuspended = (user: any) => 
+    user.account_status === 'suspended' || user.account_status === 'closed';
+
   // Handlers
   const handleViewDetails = (user: any) => {
     setSelectedUser(user);
@@ -76,6 +108,24 @@ export default function AdminUsers() {
   const handleChangeRole = (user: any) => {
     setSelectedUser(user);
     setRoleDialogOpen(true);
+  };
+
+  const handleSuspendClick = (user: any) => {
+    setSelectedUser(user);
+    setBanReason('');
+    setBanDialogOpen(true);
+  };
+
+  const handleConfirmBan = () => {
+    if (!selectedUser) return;
+    banUser.mutate(
+      { userId: selectedUser.id, reason: banReason },
+      { onSuccess: () => setBanDialogOpen(false) }
+    );
+  };
+
+  const handleReactivate = (user: any) => {
+    unbanUser.mutate({ userId: user.id });
   };
 
   return (
@@ -97,7 +147,7 @@ export default function AdminUsers() {
           <div>
             <p className="font-medium text-amber-800 dark:text-amber-200">Admin Access</p>
             <p className="text-sm text-amber-600 dark:text-amber-400">
-              User data is read-only. Role changes are logged to the audit trail.
+              User data is read-only. Role changes and suspensions are logged to the audit trail.
             </p>
           </div>
         </div>
@@ -136,7 +186,7 @@ export default function AdminUsers() {
                 <TableHead>User</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Verified</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -162,7 +212,7 @@ export default function AdminUsers() {
                 </TableRow>
               ) : (
                 users?.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.id} className={isSuspended(user) ? 'opacity-60' : ''}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
@@ -184,14 +234,16 @@ export default function AdminUsers() {
                       {getRoleBadge((user as any).user_roles || [])}
                     </TableCell>
                     <TableCell>
-                      {user.email_verified ? (
-                        <Badge variant="outline" className="text-green-600 border-green-600">
-                          Verified
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-amber-600 border-amber-600">
-                          Pending
-                        </Badge>
+                      {getStatusBadge(user.account_status) || (
+                        user.email_verified ? (
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-600 border-amber-600">
+                            Unverified
+                          </Badge>
+                        )
                       )}
                     </TableCell>
                     <TableCell>
@@ -220,6 +272,18 @@ export default function AdminUsers() {
                             <UserCog className="mr-2 h-4 w-4" />
                             Change Role
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {isSuspended(user) ? (
+                            <DropdownMenuItem onClick={() => handleReactivate(user)}>
+                              <UserCheck className="mr-2 h-4 w-4 text-green-600" />
+                              <span className="text-green-600">Reactivate User</span>
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleSuspendClick(user)}>
+                              <Ban className="mr-2 h-4 w-4 text-destructive" />
+                              <span className="text-destructive">Suspend User</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -242,6 +306,38 @@ export default function AdminUsers() {
         open={roleDialogOpen} 
         onOpenChange={setRoleDialogOpen} 
       />
+
+      {/* Ban Confirmation Dialog */}
+      <AlertDialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend User</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately block <strong>{selectedUser?.email}</strong> from accessing the platform. They will not be able to issue invoices or use any features.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="ban-reason">Reason for suspension</Label>
+            <Textarea
+              id="ban-reason"
+              placeholder="Explain why this user is being suspended (min 10 characters)..."
+              value={banReason}
+              onChange={(e) => setBanReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmBan}
+              disabled={banReason.trim().length < 10 || banUser.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {banUser.isPending ? 'Suspending...' : 'Suspend User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
