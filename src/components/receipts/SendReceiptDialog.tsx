@@ -65,7 +65,13 @@ export function SendReceiptDialog({ open, onOpenChange, receipt }: SendReceiptDi
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to send receipt');
+        const serverMessage = typeof response.data === 'object' && response.data?.error
+          ? response.data.error
+          : response.error.message;
+        throw new Error(serverMessage || 'Failed to send receipt');
+      }
+      if (response.data?.error) {
+        throw new Error(response.data.error);
       }
 
       toast.success('Receipt sent successfully!');

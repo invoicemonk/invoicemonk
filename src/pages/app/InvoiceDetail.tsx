@@ -121,7 +121,7 @@ export default function InvoiceDetail() {
     }
   };
 
-  const formatCurrency = (amount: number, currency: string = 'NGN') => {
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
   };
 

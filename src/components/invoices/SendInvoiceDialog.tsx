@@ -79,8 +79,17 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
         }
       });
 
+      // supabase.functions.invoke returns { data, error }
+      // For non-2xx responses, error may be a generic FunctionsHttpError
+      // The actual error message is in response.data?.error
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to send invoice');
+        const serverMessage = typeof response.data === 'object' && response.data?.error
+          ? response.data.error
+          : response.error.message;
+        throw new Error(serverMessage || 'Failed to send invoice');
+      }
+      if (response.data?.error) {
+        throw new Error(response.data.error);
       }
 
       // Invalidate caches after successful send (status changes to 'sent')
