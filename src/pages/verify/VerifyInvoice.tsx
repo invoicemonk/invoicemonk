@@ -18,7 +18,8 @@ import {
   MapPin,
   Phone,
   Mail,
-  Download
+  Download,
+  AlertTriangle
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ interface VerificationResponse {
     issued_at: string | null;
     issuer_name: string;
     issuer_identity?: IssuerIdentity;
+    issuer_identity_complete?: boolean;
     recipient_identity?: RecipientIdentity;
     payment_status: string;
     total_amount: number;
@@ -293,6 +295,12 @@ const VerifyInvoice = () => {
                         <div>
                           <p className="text-sm text-muted-foreground">Issued By</p>
                           <p className="font-semibold">{data.invoice.issuer_name}</p>
+                          {data.invoice.issuer_identity_complete === false && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                              <span className="text-xs text-amber-600 dark:text-amber-400">Limited identity information</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 

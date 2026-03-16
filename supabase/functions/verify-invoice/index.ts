@@ -2,13 +2,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface IssuerSnapshot {
-  name?: string
+  business_name?: string
+  name?: string // legacy fallback
   legal_name?: string
   tax_id?: string
   address?: Record<string, unknown>
   contact_email?: string
   contact_phone?: string
   logo_url?: string
+  jurisdiction?: string
 }
 
 interface VerificationResponse {
@@ -22,7 +24,10 @@ interface VerificationResponse {
       contact_email?: string
       contact_phone?: string
       legal_name?: string
+      tax_id?: string
+      jurisdiction?: string
     }
+    issuer_identity_complete: boolean
     payment_status: string
     payment_method_type?: string
     total_amount: number
@@ -121,11 +126,19 @@ Deno.serve(async (req) => {
     const snapshot = invoice.issuer_snapshot as IssuerSnapshot | null
     
     if (snapshot) {
-      issuerName = snapshot.legal_name || snapshot.name || 'Unknown Business'
+      issuerName = snapshot.legal_name || snapshot.business_name || snapshot.name || 'Unknown Business'
     } else {
       // No fallback to live data - snapshot should always exist for issued invoices
       console.warn('Invoice missing issuer_snapshot:', invoice.id)
     }
+
+    // Check issuer identity completeness (legal_name, tax_id, contact_email all present)
+    const issuerIdentityComplete = !!(
+      snapshot &&
+      (snapshot.legal_name || snapshot.business_name || snapshot.name) &&
+      snapshot.tax_id &&
+      snapshot.contact_email
+    )
 
     // Check integrity (hash exists = not tampered)
     const integrityValid = !!invoice.invoice_hash
@@ -169,8 +182,11 @@ Deno.serve(async (req) => {
         issuer_identity: snapshot ? {
           contact_email: snapshot.contact_email,
           contact_phone: snapshot.contact_phone,
-          legal_name: snapshot.legal_name || snapshot.name
+          legal_name: snapshot.legal_name || snapshot.business_name || snapshot.name,
+          tax_id: snapshot.tax_id,
+          jurisdiction: snapshot.jurisdiction
         } : undefined,
+        issuer_identity_complete: issuerIdentityComplete,
         payment_status: paymentStatus,
         payment_method_type: paymentMethodType,
         total_amount: invoice.total_amount,
