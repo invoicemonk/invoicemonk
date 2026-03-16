@@ -2496,6 +2496,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ban_user: {
+        Args: { _reason: string; _user_id: string }
+        Returns: undefined
+      }
       canonicalize_jsonb: { Args: { p_input: Json }; Returns: string }
       check_currency_account_limit: {
         Args: { _business_id: string }
@@ -2670,6 +2674,7 @@ export type Database = {
         Args: { _business_name: string; _subscription_id: string }
         Returns: undefined
       }
+      unban_user: { Args: { _user_id: string }; Returns: undefined }
       update_compliance_analytics: {
         Args: { p_business_id: string; p_compliance_result: Json }
         Returns: undefined
@@ -2740,6 +2745,8 @@ export type Database = {
         | "XML_ARTIFACT_GENERATED"
         | "REGULATORY_SUBMISSION_CREATED"
         | "REGULATORY_STATUS_CHANGED"
+        | "USER_SUSPENDED"
+        | "USER_REACTIVATED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
       invoice_status:
@@ -2941,6 +2948,8 @@ export const Constants = {
         "XML_ARTIFACT_GENERATED",
         "REGULATORY_SUBMISSION_CREATED",
         "REGULATORY_STATUS_CHANGED",
+        "USER_SUSPENDED",
+        "USER_REACTIVATED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],

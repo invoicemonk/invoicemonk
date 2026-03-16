@@ -195,12 +195,29 @@ export function validateDateStr(value: unknown, fieldName: string): string | nul
   return null;
 }
 
-// Sanitize string to prevent injection (removes HTML tags, trims)
+// HTML entity encoder to prevent injection when interpolating into HTML templates
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Sanitize string for use in email headers (strip newlines/control chars)
+export function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n\t\x00-\x1f]/g, ' ').trim();
+}
+
+// Sanitize string to prevent injection (removes HTML tags, encodes entities, trims)
 export function sanitizeString(value: string): string {
-  return value
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/[<>]/g, '') // Remove remaining angle brackets
-    .trim();
+  return escapeHtml(
+    value
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/[<>]/g, '') // Remove remaining angle brackets
+      .trim()
+  );
 }
 
 // === CORS configuration ===

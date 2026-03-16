@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { corsHeaders, checkRateLimit, rateLimitResponse, escapeHtml, sanitizeHeaderValue } from '../_shared/validation.ts'
 
 async function sendBrevoEmail(
   brevoApiKey: string,
@@ -135,14 +135,14 @@ Deno.serve(async (req) => {
       .eq('id', invoice.business_id)
       .single()
 
-    const businessName = business?.name || 'InvoiceMonk'
+    const businessName = escapeHtml(business?.name || 'InvoiceMonk')
 
     // Build email
     const publicInvoiceUrl = invoice.verification_id 
       ? `https://app.invoicemonk.com/invoice/view/${invoice.verification_id}`
       : `https://app.invoicemonk.com/verify/invoice/${invoice.id}`
-    const formattedAmount = `${invoice.currency} ${Number(invoice.total_amount).toLocaleString()}`
-    const formattedDueDate = new Date(invoice.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const formattedAmount = `${escapeHtml(invoice.currency)} ${Number(invoice.total_amount).toLocaleString()}`
+    const formattedDueDate = escapeHtml(new Date(invoice.due_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     <h1 style="margin: 0; font-size: 24px;">Payment Reminder</h1>
   </div>
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
-    <p>Dear ${client.name},</p>
+    <p>Dear ${escapeHtml(client.name)},</p>
     <p>This is a friendly reminder that invoice <strong>${invoice.invoice_number}</strong>, originally due on <strong>${formattedDueDate}</strong>, remains unpaid.</p>
     <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0d9488;">
       <table style="width: 100%;">
@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Email service not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, businessName, client.email, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
+    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, sanitizeHeaderValue(business?.name || 'InvoiceMonk'), client.email, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
     if (!sent) {
       return new Response(JSON.stringify({ error: 'Failed to send reminder email' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }

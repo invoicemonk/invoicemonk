@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, escapeHtml, sanitizeHeaderValue, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface SendInvoiceRequest {
   invoice_id: string
@@ -940,6 +940,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
@@ -1027,13 +1028,13 @@ Deno.serve(async (req) => {
     const templateSnapshot = invoice.template_snapshot as TemplateSnapshot | null
     const items = (invoice.invoice_items || []) as InvoiceItem[]
     
-    const businessName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'
-    const clientName = recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer'
-    const invoiceSummary = invoice.summary as string | null
+    const businessName = escapeHtml(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk')
+    const clientName = escapeHtml(recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer')
+    const invoiceSummary = invoice.summary ? escapeHtml(invoice.summary as string) : null
 
-    const issuerAddress = formatAddressCompact(issuerSnapshot?.address)
-    const issuerEmail = issuerSnapshot?.contact_email || ''
-    const issuerPhone = issuerSnapshot?.contact_phone || ''
+    const issuerAddress = escapeHtml(formatAddressCompact(issuerSnapshot?.address))
+    const issuerEmail = escapeHtml(issuerSnapshot?.contact_email || '')
+    const issuerPhone = escapeHtml(issuerSnapshot?.contact_phone || '')
     let issuerLogoUrl = issuerSnapshot?.logo_url || null
 
     if (!issuerLogoUrl && invoice.business_id) {
@@ -1128,7 +1129,7 @@ Deno.serve(async (req) => {
             <td>
               <p style="margin: 0 0 16px; color: #374151; font-size: 16px;">Dear ${clientName},</p>
               
-              ${body.custom_message ? `<p style="margin: 0 0 16px; color: #374151; font-size: 16px;">${body.custom_message}</p>` : ''}
+              ${sanitizedCustomMessage ? `<p style="margin: 0 0 16px; color: #374151; font-size: 16px;">${sanitizedCustomMessage}</p>` : ''}
               
               <p style="margin: 0 0 16px; color: #374151; font-size: 16px;">
                 Please find below the details for invoice <strong>${invoice.invoice_number}</strong>.
@@ -1258,9 +1259,9 @@ Deno.serve(async (req) => {
 
     try {
       const brevoPayload: Record<string, unknown> = {
-        sender: { name: businessName, email: smtpFrom },
-        to: [{ email: body.recipient_email, name: clientName }],
-        subject: `Invoice ${invoice.invoice_number} from ${businessName}`,
+        sender: { name: sanitizeHeaderValue(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'), email: smtpFrom },
+        to: [{ email: body.recipient_email, name: sanitizeHeaderValue(recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer') }],
+        subject: `Invoice ${invoice.invoice_number} from ${sanitizeHeaderValue(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk')}`,
         htmlContent: emailHtml,
         attachment: [{ content: attachmentContent, name: attachmentName }],
       }
@@ -1300,7 +1301,6 @@ Deno.serve(async (req) => {
     }
 
     // Log audit event and create notification
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (serviceRoleKey) {
       const adminClient = createClient(supabaseUrl, serviceRoleKey)
       

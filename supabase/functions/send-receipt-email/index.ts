@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, escapeHtml, sanitizeHeaderValue, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
 interface SendReceiptRequest {
   receipt_id: string;
@@ -134,11 +134,11 @@ Deno.serve(async (req) => {
     const payment = (receipt.payment_snapshot || {}) as Record<string, unknown>;
     const issuerAddress = (issuer.address || {}) as Record<string, string>;
 
-    const businessName = (issuer.legal_name || issuer.name || 'Invoicemonk') as string;
-    const payerName = (payer.name || 'Valued Customer') as string;
-    const issuerEmail = (issuer.contact_email || '') as string;
-    const issuerPhone = (issuer.contact_phone || '') as string;
-    const issuerAddressStr = [issuerAddress.street, issuerAddress.city, issuerAddress.country].filter(Boolean).join(', ');
+    const businessName = escapeHtml((issuer.legal_name || issuer.name || 'Invoicemonk') as string);
+    const payerName = escapeHtml((payer.name || 'Valued Customer') as string);
+    const issuerEmail = escapeHtml((issuer.contact_email || '') as string);
+    const issuerPhone = escapeHtml((issuer.contact_phone || '') as string);
+    const issuerAddressStr = escapeHtml([issuerAddress.street, issuerAddress.city, issuerAddress.country].filter(Boolean).join(', '));
 
     // Get logo URL from business table
     let issuerLogoUrl = (issuer.logo_url || null) as string | null;
@@ -341,9 +341,9 @@ Deno.serve(async (req) => {
     console.log('Sending receipt email via Brevo to:', body.recipient_email);
 
     const brevoPayload: Record<string, unknown> = {
-      sender: { name: businessName, email: smtpFrom },
-      to: [{ email: body.recipient_email, name: payerName }],
-      subject: `Payment Receipt ${receipt.receipt_number} from ${businessName}`,
+      sender: { name: sanitizeHeaderValue((issuer.legal_name || issuer.name || 'Invoicemonk') as string), email: smtpFrom },
+      to: [{ email: body.recipient_email, name: sanitizeHeaderValue((payer.name || 'Valued Customer') as string) }],
+      subject: `Payment Receipt ${receipt.receipt_number} from ${sanitizeHeaderValue((issuer.legal_name || issuer.name || 'Invoicemonk') as string)}`,
       htmlContent: emailHtml,
       attachment: [{ content: attachmentContent, name: attachmentName }],
     };
