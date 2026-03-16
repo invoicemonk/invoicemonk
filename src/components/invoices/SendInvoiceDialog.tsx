@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
+import { stripUrls } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -74,8 +75,8 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
         body: {
           invoice_id: invoice.id,
           recipient_email: recipientEmail,
-          custom_message: customMessage || undefined,
-          app_url: getProductionUrl() // Use production URL for verification links
+          custom_message: customMessage ? stripUrls(customMessage) : undefined,
+          app_url: getProductionUrl()
         }
       });
 

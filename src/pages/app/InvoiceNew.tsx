@@ -68,6 +68,7 @@ import { useProductsServices } from '@/hooks/use-products-services';
 import { supabase } from '@/integrations/supabase/client';
 import { getCountryName } from '@/lib/countries';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
+import { stripUrls } from '@/lib/utils';
 
 function getSmartPrefillAmount(currency: string): number {
   const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
@@ -436,9 +437,9 @@ export default function InvoiceNew() {
         currency_account_id: currentCurrencyAccount?.id || null,
         issue_date: issueDate,
         due_date: dueDate || null,
-        notes: notes || null,
-        terms: terms || null,
-        summary: summary || null,
+        notes: notes ? stripUrls(notes) : null,
+        terms: terms ? stripUrls(terms) : null,
+        summary: summary ? stripUrls(summary) : null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),

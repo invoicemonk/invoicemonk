@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { stripUrls } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -123,7 +124,7 @@ export default function ClientEdit() {
         email: formData.email || null,
         phone: formData.phone || null,
         tax_id: formData.tax_id || null,
-        notes: formData.notes || null,
+        notes: formData.notes ? stripUrls(formData.notes) : null,
         client_type: formData.client_type,
         cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
         contact_person: formData.client_type === 'company' ? (formData.contact_person || null) : null,

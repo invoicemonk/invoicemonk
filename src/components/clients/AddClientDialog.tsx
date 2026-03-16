@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { stripUrls } from '@/lib/utils';
 import {
   Building2,
   User,
@@ -106,7 +107,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
-      notes: newClient.notes || null,
+      notes: newClient.notes ? stripUrls(newClient.notes) : null,
       address: addressData,
       business_id: currentBusiness?.id,
     });

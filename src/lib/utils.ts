@@ -6,6 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Strip URLs from user-provided text to prevent phishing/spam in emails.
+ * Replaces http(s), ftp, and www. links with '[link removed]'.
+ */
+export function stripUrls(str: string): string {
+  return str
+    .replace(/https?:\/\/[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/ftp:\/\/[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/www\.[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/\b[a-zA-Z0-9][-a-zA-Z0-9]*\.(com|net|org|io|co|app|dev|xyz|info|biz|me|us|uk|ng|za|ke|gh|de|fr|es|it|nl|au|ca|in|jp|ru|br|mx|ar|cl|se|no|dk|fi|pl|cz|pt|be|at|ch|ie|nz|sg|hk|tw|kr|ph|th|my|id|vn|ae|sa|qa|eg|ma|tz|rw|ug|site|online|store|shop|tech|pro|cloud|ai|gg|tv|cc|ly)(\/[^\s<>"')\]]*)?/gi, '[link removed]');
+}
+
+/**
  * Get currency symbol for a currency code
  */
 export function getCurrencySymbol(currency: string): string {

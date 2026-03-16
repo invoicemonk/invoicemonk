@@ -205,19 +205,35 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// Sanitize string for use in email headers (strip newlines/control chars)
-export function sanitizeHeaderValue(value: string): string {
-  return value.replace(/[\r\n\t\x00-\x1f]/g, ' ').trim();
+// Strip URLs (http/https/ftp and www.) from user-provided text to prevent phishing
+export function stripUrls(str: string): string {
+  return str
+    .replace(/https?:\/\/[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/ftp:\/\/[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/www\.[^\s<>"')\]]+/gi, '[link removed]')
+    .replace(/\b[a-zA-Z0-9][-a-zA-Z0-9]*\.(com|net|org|io|co|app|dev|xyz|info|biz|me|us|uk|ng|za|ke|gh|de|fr|es|it|nl|au|ca|in|jp|ru|br|mx|ar|cl|se|no|dk|fi|pl|cz|pt|be|at|ch|ie|nz|sg|hk|tw|kr|ph|th|my|id|vn|ae|sa|qa|eg|ma|tz|rw|ug|site|online|store|shop|tech|pro|cloud|ai|gg|tv|cc|ly)(\/[^\s<>"')\]]*)?/gi, '[link removed]');
 }
 
-// Sanitize string to prevent injection (removes HTML tags, encodes entities, trims)
+// Sanitize string to prevent injection (removes HTML tags, URLs, encodes entities, trims)
 export function sanitizeString(value: string): string {
   return escapeHtml(
-    value
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/[<>]/g, '') // Remove remaining angle brackets
-      .trim()
+    stripUrls(
+      value
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/[<>]/g, '') // Remove remaining angle brackets
+    ).trim()
   );
+}
+
+// === Header sanitization ===
+
+/** Sanitize a string for use in email headers to prevent header injection. */
+export function sanitizeHeaderValue(value: string): string {
+  return value
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, '')
+    .trim()
+    .slice(0, 200);
 }
 
 // === CORS configuration ===

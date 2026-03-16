@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
+import { stripUrls } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +60,7 @@ export function SendReceiptDialog({ open, onOpenChange, receipt }: SendReceiptDi
         body: {
           receipt_id: receipt.id,
           recipient_email: recipientEmail,
-          custom_message: customMessage || undefined,
+          custom_message: customMessage ? stripUrls(customMessage) : undefined,
           app_url: getProductionUrl(),
         }
       });

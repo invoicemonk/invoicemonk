@@ -54,6 +54,7 @@ import { getJurisdictionConfig, JURISDICTION_CONFIG } from '@/lib/jurisdiction-c
 import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
+import { stripUrls } from '@/lib/utils';
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -128,7 +129,7 @@ export default function Clients() {
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
-      notes: newClient.notes || null,
+      notes: newClient.notes ? stripUrls(newClient.notes) : null,
       address: addressData,
       business_id: currentBusiness?.id,
     });

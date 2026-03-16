@@ -63,6 +63,7 @@ import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
+import { stripUrls } from '@/lib/utils';
 
 interface InvoiceItem {
   id: string;
@@ -307,9 +308,9 @@ export default function InvoiceEdit() {
         currency: currency,
         issue_date: issueDate,
         due_date: dueDate || null,
-        notes: notes || null,
-        terms: terms || null,
-        summary: summary || null,
+        notes: notes ? stripUrls(notes) : null,
+        terms: terms ? stripUrls(terms) : null,
+        summary: summary ? stripUrls(summary) : null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -367,9 +368,9 @@ export default function InvoiceEdit() {
         currency: currency,
         issue_date: issueDate,
         due_date: dueDate || null,
-        notes: notes || null,
-        terms: terms || null,
-        summary: summary || null,
+        notes: notes ? stripUrls(notes) : null,
+        terms: terms ? stripUrls(terms) : null,
+        summary: summary ? stripUrls(summary) : null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
