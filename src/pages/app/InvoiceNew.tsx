@@ -817,11 +817,12 @@ export default function InvoiceNew() {
                 <Textarea
                   id="summary"
                   value={summary}
-                  onChange={(e) => setSummary(e.target.value.slice(0, 500))}
+                  onChange={(e) => setSummary(e.target.value)}
                   placeholder="Brief description of what this invoice is for..."
                   className="min-h-[80px]"
+                  maxLength={INPUT_LIMITS.TEXTAREA}
                 />
-                <p className="text-xs text-muted-foreground text-right">{summary.length}/500</p>
+                <p className="text-xs text-muted-foreground text-right">{summary.length}/{INPUT_LIMITS.TEXTAREA}</p>
               </div>
 
               {/* Template Selection */}

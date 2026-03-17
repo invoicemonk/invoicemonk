@@ -16,6 +16,7 @@ import {
   Phone,
   ExternalLink,
   AlertCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,8 @@ interface InvoiceViewResponse {
     verification_id: string;
   };
   issuer_tier?: string;
+  is_flagged?: boolean;
+  flag_reason?: string;
   error?: string;
 }
 
@@ -278,6 +281,36 @@ const InvoiceView = () => {
             transition={{ duration: 0.5 }}
             className="space-y-6"
           >
+            {/* Fraud Warning Banner */}
+            {data?.is_flagged && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className="border-destructive bg-destructive/10">
+                  <CardContent className="pt-6 pb-5">
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-full bg-destructive/20 p-3 shrink-0">
+                        <ShieldAlert className="h-8 w-8 text-destructive" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-destructive mb-1">Fraud Warning</h2>
+                        <p className="text-sm text-destructive/90">
+                          This invoice was issued by a business that has been flagged for suspicious activity by InvoiceMonk. 
+                          Exercise extreme caution before making any payments or sharing personal information.
+                        </p>
+                        {data.flag_reason && (
+                          <p className="text-sm text-destructive/80 mt-2 italic">
+                            Reason: {data.flag_reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
             {/* Business Header */}
             <Card>
               <CardContent className="pt-6">

@@ -1,9 +1,16 @@
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface BusinessData {
   id: string;
@@ -19,6 +26,8 @@ interface BusinessData {
   created_at: string;
   updated_at: string;
   business_identity_level: 'unverified' | 'self_declared' | 'verified' | 'nrs_linked' | 'regulator_linked' | null;
+  is_flagged?: boolean;
+  flag_reason?: string | null;
   business_members?: { count: number }[];
   subscriptions?: { tier: string; status: string }[];
 }
@@ -30,10 +39,43 @@ interface BusinessDetailSheetProps {
 }
 
 export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDetailSheetProps) {
+  const [isFlagged, setIsFlagged] = useState(business?.is_flagged || false);
+  const [flagReason, setFlagReason] = useState(business?.flag_reason || '');
+  const [saving, setSaving] = useState(false);
+
+  // Sync state when a different business is opened
+  useEffect(() => {
+    if (business) {
+      setIsFlagged(business.is_flagged || false);
+      setFlagReason(business.flag_reason || '');
+    }
+  }, [business?.id]);
+
   if (!business) return null;
 
   const memberCount = business.business_members?.[0]?.count || 0;
   const subscription = business.subscriptions?.[0];
+
+  const handleSaveFlag = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('businesses')
+        .update({ 
+          is_flagged: isFlagged, 
+          flag_reason: isFlagged ? flagReason || null : null 
+        })
+        .eq('id', business.id);
+      if (error) throw error;
+      toast.success(isFlagged ? 'Business flagged as fraudulent' : 'Fraud flag removed');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update flag');
+      setIsFlagged(business.is_flagged || false);
+      setFlagReason(business.flag_reason || '');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const formatAddress = (address: any) => {
     if (!address) return 'Not provided';
@@ -191,6 +233,50 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Fraud Flagging */}
+          <Separator />
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4" />
+              Fraud Controls
+            </h4>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="fraud-flag" className="text-sm">Flag as Fraudulent</Label>
+              <Switch
+                id="fraud-flag"
+                checked={isFlagged}
+                onCheckedChange={setIsFlagged}
+              />
+            </div>
+
+            {isFlagged && (
+              <div className="space-y-2">
+                <Label htmlFor="flag-reason" className="text-sm text-muted-foreground">Reason</Label>
+                <Textarea
+                  id="flag-reason"
+                  placeholder="e.g. Suspected fraudulent invoicing activity"
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            )}
+
+            <Button 
+              size="sm" 
+              variant={isFlagged ? "destructive" : "outline"}
+              onClick={handleSaveFlag}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : isFlagged ? 'Save Fraud Flag' : 'Save Changes'}
+            </Button>
+
+            {business.is_flagged && (
+              <p className="text-xs text-destructive">⚠ This business is currently flagged. Public invoices show a fraud warning.</p>
+            )}
           </div>
 
           {/* Business ID */}

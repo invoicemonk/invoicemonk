@@ -165,7 +165,14 @@ export default function AdminBusinesses() {
               ) : (
                 businesses?.map((business) => (
                   <TableRow key={business.id}>
-                    <TableCell className="font-medium">{business.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        {business.name}
+                        {business.is_flagged && (
+                          <Badge variant="destructive" className="text-xs">Flagged</Badge>
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell>{business.legal_name || '-'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

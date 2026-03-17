@@ -19,7 +19,8 @@ import {
   Phone,
   Mail,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  ShieldAlert
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,8 @@ interface VerificationResponse {
     identity_snapshot_date?: string;
   };
   issuer_tier?: string;
+  is_flagged?: boolean;
+  flag_reason?: string;
   error?: string;
 }
 
@@ -240,22 +243,63 @@ const VerifyInvoice = () => {
           >
             {data.verified && data.invoice ? (
               <>
+                {/* Fraud Warning Banner */}
+                {data.is_flagged && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6"
+                  >
+                    <Card className="border-destructive bg-destructive/10">
+                      <CardContent className="pt-6 pb-5">
+                        <div className="flex items-start gap-4">
+                          <div className="rounded-full bg-destructive/20 p-3 shrink-0">
+                            <ShieldAlert className="h-8 w-8 text-destructive" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-bold text-destructive mb-1">Fraud Warning</h2>
+                            <p className="text-sm text-destructive/90">
+                              This invoice was issued by a business that has been flagged for suspicious activity by InvoiceMonk. 
+                              Exercise extreme caution before making any payments or sharing personal information.
+                            </p>
+                            {data.flag_reason && (
+                              <p className="text-sm text-destructive/80 mt-2 italic">
+                                Reason: {data.flag_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
                 {/* Success Header */}
                 <div className="text-center mb-8">
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    className="inline-flex rounded-full bg-green-100 dark:bg-green-900/30 p-4 mb-4"
+                    className={`inline-flex rounded-full p-4 mb-4 ${
+                      data.is_flagged 
+                        ? 'bg-destructive/10' 
+                        : 'bg-green-100 dark:bg-green-900/30'
+                    }`}
                   >
-                    <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400" />
+                    {data.is_flagged ? (
+                      <ShieldAlert className="h-16 w-16 text-destructive" />
+                    ) : (
+                      <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400" />
+                    )}
                   </motion.div>
                   <h1 className="text-3xl md:text-4xl font-bold mb-3">
-                    Invoice Verified
+                    {data.is_flagged ? 'Invoice Flagged' : 'Invoice Verified'}
                   </h1>
                   <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                    This invoice is a verified financial record issued via Invoicemonk's 
-                    compliance-first invoicing platform.
+                    {data.is_flagged 
+                      ? 'This invoice exists on our platform but the issuing business has been flagged for suspicious activity.'
+                      : "This invoice is a verified financial record issued via Invoicemonk's compliance-first invoicing platform."
+                    }
                   </p>
                 </div>
 

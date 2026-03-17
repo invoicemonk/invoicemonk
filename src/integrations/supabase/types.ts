@@ -199,10 +199,12 @@ export type Database = {
           currency_locked: boolean | null
           currency_locked_at: string | null
           default_currency: string | null
+          flag_reason: string | null
           id: string
           invoice_number_digits: number
           invoice_prefix: string | null
           is_default: boolean | null
+          is_flagged: boolean
           is_vat_registered: boolean | null
           jurisdiction: string | null
           legal_name: string | null
@@ -231,10 +233,12 @@ export type Database = {
           currency_locked?: boolean | null
           currency_locked_at?: string | null
           default_currency?: string | null
+          flag_reason?: string | null
           id?: string
           invoice_number_digits?: number
           invoice_prefix?: string | null
           is_default?: boolean | null
+          is_flagged?: boolean
           is_vat_registered?: boolean | null
           jurisdiction?: string | null
           legal_name?: string | null
@@ -263,10 +267,12 @@ export type Database = {
           currency_locked?: boolean | null
           currency_locked_at?: string | null
           default_currency?: string | null
+          flag_reason?: string | null
           id?: string
           invoice_number_digits?: number
           invoice_prefix?: string | null
           is_default?: boolean | null
+          is_flagged?: boolean
           is_vat_registered?: boolean | null
           jurisdiction?: string | null
           legal_name?: string | null

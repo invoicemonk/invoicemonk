@@ -176,6 +176,21 @@ Deno.serve(async (req) => {
       (a: InvoiceItem, b: InvoiceItem) => a.sort_order - b.sort_order
     )
 
+    // Check if business is flagged for fraud
+    let isFlagged = false
+    let flagReason: string | null = null
+    if (invoice.business_id) {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('is_flagged, flag_reason')
+        .eq('id', invoice.business_id)
+        .maybeSingle()
+      if (business) {
+        isFlagged = business.is_flagged || false
+        flagReason = business.flag_reason || null
+      }
+    }
+
     // Get issuer's subscription tier
     const { data: subscription } = await supabase
       .from('subscriptions')
@@ -253,7 +268,9 @@ Deno.serve(async (req) => {
         items: sortedItems,
         verification_id: invoice.verification_id
       },
-      issuer_tier: issuerTier
+      issuer_tier: issuerTier,
+      is_flagged: isFlagged,
+      flag_reason: isFlagged ? flagReason : undefined
     }
 
     return new Response(JSON.stringify(response), {
