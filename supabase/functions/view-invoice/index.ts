@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse, stripUrls } from '../_shared/validation.ts'
 
 interface InvoiceItem {
   id: string
@@ -57,6 +57,7 @@ interface ViewInvoiceResponse {
     currency: string
     notes: string | null
     terms: string | null
+    summary: string | null
     issuer_snapshot: IssuerSnapshot | null
     recipient_snapshot: RecipientSnapshot | null
     payment_method_snapshot: PaymentMethodSnapshot | null
@@ -115,6 +116,7 @@ Deno.serve(async (req) => {
         currency,
         notes,
         terms,
+        summary,
         verification_id,
         issuer_snapshot,
         recipient_snapshot,
@@ -244,6 +246,7 @@ Deno.serve(async (req) => {
         currency: invoice.currency,
         notes: invoice.notes,
         terms: invoice.terms,
+        summary: invoice.summary ? stripUrls(String(invoice.summary)) : null,
         issuer_snapshot: invoice.issuer_snapshot as IssuerSnapshot | null,
         recipient_snapshot: invoice.recipient_snapshot as RecipientSnapshot | null,
         payment_method_snapshot: invoice.payment_method_snapshot as PaymentMethodSnapshot | null,

@@ -6,9 +6,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert, Globe, Monitor } from 'lucide-react';
 import { format } from 'date-fns';
 import { useBanUser, useUnbanUser } from '@/hooks/use-admin';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -221,6 +224,11 @@ export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetPro
 
             <Separator />
 
+            {/* IP History */}
+            <IPHistorySection userId={user.id} />
+
+            <Separator />
+
             {/* User ID */}
             <div className="space-y-2">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">System Info</h4>
@@ -265,5 +273,59 @@ export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetPro
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function IPHistorySection({ userId }: { userId: string }) {
+  const { data: events, isLoading } = useQuery({
+    queryKey: ['user-login-events', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_login_events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+  });
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">IP History</h4>
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : !events?.length ? (
+        <p className="text-sm text-muted-foreground">No login events recorded yet.</p>
+      ) : (
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {events.map((evt) => (
+            <div key={evt.id} className="bg-muted rounded-md p-2.5 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Globe className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-mono">{String(evt.ip_address || 'Unknown')}</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {evt.event_type === 'sign_up' ? 'Sign Up' : 'Sign In'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Monitor className="h-3 w-3" />
+                <span className="truncate max-w-[250px]">{evt.user_agent || 'Unknown'}</span>
+              </div>
+              <p className="text-muted-foreground">
+                {format(new Date(evt.created_at), 'MMM d, yyyy HH:mm')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,6 +85,7 @@ export function PaymentMethodForm({
           value={displayName}
           onChange={e => setDisplayName(e.target.value)}
           placeholder="e.g. Bank Transfer (NGN)"
+          maxLength={INPUT_LIMITS.SHORT_TEXT}
         />
       </div>
 
@@ -100,6 +102,7 @@ export function PaymentMethodForm({
                 value={instructions[field.key] || ''}
                 onChange={e => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
+                maxLength={INPUT_LIMITS.SHORT_TEXT}
               />
             </div>
           ))}

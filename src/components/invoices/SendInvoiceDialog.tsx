@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
 import { stripUrls } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -150,6 +151,7 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
               placeholder="client@example.com"
+              maxLength={INPUT_LIMITS.EMAIL}
             />
           </div>
 
@@ -162,6 +164,7 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
               onChange={(e) => setCustomMessage(e.target.value)}
               placeholder="Add a personal message to include in the email..."
               rows={3}
+              maxLength={INPUT_LIMITS.TEXTAREA}
             />
           </div>
 

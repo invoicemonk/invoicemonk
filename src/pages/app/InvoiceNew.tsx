@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
@@ -514,9 +515,9 @@ export default function InvoiceNew() {
         currency_account_id: currentCurrencyAccount?.id || null,
         issue_date: issueDate,
         due_date: dueDate || null,
-        notes: notes || null,
-        terms: terms || null,
-        summary: summary || null,
+        notes: notes ? stripUrls(notes) : null,
+        terms: terms ? stripUrls(terms) : null,
+        summary: summary ? stripUrls(summary) : null,
         subtotal: calculateSubtotal(),
         tax_amount: calculateTax(),
         total_amount: calculateTotal(),
@@ -932,6 +933,7 @@ export default function InvoiceNew() {
                           placeholder="Service or product description"
                           value={item.description}
                           onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                          maxLength={INPUT_LIMITS.SHORT_TEXT}
                         />
                       </div>
                       <div className="grid gap-4 sm:grid-cols-3">
@@ -976,6 +978,7 @@ export default function InvoiceNew() {
                             placeholder="e.g. DE VAT, NL BTW"
                             value={item.taxLabel || ''}
                             onChange={(e) => updateItem(item.id, 'taxLabel', e.target.value)}
+                            maxLength={INPUT_LIMITS.SHORT_TEXT}
                           />
                         </div>
                       )}
@@ -1073,6 +1076,7 @@ export default function InvoiceNew() {
                   rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  maxLength={INPUT_LIMITS.TEXTAREA}
                 />
               </div>
               <div className="space-y-2">
@@ -1083,6 +1087,7 @@ export default function InvoiceNew() {
                   rows={3}
                   value={terms}
                   onChange={(e) => setTerms(e.target.value)}
+                  maxLength={INPUT_LIMITS.TEXTAREA}
                 />
               </div>
             </CardContent>

@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLimitResponse, escapeHtml, stripUrls } from '../_shared/validation.ts'
 
 interface GeneratePdfRequest {
   invoice_id?: string
@@ -707,6 +707,10 @@ Deno.serve(async (req) => {
               ${recipientTaxId ? `<div style="font-size: 10px; color: #333; font-weight: 500;">TIN: ${recipientTaxId}</div>` : ''}
             </div>
           </div>
+          ${inv.summary ? `<div style="background: #f8f9fa; border: 1px solid ${tplPrimaryColor}30; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="font-size: 9px; font-weight: 600; color: ${tplPrimaryColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Summary / Description</div>
+            <div style="font-size: 10px; color: #444; line-height: 1.5;">${escapeHtml(stripUrls(String(inv.summary)))}</div>
+          </div>` : ''}
           <div style="border: 1px solid ${tplPrimaryColor}30; border-radius: 4px; overflow: hidden; margin-bottom: 16px;">
             ${itemsTableHtml}
           </div>
@@ -769,6 +773,10 @@ Deno.serve(async (req) => {
               </div>
             </div>
           </div>
+          ${inv.summary ? `<div style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Summary / Description</div>
+            <div style="font-size: 10px; color: #444; line-height: 1.5;">${escapeHtml(stripUrls(String(inv.summary)))}</div>
+          </div>` : ''}
           ${itemsTableHtml}
           <div class="no-break" style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
             <div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 6px;">Invoice Summary</div>

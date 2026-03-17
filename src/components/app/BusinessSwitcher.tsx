@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { useNavigate } from 'react-router-dom';
 import { ChevronsUpDown, Plus, Building2, User, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -304,6 +305,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
                 placeholder="My New Business"
                 value={newBusinessName}
                 onChange={(e) => setNewBusinessName(e.target.value)}
+                maxLength={INPUT_LIMITS.NAME}
               />
             </div>
             <div className="grid gap-2">

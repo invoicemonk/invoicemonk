@@ -1030,7 +1030,7 @@ Deno.serve(async (req) => {
     
     const businessName = escapeHtml(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk')
     const clientName = escapeHtml(recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer')
-    const invoiceSummary = invoice.summary ? escapeHtml(invoice.summary as string) : null
+    
 
     const issuerAddress = escapeHtml(formatAddressCompact(issuerSnapshot?.address))
     const issuerEmail = escapeHtml(issuerSnapshot?.contact_email || '')
@@ -1135,7 +1135,7 @@ Deno.serve(async (req) => {
                 Please find below the details for invoice <strong>${invoice.invoice_number}</strong>.
               </p>
 
-              ${invoiceSummary ? `<p style="margin: 0 0 24px; color: #6b7280; font-style: italic; font-size: 15px; padding-left: 16px; border-left: 3px solid #e5e7eb;">${invoiceSummary}</p>` : ''}
+              
 
               <!-- Invoice Summary Box -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #e5e7eb;">

@@ -88,6 +88,7 @@ interface InvoiceViewResponse {
     currency: string;
     notes: string | null;
     terms: string | null;
+    summary: string | null;
     issuer_snapshot: IssuerIdentity | null;
     recipient_snapshot: RecipientIdentity | null;
     payment_method_snapshot: PaymentMethodSnapshot | null;
@@ -433,6 +434,18 @@ const InvoiceView = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Summary / Description */}
+            {invoice.summary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Summary / Description</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{invoice.summary}</p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Line Items */}
             <Card>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { stripUrls } from '@/lib/utils';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -259,6 +260,7 @@ export default function ClientEdit() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={formData.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
+                maxLength={INPUT_LIMITS.NAME}
               />
             </div>
 
@@ -271,6 +273,7 @@ export default function ClientEdit() {
                   value={formData.contact_person}
                   onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                   placeholder="Jane Smith"
+                  maxLength={INPUT_LIMITS.NAME}
                 />
               </div>
             )}
@@ -283,6 +286,7 @@ export default function ClientEdit() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="client@example.com"
+                maxLength={INPUT_LIMITS.EMAIL}
               />
             </div>
 
@@ -293,6 +297,7 @@ export default function ClientEdit() {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder={`${jurisdictionConfig.phonePrefix} ...`}
+                maxLength={INPUT_LIMITS.PHONE}
               />
             </div>
           </CardContent>
@@ -316,6 +321,7 @@ export default function ClientEdit() {
                 onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                 placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
                 className="font-mono"
+                maxLength={INPUT_LIMITS.TAX_ID}
               />
               <p className="text-xs text-muted-foreground">
                 {jurisdictionConfig.clientTaxIdHint}
@@ -331,6 +337,7 @@ export default function ClientEdit() {
                   onChange={(e) => setFormData({ ...formData, cac_number: e.target.value })}
                   placeholder={jurisdictionConfig.clientRegPlaceholder}
                   className="font-mono"
+                  maxLength={INPUT_LIMITS.REG_NUMBER}
                 />
                 <p className="text-xs text-muted-foreground">
                   {jurisdictionConfig.clientRegHint}
@@ -357,6 +364,7 @@ export default function ClientEdit() {
                   address: { ...formData.address, street: e.target.value } 
                 })}
                 placeholder="123 Main Street"
+                maxLength={INPUT_LIMITS.ADDRESS_LINE}
               />
             </div>
 
@@ -371,6 +379,7 @@ export default function ClientEdit() {
                     address: { ...formData.address, city: e.target.value } 
                   })}
                   placeholder={jurisdictionConfig.cityPlaceholder}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
               <div className="space-y-2">
@@ -383,6 +392,7 @@ export default function ClientEdit() {
                     address: { ...formData.address, state: e.target.value } 
                   })}
                   placeholder={jurisdictionConfig.statePlaceholder}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
             </div>
@@ -398,6 +408,7 @@ export default function ClientEdit() {
                     address: { ...formData.address, postal_code: e.target.value } 
                   })}
                   placeholder={jurisdictionConfig.postalCodePlaceholder}
+                  maxLength={INPUT_LIMITS.POSTAL_CODE}
                 />
               </div>
               <div className="space-y-2">
@@ -429,6 +440,7 @@ export default function ClientEdit() {
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Add any notes about this client..."
               rows={4}
+              maxLength={INPUT_LIMITS.TEXTAREA}
             />
           </CardContent>
         </Card>

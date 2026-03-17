@@ -250,6 +250,7 @@ export function AccountClosureDialog({
                   value={additionalFeedback}
                   onChange={(e) => setAdditionalFeedback(e.target.value)}
                   rows={3}
+                  maxLength={200}
                 />
               </div>
             </div>
@@ -301,6 +302,7 @@ export function AccountClosureDialog({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
+                  maxLength={128}
                 />
               </div>
             </div>

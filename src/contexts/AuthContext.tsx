@@ -82,6 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   { onConflict: 'user_id' }
                 )
             ).catch(() => {});
+
+          // sign_in tracking moved to signIn() method to avoid session race conditions
           }
         } else {
           setProfile(null);
@@ -139,6 +141,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Trigger referral attribution if signup succeeded and we have a user
     if (!error && data?.user?.id) {
       triggerReferralAttribution();
+      // Queue sign_up tracking — will be recorded on first verified login
+      localStorage.setItem('pending_signup_tracking', 'true');
     }
     
     return { error: error as Error | null };
@@ -149,6 +153,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
     });
+
+    if (!error) {
+      // Track sign_in event with IP (fire-and-forget, uses fresh session)
+      supabase.functions.invoke('track-auth-event', {
+        body: { event_type: 'sign_in' },
+      }).catch(() => {});
+
+      // If a pending sign_up event was queued (email verification flow), record it now
+      if (localStorage.getItem('pending_signup_tracking')) {
+        localStorage.removeItem('pending_signup_tracking');
+        supabase.functions.invoke('track-auth-event', {
+          body: { event_type: 'sign_up' },
+        }).catch(() => {});
+      }
+    }
     
     return { error: error as Error | null };
   };

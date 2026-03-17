@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -220,6 +221,7 @@ export default function Clients() {
                   placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                  maxLength={INPUT_LIMITS.NAME}
                 />
               </div>
 
@@ -232,6 +234,7 @@ export default function Clients() {
                     placeholder="Jane Smith"
                     value={newClient.contact_person}
                     onChange={(e) => setNewClient({ ...newClient, contact_person: e.target.value })}
+                    maxLength={INPUT_LIMITS.NAME}
                   />
                 </div>
               )}
@@ -260,23 +263,25 @@ export default function Clients() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="client@example.com"
-                    value={newClient.email}
-                    onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                  />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="client@example.com"
+                      value={newClient.email}
+                      onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                      maxLength={INPUT_LIMITS.EMAIL}
+                    />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder={`${jurisdictionConfig.phonePrefix} ...`}
-                    value={newClient.phone}
-                    onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-                  />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder={`${jurisdictionConfig.phonePrefix} ...`}
+                      value={newClient.phone}
+                      onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                      maxLength={INPUT_LIMITS.PHONE}
+                    />
                 </div>
               </div>
 
@@ -289,13 +294,14 @@ export default function Clients() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="tax_id">{jurisdictionConfig.clientTaxIdLabel}</Label>
-                  <Input
-                    id="tax_id"
-                    placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
-                    value={newClient.tax_id}
-                    onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
-                    className="font-mono"
-                  />
+                    <Input
+                      id="tax_id"
+                      placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
+                      value={newClient.tax_id}
+                      onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
+                      className="font-mono"
+                      maxLength={INPUT_LIMITS.TAX_ID}
+                    />
                   <p className="text-xs text-muted-foreground">
                     {jurisdictionConfig.clientTaxIdHint}
                   </p>
@@ -304,13 +310,14 @@ export default function Clients() {
               {newClient.client_type === 'company' && jurisdictionConfig.showClientReg && (
                   <div className="space-y-2">
                     <Label htmlFor="cac_number">{jurisdictionConfig.clientRegLabel}</Label>
-                    <Input
-                      id="cac_number"
-                      placeholder={jurisdictionConfig.clientRegPlaceholder}
-                      value={newClient.cac_number}
-                      onChange={(e) => setNewClient({ ...newClient, cac_number: e.target.value })}
-                      className="font-mono"
-                    />
+                      <Input
+                        id="cac_number"
+                        placeholder={jurisdictionConfig.clientRegPlaceholder}
+                        value={newClient.cac_number}
+                        onChange={(e) => setNewClient({ ...newClient, cac_number: e.target.value })}
+                        className="font-mono"
+                        maxLength={INPUT_LIMITS.REG_NUMBER}
+                      />
                     <p className="text-xs text-muted-foreground">
                       {jurisdictionConfig.clientRegHint}
                     </p>
@@ -327,6 +334,7 @@ export default function Clients() {
                   value={newClient.notes}
                   onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
                   rows={3}
+                  maxLength={INPUT_LIMITS.TEXTAREA}
                 />
               </div>
 
@@ -436,6 +444,7 @@ export default function Clients() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
+              maxLength={INPUT_LIMITS.SEARCH}
             />
           </div>
         </CardContent>

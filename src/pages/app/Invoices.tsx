@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -349,6 +350,7 @@ export default function Invoices() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
+                maxLength={INPUT_LIMITS.SEARCH}
               />
             </div>
             
@@ -787,6 +789,7 @@ export default function Invoices() {
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
               className="mt-2"
+              maxLength={INPUT_LIMITS.TEXTAREA}
             />
           </div>
           <AlertDialogFooter>

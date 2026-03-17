@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { stripUrls } from '@/lib/utils';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import {
   Building2,
   User,
@@ -165,6 +166,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
               value={newClient.name}
               onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+              maxLength={INPUT_LIMITS.NAME}
             />
           </div>
 
@@ -177,6 +179,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 placeholder="Jane Smith"
                 value={newClient.contact_person}
                 onChange={(e) => setNewClient({ ...newClient, contact_person: e.target.value })}
+                maxLength={INPUT_LIMITS.NAME}
               />
             </div>
           )}
@@ -211,6 +214,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 placeholder="client@example.com"
                 value={newClient.email}
                 onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                maxLength={INPUT_LIMITS.EMAIL}
               />
             </div>
             <div className="space-y-2">
@@ -221,6 +225,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 placeholder={`${jurisdictionConfig.phonePrefix} ...`}
                 value={newClient.phone}
                 onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                maxLength={INPUT_LIMITS.PHONE}
               />
             </div>
           </div>
@@ -240,6 +245,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 value={newClient.tax_id}
                 onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
                 className="font-mono"
+                maxLength={INPUT_LIMITS.TAX_ID}
               />
               <p className="text-xs text-muted-foreground">
                 {jurisdictionConfig.clientTaxIdHint}
@@ -255,6 +261,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                   value={newClient.cac_number}
                   onChange={(e) => setNewClient({ ...newClient, cac_number: e.target.value })}
                   className="font-mono"
+                  maxLength={INPUT_LIMITS.REG_NUMBER}
                 />
                 <p className="text-xs text-muted-foreground">
                   {jurisdictionConfig.clientRegHint}
@@ -272,6 +279,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               value={newClient.notes}
               onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
               rows={3}
+              maxLength={INPUT_LIMITS.TEXTAREA}
             />
           </div>
 
@@ -297,46 +305,50 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                     ...newClient,
                     address: { ...newClient.address, street: e.target.value },
                   })}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="dialog-city">City</Label>
-                  <Input
-                    id="dialog-city"
-                    placeholder={jurisdictionConfig.cityPlaceholder}
-                    value={newClient.address.city}
-                    onChange={(e) => setNewClient({
-                      ...newClient,
-                      address: { ...newClient.address, city: e.target.value },
-                    })}
-                  />
+                    <Input
+                      id="dialog-city"
+                      placeholder={jurisdictionConfig.cityPlaceholder}
+                      value={newClient.address.city}
+                      onChange={(e) => setNewClient({
+                        ...newClient,
+                        address: { ...newClient.address, city: e.target.value },
+                      })}
+                      maxLength={INPUT_LIMITS.ADDRESS_LINE}
+                    />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dialog-state">{jurisdictionConfig.stateLabel}</Label>
-                  <Input
-                    id="dialog-state"
-                    placeholder={jurisdictionConfig.statePlaceholder}
-                    value={newClient.address.state}
-                    onChange={(e) => setNewClient({
-                      ...newClient,
-                      address: { ...newClient.address, state: e.target.value },
-                    })}
-                  />
+                    <Input
+                      id="dialog-state"
+                      placeholder={jurisdictionConfig.statePlaceholder}
+                      value={newClient.address.state}
+                      onChange={(e) => setNewClient({
+                        ...newClient,
+                        address: { ...newClient.address, state: e.target.value },
+                      })}
+                      maxLength={INPUT_LIMITS.ADDRESS_LINE}
+                    />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="dialog-postal_code">{jurisdictionConfig.postalCodeLabel}</Label>
-                  <Input
-                    id="dialog-postal_code"
-                    placeholder={jurisdictionConfig.postalCodePlaceholder}
-                    value={newClient.address.postal_code}
-                    onChange={(e) => setNewClient({
-                      ...newClient,
-                      address: { ...newClient.address, postal_code: e.target.value },
-                    })}
-                  />
+                    <Input
+                      id="dialog-postal_code"
+                      placeholder={jurisdictionConfig.postalCodePlaceholder}
+                      value={newClient.address.postal_code}
+                      onChange={(e) => setNewClient({
+                        ...newClient,
+                        address: { ...newClient.address, postal_code: e.target.value },
+                      })}
+                      maxLength={INPUT_LIMITS.POSTAL_CODE}
+                    />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dialog-country">Country</Label>

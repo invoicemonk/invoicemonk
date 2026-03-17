@@ -289,6 +289,7 @@ export default function Team() {
                     placeholder="colleague@company.com"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
+                    maxLength={100}
                   />
                 </div>
                 <div className="space-y-2">

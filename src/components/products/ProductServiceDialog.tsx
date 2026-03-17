@@ -34,11 +34,11 @@ import {
 
 const schema = z
   .object({
-    name: z.string().min(1, 'Name is required'),
+    name: z.string().min(1, 'Name is required').max(50),
     type: z.enum(['product', 'service']),
-    description: z.string().optional().nullable(),
-    sku: z.string().optional().nullable(),
-    category: z.string().optional().nullable(),
+    description: z.string().max(200).optional().nullable(),
+    sku: z.string().max(50).optional().nullable(),
+    category: z.string().max(50).optional().nullable(),
     defaultPrice: z.number().min(0, 'Price must be 0 or greater'),
     taxApplicable: z.boolean().default(false),
     taxRate: z.number().min(0).max(100).nullable().optional(),

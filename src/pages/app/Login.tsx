@@ -14,8 +14,8 @@ import { AuthLayout } from '@/components/auth/AuthLayout';
 import { gaEvents } from '@/hooks/use-google-analytics';
 
 const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Please enter a valid email address').max(100),
+  password: z.string().min(1, 'Password is required').max(128),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;

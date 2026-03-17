@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -16,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoice, useIssueInvoice, useVoidInvoice, useRecordPayment } from '@/hooks/use-invoices';
+import { useInvoiceTemplates } from '@/hooks/use-invoice-templates';
 import { useInvoiceAuditLogs } from '@/hooks/use-audit-logs';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
 import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
@@ -78,6 +80,16 @@ export default function InvoiceDetail() {
   const downloadPdf = useDownloadInvoicePdf();
   const uploadProof = useUploadPaymentProof();
   const { isStarter, currentBusiness } = useBusiness();
+  const { data: templates } = useInvoiceTemplates();
+
+  // For drafts without a template_snapshot, look up the live template by template_id
+  const draftTemplateConfig = (() => {
+    if (invoice?.template_snapshot) return undefined; // issued invoices already have snapshot
+    if (!invoice?.template_id || !templates) return undefined;
+    const tpl = templates.find(t => t.id === invoice.template_id);
+    if (!tpl) return undefined;
+    return { layout: tpl.layout, styles: tpl.styles };
+  })();
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -698,7 +710,7 @@ export default function InvoiceDetail() {
           </AlertDialogHeader>
           <div className="py-4">
             <Label>Reason (required)</Label>
-            <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} className="mt-2" placeholder="Enter reason..." />
+            <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} className="mt-2" placeholder="Enter reason..." maxLength={INPUT_LIMITS.TEXTAREA} />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -755,6 +767,7 @@ export default function InvoiceDetail() {
                 value={paymentReference} 
                 onChange={(e) => setPaymentReference(e.target.value)}
                 placeholder="e.g., TXN123456789"
+                maxLength={INPUT_LIMITS.SHORT_TEXT}
               />
             </div>
             <div className="space-y-2">
@@ -774,6 +787,7 @@ export default function InvoiceDetail() {
                 onChange={(e) => setPaymentNotes(e.target.value)}
                 placeholder="Additional notes..."
                 rows={2}
+                maxLength={INPUT_LIMITS.TEXTAREA}
               />
             </div>
             <div className="space-y-2">
@@ -825,6 +839,7 @@ export default function InvoiceDetail() {
             contact_phone: currentBusiness.contact_phone,
             logo_url: currentBusiness.logo_url,
           } : undefined}
+          templateConfig={draftTemplateConfig}
         />
       )}
 

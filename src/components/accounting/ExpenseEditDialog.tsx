@@ -30,11 +30,11 @@ import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
-  description: z.string().optional(),
+  description: z.string().max(200).optional(),
   amount: z.number().min(0.01, 'Amount must be greater than 0'),
-  vendor: z.string().optional(),
+  vendor: z.string().max(50).optional(),
   expenseDate: z.string().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(200).optional(),
   receiptUrl: z.string().optional().nullable(),
 });
 

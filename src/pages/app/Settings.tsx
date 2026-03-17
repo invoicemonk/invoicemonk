@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { 
   Settings as SettingsIcon, 
@@ -222,6 +223,7 @@ export default function Settings() {
                   id="fullName"
                   defaultValue={profile?.full_name || ''}
                   placeholder="Your name"
+                  maxLength={INPUT_LIMITS.NAME}
                 />
               </div>
               <div className="space-y-2">
@@ -257,12 +259,13 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
                 <div className="relative">
-                  <Input
-                    id="currentPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    value={passwords.current}
-                    onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                  />
+                    <Input
+                      id="currentPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwords.current}
+                      onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                      maxLength={INPUT_LIMITS.PASSWORD}
+                    />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -279,6 +282,7 @@ export default function Settings() {
                   type={showPassword ? 'text' : 'password'}
                   value={passwords.new}
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                  maxLength={INPUT_LIMITS.PASSWORD}
                 />
               </div>
               <div className="space-y-2">
@@ -288,6 +292,7 @@ export default function Settings() {
                   type={showPassword ? 'text' : 'password'}
                   value={passwords.confirm}
                   onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                  maxLength={INPUT_LIMITS.PASSWORD}
                 />
               </div>
               <Button onClick={handlePasswordChange} disabled={isLoading}>
@@ -438,6 +443,7 @@ export default function Settings() {
                             value={notifications.reminderEmailTemplate}
                             onChange={(e) => handleNotificationChange('reminderEmailTemplate', e.target.value)}
                             className="min-h-[80px]"
+                            maxLength={INPUT_LIMITS.TEXTAREA}
                           />
                           <p className="text-xs text-muted-foreground">
                             This message will be included in reminder emails sent to clients

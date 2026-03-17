@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
 import { stripUrls } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -124,6 +125,7 @@ export function SendReceiptDialog({ open, onOpenChange, receipt }: SendReceiptDi
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
               placeholder="client@example.com"
+              maxLength={INPUT_LIMITS.EMAIL}
             />
           </div>
 
@@ -136,6 +138,7 @@ export function SendReceiptDialog({ open, onOpenChange, receipt }: SendReceiptDi
               onChange={(e) => setCustomMessage(e.target.value)}
               placeholder="Add a personal message to include in the email..."
               rows={3}
+              maxLength={INPUT_LIMITS.TEXTAREA}
             />
           </div>
 

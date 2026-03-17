@@ -60,3 +60,6 @@ verify_jwt = false
 [functions.send-due-date-reminders]
 verify_jwt = false
 
+[functions.track-auth-event]
+verify_jwt = false
+

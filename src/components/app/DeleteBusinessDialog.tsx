@@ -71,6 +71,7 @@ export function DeleteBusinessDialog({
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={businessName}
               autoComplete="off"
+              maxLength={50}
             />
           </div>
         </div>

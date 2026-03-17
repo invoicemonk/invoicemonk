@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
 import { motion } from 'framer-motion';
 import { 
@@ -567,6 +568,7 @@ export default function BusinessProfile() {
                 placeholder="My Business"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                maxLength={INPUT_LIMITS.NAME}
               />
             </div>
             <div className="space-y-2">
@@ -576,6 +578,7 @@ export default function BusinessProfile() {
                 placeholder="My Business Ltd."
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
+                maxLength={INPUT_LIMITS.LEGAL_NAME}
               />
               <p className="text-xs text-muted-foreground">
                 The registered legal name of your business entity
@@ -609,6 +612,7 @@ export default function BusinessProfile() {
                 placeholder={jurisdictionConfig.taxIdPlaceholder}
                 value={formData.taxId}
                 onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                maxLength={INPUT_LIMITS.TAX_ID}
               />
               <p className="text-xs text-muted-foreground">
                 {jurisdictionConfig.countryName
@@ -628,6 +632,7 @@ export default function BusinessProfile() {
                   placeholder={jurisdictionConfig.cacPlaceholder}
                   value={formData.cacNumber}
                   onChange={(e) => setFormData({ ...formData, cacNumber: e.target.value })}
+                  maxLength={INPUT_LIMITS.REG_NUMBER}
                 />
                 <p className="text-xs text-muted-foreground">
                   {jurisdictionConfig.cacHint}
@@ -698,6 +703,7 @@ export default function BusinessProfile() {
                       placeholder={jurisdictionConfig.vatPlaceholder}
                       value={formData.vatRegistrationNumber}
                       onChange={(e) => setFormData({ ...formData, vatRegistrationNumber: e.target.value })}
+                      maxLength={INPUT_LIMITS.REG_NUMBER}
                     />
                     <p className="text-xs text-muted-foreground">
                       {jurisdictionConfig.vatHint || 'This will appear on all invoices.'}
@@ -732,6 +738,7 @@ export default function BusinessProfile() {
                   placeholder="billing@mybusiness.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  maxLength={INPUT_LIMITS.EMAIL}
                 />
               </div>
             </div>
@@ -746,6 +753,7 @@ export default function BusinessProfile() {
                   placeholder="+234 800 000 0000"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  maxLength={INPUT_LIMITS.PHONE}
                 />
               </div>
             </div>
@@ -760,6 +768,7 @@ export default function BusinessProfile() {
                   placeholder="123 Business Street"
                   value={formData.street}
                   onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
             </div>
@@ -773,6 +782,7 @@ export default function BusinessProfile() {
                   placeholder="Lagos"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
               <div className="space-y-2">
@@ -782,6 +792,7 @@ export default function BusinessProfile() {
                   placeholder="Lagos State"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  maxLength={INPUT_LIMITS.ADDRESS_LINE}
                 />
               </div>
             </div>
@@ -793,6 +804,7 @@ export default function BusinessProfile() {
                   placeholder="100001"
                   value={formData.postalCode}
                   onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                  maxLength={INPUT_LIMITS.POSTAL_CODE}
                 />
               </div>
               <div className="space-y-2">
@@ -839,6 +851,7 @@ export default function BusinessProfile() {
                   placeholder="INV"
                   value={formData.invoicePrefix}
                   onChange={(e) => setFormData({ ...formData, invoicePrefix: e.target.value })}
+                  maxLength={INPUT_LIMITS.INVOICE_PREFIX}
                 />
                 <p className="text-xs text-muted-foreground">
                   Prefix for your invoice numbers

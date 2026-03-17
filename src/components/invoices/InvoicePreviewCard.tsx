@@ -521,6 +521,11 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           </div>
 
           <div className="px-8 py-6 space-y-6">
+            {/* Summary / Description */}
+            {invoice.summary && (
+              <p className="text-sm text-muted-foreground italic max-w-md">{invoice.summary}</p>
+            )}
+
             {/* From / To in cards */}
             <div className="grid md:grid-cols-2 gap-4">
               {layout.show_issuer_details && (
