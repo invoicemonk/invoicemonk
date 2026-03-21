@@ -82,8 +82,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   { onConflict: 'user_id' }
                 )
             ).catch(() => {});
+          }
 
-          // sign_in tracking moved to signIn() method to avoid session race conditions
+          // Trigger referral attribution on first sign-in (after email confirmation)
+          if (event === 'SIGNED_IN' && localStorage.getItem('pending_referral_code')) {
+            triggerReferralAttribution();
           }
         } else {
           setProfile(null);
@@ -113,14 +116,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const refCode = localStorage.getItem('pending_referral_code');
       if (!refCode) return;
-      localStorage.removeItem('pending_referral_code');
 
-      await supabase.functions.invoke('attribute-referral', {
+      const { error } = await supabase.functions.invoke('attribute-referral', {
         body: { referral_code: refCode },
       });
+
+      if (error) {
+        console.error('Referral attribution failed, will retry on next login:', error);
+        return;
+      }
+
+      // Only clear after successful attribution
+      localStorage.removeItem('pending_referral_code');
       console.log('Referral attribution triggered for code:', refCode);
     } catch (err) {
-      console.error('Referral attribution error:', err);
+      console.error('Referral attribution error, will retry on next login:', err);
     }
   }, []);
 
@@ -138,11 +148,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       },
     });
 
-    // Trigger referral attribution if signup succeeded and we have a user
+    // Queue sign_up tracking — will be recorded on first verified login
     if (!error && data?.user?.id) {
-      triggerReferralAttribution();
-      // Queue sign_up tracking — will be recorded on first verified login
       localStorage.setItem('pending_signup_tracking', 'true');
+      // Referral attribution will happen on SIGNED_IN event (after email confirmation)
     }
     
     return { error: error as Error | null };
