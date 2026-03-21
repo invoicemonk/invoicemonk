@@ -78,12 +78,24 @@ const Signup = () => {
     setIsLoading(false);
 
     if (error) {
-      const errorMessage = error.message.includes('already registered')
-        ? 'An account with this email already exists. Please log in instead.'
-        : error.message;
+      const msg = error.message || '';
+      let errorMessage: string;
+      let errorTitle = 'Signup failed';
+
+      if (msg.includes('already registered')) {
+        errorMessage = 'An account with this email already exists. Please log in instead.';
+      } else if (
+        msg.toLowerCase().includes('email') && 
+        (msg.toLowerCase().includes('send') || msg.toLowerCase().includes('deliver') || msg.toLowerCase().includes('smtp'))
+      ) {
+        errorTitle = 'Verification email issue';
+        errorMessage = "Your account was created, but we couldn't send the verification email right now. Please try logging in, or contact support if you don't receive a verification email shortly.";
+      } else {
+        errorMessage = msg;
+      }
       
       toast({
-        title: 'Signup failed',
+        title: errorTitle,
         description: errorMessage,
         variant: 'destructive',
       });

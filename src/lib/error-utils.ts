@@ -22,6 +22,8 @@ export function sanitizeErrorMessage(error: unknown): string {
     [/FetchError|fetch failed|NetworkError/i, 'Network error. Please check your connection and try again.'],
     [/timeout|AbortError/i, 'The request timed out. Please try again.'],
     [/too many connections/i, 'The service is temporarily busy. Please try again in a moment.'],
+    [/record ".*" is not assigned yet/i, 'A system error occurred. Please contact support.'],
+    [/null value in column ".*" .* violates not-null constraint/i, 'A system error occurred. Please contact support.'],
   ];
 
   for (const [pattern, replacement] of patterns) {

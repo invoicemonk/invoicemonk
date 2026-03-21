@@ -28,7 +28,11 @@ async function sendBrevoEmail(
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`Brevo API error (${response.status}):`, errorText)
+      if (response.status === 401 || response.status === 403) {
+        console.error(`Brevo API authentication failed (${response.status}). Your BREVO_API_KEY may be expired or revoked. Check Supabase Dashboard → Edge Functions → Secrets and verify the key in your Brevo dashboard.`, errorText)
+      } else {
+        console.error(`Brevo API error (${response.status}):`, errorText)
+      }
       return false
     }
     return true
@@ -51,6 +55,10 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const brevoApiKey = Deno.env.get('BREVO_API_KEY')
     const smtpFrom = Deno.env.get('SMTP_FROM') || 'noreply@invoicemonk.com'
+
+    if (!brevoApiKey) {
+      console.warn('BREVO_API_KEY is not configured. Email notifications will be skipped. Add it in Supabase Dashboard → Edge Functions → Secrets.')
+    }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
@@ -106,7 +114,29 @@ Deno.serve(async (req) => {
     const alreadyNotifiedIds = new Set(existingNotifications?.map(n => n.entity_id) || [])
 
     // Get user preferences for email alerts
-    const userIds = [...new Set(overdueInvoices.map(i => i.user_id).filter(Boolean))]
+    // Resolve business owner user_id for invoices with null user_id
+    const businessIdsWithNullUser = [...new Set(
+      overdueInvoices.filter(i => !i.user_id).map(i => i.business_id).filter(Boolean)
+    )]
+    
+    const ownerMap = new Map<string, string>()
+    if (businessIdsWithNullUser.length > 0) {
+      const { data: members } = await adminClient
+        .from('business_members')
+        .select('business_id, user_id')
+        .in('business_id', businessIdsWithNullUser)
+        .eq('role', 'owner')
+      
+      members?.forEach(m => ownerMap.set(m.business_id, m.user_id))
+    }
+
+    // Enrich invoices with resolved user_id
+    const enrichedInvoices = overdueInvoices.map(inv => ({
+      ...inv,
+      user_id: inv.user_id || ownerMap.get(inv.business_id) || null,
+    }))
+
+    const userIds = [...new Set(enrichedInvoices.map(i => i.user_id).filter(Boolean))]
     const { data: userPrefs } = await adminClient
       .from('user_preferences')
       .select('user_id, email_overdue_alerts')
@@ -124,9 +154,9 @@ Deno.serve(async (req) => {
 
     let emailsSent = 0
 
-    // Create notifications for invoices not yet notified
-    const notificationsToCreate = overdueInvoices
-      .filter(invoice => !alreadyNotifiedIds.has(invoice.id))
+    // Create notifications for invoices not yet notified (skip those with no resolvable user_id)
+    const notificationsToCreate = enrichedInvoices
+      .filter(invoice => !alreadyNotifiedIds.has(invoice.id) && invoice.user_id)
       .map(invoice => ({
         user_id: invoice.user_id,
         business_id: invoice.business_id,
@@ -152,7 +182,7 @@ Deno.serve(async (req) => {
 
       // Send emails to users who have email_overdue_alerts enabled
       if (brevoApiKey) {
-        for (const invoice of overdueInvoices.filter(i => !alreadyNotifiedIds.has(i.id))) {
+        for (const invoice of enrichedInvoices.filter(i => !alreadyNotifiedIds.has(i.id) && i.user_id)) {
           const userPref = userPrefsMap.get(invoice.user_id)
           // Default to true if no preferences exist
           const shouldSendEmail = userPref?.email_overdue_alerts !== false

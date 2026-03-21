@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,9 +52,12 @@ export default function PlanSelection() {
     }
   };
 
+  const queryClient = useQueryClient();
+
   const handleSelectPlan = async (tier: TierKey) => {
     if (tier === 'starter') {
       await markPlanSelected();
+      queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
       navigate('/dashboard');
       return;
     }
@@ -65,6 +69,7 @@ export default function PlanSelection() {
 
   const handleSkip = async () => {
     await markPlanSelected();
+    queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
     navigate('/dashboard');
   };
 
