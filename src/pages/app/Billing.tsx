@@ -8,8 +8,7 @@ import {
   Shield,
   ExternalLink,
   Loader2,
-  Sparkles,
-  Star
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useBusiness, type SubscriptionTier as BusinessTier } from '@/contexts/BusinessContext';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { gaEvents } from '@/hooks/use-google-analytics';
@@ -25,16 +25,15 @@ import { useTierFeatures } from '@/hooks/use-tier-features';
 
 const planIcons = {
   starter: Zap,
-  starter_paid: Star,
   professional: Shield,
   business: Building2,
 };
 
-type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
+type TierKey = 'starter' | 'professional' | 'business';
 
 export default function Billing() {
   const { tier, subscription, currentBusiness, loading: businessLoading } = useBusiness();
-  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
+  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, openCustomerPortal, isLoading: checkoutLoading } = useCheckout();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
   const [isYearly, setIsYearly] = useState(false);
@@ -47,8 +46,7 @@ export default function Billing() {
   const handleUpgrade = async (newTier: TierKey) => {
     if (newTier === 'starter') return;
     setLoadingTier(newTier);
-    // Pass businessId and countryCode to checkout for correct regional pricing
-    await createCheckoutSession(newTier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id, countryCode);
+    await createCheckoutSession(newTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id, countryCode);
     setLoadingTier(null);
   };
 
@@ -56,39 +54,33 @@ export default function Billing() {
     await openCustomerPortal();
   };
 
-  // Nigeria sees 4 tiers, International sees 3 tiers
-  const tiers: TierKey[] = isNigeria && hasStarterPaidTier
-    ? ['starter', 'starter_paid', 'professional', 'business']
-    : ['starter', 'professional', 'business'];
+  const tiers: TierKey[] = ['starter', 'professional', 'business'];
   
   const hasPaidSubscription = subscription?.stripe_subscription_id != null;
 
-  const isLoadingData = pricingLoading || tierFeaturesLoading;
+  const isLoadingData = pricingLoading || tierFeaturesLoading || businessLoading;
 
   const getTierDisplayName = (t: TierKey) => {
     if (t === 'starter') return 'Free';
-    if (t === 'starter_paid') return 'Starter';
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
 
   const getTierDescription = (t: TierKey) => {
     switch (t) {
       case 'starter': return 'For individuals getting started';
-      case 'starter_paid': return 'For solo businesses ready to grow';
       case 'professional': return 'For growing businesses';
       case 'business': return 'For enterprises with advanced needs';
       default: return '';
     }
   };
 
-  // Determine if a tier is an upgrade from current
   const isUpgrade = (targetTier: TierKey): boolean => {
-    const tierOrder: Record<TierKey, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+    const tierOrder: Record<TierKey, number> = { starter: 0, professional: 1, business: 2 };
     return tierOrder[targetTier] > tierOrder[tier as TierKey];
   };
 
   const isDowngrade = (targetTier: TierKey): boolean => {
-    const tierOrder: Record<TierKey, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+    const tierOrder: Record<TierKey, number> = { starter: 0, professional: 1, business: 2 };
     return tierOrder[targetTier] < tierOrder[tier as TierKey];
   };
 
@@ -173,7 +165,7 @@ export default function Billing() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Available Plans</h2>
-        <div className={`grid gap-4 ${tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className="grid gap-4 md:grid-cols-3">
           {tiers.map((planTier) => {
             const isCurrent = planTier === tier;
             const isUpgradeTier = isUpgrade(planTier);
@@ -183,7 +175,6 @@ export default function Billing() {
             const pricing = pricingByTier[planTier];
             const isLoadingThis = loadingTier === planTier;
             
-            // Get features dynamically from tier_limits table
             const features = buildFeatureList(planTier);
 
             const price = pricing 
@@ -191,6 +182,8 @@ export default function Billing() {
                   ? pricing.yearly_price / 12
                   : pricing.monthly_price)
               : 0;
+
+            const showPriceSkeleton = isLoadingData && planTier !== 'starter' && !pricing;
 
             return (
               <Card 
@@ -215,7 +208,11 @@ export default function Billing() {
                 <CardContent className="space-y-4">
                   <div>
                     <span className="text-3xl font-bold">
-                      {pricingLoading ? '...' : formatPrice(price)}
+                      {showPriceSkeleton ? (
+                        <Skeleton className="h-9 w-24 inline-block" />
+                      ) : (
+                        formatPrice(price)
+                      )}
                     </span>
                     <span className="text-muted-foreground">/month</span>
                     {isYearly && planTier !== 'starter' && pricing?.yearly_price && (

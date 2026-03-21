@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 type BillingPeriod = 'monthly' | 'yearly';
-type Tier = 'starter_paid' | 'professional' | 'business';
+type Tier = 'professional' | 'business';
 
 interface UseCheckoutOptions {
   onSuccess?: () => void;
@@ -27,7 +27,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
       });
 
       if (error) {
-        throw new Error(error.message || 'Failed to create checkout session');
+        const serverMsg = typeof data === 'object' && data?.error ? data.error : (error.message || 'Failed to create checkout session');
+        throw new Error(serverMsg);
       }
 
       if (data?.url) {
@@ -56,7 +57,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
       });
 
       if (error) {
-        throw new Error(error.message || 'Failed to open customer portal');
+        const serverMsg = typeof data === 'object' && data?.error ? data.error : (error.message || 'Failed to open customer portal');
+        throw new Error(serverMsg);
       }
 
       if (data?.url) {
@@ -82,7 +84,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
       });
 
       if (error) {
-        throw new Error(error.message || 'Failed to cancel subscription');
+        const serverMsg = typeof data === 'object' && data?.error ? data.error : (error.message || 'Failed to cancel subscription');
+        throw new Error(serverMsg);
       }
 
       toast.success(data?.message || 'Subscription cancelled');

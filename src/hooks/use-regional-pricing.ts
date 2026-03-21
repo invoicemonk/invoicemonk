@@ -16,7 +16,6 @@ export interface RegionalPrice {
 
 interface PricingByTier {
   starter: RegionalPrice | null;
-  starter_paid: RegionalPrice | null;
   professional: RegionalPrice | null;
   business: RegionalPrice | null;
 }
@@ -218,14 +217,9 @@ export function useRegionalPricing() {
 
   const pricingByTier: PricingByTier = {
     starter: pricing.find(p => p.tier === 'starter') || null,
-    starter_paid: pricing.find(p => p.tier === 'starter_paid') || null,
     professional: pricing.find(p => p.tier === 'professional') || null,
     business: pricing.find(p => p.tier === 'business') || null,
   };
-
-  // Nigeria-specific: Check if starter_paid tier is available (Nigeria only)
-  const hasStarterPaidTier = !!pricingByTier.starter_paid;
-  const isNigeria = countryCode === 'NG';
 
   /**
    * Format a price amount for display
@@ -305,8 +299,6 @@ export function useRegionalPricing() {
     formatPrice,
     formatAmount,
     getCurrencySymbol,
-    hasStarterPaidTier,
-    isNigeria,
   };
 }
 

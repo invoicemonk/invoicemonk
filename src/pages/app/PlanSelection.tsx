@@ -11,8 +11,7 @@ import {
   Building2, 
   Loader2,
   ArrowRight,
-  Sparkles,
-  Star
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,12 +27,11 @@ import logoImage from '@/assets/invoicemonk-logo.png';
 
 const planIcons = {
   starter: Zap,
-  starter_paid: Star,
   professional: Shield,
   business: Building2,
 };
 
-type TierKey = 'starter' | 'starter_paid' | 'professional' | 'business';
+type TierKey = 'starter' | 'professional' | 'business';
 
 export default function PlanSelection() {
   const navigate = useNavigate();
@@ -41,7 +39,7 @@ export default function PlanSelection() {
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   
-  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading, isNigeria, hasStarterPaidTier } = useRegionalPricing();
+  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { tier: currentTier } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
@@ -63,7 +61,7 @@ export default function PlanSelection() {
     }
 
     setLoadingTier(tier);
-    await createCheckoutSession(tier as 'starter_paid' | 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
+    await createCheckoutSession(tier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
     setLoadingTier(null);
   };
 
@@ -73,10 +71,7 @@ export default function PlanSelection() {
     navigate('/dashboard');
   };
 
-  // Nigeria sees 4 tiers, International sees 3 tiers
-  const tiers: TierKey[] = isNigeria && hasStarterPaidTier
-    ? ['starter', 'starter_paid', 'professional', 'business']
-    : ['starter', 'professional', 'business'];
+  const tiers: TierKey[] = ['starter', 'professional', 'business'];
 
   if (pricingLoading || tierFeaturesLoading) {
     return (
@@ -130,7 +125,7 @@ export default function PlanSelection() {
         </motion.div>
 
         {/* Plan Cards */}
-        <div className={`grid gap-6 mb-8 ${tiers.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className="grid gap-6 mb-8 md:grid-cols-3">
           {tiers.map((tier, index) => {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
@@ -149,14 +144,12 @@ export default function PlanSelection() {
 
             const getTierDisplayName = (t: TierKey) => {
               if (t === 'starter') return 'Free';
-              if (t === 'starter_paid') return 'Starter';
               return t.charAt(0).toUpperCase() + t.slice(1);
             };
 
             const getTierDescription = (t: TierKey) => {
               switch (t) {
                 case 'starter': return 'For individuals getting started';
-                case 'starter_paid': return 'For solo businesses ready to grow';
                 case 'professional': return 'For growing businesses';
                 case 'business': return 'For enterprises with advanced needs';
                 default: return '';

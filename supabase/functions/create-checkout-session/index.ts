@@ -3,7 +3,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { validateEnumStr as validateEnum, validateStringStr as validateString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
 
-const VALID_TIERS = ['starter_paid', 'professional', 'business'] as const;
+const VALID_TIERS = ['professional', 'business'] as const;
 const VALID_BILLING_PERIODS = ['monthly', 'yearly'] as const;
 
 serve(async (req) => {

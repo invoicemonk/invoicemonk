@@ -1,0 +1,1 @@
+DELETE FROM public.pricing_regions WHERE country_code = 'NG' AND tier = 'starter_paid';
