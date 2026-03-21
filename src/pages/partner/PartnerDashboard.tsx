@@ -1,15 +1,32 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MousePointerClick, Users, UserCheck, Coins } from 'lucide-react';
+import { MousePointerClick, Users, UserCheck, Coins, CheckCircle2, Circle, ArrowRight } from 'lucide-react';
 import { usePartnerStats } from '@/hooks/use-partner';
+import { usePartnerLinks } from '@/hooks/use-partner';
 import { useEarningsByCurrency } from '@/hooks/use-commissions';
 import { usePartnerContext } from '@/contexts/PartnerContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 const PartnerDashboard = () => {
   const { partner } = usePartnerContext();
   const { data: stats, isLoading: statsLoading } = usePartnerStats();
   const { data: earnings, isLoading: earningsLoading } = useEarningsByCurrency();
+  const { data: links } = usePartnerLinks();
+  const navigate = useNavigate();
+
+  const hasPayoutMethod = !!partner?.payout_method;
+  const hasLinks = (links?.length || 0) > 0;
+  const hasReferrals = (stats?.signups || 0) > 0;
+
+  const setupSteps = [
+    { label: 'Set up payout method', done: hasPayoutMethod, action: () => navigate('/partner/settings') },
+    { label: 'Create your first referral link', done: hasLinks, action: () => navigate('/partner/links') },
+    { label: 'Get your first referral', done: hasReferrals, action: () => navigate('/partner/links') },
+  ];
+
+  const allDone = setupSteps.every((s) => s.done);
 
   return (
     <div className="space-y-6">
@@ -19,6 +36,34 @@ const PartnerDashboard = () => {
           Welcome back, {partner?.name || 'Partner'}. Here's your referral overview.
         </p>
       </div>
+
+      {/* Quick Setup Checklist */}
+      {!allDone && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Quick Setup</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {setupSteps.map((step, i) => (
+              <div key={i} className="flex items-center gap-3">
+                {step.done ? (
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                ) : (
+                  <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <span className={step.done ? 'text-muted-foreground line-through text-sm' : 'text-sm text-foreground'}>
+                  {step.label}
+                </span>
+                {!step.done && (
+                  <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={step.action}>
+                    Set up <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

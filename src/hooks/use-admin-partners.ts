@@ -225,6 +225,32 @@ export function useMarkPayoutPaid() {
         .eq('payout_batch_id', batchId);
       if (commError) throw commError;
 
+      // Get partner user_id for notification
+      const { data: batch } = await supabase
+        .from('payout_batches')
+        .select('partner_id, total_amount, currency')
+        .eq('id', batchId)
+        .single();
+
+      if (batch?.partner_id) {
+        const { data: partnerProfile } = await supabase
+          .from('referral_partners')
+          .select('user_id')
+          .eq('id', batch.partner_id)
+          .single();
+
+        if (partnerProfile?.user_id) {
+          await supabase.from('notifications').insert({
+            user_id: partnerProfile.user_id,
+            type: 'partner',
+            title: 'Payout Sent!',
+            message: `Your payout of ${batch.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${batch.currency} has been marked as paid.`,
+            entity_type: 'payout_batch',
+            entity_id: batchId,
+          });
+        }
+      }
+
       // Audit log
       if (authUser?.user) {
         await supabase.rpc('log_audit_event', {

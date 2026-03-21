@@ -86,6 +86,7 @@ import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
+import PartnerApply from "./pages/app/PartnerApply";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerLinks from "./pages/partner/PartnerLinks";
 import PartnerReferrals from "./pages/partner/PartnerReferrals";
@@ -265,6 +266,9 @@ const App = () => (
             <Route path="/admin/regulatory-submissions" element={<AdminRegulatorySubmissions />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
+
+          {/* Partner application (authenticated, not necessarily a partner yet) */}
+          <Route path="/partner/apply" element={<ProtectedRoute><PartnerApply /></ProtectedRoute>} />
 
           {/* Partner routes - Protected + PartnerLayout handles partner role check */}
           <Route element={<ProtectedRoute><PartnerLayout /></ProtectedRoute>}>

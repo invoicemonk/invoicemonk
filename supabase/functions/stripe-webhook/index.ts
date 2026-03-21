@@ -343,6 +343,13 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription deleted:", subscription.id);
 
+        // Find the subscription record before updating
+        const { data: cancelledSub } = await supabase
+          .from("subscriptions")
+          .select("id, business_id")
+          .eq("stripe_subscription_id", subscription.id)
+          .maybeSingle();
+
         const { error } = await supabase
           .from("subscriptions")
           .update({
@@ -358,6 +365,24 @@ serve(async (req) => {
           console.error("Error updating cancelled subscription:", error);
         } else {
           console.log("Subscription cancelled, reverted to starter");
+        }
+
+        // Void any pending/locked commissions tied to this subscription
+        if (cancelledSub?.id) {
+          const { data: voidedComms, error: voidErr } = await supabase
+            .from("commissions")
+            .update({
+              status: "voided" as const,
+            })
+            .eq("subscription_id", cancelledSub.id)
+            .in("status", ["pending", "locked"])
+            .select("id");
+
+          if (voidErr) {
+            console.error("Error voiding commissions:", voidErr);
+          } else {
+            console.log(`Voided ${voidedComms?.length || 0} commissions for cancelled subscription`);
+          }
         }
         break;
       }
@@ -467,7 +492,7 @@ serve(async (req) => {
                         .maybeSingle();
 
                       if (!existingComm) {
-                        await supabase.from("commissions").insert({
+                        const { data: newComm } = await supabase.from("commissions").insert({
                           partner_id: partner.id,
                           referral_id: referral.id,
                           subscription_id: subRecord.id,
@@ -476,9 +501,27 @@ serve(async (req) => {
                           commission_rate: commissionRate,
                           commission_amount: commissionAmount,
                           currency: currency,
-                        });
+                        }).select("id").single();
 
                         console.log("Commission created:", commissionAmount, currency, "for partner:", partner.id);
+
+                        // Notify the partner about the new commission
+                        const { data: partnerProfile } = await supabase
+                          .from("referral_partners")
+                          .select("user_id")
+                          .eq("id", partner.id)
+                          .single();
+
+                        if (partnerProfile?.user_id) {
+                          await supabase.from("notifications").insert({
+                            user_id: partnerProfile.user_id,
+                            type: "partner",
+                            title: "Commission Earned!",
+                            message: `You earned a commission of ${commissionAmount.toFixed(2)} ${currency} from a referral payment.`,
+                            entity_type: "commission",
+                            entity_id: newComm?.id || null,
+                          });
+                        }
                       }
                     }
                   }
@@ -487,6 +530,60 @@ serve(async (req) => {
             }
           } catch (commErr) {
             console.error("Commission processing error:", commErr);
+          }
+        }
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as any;
+        console.log("Charge refunded:", charge.id);
+
+        // Find subscription via the charge's invoice
+        if (charge.invoice) {
+          const stripeInvoice = await stripe.invoices.retrieve(
+            typeof charge.invoice === "string" ? charge.invoice : charge.invoice.id
+          );
+
+          if (stripeInvoice.subscription) {
+            const subId = typeof stripeInvoice.subscription === "string"
+              ? stripeInvoice.subscription
+              : stripeInvoice.subscription.id;
+
+            const { data: subRecord } = await supabase
+              .from("subscriptions")
+              .select("id")
+              .eq("stripe_subscription_id", subId)
+              .maybeSingle();
+
+            if (subRecord?.id) {
+              // Void commissions linked to this billing event
+              const { data: voidedComms, error: voidErr } = await supabase
+                .from("commissions")
+                .update({ status: "voided" as const })
+                .eq("billing_event_id", stripeInvoice.id)
+                .in("status", ["pending", "locked"])
+                .select("id");
+
+              if (voidErr) {
+                console.error("Error voiding commissions on refund:", voidErr);
+              } else {
+                console.log(`Voided ${voidedComms?.length || 0} commissions for refunded charge`);
+              }
+
+              // Audit log
+              await supabase.rpc("log_audit_event", {
+                _event_type: "COMMISSION_VOIDED",
+                _entity_type: "commission",
+                _user_id: null,
+                _metadata: {
+                  reason: "charge_refunded",
+                  charge_id: charge.id,
+                  invoice_id: stripeInvoice.id,
+                  voided_count: voidedComms?.length || 0,
+                },
+              });
+            }
           }
         }
         break;

@@ -174,7 +174,19 @@ serve(async (req) => {
 
     console.log("Referral attributed:", referral.id, "customer_ref:", customerRef);
 
-    // 7. Log audit event
+    // 7. Notify the partner about the new referral
+    if (!referral.is_self_referral) {
+      await supabase.from("notifications").insert({
+        user_id: partner.user_id,
+        type: "partner",
+        title: "New Referral!",
+        message: `A new user signed up using your referral link (${customerRef}). They'll appear in your referrals once they subscribe.`,
+        entity_type: "referral",
+        entity_id: referral.id,
+      });
+    }
+
+    // 8. Log audit event
     await supabase.rpc("log_audit_event", {
       _event_type: "REFERRAL_ATTRIBUTED",
       _entity_type: "referral",

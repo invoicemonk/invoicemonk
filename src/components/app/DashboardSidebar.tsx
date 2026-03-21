@@ -4,9 +4,11 @@ import {
   LogOut,
   Shield,
   ChevronDown,
-  User
+  User,
+  Handshake,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePartnerRole } from '@/hooks/use-partner-role';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -41,6 +43,7 @@ export function DashboardSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const { isPartner } = usePartnerRole();
 
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
@@ -129,6 +132,23 @@ export function DashboardSidebar() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              {isPartner && (
+                <DropdownMenuItem asChild>
+                  <Link to="/partner" className="cursor-pointer">
+                    <Handshake className="mr-2 h-4 w-4" />
+                    Partner Portal
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {isPartner && <DropdownMenuSeparator />}
+              {!isPartner && (
+                <DropdownMenuItem asChild>
+                  <Link to="/partner/apply" className="cursor-pointer">
+                    <Handshake className="mr-2 h-4 w-4" />
+                    Become a Partner
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />

@@ -242,6 +242,14 @@ export function BusinessSidebar() {
                 </DropdownMenuItem>
               )}
               {(isPartner || isPlatformAdmin) && <DropdownMenuSeparator />}
+              {!isPartner && (
+                <DropdownMenuItem asChild>
+                  <Link to="/partner/apply" className="cursor-pointer">
+                    <Handshake className="mr-2 h-4 w-4" />
+                    Become a Partner
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { 
@@ -12,8 +13,11 @@ import {
   EyeOff,
   AlertTriangle,
   Loader2,
-  Info
+  Info,
+  Handshake,
+  ArrowRight
 } from 'lucide-react';
+import { usePartnerRole } from '@/hooks/use-partner-role';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +37,7 @@ const PRESET_OVERDUE_DAYS = [1, 7, 14, 30];
 
 export default function Settings() {
   const { profile, updatePassword } = useAuth();
+  const { isPartner } = usePartnerRole();
   const { data: preferences, isLoading: preferencesLoading } = useUserPreferences();
   const updatePreferences = useUpdatePreferences();
   
@@ -542,7 +547,30 @@ export default function Settings() {
 
         {/* Account Tab (Danger Zone) */}
         <TabsContent value="account">
-          <AccountClosureSection userJurisdiction="NG" />
+          <div className="space-y-6">
+            {!isPartner && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Handshake className="h-5 w-5" />
+                    Partner Program
+                  </CardTitle>
+                  <CardDescription>
+                    Earn commissions by referring businesses to Invoicemonk
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild variant="outline">
+                    <Link to="/partner/apply">
+                      Become a Partner
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            <AccountClosureSection userJurisdiction="NG" />
+          </div>
         </TabsContent>
       </Tabs>
     </motion.div>
