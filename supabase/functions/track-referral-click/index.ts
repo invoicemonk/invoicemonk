@@ -7,6 +7,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const APP_URL = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
+
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
@@ -32,14 +34,14 @@ serve(async (req) => {
       // Still redirect to signup, just without tracking
       return new Response(null, {
         status: 302,
-        headers: { ...corsHeaders, "Location": "/signup" },
+        headers: { ...corsHeaders, "Location": `${APP_URL}/signup` },
       });
     }
 
     if (!link.is_active) {
       return new Response(null, {
         status: 302,
-        headers: { ...corsHeaders, "Location": "/signup" },
+        headers: { ...corsHeaders, "Location": `${APP_URL}/signup` },
       });
     }
 
@@ -74,7 +76,7 @@ serve(async (req) => {
 
     // Redirect to signup with ref param
     // Set cookie for 60-day attribution window
-    const redirectUrl = link.landing_page || `/signup?ref=${code}`;
+    const redirectUrl = link.landing_page || `${APP_URL}/signup?ref=${code}`;
     const cookieMaxAge = 60 * 24 * 60 * 60; // 60 days in seconds
 
     return new Response(null, {
@@ -89,7 +91,7 @@ serve(async (req) => {
     console.error("Track referral click error:", error);
     return new Response(null, {
       status: 302,
-      headers: { ...corsHeaders, "Location": "/signup" },
+      headers: { ...corsHeaders, "Location": `${APP_URL}/signup` },
     });
   }
 });
