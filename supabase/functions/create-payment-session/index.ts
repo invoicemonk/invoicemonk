@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     // Look up invoice by verification_id (server-side, never trust client amounts)
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select('id, business_id, invoice_number, total_amount, amount_paid, currency, status, verification_id')
+      .select('id, business_id, invoice_number, total_amount, amount_paid, currency, status, verification_id, recipient_snapshot')
       .eq('verification_id', verification_id)
       .maybeSingle()
 
@@ -143,12 +143,23 @@ Deno.serve(async (req) => {
         })
       }
 
+      // Extract payer email from recipient_snapshot (required by Paystack)
+      const recipientSnapshot = invoice.recipient_snapshot as Record<string, any> | null
+      const payerEmail = recipientSnapshot?.email || recipientSnapshot?.client_email || null
+      if (!payerEmail) {
+        return new Response(JSON.stringify({ error: 'Client email is required for online payment. Please ask the business to update the recipient email on this invoice.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       // Paystack amounts are in kobo (smallest unit)
       const amountInKobo = Math.round(balance * 100)
       const reference = `inv_${invoice.id}_${Date.now()}`
 
       // Build Paystack init body
       const paystackBody: Record<string, any> = {
+        email: payerEmail,
         amount: amountInKobo,
         currency: invoice.currency,
         reference,
@@ -183,8 +194,9 @@ Deno.serve(async (req) => {
 
       const paystackData = await paystackResponse.json()
       if (!paystackData.status || !paystackData.data?.authorization_url) {
-        console.error('Paystack init failed:', paystackData)
-        return new Response(JSON.stringify({ error: 'Failed to initialize payment session' }), {
+        console.error('Paystack init failed:', { invoice_id: invoice.id, message: paystackData.message, code: paystackData.code })
+        const userMessage = paystackData.message || 'Failed to initialize payment session'
+        return new Response(JSON.stringify({ error: userMessage }), {
           status: 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
