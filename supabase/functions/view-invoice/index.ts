@@ -179,15 +179,17 @@ Deno.serve(async (req) => {
     // Check if business is flagged for fraud
     let isFlagged = false
     let flagReason: string | null = null
+    let onlinePaymentsEnabled = false
     if (invoice.business_id) {
-      const { data: business } = await supabase
+      const { data: businessData } = await supabase
         .from('businesses')
-        .select('is_flagged, flag_reason')
+        .select('is_flagged, flag_reason, online_payments_enabled')
         .eq('id', invoice.business_id)
         .maybeSingle()
-      if (business) {
-        isFlagged = business.is_flagged || false
-        flagReason = business.flag_reason || null
+      if (businessData) {
+        isFlagged = businessData.is_flagged || false
+        flagReason = businessData.flag_reason || null
+        onlinePaymentsEnabled = !isFlagged && (businessData.online_payments_enabled || false)
       }
     }
 
@@ -270,7 +272,8 @@ Deno.serve(async (req) => {
       },
       issuer_tier: issuerTier,
       is_flagged: isFlagged,
-      flag_reason: isFlagged ? flagReason : undefined
+      flag_reason: isFlagged ? flagReason : undefined,
+      online_payments_enabled: onlinePaymentsEnabled
     }
 
     return new Response(JSON.stringify(response), {

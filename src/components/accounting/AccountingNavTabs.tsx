@@ -1,6 +1,6 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Calculator, PieChart } from 'lucide-react';
 
 export function AccountingNavTabs() {
   const { businessId } = useParams<{ businessId: string }>();
@@ -30,6 +30,12 @@ export function AccountingNavTabs() {
       href: `${baseUrl}/accounting/result`, 
       icon: Calculator,
       description: 'What\'s left' 
+    },
+    { 
+      label: 'Profitability', 
+      href: `${baseUrl}/accounting/profitability`, 
+      icon: TrendingUp,
+      description: 'Margins & trends' 
     },
   ];
   const location = useLocation();

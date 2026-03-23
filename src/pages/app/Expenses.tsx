@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Receipt, TrendingDown, Search, Filter, Download, PieChart } from 'lucide-react';
+import { Receipt, TrendingDown, Search, Filter, Download, PieChart, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import { useExportRecords } from '@/hooks/use-export';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
+import { CsvImportDialog } from '@/components/import/CsvImportDialog';
 
 const getCategoryLabel = (value: string) => {
   const category = EXPENSE_CATEGORIES.find(c => c.value === value);
@@ -117,6 +118,12 @@ export default function Expenses() {
         </div>
         <div className="flex items-center gap-3">
           <AccountingPeriodSelector value={period} onChange={setPeriod} />
+          <CsvImportDialog importType="expenses" trigger={
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+          } />
           <ExpenseForm />
         </div>
       </div>

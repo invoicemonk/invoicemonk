@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -7,6 +7,7 @@ import {
   Calendar,
   Building2,
   CreditCard,
+  Wallet,
   Download,
   Shield,
   Mail,
@@ -99,12 +100,51 @@ interface InvoiceViewResponse {
   issuer_tier?: string;
   is_flagged?: boolean;
   flag_reason?: string;
+  online_payments_enabled?: boolean;
   error?: string;
 }
 
 const InvoiceView = () => {
   const { verificationId } = useParams<{ verificationId: string }>();
+  const [searchParams] = useSearchParams();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [creatingPayment, setCreatingPayment] = useState(false);
+
+  // Show toast for payment result from redirect
+  useEffect(() => {
+    const paymentResult = searchParams.get("payment");
+    if (paymentResult === "success") {
+      toast.success("Payment submitted successfully! It may take a moment to process.");
+    } else if (paymentResult === "cancelled") {
+      toast.info("Payment was cancelled.");
+    }
+  }, [searchParams]);
+
+  const handlePayOnline = async () => {
+    if (!verificationId) return;
+    setCreatingPayment(true);
+    try {
+      const response = await fetch(
+        `https://skcxogeaerudoadluexz.supabase.co/functions/v1/create-payment-session`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ verification_id: verificationId }),
+        }
+      );
+      const result = await response.json();
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      } else {
+        toast.error(result.error || "Failed to create payment session");
+      }
+    } catch (err) {
+      console.error("Payment session error:", err);
+      toast.error("Failed to initiate payment");
+    } finally {
+      setCreatingPayment(false);
+    }
+  };
 
   const { data, isLoading, error } = useQuery<InvoiceViewResponse>({
     queryKey: ["view-invoice", verificationId],
@@ -641,10 +681,28 @@ const InvoiceView = () => {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-wrap gap-3 justify-center">
+                  {/* Pay Online Button — only show when balance > 0, not voided/paid, not flagged, and online payments enabled */}
+                  {balanceDue > 0 && invoice.status !== "voided" && invoice.status !== "paid" && !data?.is_flagged && data?.online_payments_enabled && (
+                    <Button
+                      onClick={handlePayOnline}
+                      disabled={creatingPayment}
+                      variant="default"
+                      size="lg"
+                      className="bg-primary"
+                    >
+                      {creatingPayment ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wallet className="mr-2 h-4 w-4" />
+                      )}
+                      Pay {formatCurrency(balanceDue, invoice.currency)} Online
+                    </Button>
+                  )}
+
                   <Button
                     onClick={handleDownloadPdf}
                     disabled={downloadingPdf}
-                    variant="default"
+                    variant={balanceDue > 0 ? "outline" : "default"}
                     size="lg"
                   >
                     {downloadingPdf ? (

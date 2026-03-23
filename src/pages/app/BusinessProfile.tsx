@@ -1025,6 +1025,56 @@ export default function BusinessProfile() {
         />
       )}
 
+      {/* Online Payments Toggle */}
+      {business && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5" />
+              Online Payments
+            </CardTitle>
+            <CardDescription>
+              Allow clients to pay invoices online via Stripe or Paystack directly from the invoice page
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Enable online payments</p>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, a "Pay Online" button will appear on your public invoice pages. Payments are processed securely via Stripe (international) or Paystack (Nigeria/NGN).
+                </p>
+              </div>
+              <Switch
+                checked={(business as any).online_payments_enabled || false}
+                onCheckedChange={async (checked) => {
+                  try {
+                    const { error } = await supabase
+                      .from('businesses')
+                      .update({ online_payments_enabled: checked } as any)
+                      .eq('id', business.id);
+                    if (error) throw error;
+                    queryClient.invalidateQueries({ queryKey: ['businesses'] });
+                    toast({
+                      title: checked ? 'Online payments enabled' : 'Online payments disabled',
+                      description: checked 
+                        ? 'Clients can now pay your invoices online.' 
+                        : 'The Pay Online button will no longer appear on your invoices.',
+                    });
+                  } catch (err: any) {
+                    toast({
+                      title: 'Error',
+                      description: err.message || 'Failed to update setting',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Danger Zone — only for non-default businesses */}
       {business && !business.is_default && (
         <Card className="border-destructive/30">

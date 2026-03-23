@@ -1,0 +1,268 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Stripe from 'https://esm.sh/stripe@14.21.0'
+import {
+  validateUUIDStr as validateUUID,
+  getCorsHeaders,
+  checkRateLimit,
+  rateLimitResponse,
+  getRateLimitKeyFromRequest,
+} from '../_shared/validation.ts'
+
+Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req, true) // public endpoint
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, serviceKey)
+
+    // Rate limit: 5 requests/minute per IP
+    const rateLimitKey = getRateLimitKeyFromRequest(req)
+    const allowed = await checkRateLimit(serviceKey, rateLimitKey, 'create-payment-session', 60, 5)
+    if (!allowed) {
+      return rateLimitResponse(corsHeaders)
+    }
+
+    // Parse request — only accept verification_id
+    const { verification_id } = await req.json()
+
+    const verificationError = validateUUID(verification_id, 'verification_id')
+    if (verificationError) {
+      return new Response(JSON.stringify({ error: verificationError }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Look up invoice by verification_id (server-side, never trust client amounts)
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('id, business_id, invoice_number, total_amount, amount_paid, currency, status, verification_id')
+      .eq('verification_id', verification_id)
+      .maybeSingle()
+
+    if (invoiceError || !invoice) {
+      return new Response(JSON.stringify({ error: 'Invoice not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Validate invoice can accept payments
+    if (invoice.status === 'draft') {
+      return new Response(JSON.stringify({ error: 'Invoice has not been issued yet' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (invoice.status === 'voided') {
+      return new Response(JSON.stringify({ error: 'Invoice has been voided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (invoice.status === 'paid') {
+      return new Response(JSON.stringify({ error: 'Invoice is already fully paid' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Compute balance server-side
+    const balance = invoice.total_amount - (invoice.amount_paid || 0)
+    if (balance <= 0) {
+      return new Response(JSON.stringify({ error: 'No balance remaining on this invoice' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Check business is not flagged and has online payments enabled
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('id, jurisdiction, is_flagged, name, online_payments_enabled')
+      .eq('id', invoice.business_id)
+      .maybeSingle()
+
+    if (!business) {
+      return new Response(JSON.stringify({ error: 'Business not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (business.is_flagged) {
+      return new Response(JSON.stringify({ error: 'Payment is currently unavailable for this business' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!business.online_payments_enabled) {
+      return new Response(JSON.stringify({ error: 'Online payments are not enabled for this business' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Determine provider based on jurisdiction and currency
+    const usePaystack = business.jurisdiction === 'NG' && invoice.currency === 'NGN'
+    const provider = usePaystack ? 'paystack' : 'stripe'
+
+    const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
+    const successUrl = `${appUrl}/invoice/${verification_id}?payment=success`
+    const cancelUrl = `${appUrl}/invoice/${verification_id}?payment=cancelled`
+
+    let checkoutUrl: string
+    let providerSessionId: string
+    let providerReference: string
+
+    if (provider === 'paystack') {
+      const paystackKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+      if (!paystackKey) {
+        console.error('PAYSTACK_SECRET_KEY not configured')
+        return new Response(JSON.stringify({ error: 'Payment provider not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Paystack amounts are in kobo (smallest unit)
+      const amountInKobo = Math.round(balance * 100)
+      const reference = `inv_${invoice.id}_${Date.now()}`
+
+      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${paystackKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: amountInKobo,
+          currency: invoice.currency,
+          reference,
+          callback_url: successUrl,
+          metadata: {
+            invoice_id: invoice.id,
+            business_id: invoice.business_id,
+            verification_id,
+            invoice_number: invoice.invoice_number,
+            custom_fields: [
+              { display_name: 'Invoice', variable_name: 'invoice_number', value: invoice.invoice_number },
+            ],
+          },
+        }),
+      })
+
+      const paystackData = await paystackResponse.json()
+      if (!paystackData.status || !paystackData.data?.authorization_url) {
+        console.error('Paystack init failed:', paystackData)
+        return new Response(JSON.stringify({ error: 'Failed to initialize payment session' }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      checkoutUrl = paystackData.data.authorization_url
+      providerSessionId = paystackData.data.access_code
+      providerReference = reference
+    } else {
+      // Stripe
+      const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
+      if (!stripeKey) {
+        console.error('STRIPE_SECRET_KEY not configured')
+        return new Response(JSON.stringify({ error: 'Payment provider not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' })
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: invoice.currency.toLowerCase(),
+              unit_amount: Math.round(balance * 100), // Stripe uses smallest unit
+              product_data: {
+                name: `Invoice ${invoice.invoice_number}`,
+                description: `Payment for invoice ${invoice.invoice_number} from ${business.name}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          type: 'invoice_payment',
+          invoice_id: invoice.id,
+          business_id: invoice.business_id,
+          verification_id,
+          invoice_number: invoice.invoice_number,
+        },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      })
+
+      checkoutUrl = session.url!
+      providerSessionId = session.id
+      providerReference = session.id
+    }
+
+    // Insert online_payments record with status pending
+    const { error: insertError } = await supabase
+      .from('online_payments')
+      .insert({
+        invoice_id: invoice.id,
+        business_id: invoice.business_id,
+        provider,
+        provider_reference: providerReference,
+        provider_session_id: providerSessionId,
+        amount: balance,
+        currency: invoice.currency,
+        status: 'pending',
+      })
+
+    if (insertError) {
+      console.error('Failed to insert online_payment record:', insertError)
+      // Don't fail — the checkout session was already created
+    }
+
+    // Audit log
+    try {
+      await supabase.rpc('log_audit_event', {
+        _event_type: 'PAYMENT_SESSION_CREATED',
+        _entity_type: 'online_payment',
+        _entity_id: invoice.id,
+        _business_id: invoice.business_id,
+        _metadata: {
+          provider,
+          amount: balance,
+          currency: invoice.currency,
+          invoice_number: invoice.invoice_number,
+        },
+      })
+    } catch (auditErr) {
+      console.error('Audit log error:', auditErr)
+    }
+
+    return new Response(
+      JSON.stringify({ checkout_url: checkoutUrl, provider }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Create payment session error:', error)
+    return new Response(
+      JSON.stringify({ error: 'An unexpected error occurred' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+})

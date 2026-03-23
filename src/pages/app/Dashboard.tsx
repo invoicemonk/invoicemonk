@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import { 
   FileText, 
   DollarSign, 
@@ -26,14 +27,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useDashboardStats, useRecentInvoices, useDueDateStats, useRefreshDashboard, useRevenueTrend, type DateRange } from '@/hooks/use-dashboard-stats';
+import { useCashflowSummary, useReceivablesIntelligence, useProfitabilityStats } from '@/hooks/use-cashflow-stats';
 import { useRealtimeInvoices } from '@/hooks/use-realtime-invoices';
 import { useQuickSetup } from '@/hooks/use-quick-setup';
+import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
+import { CashflowSummaryCard } from '@/components/dashboard/CashflowSummaryCard';
+import { ReceivablesCard } from '@/components/dashboard/ReceivablesCard';
+import { ProfitabilityCard } from '@/components/dashboard/ProfitabilityCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
 import { formatCurrency, formatCompactCurrency } from '@/lib/utils';
 import { getCountryName } from '@/lib/countries';
 
@@ -129,6 +134,20 @@ export default function Dashboard() {
   useRealtimeInvoices(currentBusiness?.id, user?.id);
   const { refresh, isRefreshing } = useRefreshDashboard();
   const { dismissed: checklistDismissed } = useQuickSetup();
+  const { isProfessional, isBusiness: isBusinessTier } = useSubscriptionContext();
+  const showCashflow = isProfessional || isBusinessTier;
+
+  // Cashflow date range for RPCs (ISO date strings)
+  const cashflowStartDate = useMemo(() => {
+    if (dateRange) return format(dateRange.start, 'yyyy-MM-dd');
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return format(d, 'yyyy-MM-dd');
+  }, [dateRange]);
+  const cashflowEndDate = useMemo(() => {
+    if (dateRange) return format(dateRange.end, 'yyyy-MM-dd');
+    return format(new Date(), 'yyyy-MM-dd');
+  }, [dateRange]);
   
   // All hooks now use currency account scoping
   const { data: stats, isLoading: statsLoading } = useDashboardStats(
@@ -151,6 +170,24 @@ export default function Dashboard() {
     currentCurrencyAccount?.id,
     activeCurrency,
     12
+  );
+
+  // Cashflow RPCs (professional+ only, always called for hook stability)
+  const { data: cashflowData, isLoading: cashflowLoading } = useCashflowSummary(
+    showCashflow ? currentBusiness?.id : undefined,
+    currentCurrencyAccount?.id,
+    cashflowStartDate,
+    cashflowEndDate
+  );
+  const { data: receivablesData, isLoading: receivablesLoading } = useReceivablesIntelligence(
+    showCashflow ? currentBusiness?.id : undefined,
+    currentCurrencyAccount?.id
+  );
+  const { data: profitData, isLoading: profitLoading } = useProfitabilityStats(
+    showCashflow ? currentBusiness?.id : undefined,
+    currentCurrencyAccount?.id,
+    cashflowStartDate,
+    cashflowEndDate
   );
   
   const businessComplianceStatus = currentBusiness?.compliance_status || 'incomplete';
@@ -384,6 +421,19 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* Cashflow Intelligence (Professional+) */}
+          {showCashflow && (
+            <>
+              <motion.div variants={item}>
+                <CashflowSummaryCard data={cashflowData} isLoading={cashflowLoading} currency={activeCurrency} />
+              </motion.div>
+              <motion.div variants={item} className="grid gap-4 lg:grid-cols-2">
+                <ReceivablesCard data={receivablesData} isLoading={receivablesLoading} currency={activeCurrency} />
+                <ProfitabilityCard data={profitData} isLoading={profitLoading} currency={activeCurrency} />
+              </motion.div>
+            </>
+          )}
 
           {/* Due Date Alerts */}
           {(dueDateStats?.overdueCount > 0 || dueDateStats?.upcomingCount > 0) && (

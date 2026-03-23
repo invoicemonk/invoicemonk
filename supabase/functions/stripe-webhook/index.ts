@@ -202,6 +202,162 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session;
         console.log("Checkout session completed:", session.id);
 
+        // === INVOICE PAYMENT via Stripe Checkout ===
+        if (session.mode === "payment" && session.metadata?.type === "invoice_payment") {
+          const invoiceId = session.metadata.invoice_id;
+          const businessId = session.metadata.business_id;
+          const verificationId = session.metadata.verification_id;
+          const invoiceNumber = session.metadata.invoice_number;
+          const providerReference = session.id;
+
+          console.log("Processing invoice payment:", invoiceNumber, "session:", session.id);
+
+          // Idempotency: check if already processed
+          const { data: existingOp } = await supabase
+            .from("online_payments")
+            .select("id, status")
+            .eq("provider_reference", providerReference)
+            .maybeSingle();
+
+          if (existingOp?.status === "completed") {
+            console.log("Already processed Stripe invoice payment:", providerReference);
+            break;
+          }
+
+          // Fetch invoice
+          const { data: inv } = await supabase
+            .from("invoices")
+            .select("id, total_amount, amount_paid, currency, status, user_id, business_id, invoice_number")
+            .eq("id", invoiceId)
+            .maybeSingle();
+
+          if (!inv || ["draft", "voided"].includes(inv.status)) {
+            console.warn("Invoice not payable:", invoiceId, inv?.status);
+            break;
+          }
+
+          // Currency mismatch check
+          const paymentCurrency = (session.currency || "").toUpperCase();
+          if (paymentCurrency && paymentCurrency !== inv.currency) {
+            console.error(`Currency mismatch: payment=${paymentCurrency}, invoice=${inv.currency}`);
+            if (existingOp) {
+              await supabase.from("online_payments").update({ status: "failed" }).eq("id", existingOp.id);
+            }
+            break;
+          }
+
+          const amountPaid = (session.amount_total || 0) / 100;
+          const remainingBalance = inv.total_amount - (inv.amount_paid || 0);
+          const effectiveAmount = Math.min(amountPaid, remainingBalance);
+
+          if (effectiveAmount <= 0) {
+            console.log("Invoice already fully paid:", invoiceId);
+            if (existingOp) {
+              await supabase.from("online_payments").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", existingOp.id);
+            }
+            break;
+          }
+
+          // Update online_payments
+          if (existingOp) {
+            await supabase.from("online_payments").update({
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              provider_metadata: { session_id: session.id, payment_intent: session.payment_intent },
+            }).eq("id", existingOp.id);
+          } else {
+            await supabase.from("online_payments").insert({
+              invoice_id: inv.id,
+              business_id: inv.business_id,
+              provider: "stripe",
+              provider_reference: providerReference,
+              provider_session_id: session.id,
+              amount: effectiveAmount,
+              currency: inv.currency,
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              provider_metadata: { session_id: session.id, payment_intent: session.payment_intent },
+            });
+          }
+
+          // Record payment
+          const paymentDate = new Date().toISOString().split("T")[0];
+          const { data: paymentRecord } = await supabase
+            .from("payments")
+            .insert({
+              invoice_id: inv.id,
+              amount: effectiveAmount,
+              payment_method: "stripe_online",
+              payment_reference: `Stripe: ${session.id}`,
+              payment_date: paymentDate,
+              notes: "Online payment via Stripe",
+              recorded_by: inv.user_id,
+            })
+            .select("id")
+            .single();
+
+          // Update invoice
+          const newAmountPaid = (inv.amount_paid || 0) + effectiveAmount;
+          const isFullyPaid = newAmountPaid >= inv.total_amount;
+          const newStatus = isFullyPaid ? "paid" : inv.status;
+
+          await supabase
+            .from("invoices")
+            .update({ amount_paid: newAmountPaid, status: newStatus })
+            .eq("id", inv.id);
+
+          // Create receipt
+          if (paymentRecord?.id) {
+            try {
+              await supabase.rpc("create_receipt_from_payment", { _payment_id: paymentRecord.id });
+            } catch (receiptErr) {
+              console.error("Receipt creation failed:", receiptErr);
+            }
+          }
+
+          // Notification
+          try {
+            let formattedAmount: string;
+            try {
+              formattedAmount = new Intl.NumberFormat("en", { style: "currency", currency: inv.currency }).format(effectiveAmount);
+            } catch {
+              formattedAmount = `${inv.currency} ${effectiveAmount}`;
+            }
+            await supabase.from("notifications").insert({
+              user_id: inv.user_id,
+              business_id: inv.business_id,
+              type: "ONLINE_PAYMENT_RECEIVED",
+              title: "Online Payment Received",
+              message: `Payment of ${formattedAmount} received via Stripe for invoice ${inv.invoice_number}. ${isFullyPaid ? "Invoice is now fully paid!" : ""}`,
+              entity_type: "invoice",
+              entity_id: inv.id,
+            });
+          } catch (notifErr) {
+            console.error("Notification error:", notifErr);
+          }
+
+          // Audit log
+          await supabase.rpc("log_audit_event", {
+            _event_type: "PAYMENT_RECORDED",
+            _entity_type: "payment",
+            _entity_id: paymentRecord?.id,
+            _user_id: inv.user_id,
+            _business_id: inv.business_id,
+            _new_state: { status: newStatus, amount_paid: newAmountPaid },
+            _metadata: {
+              provider: "stripe",
+              provider_reference: providerReference,
+              invoice_id: inv.id,
+              invoice_number: inv.invoice_number,
+              fully_paid: isFullyPaid,
+              online_payment: true,
+            },
+          });
+
+          console.log(`Stripe invoice payment processed: ${effectiveAmount} ${inv.currency} for ${inv.invoice_number}`);
+          break;
+        }
+
         if (session.mode === "subscription" && session.subscription) {
           const subscriptionId = typeof session.subscription === "string" 
             ? session.subscription 

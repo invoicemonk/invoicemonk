@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell
+  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -292,6 +292,18 @@ export default function InvoiceDetail() {
                     <span className="text-xs text-muted-foreground">Reminder sent {hoursAgo}h ago</span>
                   )}
                 </div>
+              )}
+              {/* Payment Link button - for non-draft, non-voided, non-paid invoices with online payments enabled */}
+              {invoice.verification_id && (currentBusiness as any)?.online_payments_enabled && 
+                ['issued', 'sent', 'viewed'].includes(invoice.status) && 
+                (Number(invoice.total_amount) - Number(invoice.amount_paid)) > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(`/invoice/${invoice.verification_id}`, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Payment Link
+                </Button>
               )}
               {invoice.status !== 'voided' && invoice.status !== 'paid' && (
                 <>

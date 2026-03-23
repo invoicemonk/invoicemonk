@@ -56,6 +56,7 @@ import { useNavigate } from 'react-router-dom';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 import { stripUrls } from '@/lib/utils';
+import { CsvImportDialog } from '@/components/import/CsvImportDialog';
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -171,13 +172,15 @@ export default function Clients() {
             Manage your client database
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-3">
+          <CsvImportDialog importType="clients" />
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Client</DialogTitle>
@@ -432,6 +435,7 @@ export default function Clients() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Search */}

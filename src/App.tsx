@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { TierGatedRoute } from "@/components/app/TierGatedRoute";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
@@ -53,6 +54,8 @@ import AccountingResult from "./pages/app/accounting/AccountingResult";
 
 // Expenses page (standalone entry point)
 import Expenses from "./pages/app/Expenses";
+import Receivables from "./pages/app/Receivables";
+import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
 
 // Receipts pages
 import Receipts from "./pages/app/Receipts";
@@ -212,9 +215,31 @@ const App = () => (
             <Route path="/b/:businessId/accounting/income" element={<AccountingIncome />} />
             <Route path="/b/:businessId/accounting/expenses" element={<AccountingExpenses />} />
             <Route path="/b/:businessId/accounting/result" element={<AccountingResult />} />
+            <Route path="/b/:businessId/accounting/profitability" element={
+              <TierGatedRoute
+                feature="profitability_analytics"
+                featureDisplayName="Profitability Analytics"
+                featureDescription="Analyze revenue vs expenses, profit margins, and expense breakdowns over time."
+                requiredTier="Professional"
+              >
+                <AccountingProfitability />
+              </TierGatedRoute>
+            } />
             
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />
+            
+            {/* Receivables Intelligence */}
+            <Route path="/b/:businessId/receivables" element={
+              <TierGatedRoute
+                feature="receivables_intelligence"
+                featureDisplayName="Receivables Intelligence"
+                featureDescription="Track aging buckets, identify slow-paying clients, and monitor collection performance."
+                requiredTier="Professional"
+              >
+                <Receivables />
+              </TierGatedRoute>
+            } />
             
           </Route>
 

@@ -212,6 +212,7 @@ export type Database = {
           name: string
           next_invoice_number: number | null
           next_receipt_number: number
+          online_payments_enabled: boolean
           registration_status: string | null
           regulator_code: string | null
           tax_id: string | null
@@ -246,6 +247,7 @@ export type Database = {
           name: string
           next_invoice_number?: number | null
           next_receipt_number?: number
+          online_payments_enabled?: boolean
           registration_status?: string | null
           regulator_code?: string | null
           tax_id?: string | null
@@ -280,6 +282,7 @@ export type Database = {
           name?: string
           next_invoice_number?: number | null
           next_receipt_number?: number
+          online_payments_enabled?: boolean
           registration_status?: string | null
           regulator_code?: string | null
           tax_id?: string | null
@@ -1201,6 +1204,66 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      online_payments: {
+        Row: {
+          amount: number
+          business_id: string
+          completed_at: string | null
+          created_at: string
+          currency: string
+          id: string
+          invoice_id: string
+          provider: string
+          provider_metadata: Json | null
+          provider_reference: string | null
+          provider_session_id: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          completed_at?: string | null
+          created_at?: string
+          currency: string
+          id?: string
+          invoice_id: string
+          provider: string
+          provider_metadata?: Json | null
+          provider_reference?: string | null
+          provider_session_id?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          completed_at?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          invoice_id?: string
+          provider?: string
+          provider_metadata?: Json | null
+          provider_reference?: string | null
+          provider_session_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -2647,6 +2710,25 @@ export type Database = {
         }
         Returns: Json
       }
+      get_cashflow_summary:
+        | {
+            Args: {
+              _business_id: string
+              _currency_account_id?: string
+              _end_date?: string
+              _start_date?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _business_id: string
+              _currency_account_id?: string
+              _end_date?: string
+              _start_date?: string
+            }
+            Returns: Json
+          }
       get_dashboard_stats: {
         Args: {
           _business_id: string
@@ -2679,6 +2761,29 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_profitability_stats: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _end_date?: string
+          _start_date?: string
+        }
+        Returns: Json
+      }
+      get_receivables_intelligence:
+        | {
+            Args: { _business_id: string; _currency_account_id?: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _business_id: string
+              _currency_account_id?: string
+              _end_date?: string
+              _start_date?: string
+            }
+            Returns: Json
+          }
       get_revenue_trend: {
         Args: {
           _business_id: string
