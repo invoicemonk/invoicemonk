@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
             user_id,
             business_id,
             client_id,
+            verification_id,
             clients (id, name, email),
             businesses (id, name, contact_email)
           `)
@@ -196,6 +197,10 @@ Deno.serve(async (req) => {
                    </div>`
                 : ''
 
+              const invoiceViewUrl = invoiceData.verification_id 
+                ? `https://app.invoicemonk.com/invoice/view/${invoiceData.verification_id}`
+                : null
+
               const htmlContent = `
                 <!DOCTYPE html>
                 <html>
@@ -204,8 +209,11 @@ Deno.serve(async (req) => {
                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 </head>
                 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <div style="background: ${isOverdue ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                    <h1 style="margin: 0; font-size: 24px;">${isOverdue ? 'Payment Overdue' : 'Payment Reminder'}</h1>
+                  <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
+                    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+                  </div>
+                  <div style="background: ${isOverdue ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' : 'linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%)'}; color: white; padding: 24px 30px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 22px;">${isOverdue ? 'Payment Overdue' : 'Payment Reminder'}</h1>
                   </div>
                   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
                     <p>Dear ${clientName},</p>
@@ -213,7 +221,7 @@ Deno.serve(async (req) => {
                     
                     ${customMessage}
                     
-                    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${isOverdue ? '#dc2626' : '#667eea'};">
+                    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${isOverdue ? '#dc2626' : '#1d6b5a'};">
                       <table style="width: 100%;">
                         <tr>
                           <td style="padding: 5px 0; color: #666;">Invoice Number:</td>
@@ -221,7 +229,7 @@ Deno.serve(async (req) => {
                         </tr>
                         <tr>
                           <td style="padding: 5px 0; color: #666;">Amount Due:</td>
-                          <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: ${isOverdue ? '#dc2626' : '#667eea'};">${invoiceData.currency} ${Number(invoiceData.total_amount).toLocaleString()}</td>
+                          <td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: ${isOverdue ? '#dc2626' : '#1d6b5a'};">${invoiceData.currency} ${Number(invoiceData.total_amount).toLocaleString()}</td>
                         </tr>
                         <tr>
                           <td style="padding: 5px 0; color: #666;">Due Date:</td>
@@ -232,9 +240,13 @@ Deno.serve(async (req) => {
                     
                     <p style="color: #666; font-size: 14px;">${isOverdue ? 'Please arrange payment at your earliest convenience to avoid any further action.' : 'If you have already made this payment, please disregard this reminder.'}</p>
                     
+                    ${invoiceViewUrl ? `<div style="text-align: center; margin: 25px 0;">
+                      <a href="${invoiceViewUrl}" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Invoice →</a>
+                    </div>` : ''}
+                    
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
                     <p style="color: #888; font-size: 12px; text-align: center;">
-                      This email was sent by ${businessName}
+                      This email was sent by ${businessName} via InvoiceMonk.
                     </p>
                   </div>
                 </body>

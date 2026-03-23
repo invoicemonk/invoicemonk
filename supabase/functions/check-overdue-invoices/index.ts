@@ -203,9 +203,11 @@ Deno.serve(async (req) => {
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   </head>
                   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                      <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 32px; margin-bottom: 12px;" />
-                      <h1 style="margin: 0; font-size: 24px;">⚠️ Overdue Invoice Alert</h1>
+                    <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
+                      <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+                    </div>
+                    <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
+                      <h1 style="margin: 0; font-size: 22px;">⚠️ Overdue Invoice Alert</h1>
                     </div>
                     <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
                       <p>Hi ${profile.full_name || 'there'},</p>
@@ -233,6 +235,10 @@ Deno.serve(async (req) => {
                       </div>
                       
                       <p>Consider following up with your client to collect this payment.</p>
+                      
+                      <div style="text-align: center; margin: 25px 0;">
+                        <a href="https://app.invoicemonk.com/invoices" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Overdue Invoices →</a>
+                      </div>
                       
                       <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
                       <p style="color: #888; font-size: 12px; text-align: center;">

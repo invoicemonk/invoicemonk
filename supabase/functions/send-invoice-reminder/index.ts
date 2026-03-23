@@ -148,22 +148,25 @@ Deno.serve(async (req) => {
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="margin: 0; font-size: 24px;">Payment Reminder</h1>
+  <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+  </div>
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
+    <h1 style="margin: 0; font-size: 22px;">Payment Reminder</h1>
   </div>
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Dear ${escapeHtml(client.name)},</p>
     <p>This is a friendly reminder that invoice <strong>${invoice.invoice_number}</strong>, originally due on <strong>${formattedDueDate}</strong>, remains unpaid.</p>
-    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0d9488;">
+    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
       <table style="width: 100%;">
         <tr><td style="padding: 5px 0; color: #666;">Invoice Number:</td><td style="padding: 5px 0; text-align: right; font-weight: bold;">${invoice.invoice_number}</td></tr>
-        <tr><td style="padding: 5px 0; color: #666;">Amount Due:</td><td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: #0d9488;">${formattedAmount}</td></tr>
+        <tr><td style="padding: 5px 0; color: #666;">Amount Due:</td><td style="padding: 5px 0; text-align: right; font-weight: bold; font-size: 18px; color: #1d6b5a;">${formattedAmount}</td></tr>
         <tr><td style="padding: 5px 0; color: #666;">Due Date:</td><td style="padding: 5px 0; text-align: right; font-weight: bold;">${formattedDueDate}</td></tr>
       </table>
     </div>
     <p>Please arrange payment at your earliest convenience. If you have already made this payment, kindly disregard this reminder.</p>
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${publicInvoiceUrl}" style="background: #0d9488; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">View Invoice</a>
+      <a href="${publicInvoiceUrl}" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Invoice →</a>
     </div>
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
     <p style="color: #888; font-size: 12px; text-align: center;">
