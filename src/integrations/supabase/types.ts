@@ -213,8 +213,12 @@ export type Database = {
           next_invoice_number: number | null
           next_receipt_number: number
           online_payments_enabled: boolean
+          paystack_subaccount_code: string | null
+          paystack_subaccount_status: string
           registration_status: string | null
           regulator_code: string | null
+          stripe_connect_account_id: string | null
+          stripe_connect_status: string
           tax_id: string | null
           updated_at: string
           vat_registration_number: string | null
@@ -248,8 +252,12 @@ export type Database = {
           next_invoice_number?: number | null
           next_receipt_number?: number
           online_payments_enabled?: boolean
+          paystack_subaccount_code?: string | null
+          paystack_subaccount_status?: string
           registration_status?: string | null
           regulator_code?: string | null
+          stripe_connect_account_id?: string | null
+          stripe_connect_status?: string
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
@@ -283,8 +291,12 @@ export type Database = {
           next_invoice_number?: number | null
           next_receipt_number?: number
           online_payments_enabled?: boolean
+          paystack_subaccount_code?: string | null
+          paystack_subaccount_status?: string
           registration_status?: string | null
           regulator_code?: string | null
+          stripe_connect_account_id?: string | null
+          stripe_connect_status?: string
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
@@ -1529,6 +1541,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_fee_config: {
+        Row: {
+          created_at: string
+          fee_percent: number
+          id: string
+          is_active: boolean
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          fee_percent?: number
+          id?: string
+          is_active?: boolean
+          provider: string
+        }
+        Update: {
+          created_at?: string
+          fee_percent?: number
+          id?: string
+          is_active?: boolean
+          provider?: string
+        }
+        Relationships: []
       }
       pricing_regions: {
         Row: {

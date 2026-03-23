@@ -128,10 +128,24 @@ const InvoiceView = () => {
         `https://skcxogeaerudoadluexz.supabase.co/functions/v1/create-payment-session`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrY3hvZ2VhZXJ1ZG9hZGx1ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyOTkyODcsImV4cCI6MjA4Mzg3NTI4N30._G14u4zLW4sTO0VIIgeNideez3vwBuxKAa_ef4rvImc",
+          },
           body: JSON.stringify({ verification_id: verificationId }),
         }
       );
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Payment session failed:", response.status, text);
+        try {
+          const parsed = JSON.parse(text);
+          toast.error(parsed.error || "Failed to create payment session");
+        } catch {
+          toast.error("Failed to create payment session");
+        }
+        return;
+      }
       const result = await response.json();
       if (result.checkout_url) {
         window.location.href = result.checkout_url;

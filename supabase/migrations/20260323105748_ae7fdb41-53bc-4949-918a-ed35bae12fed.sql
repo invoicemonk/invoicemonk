@@ -1,0 +1,1 @@
+ALTER TABLE businesses ALTER COLUMN online_payments_enabled SET DEFAULT true;

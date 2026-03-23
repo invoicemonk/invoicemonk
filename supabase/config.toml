@@ -69,3 +69,12 @@ verify_jwt = false
 [functions.paystack-webhook]
 verify_jwt = false
 
+[functions.create-connect-account]
+verify_jwt = false
+
+[functions.stripe-connect-webhook]
+verify_jwt = false
+
+[functions.create-paystack-subaccount]
+verify_jwt = false
+

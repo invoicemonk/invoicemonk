@@ -1,0 +1,1 @@
+DO $$ BEGIN UPDATE businesses SET online_payments_enabled = true WHERE online_payments_enabled = false; END $$;

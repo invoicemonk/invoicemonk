@@ -21,6 +21,7 @@ import { ComplianceConfidenceCard } from '@/components/dashboard/ComplianceConfi
 import { ComplianceAnalyticsCard } from '@/components/dashboard/ComplianceAnalyticsCard';
 import { QuickSetupChecklist } from '@/components/dashboard/QuickSetupChecklist';
 import { ImmutabilityBanner } from '@/components/dashboard/ImmutabilityBanner';
+import { OnlinePaymentsBanner } from '@/components/dashboard/OnlinePaymentsBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -357,12 +358,17 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Quick Setup Checklist */}
+           {/* Online Payments Announcement */}
+          <motion.div variants={item}>
+            <OnlinePaymentsBanner />
+          </motion.div>
+
+           {/* Quick Setup Checklist */}
           <motion.div variants={item}>
             <QuickSetupChecklist />
           </motion.div>
 
-          {/* Stats Grid */}
+           {/* Stats Grid */}
           <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {statsCards.map((stat) => (
               <Card key={stat.title} className="relative overflow-hidden">

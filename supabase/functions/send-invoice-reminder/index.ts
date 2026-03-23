@@ -131,11 +131,12 @@ Deno.serve(async (req) => {
     // Fetch business name
     const { data: business } = await adminClient
       .from('businesses')
-      .select('name')
+      .select('name, online_payments_enabled')
       .eq('id', invoice.business_id)
       .single()
 
     const businessName = escapeHtml(business?.name || 'InvoiceMonk')
+    const onlinePaymentsEnabled = business?.online_payments_enabled === true
 
     // Build email
     const publicInvoiceUrl = invoice.verification_id 
@@ -165,7 +166,13 @@ Deno.serve(async (req) => {
       </table>
     </div>
     <p>Please arrange payment at your earliest convenience. If you have already made this payment, kindly disregard this reminder.</p>
-    <div style="text-align: center; margin: 30px 0;">
+    ${onlinePaymentsEnabled ? `
+    <div style="text-align: center; margin: 30px 0 15px;">
+      <a href="${publicInvoiceUrl}" style="display: inline-block; background: #059669; color: white; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">💳 Pay Now →</a>
+    </div>
+    <p style="text-align: center; color: #888; font-size: 12px; margin: 0 0 15px;">Pay securely online with card</p>
+    ` : ''}
+    <div style="text-align: center; margin: 15px 0 30px;">
       <a href="${publicInvoiceUrl}" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Invoice →</a>
     </div>
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">

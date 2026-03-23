@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     // Check business is not flagged and has online payments enabled
     const { data: business } = await supabase
       .from('businesses')
-      .select('id, jurisdiction, is_flagged, name, online_payments_enabled')
+      .select('id, jurisdiction, is_flagged, name, online_payments_enabled, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status')
       .eq('id', invoice.business_id)
       .maybeSingle()
 
@@ -123,6 +123,16 @@ Deno.serve(async (req) => {
     let providerSessionId: string
     let providerReference: string
 
+    // Fetch platform fee config
+    const { data: feeConfig } = await supabase
+      .from('platform_fee_config')
+      .select('fee_percent')
+      .eq('provider', provider)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const feePercent = (feeConfig?.fee_percent || 0) / 100 // Convert from percentage to decimal
+
     if (provider === 'paystack') {
       const paystackKey = Deno.env.get('PAYSTACK_SECRET_KEY')
       if (!paystackKey) {
@@ -137,27 +147,38 @@ Deno.serve(async (req) => {
       const amountInKobo = Math.round(balance * 100)
       const reference = `inv_${invoice.id}_${Date.now()}`
 
+      // Build Paystack init body
+      const paystackBody: Record<string, any> = {
+        amount: amountInKobo,
+        currency: invoice.currency,
+        reference,
+        callback_url: successUrl,
+        metadata: {
+          invoice_id: invoice.id,
+          business_id: invoice.business_id,
+          verification_id,
+          invoice_number: invoice.invoice_number,
+          custom_fields: [
+            { display_name: 'Invoice', variable_name: 'invoice_number', value: invoice.invoice_number },
+          ],
+        },
+      }
+
+      // If business has a Paystack subaccount, use split payment
+      if (business.paystack_subaccount_code && business.paystack_subaccount_status === 'active') {
+        paystackBody.subaccount = business.paystack_subaccount_code
+        // transaction_charge is the flat amount in kobo that the platform keeps
+        paystackBody.transaction_charge = Math.round(balance * 100 * feePercent)
+        paystackBody.bearer = 'account' // subaccount bears Paystack's own fees
+      }
+
       const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${paystackKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount: amountInKobo,
-          currency: invoice.currency,
-          reference,
-          callback_url: successUrl,
-          metadata: {
-            invoice_id: invoice.id,
-            business_id: invoice.business_id,
-            verification_id,
-            invoice_number: invoice.invoice_number,
-            custom_fields: [
-              { display_name: 'Invoice', variable_name: 'invoice_number', value: invoice.invoice_number },
-            ],
-          },
-        }),
+        body: JSON.stringify(paystackBody),
       })
 
       const paystackData = await paystackResponse.json()
@@ -185,14 +206,15 @@ Deno.serve(async (req) => {
 
       const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' })
 
-      const session = await stripe.checkout.sessions.create({
+      // Build session options
+      const sessionOptions: any = {
         mode: 'payment',
         payment_method_types: ['card'],
         line_items: [
           {
             price_data: {
               currency: invoice.currency.toLowerCase(),
-              unit_amount: Math.round(balance * 100), // Stripe uses smallest unit
+              unit_amount: Math.round(balance * 100),
               product_data: {
                 name: `Invoice ${invoice.invoice_number}`,
                 description: `Payment for invoice ${invoice.invoice_number} from ${business.name}`,
@@ -210,7 +232,19 @@ Deno.serve(async (req) => {
         },
         success_url: successUrl,
         cancel_url: cancelUrl,
-      })
+      }
+
+      // If business has an active Stripe Connect account, use destination charges
+      if (business.stripe_connect_account_id && business.stripe_connect_status === 'active') {
+        sessionOptions.payment_intent_data = {
+          application_fee_amount: Math.round(balance * 100 * feePercent),
+          transfer_data: {
+            destination: business.stripe_connect_account_id,
+          },
+        }
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionOptions)
 
       checkoutUrl = session.url!
       providerSessionId = session.id

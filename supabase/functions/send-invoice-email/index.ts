@@ -1037,14 +1037,18 @@ Deno.serve(async (req) => {
     const issuerPhone = escapeHtml(issuerSnapshot?.contact_phone || '')
     let issuerLogoUrl = issuerSnapshot?.logo_url || null
 
-    if (!issuerLogoUrl && invoice.business_id) {
+    let onlinePaymentsEnabled = false
+    if (invoice.business_id) {
       const { data: business } = await supabase
         .from('businesses')
-        .select('logo_url')
+        .select('logo_url, online_payments_enabled')
         .eq('id', invoice.business_id)
         .single()
-      issuerLogoUrl = business?.logo_url || null
-      if (issuerLogoUrl) console.log('Logo fetched from business table as fallback')
+      if (!issuerLogoUrl) {
+        issuerLogoUrl = business?.logo_url || null
+        if (issuerLogoUrl) console.log('Logo fetched from business table as fallback')
+      }
+      onlinePaymentsEnabled = business?.online_payments_enabled === true
     }
 
     const { data: tierResult, error: tierError } = await supabase.rpc('check_tier_limit', {
@@ -1164,8 +1168,22 @@ Deno.serve(async (req) => {
               </table>
 
               ${viewInvoiceUrl ? `
-              <!-- Primary CTA -->
+              <!-- Primary CTAs -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+                ${onlinePaymentsEnabled && invoice.status !== 'paid' && invoice.status !== 'voided' ? `
+                <tr>
+                  <td style="text-align: center; padding: 8px 0;">
+                    <a href="${viewInvoiceUrl}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      💳 Pay Now &rarr;
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; padding-top: 4px; padding-bottom: 12px;">
+                    <span style="color: #6b7280; font-size: 12px;">Pay securely online with card</span>
+                  </td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="text-align: center; padding: 8px 0;">
                     <a href="${viewInvoiceUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">

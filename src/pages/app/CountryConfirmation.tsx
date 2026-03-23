@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Globe, Shield, FileText, ArrowRight, Loader2 } from 'lucide-react';
+import { Globe, Shield, FileText, ArrowRight, Loader2, CreditCard } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -240,6 +240,15 @@ export default function CountryConfirmation() {
               <p className="text-sm text-muted-foreground">
                 Your invoices will be automatically formatted for{' '}
                 <span className="font-medium text-foreground">{country?.name}</span> compliance requirements.
+              </p>
+            </div>
+
+            {/* Online payments info */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border">
+              <CreditCard className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Online payments included.</span>{' '}
+                Your clients will be able to pay invoices online via card. You can manage this in Settings.
               </p>
             </div>
           </motion.div>
