@@ -1,15 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
-import {
 import { initSentry, captureException } from '../_shared/sentry.ts'
-initSentry()
-
+import {
   validateUUIDStr as validateUUID,
   getCorsHeaders,
   checkRateLimit,
   rateLimitResponse,
   getRateLimitKeyFromRequest,
 } from '../_shared/validation.ts'
+
+initSentry()
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req, true) // public endpoint
@@ -119,8 +119,8 @@ Deno.serve(async (req) => {
     const provider = usePaystack ? 'paystack' : 'stripe'
 
     const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
-    const successUrl = `${appUrl}/invoice/${verification_id}?payment=success`
-    const cancelUrl = `${appUrl}/invoice/${verification_id}?payment=cancelled`
+    const successUrl = `${appUrl}/invoice/view/${verification_id}?payment=success`
+    const cancelUrl = `${appUrl}/invoice/view/${verification_id}?payment=cancelled`
 
     let checkoutUrl: string
     let providerSessionId: string
