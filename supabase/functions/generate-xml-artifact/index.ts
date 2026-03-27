@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 function jsonToUblXml(data: Record<string, unknown>): string {
   const ns = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2'
@@ -210,6 +213,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ artifact_id, xml_hash: xmlHash, schema_version: schemaVersion }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error('generate-xml-artifact error:', error)
+    captureException(error, { function_name: 'generate-xml-artifact' })
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

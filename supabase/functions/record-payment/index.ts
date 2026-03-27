@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, validateAmountStr as validateAmount, validateStringStr as validateString, sanitizeString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 // Helper function to create notification
 async function createNotification(
@@ -25,6 +28,7 @@ async function createNotification(
     })
   } catch (err) {
     console.error('Failed to create notification:', err)
+    captureException(err, { function_name: 'record-payment' })
   }
 }
 
@@ -203,6 +207,7 @@ Deno.serve(async (req) => {
         })
       } catch (auditErr) {
         console.error('Audit log error for rejected overpayment:', auditErr)
+        captureException(auditErr, { function_name: 'record-payment' })
       }
 
       return new Response(
@@ -291,6 +296,7 @@ Deno.serve(async (req) => {
       })
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
+      captureException(auditErr, { function_name: 'record-payment' })
     }
 
     // Create notification for payment received (use invoice currency, not hardcoded NGN)
@@ -342,6 +348,7 @@ Deno.serve(async (req) => {
       }
     } catch (receiptErr) {
       console.error('Receipt creation exception:', receiptErr)
+      captureException(receiptErr, { function_name: 'record-payment' })
       // Don't fail the payment recording if receipt creation fails
     }
 
@@ -364,6 +371,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Record payment error:', error)
+    captureException(error, { function_name: 'record-payment' })
     const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ 

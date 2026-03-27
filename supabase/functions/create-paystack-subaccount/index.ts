@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req)
@@ -168,6 +171,7 @@ Deno.serve(async (req) => {
       })
     } catch (e) {
       console.error('Audit log error:', e)
+      captureException(e, { function_name: 'create-paystack-subaccount' })
     }
 
     return new Response(
@@ -179,6 +183,7 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     console.error('Create paystack subaccount error:', error)
+    captureException(error, { function_name: 'create-paystack-subaccount' })
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

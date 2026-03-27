@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 // Send email via Brevo (Sendinblue) API
 async function sendBrevoEmail(
@@ -38,6 +41,7 @@ async function sendBrevoEmail(
     return true
   } catch (err) {
     console.error('Brevo email send error:', err)
+    captureException(err, { function_name: 'check-overdue-invoices' })
     return false
   }
 }
@@ -265,6 +269,7 @@ Deno.serve(async (req) => {
                 }
               } catch (emailError) {
                 console.error(`Failed to send overdue email for invoice ${invoice.invoice_number}:`, emailError)
+                captureException(emailError, { function_name: 'check-overdue-invoices' })
               }
             }
           }
@@ -288,6 +293,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Check overdue invoices error:', error)
+    captureException(error, { function_name: 'check-overdue-invoices' })
     return new Response(
       JSON.stringify({ 
         success: false, 

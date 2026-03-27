@@ -1,4 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,6 +177,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("Unexpected error:", err);
+    captureException(err, { function_name: 'sync-subscriptions' })
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

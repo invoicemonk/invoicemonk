@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 /**
  * Cleanup Expired Records Edge Function
@@ -147,6 +150,7 @@ Deno.serve(async (req) => {
       }
     } catch (err) {
       console.error('Verification logs cleanup error:', err)
+      captureException(err, { function_name: 'cleanup-expired-records' })
     }
 
     // Step 7: Clean up export_manifests older than 365 days
@@ -165,6 +169,7 @@ Deno.serve(async (req) => {
       }
     } catch (err) {
       console.error('Export manifests cleanup error:', err)
+      captureException(err, { function_name: 'cleanup-expired-records' })
     }
 
     results.completed_at = new Date().toISOString()
@@ -190,6 +195,7 @@ Deno.serve(async (req) => {
         })
       } catch (auditErr) {
         console.error('Failed to log cleanup audit event:', auditErr)
+        captureException(auditErr, { function_name: 'cleanup-expired-records' })
       }
     }
 
@@ -204,6 +210,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Cleanup expired records error:', error)
+    captureException(error, { function_name: 'cleanup-expired-records' })
     return new Response(
       JSON.stringify({ 
         success: false, 

@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr, validateDateStr as validateDate, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 // Wrapper to support optional UUID validation
 function validateUUID(value: unknown, fieldName: string, required = true): string | null {
@@ -496,6 +499,7 @@ Deno.serve(async (req) => {
       }
     } catch (manifestErr) {
       console.error('Export manifest creation error:', manifestErr)
+      captureException(manifestErr, { function_name: 'export-records' })
     }
 
     // Log the export event with manifest reference
@@ -522,6 +526,7 @@ Deno.serve(async (req) => {
       })
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
+      captureException(auditErr, { function_name: 'export-records' })
     }
 
     const response: ExportRecordsResponse = {
@@ -542,6 +547,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Export records error:', error)
+    captureException(error, { function_name: 'export-records' })
     return new Response(
       JSON.stringify({ 
         success: false, 

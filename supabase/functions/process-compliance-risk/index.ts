@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface ComplianceRisk {
   invoice_id: string
@@ -226,6 +229,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Compliance risk scan fatal error:', error)
+    captureException(error, { function_name: 'process-compliance-risk' })
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Internal error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

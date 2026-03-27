@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +70,7 @@ Deno.serve(async (req) => {
         results.succeeded++
       } catch (err) {
         console.error(`[Queue] Failed to process item ${item.id}:`, err)
+        captureException(err, { function_name: 'process-submission-queue' })
 
         await serviceClient
           .from('submission_queue')
@@ -84,6 +88,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, ...results }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error('process-submission-queue error:', error)
+    captureException(error, { function_name: 'process-submission-queue' })
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

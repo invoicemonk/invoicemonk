@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { validateEnumStr as validateEnum, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const VALID_ACTIONS = ['portal', 'cancel', 'reactivate'] as const;
 
@@ -163,6 +166,7 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error("Error managing subscription:", error);
+    captureException(error, { function_name: 'manage-subscription' })
     const message = error instanceof Error ? error.message : "Unknown error";
     const corsHeaders = getCorsHeaders(req);
     return new Response(

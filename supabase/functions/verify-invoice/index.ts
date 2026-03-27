@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface IssuerSnapshot {
   business_name?: string
@@ -232,6 +235,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Verification error:', error)
+    captureException(error, { function_name: 'verify-invoice' })
     const response: VerificationResponse = {
       verified: false,
       error: 'An unexpected error occurred during verification'

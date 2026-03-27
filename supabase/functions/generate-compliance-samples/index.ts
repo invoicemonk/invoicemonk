@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface GenerateComplianceSampleRequest {
   sample_type: 'b2b' | 'b2c'
@@ -748,6 +751,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Generate compliance sample error:', error)
+    captureException(error, { function_name: 'generate-compliance-samples' })
     return new Response(
       JSON.stringify({ 
         success: false, 

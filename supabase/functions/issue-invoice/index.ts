@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 // Helper function to create notification
 async function createNotification(
@@ -25,6 +28,7 @@ async function createNotification(
     })
   } catch (err) {
     console.error('Failed to create notification:', err)
+    captureException(err, { function_name: 'issue-invoice' })
   }
 }
 
@@ -187,6 +191,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Issue invoice error:', error)
+    captureException(error, { function_name: 'issue-invoice' })
     const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ 

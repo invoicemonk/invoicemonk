@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/validation.ts";
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -85,6 +88,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("track-auth-event error:", error);
+    captureException(error, { function_name: 'track-auth-event' })
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

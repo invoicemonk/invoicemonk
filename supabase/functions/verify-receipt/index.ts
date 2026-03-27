@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -137,6 +140,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Verify receipt error:', error)
+    captureException(error, { function_name: 'verify-receipt' })
     return new Response(
       JSON.stringify({ verified: false, error: 'An unexpected error occurred' } as VerifyReceiptResponse),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

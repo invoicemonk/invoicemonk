@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { getCorsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req)
@@ -131,6 +134,7 @@ Deno.serve(async (req) => {
       })
     } catch (e) {
       console.error('Audit log error:', e)
+      captureException(e, { function_name: 'create-connect-account' })
     }
 
     return new Response(
@@ -139,6 +143,7 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     console.error('Create connect account error:', error)
+    captureException(error, { function_name: 'create-connect-account' })
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

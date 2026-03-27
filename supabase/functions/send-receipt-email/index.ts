@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, escapeHtml, sanitizeHeaderValue, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface SendReceiptRequest {
   receipt_id: string;
@@ -389,6 +392,7 @@ Deno.serve(async (req) => {
       });
     } catch (auditErr) {
       console.error('Audit log error:', auditErr);
+      captureException(auditErr, { function_name: 'send-receipt-email' })
     }
 
     try {
@@ -404,6 +408,7 @@ Deno.serve(async (req) => {
       });
     } catch (notifErr) {
       console.error('Notification error:', notifErr);
+      captureException(notifErr, { function_name: 'send-receipt-email' })
     }
 
     return new Response(
@@ -417,6 +422,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Send receipt email error:', error);
+    captureException(error, { function_name: 'send-receipt-email' })
     const corsHeaders2 = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Internal server error' }),

@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,6 +42,7 @@ async function sendBrevoEmail(
     return true;
   } catch (err) {
     console.error("Brevo email send error:", err);
+    captureException(err, { function_name: 'stripe-webhook' })
     return false;
   }
 }
@@ -137,6 +141,7 @@ async function sendUpgradeEmail(
     console.log(sent ? "Upgrade email sent to:" : "Failed to send upgrade email to:", profile.email);
   } catch (err) {
     console.error("Error sending upgrade email:", err);
+    captureException(err, { function_name: 'stripe-webhook' })
   }
 }
 
@@ -189,6 +194,7 @@ serve(async (req) => {
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
+      captureException(err, { function_name: 'stripe-webhook' })
       return new Response(
         JSON.stringify({ error: "Webhook signature verification failed" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -312,6 +318,7 @@ serve(async (req) => {
               await supabase.rpc("create_receipt_from_payment", { _payment_id: paymentRecord.id });
             } catch (receiptErr) {
               console.error("Receipt creation failed:", receiptErr);
+              captureException(receiptErr, { function_name: 'stripe-webhook' })
             }
           }
 
@@ -334,6 +341,7 @@ serve(async (req) => {
             });
           } catch (notifErr) {
             console.error("Notification error:", notifErr);
+            captureException(notifErr, { function_name: 'stripe-webhook' })
           }
 
           // Audit log
@@ -688,6 +696,7 @@ serve(async (req) => {
             }
           } catch (commErr) {
             console.error("Commission processing error:", commErr);
+            captureException(commErr, { function_name: 'stripe-webhook' })
           }
         }
         break;
@@ -757,6 +766,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Webhook error:", error);
+    captureException(error, { function_name: 'stripe-webhook' })
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: message }),

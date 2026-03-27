@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 /**
  * Paystack Webhook Handler
@@ -254,6 +257,7 @@ Deno.serve(async (req) => {
     await supabase.rpc('create_receipt_from_payment', { _payment_id: payment.id })
   } catch (receiptErr) {
     console.error('Receipt creation failed:', receiptErr)
+    captureException(receiptErr, { function_name: 'paystack-webhook' })
   }
 
   // Create notification
@@ -276,6 +280,7 @@ Deno.serve(async (req) => {
     })
   } catch (notifErr) {
     console.error('Notification error:', notifErr)
+    captureException(notifErr, { function_name: 'paystack-webhook' })
   }
 
   // 5. Audit log
@@ -298,6 +303,7 @@ Deno.serve(async (req) => {
     })
   } catch (auditErr) {
     console.error('Audit log error:', auditErr)
+    captureException(auditErr, { function_name: 'paystack-webhook' })
   }
 
   console.log(`Payment processed: ${effectiveAmount} ${invoice.currency} for invoice ${invoice.invoice_number} (ref: ${reference})`)

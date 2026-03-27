@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const ADAPTERS: Record<string, { submissionRequired: boolean; regulatorCode: string }> = {
   NG: { submissionRequired: false, regulatorCode: 'NGA-NRS' },
@@ -82,6 +85,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ submission_id: submissionId, status: 'pending' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error('submit-invoice-to-regulator error:', error)
+    captureException(error, { function_name: 'submit-invoice-to-regulator' })
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

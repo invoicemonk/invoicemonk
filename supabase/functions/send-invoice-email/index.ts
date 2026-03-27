@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, validateEmailStr as validateEmail, validateStringStr as validateString, sanitizeString, escapeHtml, sanitizeHeaderValue, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface SendInvoiceRequest {
   invoice_id: string
@@ -996,6 +999,7 @@ Deno.serve(async (req) => {
 
     if (!brevoApiKey) {
       console.error('BREVO_API_KEY not configured')
+      captureException(error instanceof Error ? error : new Error(String(error)), { function_name: 'send-invoice-email' })
       return new Response(
         JSON.stringify({ success: false, error: 'Email sending is not configured. Please configure BREVO_API_KEY.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1307,6 +1311,7 @@ Deno.serve(async (req) => {
       console.log('Email sent successfully via Brevo:', brevoResult)
     } catch (emailError) {
       console.error('Email sending error:', emailError)
+      captureException(emailError, { function_name: 'send-invoice-email' })
       return new Response(
         JSON.stringify({ success: false, error: `Failed to send email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1362,6 +1367,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Send invoice error:', error)
+    captureException(error, { function_name: 'send-invoice-email' })
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

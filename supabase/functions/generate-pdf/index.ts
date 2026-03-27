@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLimitResponse, escapeHtml, stripUrls } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface GeneratePdfRequest {
   invoice_id?: string
@@ -853,6 +856,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Generate PDF error:', error)
+    captureException(error, { function_name: 'generate-pdf' })
     return new Response(
       JSON.stringify({ 
         success: false, 

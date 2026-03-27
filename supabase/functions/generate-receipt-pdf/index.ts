@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface GenerateReceiptPdfRequest {
   receipt_id: string
@@ -400,6 +403,7 @@ Deno.serve(async (req) => {
       })
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
+      captureException(auditErr, { function_name: 'generate-receipt-pdf' })
     }
 
     const response: GenerateReceiptPdfResponse = {
@@ -415,6 +419,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Generate receipt PDF error:', error)
+    captureException(error, { function_name: 'generate-receipt-pdf' })
     const corsHeaders = getCorsHeaders(req)
     return new Response(
       JSON.stringify({ success: false, error: 'An unexpected error occurred' } as GenerateReceiptPdfResponse),

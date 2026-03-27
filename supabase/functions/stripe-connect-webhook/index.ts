@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
@@ -27,6 +30,7 @@ Deno.serve(async (req) => {
     event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
+    captureException(err, { function_name: 'stripe-connect-webhook' })
     return new Response('Invalid signature', { status: 400 })
   }
 
@@ -71,6 +75,7 @@ Deno.serve(async (req) => {
         })
       } catch (e) {
         console.error('Audit log error:', e)
+        captureException(e, { function_name: 'stripe-connect-webhook' })
       }
     }
   }

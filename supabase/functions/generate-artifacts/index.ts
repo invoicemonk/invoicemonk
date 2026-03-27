@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 // Compliance adapter configs (mirrors src/lib/compliance-adapters.ts)
 const COMPLIANCE_ADAPTERS: Record<string, { regulatorCode: string; countryCode: string; supportedArtifacts: string[]; regulatorName: string }> = {
@@ -760,6 +763,7 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     console.error('Generate artifacts error:', error)
+    captureException(error, { function_name: 'generate-artifacts' })
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

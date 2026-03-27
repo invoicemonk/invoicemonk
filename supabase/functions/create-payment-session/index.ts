@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import {
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
   validateUUIDStr as validateUUID,
   getCorsHeaders,
   checkRateLimit,
@@ -298,6 +301,7 @@ Deno.serve(async (req) => {
       })
     } catch (auditErr) {
       console.error('Audit log error:', auditErr)
+      captureException(auditErr, { function_name: 'create-payment-session' })
     }
 
     return new Response(
@@ -306,6 +310,7 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     console.error('Create payment session error:', error)
+    captureException(error, { function_name: 'create-payment-session' })
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

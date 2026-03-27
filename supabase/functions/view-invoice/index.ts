@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, corsHeaders, getRateLimitKeyFromRequest, checkRateLimit, rateLimitResponse, stripUrls } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface InvoiceItem {
   id: string
@@ -219,6 +222,7 @@ Deno.serve(async (req) => {
     } catch (auditErr) {
       // Don't fail the request if audit logging fails
       console.error('Audit log error:', auditErr)
+      captureException(auditErr, { function_name: 'view-invoice' })
     }
 
     // Update status to 'viewed' on first view (only from issued/sent)
@@ -245,6 +249,7 @@ Deno.serve(async (req) => {
       } catch (viewErr) {
         // Don't fail the request if status update or notification fails
         console.error('View status update error:', viewErr)
+        captureException(viewErr, { function_name: 'view-invoice' })
       }
     }
 
@@ -283,6 +288,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('View invoice error:', error)
+    captureException(error, { function_name: 'view-invoice' })
     const response: ViewInvoiceResponse = {
       success: false,
       error: 'An unexpected error occurred'

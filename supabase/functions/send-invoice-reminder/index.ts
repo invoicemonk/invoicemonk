@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, checkRateLimit, rateLimitResponse, escapeHtml, sanitizeHeaderValue } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 async function sendBrevoEmail(
   brevoApiKey: string,
@@ -32,6 +35,7 @@ async function sendBrevoEmail(
     return true
   } catch (err) {
     console.error('Brevo email send error:', err)
+    captureException(err, { function_name: 'send-invoice-reminder' })
     return false
   }
 }
@@ -225,6 +229,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Send invoice reminder error:', error)
+    captureException(error, { function_name: 'send-invoice-reminder' })
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 type FinancialReportType =
   | 'invoice-register'
@@ -737,6 +740,7 @@ Deno.serve(async (req) => {
       });
     } catch (auditErr) {
       console.error('Audit log error:', auditErr);
+      captureException(auditErr, { function_name: 'generate-report' })
     }
 
     // CSV format
@@ -781,6 +785,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('Report generation error:', error);
+    captureException(error, { function_name: 'generate-report' })
     return new Response(JSON.stringify({
       success: false,
       error: 'An unexpected error occurred while generating the report',

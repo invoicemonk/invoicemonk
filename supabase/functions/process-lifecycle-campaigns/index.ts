@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +41,7 @@ async function sendBrevoEmail(
     return true
   } catch (err) {
     console.error('Brevo email send error:', err)
+    captureException(err, { function_name: 'process-lifecycle-campaigns' })
     return false
   }
 }
@@ -472,6 +476,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign A: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_a.errors++
             }
           }
@@ -480,6 +485,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign A failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -540,6 +546,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign B: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_b.errors++
             }
           }
@@ -548,6 +555,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign B failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -607,6 +615,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign C: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_c.errors++
             }
           }
@@ -615,6 +624,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign C failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -674,6 +684,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign D: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_d.errors++
             }
           }
@@ -682,6 +693,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign D failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -786,6 +798,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign E: Error for draft ${draft.id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_e.errors++
             }
           }
@@ -794,6 +807,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign E failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -900,6 +914,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign F: Error for user ${userId}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_f.errors++
             }
           }
@@ -908,6 +923,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign F failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -968,6 +984,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign G: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_g.errors++
             }
           }
@@ -976,6 +993,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign G failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -1037,6 +1055,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign H: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_h.errors++
             }
           }
@@ -1045,6 +1064,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign H failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -1122,6 +1142,7 @@ Deno.serve(async (req) => {
               }
             } catch (userErr) {
               console.error(`Campaign I: Error for user ${target.user_id}:`, userErr)
+              captureException(userErr, { function_name: 'process-lifecycle-campaigns' })
               summary.campaign_i.errors++
             }
           }
@@ -1130,6 +1151,7 @@ Deno.serve(async (req) => {
         }
       } catch (campaignErr) {
         console.error('Campaign I failed:', campaignErr)
+        captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 
@@ -1142,6 +1164,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Lifecycle campaigns fatal error:', error)
+    captureException(error, { function_name: 'process-lifecycle-campaigns' })
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Internal error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

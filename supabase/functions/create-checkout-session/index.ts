@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { validateEnumStr as validateEnum, validateStringStr as validateString, getCorsHeaders, checkRateLimit, rateLimitResponse } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 const VALID_TIERS = ['professional', 'business'] as const;
 const VALID_BILLING_PERIODS = ['monthly', 'yearly'] as const;
@@ -277,6 +280,7 @@ serve(async (req) => {
       }
     } catch (cancelErr) {
       console.error("Error cancelling conflicting subscriptions:", cancelErr);
+      captureException(cancelErr, { function_name: 'create-checkout-session' })
       // Continue anyway — the checkout may still work if there's no actual conflict
     }
 
@@ -319,6 +323,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error creating checkout session:", error);
+    captureException(error, { function_name: 'create-checkout-session' })
     const message = error instanceof Error ? error.message : "Unknown error";
     const corsHeaders = getCorsHeaders(req);
     return new Response(

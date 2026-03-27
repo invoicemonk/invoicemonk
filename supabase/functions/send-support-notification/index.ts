@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 interface SendSupportNotificationRequest {
   type: 'ticket_created' | 'admin_reply' | 'user_reply';
@@ -567,6 +570,7 @@ Deno.serve(async (req: Request) => {
         }
       } catch (emailError) {
         console.error(`Error sending email to ${emailData.to}:`, emailError);
+        captureException(emailError, { function_name: 'send-support-notification' })
       }
     }
 
@@ -580,6 +584,7 @@ Deno.serve(async (req: Request) => {
       });
     } catch (auditError) {
       console.error('Failed to log audit event:', auditError);
+      captureException(auditError, { function_name: 'send-support-notification' })
     }
 
     return new Response(
@@ -589,6 +594,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in send-support-notification:', error);
+    captureException(error, { function_name: 'send-support-notification' })
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),

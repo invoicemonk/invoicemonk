@@ -1,5 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from '../_shared/validation.ts'
+import { initSentry, captureException } from '../_shared/sentry.ts'
+initSentry()
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -88,6 +91,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("tawk-identity error:", err);
+    captureException(err, { function_name: 'tawk-identity' })
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
