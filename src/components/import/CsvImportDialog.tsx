@@ -49,6 +49,8 @@ export function CsvImportDialog({ importType, trigger }: CsvImportDialogProps) {
     result,
     importExpenses,
     importClients,
+    importInvoices,
+    importProducts,
   } = useCsvImport();
 
   const fields = getFieldsForType(importType);
@@ -60,8 +62,12 @@ export function CsvImportDialog({ importType, trigger }: CsvImportDialogProps) {
   };
 
   const handleImport = async () => {
-    if (importType === 'expenses') await importExpenses();
-    else await importClients();
+    switch (importType) {
+      case 'expenses': await importExpenses(); break;
+      case 'clients': await importClients(); break;
+      case 'invoices': await importInvoices(); break;
+      case 'products': await importProducts(); break;
+    }
   };
 
   const handleClose = () => {
@@ -74,7 +80,7 @@ export function CsvImportDialog({ importType, trigger }: CsvImportDialogProps) {
   const mappedDbFields = new Set(Object.values(mapping).filter(Boolean));
   const missingRequired = requiredFields.filter((f) => !mappedDbFields.has(f));
 
-  const label = importType === 'expenses' ? 'Expenses' : 'Clients';
+  const label = importType === 'expenses' ? 'Expenses' : importType === 'clients' ? 'Clients' : importType === 'invoices' ? 'Invoices' : 'Products';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else setOpen(true); }}>

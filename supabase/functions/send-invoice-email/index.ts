@@ -7,6 +7,7 @@ initSentry()
 interface SendInvoiceRequest {
   invoice_id: string
   recipient_email: string
+  additional_recipients?: string[]
   custom_message?: string
   app_url?: string
 }
@@ -1276,13 +1277,25 @@ Deno.serve(async (req) => {
 </html>
 `
 
-    // Send email via Brevo API
-    console.log('Sending email via Brevo API to:', body.recipient_email)
+    // Build recipient list: primary client email + optional additional recipients
+    const allRecipients: { email: string; name?: string }[] = [
+      { email: body.recipient_email, name: sanitizeHeaderValue(recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer') }
+    ]
+    // Add additional recipients (copies only, not canonical reminder targets)
+    if (body.additional_recipients && Array.isArray(body.additional_recipients)) {
+      for (const extraEmail of body.additional_recipients) {
+        if (typeof extraEmail === 'string' && extraEmail.includes('@') && extraEmail.toLowerCase() !== body.recipient_email.toLowerCase()) {
+          allRecipients.push({ email: extraEmail })
+        }
+      }
+    }
+
+    console.log('Sending email via Brevo API to:', allRecipients.map(r => r.email).join(', '))
 
     try {
       const brevoPayload: Record<string, unknown> = {
         sender: { name: sanitizeHeaderValue(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk'), email: smtpFrom },
-        to: [{ email: body.recipient_email, name: sanitizeHeaderValue(recipientSnapshot?.name || invoice.clients?.name || 'Valued Customer') }],
+        to: allRecipients,
         subject: `Invoice ${invoice.invoice_number} from ${sanitizeHeaderValue(issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk')}`,
         htmlContent: emailHtml,
         attachment: [{ content: attachmentContent, name: attachmentName }],
@@ -1335,6 +1348,7 @@ Deno.serve(async (req) => {
         _business_id: invoice.business_id,
         _metadata: {
           recipient_email: body.recipient_email,
+          additional_recipients: body.additional_recipients || [],
           sent_at: new Date().toISOString(),
           verification_url: verificationUrl,
           attachment_type: 'pdf',
@@ -1348,7 +1362,7 @@ Deno.serve(async (req) => {
         business_id: invoice.business_id,
         type: 'INVOICE_SENT',
         title: 'Invoice Sent',
-        message: `Invoice ${invoice.invoice_number} was sent to ${body.recipient_email}`,
+        message: `Invoice ${invoice.invoice_number} was sent to ${body.recipient_email}${body.additional_recipients?.length ? ` and ${body.additional_recipients.length} other(s)` : ''}`,
         entity_type: 'invoice',
         entity_id: invoice.id,
         is_read: false,

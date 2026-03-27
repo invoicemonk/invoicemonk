@@ -13,9 +13,10 @@ import {
   Bell,
   Loader2,
   RefreshCw,
+  Upload,
   Calendar as CalendarIcon
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ComplianceConfidenceCard } from '@/components/dashboard/ComplianceConfidenceCard';
 import { ComplianceAnalyticsCard } from '@/components/dashboard/ComplianceAnalyticsCard';
@@ -114,6 +115,7 @@ function getDateRangeFromPreset(preset: DateRangePreset): DateRange | undefined 
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const { currentBusiness } = useBusiness();
+  const { businessId } = useParams<{ businessId: string }>();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const isEmailVerified = user?.email_confirmed_at;
   
@@ -331,6 +333,26 @@ export default function Dashboard() {
           {/* Quick Setup Checklist — hero position */}
           <motion.div variants={item}>
             <QuickSetupChecklist />
+          </motion.div>
+
+          {/* Migration prompt for new users */}
+          <motion.div variants={item}>
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Upload className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Migrating from another platform?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Import your clients, invoices, expenses, and products from Zoho, Wave, Stripe, and 12 more.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/b/${businessId}/import`}>Import Data</Link>
+                </Button>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Compliance Confidence Card */}

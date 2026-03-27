@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     // Fetch invoice with client
     const { data: invoice, error: invoiceError } = await adminClient
       .from('invoices')
-      .select('id, invoice_number, status, due_date, total_amount, currency, business_id, reminder_count, last_reminder_sent_at, client_id, verification_id, clients(name, email)')
+      .select('id, invoice_number, status, due_date, total_amount, currency, business_id, reminder_count, last_reminder_sent_at, client_id, verification_id, recipient_snapshot, clients(name, email)')
       .eq('id', invoice_id)
       .single()
 
@@ -104,9 +104,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invoice is not overdue' }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Validate client email
+    // FIX: Always use the invoice client's canonical email for reminders.
+    // Prefer recipient_snapshot.email (frozen at issue time), fallback to clients.email.
+    // NEVER use an ad-hoc email from a previous manual send.
     const client = invoice.clients as any
-    if (!client?.email) {
+    const recipientSnapshot = invoice.recipient_snapshot as { email?: string; name?: string } | null
+    const reminderEmail = recipientSnapshot?.email || client?.email
+    if (!reminderEmail) {
       return new Response(JSON.stringify({ error: 'Client does not have an email address' }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
@@ -160,7 +164,7 @@ Deno.serve(async (req) => {
     <h1 style="margin: 0; font-size: 22px;">Payment Reminder</h1>
   </div>
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px;">
-    <p>Dear ${escapeHtml(client.name)},</p>
+    <p>Dear ${escapeHtml(recipientSnapshot?.name || client.name)},</p>
     <p>This is a friendly reminder that invoice <strong>${invoice.invoice_number}</strong>, originally due on <strong>${formattedDueDate}</strong>, remains unpaid.</p>
     <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
       <table style="width: 100%;">
@@ -192,7 +196,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Email service not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, sanitizeHeaderValue(business?.name || 'InvoiceMonk'), client.email, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
+    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, sanitizeHeaderValue(business?.name || 'InvoiceMonk'), reminderEmail, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
     if (!sent) {
       return new Response(JSON.stringify({ error: 'Failed to send reminder email' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }

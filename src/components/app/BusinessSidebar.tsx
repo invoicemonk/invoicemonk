@@ -8,7 +8,7 @@ import {
   LogOut,
   Shield,
   ShieldCheck,
-  FileX,
+  
   Calculator,
   ArrowUpRight,
   ChevronDown,
@@ -17,7 +17,8 @@ import {
   Receipt,
   MessageCircle,
   Handshake,
-  Package
+  Package,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -64,7 +65,7 @@ export function BusinessSidebar() {
   const mainNavItems = [
     { title: 'Dashboard', url: `${baseUrl}/dashboard`, icon: LayoutDashboard },
     { title: 'Invoices', url: `${baseUrl}/invoices`, icon: FileText },
-    { title: 'Credit Notes', url: `${baseUrl}/credit-notes`, icon: FileX },
+    
     { title: 'Receipts', url: `${baseUrl}/receipts`, icon: Receipt },
     { title: 'Clients', url: `${baseUrl}/clients`, icon: Users },
     { title: 'Products & Services', url: `${baseUrl}/products`, icon: Package },
@@ -75,6 +76,7 @@ export function BusinessSidebar() {
   ];
 
   const settingsNavItems = [
+    { title: 'Import Data', url: `${baseUrl}/import`, icon: Upload },
     { title: 'Business Settings', url: `${baseUrl}/settings`, icon: Settings },
   ];
 

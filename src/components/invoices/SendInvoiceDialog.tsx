@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
-import { Mail, Loader2, Send, AlertCircle } from 'lucide-react';
+import { Mail, Loader2, Send, AlertCircle, Plus, X, Info } from 'lucide-react';
 import { stripUrls } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,44 +24,65 @@ interface SendInvoiceDialogProps {
 }
 
 // Determine the correct app URL for email links
-// Never use Lovable preview/project URLs in emails - use production URL
 const getProductionUrl = (): string => {
   const hostname = window.location.hostname;
-  
-  // If on Lovable preview domains, use production URL
-  if (hostname.includes('lovableproject.com') || 
-      hostname.includes('lovable.app')) {
+  if (hostname.includes('lovableproject.com') || hostname.includes('lovable.app')) {
     return 'https://app.invoicemonk.com';
   }
-  
-  // Otherwise use current origin (for custom domains)
   return window.location.origin;
 };
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDialogProps) {
   const queryClient = useQueryClient();
   const [sending, setSending] = useState(false);
-  const [recipientEmail, setRecipientEmail] = useState(
-    invoice.clients?.email || ''
-  );
+  const [additionalEmails, setAdditionalEmails] = useState<string[]>([]);
   const [customMessage, setCustomMessage] = useState('');
+
+  // Primary client email: from recipient_snapshot or client record
+  const recipientSnapshot = invoice.recipient_snapshot as { email?: string; name?: string } | null;
+  const primaryEmail = recipientSnapshot?.email || invoice.clients?.email || '';
+  const hasPrimaryEmail = !!primaryEmail;
 
   const formatCurrency = (amount: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
   };
 
+  const addAdditionalEmail = () => {
+    setAdditionalEmails(prev => [...prev, '']);
+  };
+
+  const removeAdditionalEmail = (index: number) => {
+    setAdditionalEmails(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAdditionalEmail = (index: number, value: string) => {
+    setAdditionalEmails(prev => prev.map((e, i) => i === index ? value : e));
+  };
+
   const handleSend = async () => {
-    if (!recipientEmail.trim()) {
-      toast.error('Please enter a recipient email address');
+    if (!hasPrimaryEmail) {
+      toast.error('Client does not have an email address. Please update the client record first.');
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipientEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
+    // Validate additional emails
+    const validAdditional = additionalEmails
+      .map(e => e.trim())
+      .filter(e => e.length > 0);
+
+    for (const email of validAdditional) {
+      if (!emailRegex.test(email)) {
+        toast.error(`Invalid additional email: ${email}`);
+        return;
+      }
     }
+
+    // Dedupe: remove any additional emails that match the primary
+    const dedupedAdditional = validAdditional.filter(
+      e => e.toLowerCase() !== primaryEmail.toLowerCase()
+    );
 
     setSending(true);
     try {
@@ -75,15 +96,13 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
       const response = await supabase.functions.invoke('send-invoice-email', {
         body: {
           invoice_id: invoice.id,
-          recipient_email: recipientEmail,
+          recipient_email: primaryEmail,
+          additional_recipients: dedupedAdditional.length > 0 ? dedupedAdditional : undefined,
           custom_message: customMessage ? stripUrls(customMessage) : undefined,
           app_url: getProductionUrl()
         }
       });
 
-      // supabase.functions.invoke returns { data, error }
-      // For non-2xx responses, error may be a generic FunctionsHttpError
-      // The actual error message is in response.data?.error
       if (response.error) {
         const serverMessage = typeof response.data === 'object' && response.data?.error
           ? response.data.error
@@ -94,15 +113,19 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
         throw new Error(response.data.error);
       }
 
-      // Invalidate caches after successful send (status changes to 'sent')
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       queryClient.invalidateQueries({ queryKey: ['accounting-stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
 
-      // Track invoice sent event
       gaEvents.invoiceSent(invoice.id);
-      toast.success('Invoice sent successfully!');
+      
+      const recipientCount = 1 + dedupedAdditional.length;
+      toast.success(
+        recipientCount > 1
+          ? `Invoice sent to ${recipientCount} recipients!`
+          : 'Invoice sent successfully!'
+      );
       onOpenChange(false);
     } catch (error: any) {
       console.error('Send invoice error:', error);
@@ -142,17 +165,60 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
             </div>
           </div>
 
-          {/* Recipient Email */}
+          {/* Primary Client Email (read-only) */}
           <div className="space-y-2">
-            <Label htmlFor="email">Recipient Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              value={recipientEmail}
-              onChange={(e) => setRecipientEmail(e.target.value)}
-              placeholder="client@example.com"
-              maxLength={INPUT_LIMITS.EMAIL}
-            />
+            <Label>Client Email (primary recipient) *</Label>
+            {hasPrimaryEmail ? (
+              <div className="flex items-center gap-2 bg-muted/30 border rounded-md px-3 py-2">
+                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">{primaryEmail}</span>
+              </div>
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This client does not have an email address. Please update the client record before sending.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* Additional Emails */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Additional Recipients (optional)</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addAdditionalEmail}
+                className="h-7 text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add
+              </Button>
+            </div>
+            {additionalEmails.map((email, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => updateAdditionalEmail(index, e.target.value)}
+                  placeholder="additional@example.com"
+                  maxLength={INPUT_LIMITS.EMAIL}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeAdditionalEmail(index)}
+                  className="h-8 w-8 flex-shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
 
           {/* Custom Message */}
@@ -168,11 +234,18 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
             />
           </div>
 
-          {/* Email Preview Info */}
+          {/* Info Alerts */}
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               The email will include a PDF attachment of the invoice and a link to view it online.
+            </AlertDescription>
+          </Alert>
+
+          <Alert variant="default" className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-700 dark:text-blue-300 text-xs">
+              Payment reminders will only be sent to the client email ({primaryEmail || 'none'}). Additional recipients receive this invoice only.
             </AlertDescription>
           </Alert>
         </div>
@@ -181,7 +254,7 @@ export function SendInvoiceDialog({ open, onOpenChange, invoice }: SendInvoiceDi
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={sending || !recipientEmail.trim()}>
+          <Button onClick={handleSend} disabled={sending || !hasPrimaryEmail}>
             {sending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

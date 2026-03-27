@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, FileText, Clock, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, FileText, Clock, Wallet, FileDown, Loader2 } from 'lucide-react';
 import { AccountingNavTabs } from '@/components/accounting/AccountingNavTabs';
 import { AccountingPeriodSelector, getAccountingDateRange, getPeriodLabel } from '@/components/accounting/AccountingPeriodSelector';
 import { MissingBusinessDataBanner } from '@/components/accounting/MissingBusinessDataBanner';
@@ -14,6 +14,11 @@ import { useAccountingStats } from '@/hooks/use-accounting-stats';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useTaxPack } from '@/hooks/use-tax-pack';
+import { getJurisdictionTaxPackConfig } from '@/lib/jurisdiction-config';
+import { useNavigate } from 'react-router-dom';
 
 export default function AccountingOverview() {
   const accountContext = useAccountContext();
@@ -159,8 +164,74 @@ export default function AccountingOverview() {
         </div>
       )}
 
+      {/* Tax Pack Quick Action */}
+      {!isLoading && (
+        <TaxPackQuickAction businessId={business?.id} jurisdiction={business?.jurisdiction} />
+      )}
+
       {/* Disclaimer */}
       <AccountingDisclaimer type="overview" />
     </motion.div>
+  );
+}
+
+function TaxPackQuickAction({ businessId, jurisdiction }: { businessId?: string; jurisdiction?: string | null }) {
+  const { currentCurrencyAccount } = useCurrencyAccount();
+  const { generateTaxPack, isGenerating } = useTaxPack();
+  const navigate = useNavigate();
+  const config = jurisdiction ? getJurisdictionTaxPackConfig(jurisdiction) : null;
+
+  const handleQuickGenerate = () => {
+    if (!businessId || !currentCurrencyAccount?.id) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    generateTaxPack({
+      business_id: businessId,
+      currency_account_id: currentCurrencyAccount.id,
+      period_start: start.toISOString().split('T')[0],
+      period_end: end.toISOString().split('T')[0],
+    });
+  };
+
+  return (
+    <Card className="border-primary/20 bg-primary/5">
+      <CardContent className="flex items-center justify-between gap-4 py-4">
+        <div className="flex items-center gap-3">
+          <FileDown className="h-5 w-5 text-primary" />
+          <div>
+            <p className="text-sm font-medium">
+              {config?.documentTitle || 'Tax Summary Pack'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {config
+                ? `Generate a ${config.taxAuthorityName}-ready filing summary`
+                : 'Set your jurisdiction to enable tax document generation'
+              }
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleQuickGenerate}
+            disabled={isGenerating || !businessId || !currentCurrencyAccount}
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+            Last Month
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/b/${businessId}/reports`)}
+          >
+            All Periods →
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

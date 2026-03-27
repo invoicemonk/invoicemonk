@@ -28,7 +28,7 @@ import Invoices from "./pages/app/Invoices";
 import InvoiceNew from "./pages/app/InvoiceNew";
 import InvoiceDetail from "./pages/app/InvoiceDetail";
 import InvoiceEdit from "./pages/app/InvoiceEdit";
-import CreditNotes from "./pages/app/CreditNotes";
+
 import CreditNoteDetail from "./pages/app/CreditNoteDetail";
 import Clients from "./pages/app/Clients";
 import ClientDetail from "./pages/app/ClientDetail";
@@ -55,6 +55,7 @@ import AccountingResult from "./pages/app/accounting/AccountingResult";
 // Expenses page (standalone entry point)
 import Expenses from "./pages/app/Expenses";
 import Receivables from "./pages/app/Receivables";
+import Import from "./pages/app/Import";
 import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
 
 // Receipts pages
@@ -68,6 +69,13 @@ function OrgRedirect() {
   const orgId = params?.[1] || '';
   const rest = params?.[2] || '/dashboard';
   return <Navigate to={`/b/${orgId}${rest}`} replace />;
+}
+
+// Redirect /b/:businessId/credit-notes to invoices?tab=credit-notes
+function CreditNotesRedirect() {
+  const params = window.location.pathname.match(/^\/b\/([^/]+)\/credit-notes$/);
+  const businessId = params?.[1] || '';
+  return <Navigate to={`/b/${businessId}/invoices?tab=credit-notes`} replace />;
 }
 
 // Admin pages (Phase 6)
@@ -194,7 +202,7 @@ const App = () => (
             <Route path="/b/:businessId/invoices/new" element={<InvoiceNew />} />
             <Route path="/b/:businessId/invoices/:id" element={<InvoiceDetail />} />
             <Route path="/b/:businessId/invoices/:id/edit" element={<InvoiceEdit />} />
-            <Route path="/b/:businessId/credit-notes" element={<CreditNotes />} />
+            <Route path="/b/:businessId/credit-notes" element={<CreditNotesRedirect />} />
             <Route path="/b/:businessId/credit-notes/:id" element={<CreditNoteDetail />} />
             <Route path="/b/:businessId/clients" element={<Clients />} />
             <Route path="/b/:businessId/clients/:id" element={<ClientDetail />} />
@@ -225,6 +233,9 @@ const App = () => (
                 <AccountingProfitability />
               </TierGatedRoute>
             } />
+            
+            {/* Import / Migration wizard */}
+            <Route path="/b/:businessId/import" element={<Import />} />
             
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />

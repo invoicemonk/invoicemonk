@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { 
   FileText, 
@@ -18,7 +18,9 @@ import {
   X,
   Calendar,
   Download,
-  ChevronDown
+  ChevronDown,
+  FileX,
+  ArrowRight
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +67,7 @@ import {
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useInvoices, useDeleteInvoice, useVoidInvoice } from '@/hooks/use-invoices';
 import { useClients } from '@/hooks/use-clients';
+import { useCreditNotes } from '@/hooks/use-credit-notes';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { SendInvoiceDialog } from '@/components/invoices/SendInvoiceDialog';
@@ -99,6 +102,8 @@ const statusLabels: Record<InvoiceStatus, string> = {
 const allStatuses: InvoiceStatus[] = ['draft', 'issued', 'sent', 'viewed', 'paid', 'voided', 'credited'];
 
 export default function Invoices() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const topTab = searchParams.get('tab') === 'credit-notes' ? 'credit-notes' : 'invoices';
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -134,6 +139,23 @@ export default function Invoices() {
   const deleteInvoice = useDeleteInvoice();
   const voidInvoice = useVoidInvoice();
   const { exportRecords, isExporting } = useExportRecords();
+
+  // Credit notes data
+  const [cnSearchQuery, setCnSearchQuery] = useState('');
+  const { data: creditNotes, isLoading: cnLoading } = useCreditNotes(currentBusiness?.id, currentCurrencyAccount?.id);
+
+  const filteredCreditNotes = useMemo(() => {
+    return (creditNotes || []).filter(cn => {
+      if (!cnSearchQuery) return true;
+      const query = cnSearchQuery.toLowerCase();
+      return (
+        cn.credit_note_number.toLowerCase().includes(query) ||
+        cn.original_invoice?.invoice_number?.toLowerCase().includes(query) ||
+        cn.original_invoice?.clients?.name?.toLowerCase().includes(query) ||
+        cn.reason?.toLowerCase().includes(query)
+      );
+    });
+  }, [creditNotes, cnSearchQuery]);
 
   // Check if any filter is active
   const hasActiveFilters = statusFilter !== 'all' || clientFilter !== 'all' || dateRangeFilter !== 'all' || customDateFrom || customDateTo;
@@ -331,13 +353,39 @@ export default function Invoices() {
             Manage and track your compliance-ready invoices
           </p>
         </div>
-        <Button asChild>
-          <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Invoice
-          </Link>
-        </Button>
+        {topTab === 'invoices' && (
+          <Button asChild>
+            <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Invoice
+            </Link>
+          </Button>
+        )}
       </div>
+
+      {/* Top-level tabs: Invoices / Credit Notes */}
+      <Tabs
+        value={topTab}
+        onValueChange={(val) => {
+          if (val === 'credit-notes') {
+            setSearchParams({ tab: 'credit-notes' });
+          } else {
+            setSearchParams({});
+          }
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="invoices" className="gap-1.5">
+            <FileText className="h-4 w-4" />
+            Invoices
+          </TabsTrigger>
+          <TabsTrigger value="credit-notes" className="gap-1.5">
+            <FileX className="h-4 w-4" />
+            Credit Notes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="invoices" className="mt-4 space-y-6">
 
       {/* Filters & Search */}
       <Card>
@@ -737,6 +785,120 @@ export default function Invoices() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Credit Notes Tab */}
+        <TabsContent value="credit-notes" className="mt-4 space-y-6">
+          {/* Credit Notes Search */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search credit notes..."
+                  value={cnSearchQuery}
+                  onChange={(e) => setCnSearchQuery(e.target.value)}
+                  className="pl-9"
+                  maxLength={INPUT_LIMITS.SEARCH}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Credit Notes Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileX className="h-5 w-5" />
+                All Credit Notes
+              </CardTitle>
+              <CardDescription>
+                Credit notes are created when invoices are voided
+              </CardDescription>
+            </CardHeader>
+            {cnLoading ? (
+              <CardContent className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </CardContent>
+            ) : filteredCreditNotes.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Credit Note #</TableHead>
+                    <TableHead>Original Invoice</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCreditNotes.map((cn) => (
+                    <TableRow key={cn.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Ban className="h-4 w-4 text-destructive" />
+                          {cn.credit_note_number}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Link 
+                          to={`/b/${currentBusiness?.id}/invoices/${cn.original_invoice_id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {cn.original_invoice?.invoice_number || 'N/A'}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{cn.original_invoice?.clients?.name || 'Unknown'}</TableCell>
+                      <TableCell className="text-destructive font-medium">
+                        -{formatCurrency(Number(cn.amount), cn.original_invoice?.currency || cn.currency || '')}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={cn.reason}>
+                        {cn.reason}
+                      </TableCell>
+                      <TableCell>{formatDate(cn.issued_at)}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/b/${currentBusiness?.id}/credit-notes/${cn.id}`}>
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <CardContent>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="p-4 rounded-full bg-muted mb-4">
+                    <FileX className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold mb-1">No credit notes found</h3>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                    Credit notes are automatically created when you void an issued invoice.
+                  </p>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+
+          {/* Info Notice */}
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="flex items-start gap-3 py-4">
+              <Ban className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">What are Credit Notes?</p>
+                <p className="text-xs text-muted-foreground">
+                  Credit notes are financial documents that reverse a previously issued invoice. 
+                  When you void an invoice, a credit note is automatically created to maintain proper audit trails.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

@@ -299,7 +299,7 @@ export default function InvoiceDetail() {
                 (Number(invoice.total_amount) - Number(invoice.amount_paid)) > 0 && (
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`/invoice/${invoice.verification_id}`, '_blank')}
+                  onClick={() => window.open(`/invoice/view/${invoice.verification_id}`, '_blank')}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Payment Link

@@ -274,16 +274,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Authenticate: require CRON_SECRET header
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
-  const incomingSecret = req.headers.get('x-cron-secret') ?? ''
-  if (!cronSecret || incomingSecret !== cronSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
   try {
     const startTime = Date.now()
     const MAX_EXECUTION_MS = 20_000 // 20 second guard

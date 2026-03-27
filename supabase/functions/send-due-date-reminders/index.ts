@@ -114,13 +114,24 @@ Deno.serve(async (req) => {
         }
       }
 
+      // FIX: Resolve business IDs this user owns/is a member of,
+      // so we can find business invoices (which have user_id = null).
+      const { data: memberships } = await adminClient
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', pref.user_id)
+
+      const businessIds = (memberships || []).map(m => m.business_id)
+
       for (const { daysOffset, isOverdue } of daysToCheck) {
         // Calculate target date
         const targetDate = new Date(today)
         targetDate.setDate(targetDate.getDate() + daysOffset)
         const targetDateStr = targetDate.toISOString().split('T')[0]
 
-        const { data: invoices, error: invoicesError } = await adminClient
+        // FIX: Query invoices owned by user_id OR belonging to user's businesses.
+        // This ensures business invoices (user_id = null) are included.
+        let query = adminClient
           .from('invoices')
           .select(`
             id,
@@ -132,12 +143,22 @@ Deno.serve(async (req) => {
             business_id,
             client_id,
             verification_id,
+            recipient_snapshot,
             clients (id, name, email),
             businesses (id, name, contact_email)
           `)
-          .eq('user_id', pref.user_id)
           .eq('due_date', targetDateStr)
           .in('status', ['issued', 'sent', 'viewed'])
+
+        if (businessIds.length > 0) {
+          // Include personal invoices (user_id match) AND business invoices
+          query = query.or(`user_id.eq.${pref.user_id},business_id.in.(${businessIds.join(',')})`)
+        } else {
+          // Legacy: only personal invoices
+          query = query.eq('user_id', pref.user_id)
+        }
+
+        const { data: invoices, error: invoicesError } = await query
 
         if (invoicesError) {
           console.error(`Error fetching invoices for user ${pref.user_id}:`, invoicesError)
@@ -180,11 +201,20 @@ Deno.serve(async (req) => {
 
           const client = invoiceData.clients as { id: string; name: string; email: string } | null
           const business = invoiceData.businesses as { id: string; name: string; contact_email: string } | null
-          const clientEmail = client?.email
-          const clientName = client?.name || 'Customer'
+          const recipientSnapshot = invoiceData.recipient_snapshot as { email?: string; name?: string } | null
+
+          // FIX: Always use the invoice client's email for reminders.
+          // Prefer recipient_snapshot.email (frozen at issue time), fallback to clients.email.
+          // NEVER use an ad-hoc email from a previous manual send.
+          const clientEmail = recipientSnapshot?.email || client?.email
+          const clientName = recipientSnapshot?.name || client?.name || 'Customer'
           const businessName = business?.name || 'Our Company'
 
-          // Send email to client via Brevo
+          if (!clientEmail) {
+            console.log(`No client email for invoice ${invoiceData.invoice_number}, skipping email`)
+          }
+
+          // Send email to the invoice's client (NOT the business owner)
           if (clientEmail && brevoApiKey) {
             try {
               const subject = isOverdue
@@ -267,7 +297,7 @@ Deno.serve(async (req) => {
               )
 
               if (sent) {
-                console.log(`${isOverdue ? 'Overdue' : 'Reminder'} email sent to ${clientEmail} for invoice ${invoiceData.invoice_number}`)
+                console.log(`${isOverdue ? 'Overdue' : 'Reminder'} email sent to client ${clientEmail} for invoice ${invoiceData.invoice_number}`)
                 totalEmailsSent++
               }
             } catch (emailError) {
@@ -276,7 +306,8 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Create in-app notification for the invoice owner
+          // FIX: Create in-app notification for the business owner (pref.user_id),
+          // NOT invoiceData.user_id (which may be null for business invoices).
           const notificationMessage = isOverdue
             ? `Overdue reminder sent to ${clientName} for invoice ${invoiceData.invoice_number} (${daysLabel} days overdue)`
             : `Reminder sent to ${clientName} for invoice ${invoiceData.invoice_number} (due in ${daysLabel} days)`
@@ -284,7 +315,7 @@ Deno.serve(async (req) => {
           const { error: notifError } = await adminClient
             .from('notifications')
             .insert({
-              user_id: invoiceData.user_id,
+              user_id: pref.user_id,
               business_id: invoiceData.business_id,
               type: reminderType,
               title: isOverdue ? 'Overdue Reminder Sent' : 'Payment Reminder Sent',
