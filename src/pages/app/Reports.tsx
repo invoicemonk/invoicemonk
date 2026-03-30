@@ -14,7 +14,6 @@ import {
   AlertCircle,
   BarChart3,
   PieChart,
-  FileDown,
 } from 'lucide-react';
 import Analytics from '@/pages/app/Analytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,9 +37,6 @@ import {
   type ReportType,
   type ReportCategory,
 } from '@/hooks/use-reports';
-import { useTaxPack } from '@/hooks/use-tax-pack';
-import { getJurisdictionTaxPackConfig } from '@/lib/jurisdiction-config';
-import type { JurisdictionTaxPackConfig } from '@/lib/jurisdiction-config';
 
 const CATEGORY_ICONS: Record<ReportCategory, typeof DollarSign> = {
   revenue: DollarSign,
@@ -49,73 +45,6 @@ const CATEGORY_ICONS: Record<ReportCategory, typeof DollarSign> = {
   accounting: Calculator,
   compliance: ShieldCheck,
 };
-
-function getTaxPackPeriodOptions(config: JurisdictionTaxPackConfig | null): { value: string; label: string; start: string; end: string }[] {
-  const now = new Date();
-  const year = now.getFullYear();
-  const periods: { value: string; label: string; start: string; end: string }[] = [];
-
-  const defaultPeriod = config?.defaultFilingPeriod || 'quarterly';
-  const filingPeriods = config?.filingPeriods || ['quarterly', 'annual'];
-  const activePeriod = filingPeriods.includes(defaultPeriod as any) ? defaultPeriod : filingPeriods[0];
-
-  if (activePeriod === 'monthly') {
-    for (let m = 0; m < 12; m++) {
-      const monthStart = new Date(year, m, 1);
-      const monthEnd = new Date(year, m + 1, 0);
-      if (monthStart <= now) {
-        periods.push({
-          value: `${year}-${String(m + 1).padStart(2, '0')}`,
-          label: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          start: monthStart.toISOString().split('T')[0],
-          end: monthEnd.toISOString().split('T')[0],
-        });
-      }
-    }
-  } else if (activePeriod === 'bimonthly') {
-    const bimonths = [
-      ['Jan-Feb', 0, 1], ['Mar-Apr', 2, 3], ['May-Jun', 4, 5],
-      ['Jul-Aug', 6, 7], ['Sep-Oct', 8, 9], ['Nov-Dec', 10, 11],
-    ] as const;
-    for (const [label, startM, endM] of bimonths) {
-      const s = new Date(year, startM, 1);
-      const e = new Date(year, endM + 1, 0);
-      if (s <= now) {
-        periods.push({ value: `${year}-bm-${startM}`, label: `${label} ${year}`, start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0] });
-      }
-    }
-  } else if (activePeriod === 'quarterly') {
-    const quarters = [
-      ['Q1 (Jan-Mar)', 0, 2], ['Q2 (Apr-Jun)', 3, 5],
-      ['Q3 (Jul-Sep)', 6, 8], ['Q4 (Oct-Dec)', 9, 11],
-    ] as const;
-    for (const [label, startM, endM] of quarters) {
-      const s = new Date(year, startM, 1);
-      const e = new Date(year, endM + 1, 0);
-      if (s <= now) {
-        periods.push({ value: `${year}-q-${startM}`, label: `${label} ${year}`, start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0] });
-      }
-    }
-  }
-
-  // Always add annual
-  periods.push({
-    value: `${year}-annual`,
-    label: `Full Year ${year}`,
-    start: `${year}-01-01`,
-    end: `${year}-12-31`,
-  });
-
-  // Add previous year
-  periods.push({
-    value: `${year - 1}-annual`,
-    label: `Full Year ${year - 1}`,
-    start: `${year - 1}-01-01`,
-    end: `${year - 1}-12-31`,
-  });
-
-  return periods.reverse();
-}
 
 export default function Reports() {
   const currentYear = new Date().getFullYear();
@@ -128,12 +57,6 @@ export default function Reports() {
   const hasReportsAccess = canAccess('reports_enabled');
 
   const generateReport = useGenerateReport();
-  const { generateTaxPack, isGenerating: isGeneratingTaxPack } = useTaxPack();
-
-  const jurisdiction = currentBusiness?.jurisdiction || null;
-  const taxPackConfig = jurisdiction ? getJurisdictionTaxPackConfig(jurisdiction) : null;
-  const taxPackPeriods = getTaxPackPeriodOptions(taxPackConfig);
-  const [selectedTaxPeriod, setSelectedTaxPeriod] = useState(taxPackPeriods[0]?.value || '');
 
   const handleGenerateReport = async (reportId: ReportType, format: 'json' | 'csv' = 'json') => {
     setGeneratingReport(`${reportId}-${format}`);
@@ -148,18 +71,6 @@ export default function Reports() {
     } finally {
       setGeneratingReport(null);
     }
-  };
-
-  const handleGenerateTaxPack = () => {
-    if (!currentBusiness?.id || !currentCurrencyAccount?.id) return;
-    const period = taxPackPeriods.find(p => p.value === selectedTaxPeriod);
-    if (!period) return;
-    generateTaxPack({
-      business_id: currentBusiness.id,
-      currency_account_id: currentCurrencyAccount.id,
-      period_start: period.start,
-      period_end: period.end,
-    });
   };
 
   // Show upgrade prompt if user doesn't have access
@@ -187,6 +98,8 @@ export default function Reports() {
       </motion.div>
     );
   }
+
+  const categoryReports = REPORT_DEFINITIONS.filter(r => r.category === activeCategory);
 
   return (
     <motion.div
@@ -260,65 +173,6 @@ export default function Reports() {
           </CardContent>
         </Card>
       )}
-
-      {/* Tax Pack Card */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <FileDown className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">
-                  {taxPackConfig?.documentTitle || 'Tax Summary Pack'}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {taxPackConfig
-                    ? `Download a ${taxPackConfig.taxAuthorityName}-ready tax filing summary for your accountant`
-                    : 'Set your business jurisdiction to generate jurisdiction-specific tax documents'
-                  }
-                </CardDescription>
-              </div>
-            </div>
-            {taxPackConfig && (
-              <Badge variant="outline" className="text-xs shrink-0">
-                {taxPackConfig.taxAuthorityName}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center gap-3">
-            <Select value={selectedTaxPeriod} onValueChange={setSelectedTaxPeriod}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                {taxPackPeriods.map(p => (
-                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={handleGenerateTaxPack}
-              disabled={isGeneratingTaxPack || !currentCurrencyAccount || !currentBusiness?.id || (!isPlatformAdmin && !hasTier('professional'))}
-            >
-              {isGeneratingTaxPack ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Generate Tax Pack
-            </Button>
-          </div>
-          {taxPackConfig?.hasVat && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Includes {taxPackConfig.vatLabel} summary at {taxPackConfig.standardVatRate}% standard rate, income statement, revenue &amp; expense registers
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Category Tabs */}
       <Tabs value={activeCategory} onValueChange={v => setActiveCategory(v as ReportCategory)}>

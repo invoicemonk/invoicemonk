@@ -350,7 +350,7 @@ const InvoiceView = () => {
                       <div>
                         <h2 className="text-lg font-bold text-destructive mb-1">Fraud Warning</h2>
                         <p className="text-sm text-destructive/90">
-                          This invoice was issued by a business that has been flagged for suspicious activity by Invoicemonk. 
+                          This invoice was issued by a business that has been flagged for suspicious activity by InvoiceMonk. 
                           Exercise extreme caution before making any payments or sharing personal information.
                         </p>
                         {data.flag_reason && (

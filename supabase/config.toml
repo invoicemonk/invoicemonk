@@ -78,6 +78,3 @@ verify_jwt = false
 [functions.create-paystack-subaccount]
 verify_jwt = false
 
-[functions.generate-tax-pack]
-verify_jwt = false
-

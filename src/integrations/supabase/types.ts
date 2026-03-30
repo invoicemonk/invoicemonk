@@ -731,8 +731,6 @@ export type Database = {
           primary_currency: string | null
           product_service_id: string | null
           receipt_url: string | null
-          tax_amount: number
-          tax_rate: number | null
           updated_at: string
           user_id: string
           vendor: string | null
@@ -752,8 +750,6 @@ export type Database = {
           primary_currency?: string | null
           product_service_id?: string | null
           receipt_url?: string | null
-          tax_amount?: number
-          tax_rate?: number | null
           updated_at?: string
           user_id: string
           vendor?: string | null
@@ -773,8 +769,6 @@ export type Database = {
           primary_currency?: string | null
           product_service_id?: string | null
           receipt_url?: string | null
-          tax_amount?: number
-          tax_rate?: number | null
           updated_at?: string
           user_id?: string
           vendor?: string | null

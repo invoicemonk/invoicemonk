@@ -29,8 +29,6 @@ export interface CreateExpenseInput {
   notes?: string;
   receiptUrl?: string;
   productServiceId?: string | null;
-  taxAmount?: number;
-  taxRate?: number | null;
 }
 
 export interface UpdateExpenseInput {
@@ -42,8 +40,6 @@ export interface UpdateExpenseInput {
   notes?: string;
   receiptUrl?: string;
   productServiceId?: string | null;
-  taxAmount?: number;
-  taxRate?: number | null;
 }
 
 // Expense categories
@@ -197,8 +193,6 @@ export function useCreateExpense(businessId?: string, currencyAccountId?: string
           notes: input.notes || null,
           receipt_url: input.receiptUrl || null,
           product_service_id: input.productServiceId ?? null,
-          tax_amount: input.taxAmount || 0,
-          tax_rate: input.taxRate ?? null,
           // Legacy FX fields - null for new records
           exchange_rate_to_primary: null,
           primary_currency: null,

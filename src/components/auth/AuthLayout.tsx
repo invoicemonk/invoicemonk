@@ -100,7 +100,7 @@ export const AuthLayout = ({ children, variant = 'login' }: AuthLayoutProps) => 
             className="mt-auto p-6 bg-primary-foreground/10 rounded-xl backdrop-blur-sm"
           >
             <blockquote className="text-primary-foreground/90 italic mb-3">
-              "Invoicemonk transformed how we handle invoicing. The compliance features saved us during our audit."
+              "InvoiceMonk transformed how we handle invoicing. The compliance features saved us during our audit."
             </blockquote>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">

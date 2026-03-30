@@ -35,7 +35,7 @@ const InvoicemonkCTA = ({ variant = "default" }: InvoicemonkCTAProps) => {
                     Ready to streamline your invoicing?
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Join other businesses using Invoicemonk
+                    Join thounsands of businesses using Invoicemonk
                   </p>
                 </div>
               </div>
@@ -70,7 +70,7 @@ const InvoicemonkCTA = ({ variant = "default" }: InvoicemonkCTAProps) => {
                 Ready to streamline your invoicing?
               </h3>
               <p className="text-muted-foreground mb-4">
-                Join other businesses using Invoicemonk for professional,
+                Join thousands of businesses using Invoicemonk for professional,
                 compliance-ready invoicing.
               </p>
 
@@ -104,13 +104,13 @@ const InvoicemonkCTA = ({ variant = "default" }: InvoicemonkCTAProps) => {
             {/* Stats/Social Proof */}
             <div className="hidden lg:flex flex-col gap-4 p-6 bg-card rounded-xl border border-border/50 min-w-[200px]">
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary">100+</p>
+                <p className="text-3xl font-bold text-primary">10,000+</p>
                 <p className="text-sm text-muted-foreground">
                   Invoices processed
                 </p>
               </div>
               <div className="border-t border-border pt-4 text-center">
-                <p className="text-3xl font-bold text-primary">25+</p>
+                <p className="text-3xl font-bold text-primary">500+</p>
                 <p className="text-sm text-muted-foreground">
                   Businesses trust us
                 </p>

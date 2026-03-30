@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,7 +29,6 @@ import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { ReceiptUpload } from './ReceiptUpload';
 import { VendorCombobox } from './VendorCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
-import { getJurisdictionTaxPackConfig } from '@/lib/jurisdiction-config';
 
 const expenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -39,8 +38,6 @@ const expenseSchema = z.object({
   expenseDate: z.string().optional(),
   notes: z.string().max(200).optional(),
   receiptUrl: z.string().optional().nullable(),
-  taxAmount: z.number().min(0).optional(),
-  taxRate: z.number().min(0).max(100).optional().nullable(),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -55,10 +52,7 @@ export function ExpenseForm({ onSuccess }: Props) {
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const { data: products = [] } = useProductsServices(currentCurrencyAccount?.id);
   
-  const jurisdiction = business?.jurisdiction || null;
-  const taxPackConfig = jurisdiction ? getJurisdictionTaxPackConfig(jurisdiction) : null;
-  const vatLabel = taxPackConfig?.vatLabel || 'Tax';
-  
+  // Currency is now derived from the active currency account
   const createExpense = useCreateExpense(
     business?.id, 
     currentCurrencyAccount?.id,
@@ -82,8 +76,6 @@ export function ExpenseForm({ onSuccess }: Props) {
       expenseDate: new Date().toISOString().split('T')[0],
       notes: '',
       receiptUrl: null,
-      taxAmount: 0,
-      taxRate: null,
     },
   });
 
@@ -102,8 +94,6 @@ export function ExpenseForm({ onSuccess }: Props) {
       notes: data.notes,
       receiptUrl: data.receiptUrl || undefined,
       productServiceId: linkedProductId || null,
-      taxAmount: data.taxAmount || 0,
-      taxRate: data.taxRate ?? null,
     });
     
     reset();
@@ -161,35 +151,6 @@ export function ExpenseForm({ onSuccess }: Props) {
               {errors.amount && (
                 <p className="text-sm text-destructive">{errors.amount.message}</p>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="taxAmount">{vatLabel} Paid ({activeCurrency})</Label>
-                <Input
-                  id="taxAmount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  {...register('taxAmount', { valueAsNumber: true })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {vatLabel} included in this expense
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="taxRate">{vatLabel} Rate (%)</Label>
-                <Input
-                  id="taxRate"
-                  type="number"
-                  step="0.1"
-                  placeholder={taxPackConfig ? String(taxPackConfig.standardVatRate) : '0'}
-                  {...register('taxRate', { valueAsNumber: true })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {taxPackConfig ? `Standard: ${taxPackConfig.standardVatRate}%` : 'Optional'}
-                </p>
-              </div>
             </div>
 
             <div className="space-y-2">
