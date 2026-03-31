@@ -201,6 +201,39 @@ export function useDeleteCurrencyAccount() {
   });
 }
 
+// Set a currency account as the default
+export function useSetDefaultCurrencyAccount() {
+  const queryClient = useQueryClient();
+  const { currentBusiness } = useBusiness();
+
+  return useMutation({
+    mutationFn: async (accountId: string) => {
+      if (!currentBusiness?.id) throw new Error('No business selected');
+
+      const { error } = await supabase.rpc('set_default_currency_account', {
+        _business_id: currentBusiness.id,
+        _account_id: accountId,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currency-accounts'] });
+      toast({
+        title: 'Default account updated',
+        description: 'Your default currency account has been changed.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error updating default account',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Get currency account limit info
 export function useCurrencyAccountLimit(businessId?: string) {
   return useQuery({

@@ -731,6 +731,8 @@ export type Database = {
           primary_currency: string | null
           product_service_id: string | null
           receipt_url: string | null
+          tax_amount: number
+          tax_rate: number | null
           updated_at: string
           user_id: string
           vendor: string | null
@@ -750,6 +752,8 @@ export type Database = {
           primary_currency?: string | null
           product_service_id?: string | null
           receipt_url?: string | null
+          tax_amount?: number
+          tax_rate?: number | null
           updated_at?: string
           user_id: string
           vendor?: string | null
@@ -769,6 +773,8 @@ export type Database = {
           primary_currency?: string | null
           product_service_id?: string | null
           receipt_url?: string | null
+          tax_amount?: number
+          tax_rate?: number | null
           updated_at?: string
           user_id?: string
           vendor?: string | null
@@ -2885,6 +2891,10 @@ export type Database = {
       }
       notify_admin_payment_failed: {
         Args: { _business_name: string; _subscription_id: string }
+        Returns: undefined
+      }
+      set_default_currency_account: {
+        Args: { _account_id: string; _business_id: string }
         Returns: undefined
       }
       unban_user: { Args: { _user_id: string }; Returns: undefined }

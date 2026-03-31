@@ -378,8 +378,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
             <span className="font-medium">TIN:</span> <span className="font-mono">{recipientSnapshot?.tax_id || invoice.clients?.tax_id}</span>
           </p>
         )}
-        {recipientSnapshot?.address && (
-          <p className="text-sm text-muted-foreground">{formatAddress(recipientSnapshot.address)}</p>
+        {(recipientSnapshot?.address || invoice.clients?.address) && (
+          <p className="text-sm text-muted-foreground">
+            {formatAddress((recipientSnapshot?.address || invoice.clients?.address) as Record<string, string>)}
+          </p>
         )}
         {(recipientSnapshot?.email || invoice.clients?.email) && (
           <p className="text-sm text-muted-foreground">{recipientSnapshot?.email || invoice.clients?.email}</p>

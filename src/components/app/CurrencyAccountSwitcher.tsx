@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronsUpDown, Plus, Wallet } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Wallet, Star, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -36,7 +46,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
-import { useCreateCurrencyAccount, useCurrencyAccountLimit } from '@/hooks/use-currency-accounts';
+import { useCreateCurrencyAccount, useCurrencyAccountLimit, useSetDefaultCurrencyAccount, useDeleteCurrencyAccount } from '@/hooks/use-currency-accounts';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { getCurrencySymbol } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -94,6 +104,7 @@ interface Props {
 export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
   const [open, setOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
   const [newCurrency, setNewCurrency] = useState('');
   const [newName, setNewName] = useState('');
 
@@ -108,6 +119,8 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
   } = useCurrencyAccount();
   
   const createAccount = useCreateCurrencyAccount();
+  const setDefaultAccount = useSetDefaultCurrencyAccount();
+  const deleteAccount = useDeleteCurrencyAccount();
   const { data: limitInfo } = useCurrencyAccountLimit(currentBusiness?.id);
 
   // Get currencies already in use
@@ -127,6 +140,21 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
     setNewName('');
   };
 
+  const handleSetDefault = (accountId: string) => {
+    setDefaultAccount.mutate(accountId);
+    setOpen(false);
+  };
+
+  const handleDeleteAccount = () => {
+    if (!deleteAccountId) return;
+    deleteAccount.mutate(deleteAccountId, {
+      onSuccess: () => setDeleteAccountId(null),
+      onError: () => setDeleteAccountId(null),
+    });
+  };
+
+  const accountToDelete = currencyAccounts.find(a => a.id === deleteAccountId);
+
   // Platform admins can always create more currency accounts
   const canCreateMore = isPlatformAdmin || (limitInfo?.allowed ?? false);
   const isAtLimit = !canCreateMore && currencyAccounts.length > 0;
@@ -134,7 +162,6 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
   if (loading || currencyAccounts.length === 0) {
     return null;
   }
-
 
   return (
     <>
@@ -166,7 +193,7 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
             {!collapsed && <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[240px] p-0" align="start">
+        <PopoverContent className="w-[280px] p-0" align="start">
           <Command>
             <CommandInput placeholder="Search accounts..." />
             <CommandList>
@@ -191,12 +218,43 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
                         </Badge>
                       )}
                     </div>
-                    <Check
-                      className={cn(
-                        "h-4 w-4",
-                        currentCurrencyAccount?.id === account.id ? "opacity-100" : "opacity-0"
+                    <div className="flex items-center gap-1">
+                      {!account.is_default && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            title="Set as default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetDefault(account.id);
+                            }}
+                          >
+                            <Star className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            title="Delete account"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(false);
+                              setDeleteAccountId(account.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
                       )}
-                    />
+                      <Check
+                        className={cn(
+                          "h-4 w-4",
+                          currentCurrencyAccount?.id === account.id ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -281,6 +339,28 @@ export function CurrencyAccountSwitcher({ collapsed = false }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={(open) => !open && setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {accountToDelete?.currency} account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {accountToDelete?.name || accountToDelete?.currency} account. 
+              This action cannot be undone. Accounts with existing invoices or expenses cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAccount.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
