@@ -2812,20 +2812,15 @@ export type Database = {
         }
         Returns: Json
       }
-      get_receivables_intelligence:
-        | {
-            Args: { _business_id: string; _currency_account_id?: string }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _business_id: string
-              _currency_account_id?: string
-              _end_date?: string
-              _start_date?: string
-            }
-            Returns: Json
-          }
+      get_receivables_intelligence: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _end_date?: string
+          _start_date?: string
+        }
+        Returns: Json
+      }
       get_revenue_trend: {
         Args: {
           _business_id: string

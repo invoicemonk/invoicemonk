@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -120,17 +121,35 @@ export default function VerifyReceipt() {
           className="space-y-6"
         >
           {/* Verification Status Card */}
-          <Card className="border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 print:bg-emerald-50">
+          <Card className={cn(
+            "print:bg-emerald-50",
+            receipt.integrity_valid
+              ? "border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20"
+              : "border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20"
+          )}>
             <CardContent className="flex items-center gap-4 py-6">
-              <div className="rounded-full bg-emerald-500/20 p-3">
-                <Shield className="h-8 w-8 text-emerald-600" />
+              <div className={cn(
+                "rounded-full p-3",
+                receipt.integrity_valid ? "bg-emerald-500/20" : "bg-amber-500/20"
+              )}>
+                <Shield className={cn(
+                  "h-8 w-8",
+                  receipt.integrity_valid ? "text-emerald-600" : "text-amber-600"
+                )} />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                  Receipt Verified
+                <h2 className={cn(
+                  "text-xl font-bold",
+                  receipt.integrity_valid
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-amber-700 dark:text-amber-400"
+                )}>
+                  {receipt.integrity_valid ? 'Receipt Verified' : 'Receipt Found'}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  This receipt is authentic and has not been tampered with.
+                  {receipt.integrity_valid
+                    ? 'This receipt is authentic and has not been tampered with.'
+                    : 'This receipt was found but its integrity could not be confirmed.'}
                 </p>
               </div>
               {receipt.integrity_valid ? (

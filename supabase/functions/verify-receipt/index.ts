@@ -86,8 +86,16 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Normalize values to match Postgres TEXT casting used during hash creation
+    const toPgTimestamptz = (iso: string): string => {
+      const d = new Date(iso)
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}+00`
+    }
+    const toPgNumeric = (n: number): string => Number(n).toFixed(2)
+
     // Verify hash integrity
-    const hashInput = `${receipt.receipt_number}|${receipt.invoice_id}|${receipt.payment_id}|${receipt.amount}|${receipt.currency}|${receipt.issued_at}`
+    const hashInput = `${receipt.receipt_number}|${receipt.invoice_id}|${receipt.payment_id}|${toPgNumeric(receipt.amount)}|${receipt.currency}|${toPgTimestamptz(receipt.issued_at)}`
     
     // Use Web Crypto API for SHA-256
     const encoder = new TextEncoder()

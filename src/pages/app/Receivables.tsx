@@ -117,7 +117,7 @@ export default function Receivables() {
       </motion.div>
 
       {/* Summary KPIs */}
-      <motion.div variants={item} className="grid gap-4 sm:grid-cols-3">
+      <motion.div variants={item} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Outstanding</p>
@@ -139,9 +139,17 @@ export default function Receivables() {
         </Card>
         <Card>
           <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
+            <p className="text-2xl font-bold" title={formatCurrency(data?.total_collected ?? 0, currency)}>
+              {formatCompactCurrency(data?.total_collected ?? 0, currency)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Collection Rate</p>
             <p className="text-2xl font-bold">
-              {total > 0 ? `${Math.round(((total - overdue) / total) * 100)}%` : '—'}
+              {(data?.collection_rate_pct ?? 0) > 0 ? `${data?.collection_rate_pct}%` : '—'}
             </p>
           </CardContent>
         </Card>
@@ -240,6 +248,7 @@ export default function Receivables() {
                   <TableRow>
                     <TableHead>Client</TableHead>
                     <TableHead className="text-right">Avg Days to Pay</TableHead>
+                    <TableHead className="text-right">Total Paid</TableHead>
                     <TableHead className="text-right">Outstanding</TableHead>
                     <TableHead className="text-right">Invoices</TableHead>
                   </TableRow>
@@ -254,6 +263,9 @@ export default function Receivables() {
                         >
                           {payer.avg_days_to_pay}d
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(payer.total_paid, currency)}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(payer.outstanding_amount, currency)}

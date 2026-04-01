@@ -29,12 +29,16 @@ export interface SlowPayer {
   client_name: string;
   avg_days_to_pay: number;
   outstanding_amount: number;
+  total_paid: number;
   invoice_count: number;
 }
 
 export interface ReceivablesIntelligence {
   total_outstanding: number;
   overdue_amount: number;
+  total_collected: number;
+  total_invoiced: number;
+  collection_rate_pct: number;
   aging: AgingBuckets;
   slow_payers: SlowPayer[];
 }
