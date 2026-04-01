@@ -20,6 +20,7 @@ export function AccountingPeriodSelector({ value, onChange, disabled }: Props) {
           <SelectItem value="monthly">Monthly</SelectItem>
           <SelectItem value="quarterly">Quarterly</SelectItem>
           <SelectItem value="yearly">Yearly</SelectItem>
+          <SelectItem value="all_time">All Time</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -27,7 +28,10 @@ export function AccountingPeriodSelector({ value, onChange, disabled }: Props) {
 }
 
 // Helper to get date range for accounting period
-export function getAccountingDateRange(period: AccountingPeriod): { start: Date; end: Date } {
+// Returns undefined for 'all_time' to skip date filtering
+export function getAccountingDateRange(period: AccountingPeriod): { start: Date; end: Date } | undefined {
+  if (period === 'all_time') return undefined;
+
   const now = new Date();
   const start = new Date();
   const end = new Date();
@@ -73,6 +77,8 @@ export function getPeriodLabel(period: AccountingPeriod): string {
       return `Q${quarter} ${now.getFullYear()}`;
     case 'yearly':
       return now.getFullYear().toString();
+    case 'all_time':
+      return 'All Time';
     default:
       return '';
   }

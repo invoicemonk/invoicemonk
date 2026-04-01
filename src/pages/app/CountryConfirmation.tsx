@@ -22,6 +22,7 @@ import { getComplianceAdapterByCountry } from '@/lib/compliance-adapters';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { addTags } from '@/lib/onesignal';
 
 function getSmartPrefillAmount(currency: string): number {
   const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
@@ -125,6 +126,7 @@ export default function CountryConfirmation() {
         description: `Your business is set up for compliant invoicing in ${countryName}.`,
       });
 
+      addTags({ jurisdiction: selectedCountry, onboarding_complete: 'true' });
       navigate(`/b/${businessId}/dashboard`, { replace: true });
     } catch (err: any) {
       toast({

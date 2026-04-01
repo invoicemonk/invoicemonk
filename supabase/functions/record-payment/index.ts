@@ -55,6 +55,7 @@ interface RecordPaymentResponse {
     verification_id: string
   }
   invoice_status?: string
+  receipt_warning?: string
   error?: string
   error_code?: string
 }
@@ -324,12 +325,14 @@ Deno.serve(async (req) => {
 
     // Create receipt for this payment
     let receiptInfo: { id: string; receipt_number: string; verification_id: string } | undefined = undefined
+    let receiptWarning: string | undefined = undefined
     try {
       const { data: receiptId, error: receiptError } = await supabaseService
         .rpc('create_receipt_from_payment', { _payment_id: payment.id })
       
       if (receiptError) {
         console.error('Receipt creation error:', receiptError)
+        receiptWarning = 'Payment recorded but receipt generation failed. You can generate it manually from the invoice detail page.'
       } else if (receiptId) {
         // Fetch the created receipt for response
         const { data: receiptData } = await supabaseService
@@ -349,7 +352,7 @@ Deno.serve(async (req) => {
     } catch (receiptErr) {
       console.error('Receipt creation exception:', receiptErr)
       captureException(receiptErr, { function_name: 'record-payment' })
-      // Don't fail the payment recording if receipt creation fails
+      receiptWarning = 'Payment recorded but receipt generation failed. You can generate it manually from the invoice detail page.'
     }
 
     const response: RecordPaymentResponse = {
@@ -361,6 +364,7 @@ Deno.serve(async (req) => {
         payment_date: payment.payment_date
       },
       receipt: receiptInfo,
+      receipt_warning: receiptWarning,
       invoice_status: newStatus
     }
 

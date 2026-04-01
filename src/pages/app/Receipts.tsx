@@ -4,16 +4,18 @@ import { Link, useParams } from 'react-router-dom';
 import { 
   FileText, Search, Download, Eye, ExternalLink, 
   Loader2, Receipt as ReceiptIcon, Calendar, User, 
-  CheckCircle2
+  CheckCircle2, AlertTriangle, Plus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useReceipts, useDownloadReceiptPdf } from '@/hooks/use-receipts';
+import { useReceipts, useDownloadReceiptPdf, useGenerateReceipt } from '@/hooks/use-receipts';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { formatCompactCurrency, formatCurrency } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 
 export default function Receipts() {
@@ -22,7 +24,56 @@ export default function Receipts() {
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const { data: receipts, isLoading } = useReceipts(currentCurrencyAccount?.id);
   const downloadPdf = useDownloadReceiptPdf();
+  const generateReceipt = useGenerateReceipt();
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch payments without receipts for recovery section
+  const { data: orphanedPayments } = useQuery({
+    queryKey: ['orphaned-payments', business?.id],
+    queryFn: async () => {
+      if (!business?.id) return [];
+      // Get all payments for this business's invoices that don't have receipts
+      const { data: payments, error } = await supabase
+        .from('payments')
+        .select(`
+          id,
+          amount,
+          payment_date,
+          payment_method,
+          invoice_id,
+          invoices!inner (
+            id,
+            invoice_number,
+            currency,
+            business_id,
+            currency_account_id,
+            clients!inner ( name )
+          )
+        `)
+        .eq('invoices.business_id', business.id);
+
+      if (error || !payments) return [];
+
+      // Filter to only payments without receipts
+      const paymentIds = payments.map(p => p.id);
+      if (paymentIds.length === 0) return [];
+
+      const { data: existingReceipts } = await supabase
+        .from('receipts')
+        .select('payment_id')
+        .in('payment_id', paymentIds);
+
+      const receiptPaymentIds = new Set((existingReceipts || []).map(r => r.payment_id));
+      
+      return payments
+        .filter(p => !receiptPaymentIds.has(p.id))
+        .filter(p => {
+          const inv = p.invoices as any;
+          return !currentCurrencyAccount?.id || inv.currency_account_id === currentCurrencyAccount.id;
+        });
+    },
+    enabled: !!business?.id,
+  });
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', { 
@@ -142,13 +193,73 @@ export default function Receipts() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredReceipts.length === 0 ? (
+          {filteredReceipts.length === 0 && (!orphanedPayments || orphanedPayments.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <ReceiptIcon className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No receipts yet</h3>
               <p className="text-muted-foreground max-w-sm">
                 Receipts are automatically generated when you record payments against invoices.
               </p>
+            </div>
+          ) : filteredReceipts.length === 0 && orphanedPayments && orphanedPayments.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-amber-600 mb-2">
+                <AlertTriangle className="h-5 w-5" />
+                <p className="font-medium">Missing receipts detected</p>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                The following payments don't have receipts. Click "Generate" to create them.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Payer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orphanedPayments.map((payment: any) => {
+                    const inv = payment.invoices;
+                    return (
+                      <TableRow key={payment.id}>
+                        <TableCell>
+                          <Link 
+                            to={`/b/${businessId}/invoices/${inv.id}`}
+                            className="text-primary hover:underline flex items-center gap-1"
+                          >
+                            <FileText className="h-3 w-3" />
+                            {inv.invoice_number}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{inv.clients?.name || 'Unknown'}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(payment.payment_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(Number(payment.amount), inv.currency)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => generateReceipt.mutate(payment.id)}
+                            disabled={generateReceipt.isPending}
+                          >
+                            {generateReceipt.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Plus className="h-3 w-3 mr-1" />
+                            )}
+                            Generate
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <Table>

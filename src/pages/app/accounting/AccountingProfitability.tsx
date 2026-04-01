@@ -3,12 +3,14 @@ import { motion } from 'framer-motion';
 import { PieChart, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useProfitabilityStats } from '@/hooks/use-cashflow-stats';
 import { formatCurrency, formatCompactCurrency } from '@/lib/utils';
 import { AccountingNavTabs } from '@/components/accounting/AccountingNavTabs';
+import { AccountingPeriodSelector, getAccountingDateRange, getPeriodLabel } from '@/components/accounting/AccountingPeriodSelector';
+import { AccountingDisclaimer } from '@/components/accounting/AccountingDisclaimer';
+import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart as RechartsPieChart, Pie, Cell, LineChart, Line,
@@ -25,31 +27,19 @@ const COLORS = [
   'hsl(330, 60%, 50%)',
 ];
 
-type Period = '30d' | '90d' | '180d' | '365d' | 'ytd';
-
-function getPeriodDates(period: Period) {
-  const end = new Date();
-  const start = new Date();
-  switch (period) {
-    case '30d': start.setDate(end.getDate() - 30); break;
-    case '90d': start.setDate(end.getDate() - 90); break;
-    case '180d': start.setDate(end.getDate() - 180); break;
-    case '365d': start.setFullYear(end.getFullYear() - 1); break;
-    case 'ytd': start.setMonth(0, 1); break;
-  }
-  return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
-}
-
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
 export default function AccountingProfitability() {
   const { currentBusiness } = useBusiness();
-  const { currentCurrencyAccount } = useCurrencyAccount();
+  const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const currency = currentCurrencyAccount?.currency || currentBusiness?.default_currency || 'NGN';
+  const { data: preferences } = useAccountingPreferences();
 
-  const [period, setPeriod] = useState<Period>('90d');
-  const { start, end } = getPeriodDates(period);
+  const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
+  const dateRange = getAccountingDateRange(period);
+  const start = dateRange?.start.toISOString().split('T')[0];
+  const end = dateRange?.end.toISOString().split('T')[0];
 
   const { data, isLoading } = useProfitabilityStats(
     currentBusiness?.id,
@@ -64,27 +54,16 @@ export default function AccountingProfitability() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      <AccountingNavTabs />
+
       {/* Header */}
       <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Accounting</h1>
-          <p className="text-sm text-muted-foreground">Revenue, expenses, and margins at a glance</p>
+          <h1 className="text-3xl font-bold tracking-tight">Profitability</h1>
+          <p className="text-sm text-muted-foreground">Revenue, expenses, and margins in {getPeriodLabel(period)}</p>
         </div>
-        <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-            <SelectItem value="180d">Last 6 months</SelectItem>
-            <SelectItem value="365d">Last 12 months</SelectItem>
-            <SelectItem value="ytd">Year to date</SelectItem>
-          </SelectContent>
-        </Select>
+        <AccountingPeriodSelector value={period} onChange={setPeriod} />
       </motion.div>
-
-      <AccountingNavTabs />
 
       {/* KPI cards */}
       <motion.div variants={item} className="grid gap-4 sm:grid-cols-3">
@@ -254,6 +233,8 @@ export default function AccountingProfitability() {
           </Card>
         </motion.div>
       )}
+
+      <AccountingDisclaimer type="overview" />
     </motion.div>
   );
 }

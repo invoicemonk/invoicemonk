@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { addTags } from '@/lib/onesignal';
 
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function CheckoutSuccess() {
       if (user?.id) {
         // Mark plan as selected after successful checkout
         await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
+        addTags({ stripe_checkout_completed: 'true' });
         
         // Broadly invalidate all subscription and business queries
         queryClient.invalidateQueries({ queryKey: ['subscription'] });

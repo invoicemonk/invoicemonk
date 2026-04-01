@@ -29,7 +29,7 @@ export default function AccountingOverview() {
     business?.id, 
     currentCurrencyAccount?.id,
     activeCurrency, 
-    dateRange
+    dateRange ?? undefined
   );
 
   // Check for missing recommended fields

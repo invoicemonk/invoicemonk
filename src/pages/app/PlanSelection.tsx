@@ -24,6 +24,7 @@ import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
+import { addTags } from '@/lib/onesignal';
 
 const planIcons = {
   starter: Zap,
@@ -54,20 +55,23 @@ export default function PlanSelection() {
 
   const handleSelectPlan = async (tier: TierKey) => {
     if (tier === 'starter') {
+      addTags({ plan_type: 'free' });
       await markPlanSelected();
-      queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
+      await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
       navigate('/dashboard');
       return;
     }
 
+    addTags({ plan_type: 'paid' });
     setLoadingTier(tier);
     await createCheckoutSession(tier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
     setLoadingTier(null);
   };
 
   const handleSkip = async () => {
+    addTags({ plan_type: 'free' });
     await markPlanSelected();
-    queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
+    await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
     navigate('/dashboard');
   };
 
@@ -103,11 +107,28 @@ export default function PlanSelection() {
           </p>
         </motion.div>
 
+        {/* Above-the-fold free plan CTA */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-center mb-6"
+        >
+          <Button
+            variant="link"
+            onClick={handleSkip}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Not ready to choose? Continue with Free plan
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </motion.div>
+
         {/* Billing Toggle */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.15 }}
           className="flex items-center justify-center gap-4 mb-10"
         >
           <Label htmlFor="billing-toggle" className={!isYearly ? 'font-semibold' : 'text-muted-foreground'}>
@@ -241,7 +262,7 @@ export default function PlanSelection() {
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.2 }}
           className="text-center"
         >
           <Button 

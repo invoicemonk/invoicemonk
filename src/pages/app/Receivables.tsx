@@ -214,7 +214,10 @@ export default function Receivables() {
                 </Table>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">No outstanding receivables to display.</p>
+              <div className="text-center py-8 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">No outstanding receivables</p>
+                <p className="text-xs text-muted-foreground">All invoices are either fully paid or voided. Outstanding amounts will appear here when you have unpaid issued invoices.</p>
+              </div>
             )}
           </CardContent>
         </Card>

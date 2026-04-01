@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
+import { addTags } from '@/lib/onesignal';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Invoice = Tables<'invoices'> & {
@@ -188,8 +189,24 @@ export function useCreateInvoice() {
 
       return createdInvoice;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+
+      // Tag OneSignal with invoice count (fire-and-forget)
+      try {
+        const businessId = data.business_id;
+        if (businessId) {
+          const { count } = await supabase
+            .from('invoices')
+            .select('id', { count: 'exact', head: true })
+            .eq('business_id', businessId);
+          addTags({
+            invoices_created: String(count ?? 1),
+            last_invoice_date: String(Date.now()),
+          });
+        }
+      } catch {}
+
       toast({
         title: 'Invoice created',
         description: 'Your draft invoice has been saved.',

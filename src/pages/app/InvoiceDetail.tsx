@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink
+  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink, Plus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { useDownloadInvoicePdf } from '@/hooks/use-invoice-pdf';
 import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
 import { useInvoicePayments } from '@/hooks/use-payments';
 import { useInvoicePaymentProofs, useUploadPaymentProof } from '@/hooks/use-payment-proofs';
+import { useReceiptsByInvoice, useGenerateReceipt, useDownloadReceiptPdf } from '@/hooks/use-receipts';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { ComplianceArtifactsSection } from '@/components/invoices/ComplianceArtifactsSection';
 import { RegulatoryStatusSection } from '@/components/invoices/RegulatoryStatusSection';
@@ -32,6 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { PaymentMethodCard } from '@/components/payment-methods/PaymentMethodCard';
 import { supabase } from '@/integrations/supabase/client';
+import { Receipt as ReceiptIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -74,10 +76,13 @@ export default function InvoiceDetail() {
   const { data: creditNote } = useCreditNoteByInvoice(id);
   const { data: payments } = useInvoicePayments(id);
   const { data: paymentProofs } = useInvoicePaymentProofs(id);
+  const { data: invoiceReceipts } = useReceiptsByInvoice(id);
   const issueInvoice = useIssueInvoice();
   const voidInvoice = useVoidInvoice();
   const recordPayment = useRecordPayment();
   const downloadPdf = useDownloadInvoicePdf();
+  const downloadReceiptPdf = useDownloadReceiptPdf();
+  const generateReceipt = useGenerateReceipt();
   const uploadProof = useUploadPaymentProof();
   const { isStarter, currentBusiness } = useBusiness();
   const { data: templates } = useInvoiceTemplates();
@@ -593,25 +598,60 @@ export default function InvoiceDetail() {
                         <TableRow>
                           <TableHead>Date</TableHead>
                           <TableHead>Method</TableHead>
-                          <TableHead>Reference</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Receipt</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                            <TableCell className="capitalize">
-                              {payment.payment_method?.replace('_', ' ') || '-'}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {payment.payment_reference || '-'}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-emerald-600">
-                              {formatCurrency(Number(payment.amount), invoice.currency)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {payments.map((payment) => {
+                          const receipt = invoiceReceipts?.find(r => r.payment_id === payment.id);
+                          return (
+                            <TableRow key={payment.id}>
+                              <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                              <TableCell className="capitalize">
+                                {payment.payment_method?.replace('_', ' ') || '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-emerald-600">
+                                {formatCurrency(Number(payment.amount), invoice.currency)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {receipt ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button variant="ghost" size="sm" asChild>
+                                      <Link to={`/b/${invoice.business_id}/receipts/${receipt.id}`}>
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        {receipt.receipt_number}
+                                      </Link>
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => downloadReceiptPdf.mutate({ receiptId: receipt.id, receiptNumber: receipt.receipt_number })}
+                                      disabled={downloadReceiptPdf.isPending}
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => generateReceipt.mutate(payment.id)}
+                                    disabled={generateReceipt.isPending}
+                                  >
+                                    {generateReceipt.isPending ? (
+                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                    ) : (
+                                      <Plus className="h-3 w-3 mr-1" />
+                                    )}
+                                    Generate
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                     

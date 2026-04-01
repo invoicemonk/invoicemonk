@@ -23,7 +23,7 @@ export default function AccountingResult() {
     business?.id, 
     currentCurrencyAccount?.id,
     activeCurrency,
-    dateRange
+    dateRange ?? undefined
   );
 
   const currency = stats?.currency || activeCurrency || '';

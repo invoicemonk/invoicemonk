@@ -153,6 +153,38 @@ export function useReceiptsByInvoice(invoiceId: string | undefined) {
   });
 }
 
+// Generate receipt for a payment (manual recovery)
+export function useGenerateReceipt() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentId: string) => {
+      const response = await supabase.functions.invoke('generate-receipt', {
+        body: { payment_id: paymentId },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to generate receipt');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      return response.data.receipt as { id: string; receipt_number: string; verification_id: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receipt'] });
+      queryClient.invalidateQueries({ queryKey: ['orphaned-payments'] });
+      toast.success('Receipt generated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to generate receipt: ${error.message}`);
+    },
+  });
+}
+
 // Download receipt PDF
 export function useDownloadReceiptPdf() {
   return useMutation({

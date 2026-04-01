@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAccountContext } from '@/hooks/use-account-context';
 import { toast } from '@/hooks/use-toast';
 
-export type AccountingPeriod = 'monthly' | 'quarterly' | 'yearly';
+export type AccountingPeriod = 'monthly' | 'quarterly' | 'yearly' | 'all_time';
 
 export interface AccountingPreferences {
   id: string;

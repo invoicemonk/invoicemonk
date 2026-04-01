@@ -33,13 +33,13 @@ export default function AccountingExpenses() {
   const { data: expenses, isLoading: isLoadingExpenses } = useExpenses(
     business?.id, 
     currentCurrencyAccount?.id,
-    dateRange
+    dateRange ?? undefined
   );
   const { data: categoryData, isLoading: isLoadingCategories } = useExpensesByCategory(
     business?.id, 
     currentCurrencyAccount?.id,
     activeCurrency,
-    dateRange
+    dateRange ?? undefined
   );
 
   const currency = activeCurrency || business?.default_currency || '';

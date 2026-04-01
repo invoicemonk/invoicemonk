@@ -48,7 +48,7 @@ export default function AccountingIncome() {
     business?.id, 
     currentCurrencyAccount?.id,
     activeCurrency,
-    dateRange
+    dateRange ?? undefined
   );
   const { data: invoiceResult, isLoading: isLoadingInvoices } = useInvoices(business?.id);
   const invoices = invoiceResult?.data;

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIdleTimeout } from '@/hooks/use-idle-timeout';
+import { addTags } from '@/lib/onesignal';
 
 interface Profile {
   id: string;
@@ -73,6 +74,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }, 0);
 
           // Fire-and-forget login tracking — update last_login_at
+          if (event === 'SIGNED_IN') {
+            addTags({ last_login: String(Date.now()) });
+          }
+
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             Promise.resolve(
               supabase

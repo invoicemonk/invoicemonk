@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Mail, CheckCircle, Loader2, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import logo from '@/assets/logo-red.png';
+import { addTags } from '@/lib/onesignal';
 
 const VerifyEmail = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const VerifyEmail = () => {
   useEffect(() => {
     if (user?.email_confirmed_at) {
       setIsVerified(true);
+      addTags({ email_confirmed: 'true' });
       setTimeout(() => {
         navigate('/select-plan');
       }, 2000);

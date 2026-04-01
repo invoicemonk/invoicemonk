@@ -52,6 +52,7 @@ export function useUploadBusinessLogo() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       toast({
         title: 'Logo uploaded',
         description: 'Your business logo has been updated.',
@@ -102,6 +103,7 @@ export function useDeleteBusinessLogo() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       toast({
         title: 'Logo removed',
         description: 'Your business logo has been removed.',
@@ -315,6 +317,7 @@ export function useUpdateBusiness() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
+      queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       toast({
         title: 'Profile saved',
         description: 'Your business profile has been updated.',
