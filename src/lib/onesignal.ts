@@ -17,6 +17,9 @@ export function loginUser(userId: string): void {
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   window.OneSignalDeferred.push(async (OneSignal: any) => {
     await OneSignal.login(userId);
+    if (!OneSignal.Notifications.permission) {
+      await OneSignal.Notifications.requestPermission();
+    }
   });
 }
 
