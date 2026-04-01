@@ -13,25 +13,23 @@ export function initOneSignal(): void {
   });
 }
 
+export function loginUser(userId: string): void {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async (OneSignal: any) => {
+    await OneSignal.login(userId);
+  });
+}
+
+export function logoutUser(): void {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async (OneSignal: any) => {
+    await OneSignal.logout();
+  });
+}
+
 export function addTags(tags: Record<string, string>): void {
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   window.OneSignalDeferred.push(async (OneSignal: any) => {
     await OneSignal.User.addTags(tags);
-  });
-}
-
-export function tagUser(
-  userId: string,
-  lastLoginDate: string,
-  invoicesCreated: number
-): void {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(async (OneSignal: any) => {
-    await OneSignal.login(userId);
-    await OneSignal.User.addTags({
-      user_id: userId,
-      last_login_date: lastLoginDate,
-      invoices_created: String(invoicesCreated),
-    });
   });
 }

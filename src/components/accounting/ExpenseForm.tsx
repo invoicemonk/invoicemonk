@@ -81,7 +81,7 @@ export function ExpenseForm({ onSuccess }: Props) {
 
   const category = watch('category');
   const receiptUrl = watch('receiptUrl');
-  const [linkedProductId, setLinkedProductId] = useState<string>('');
+  const [linkedProductId, setLinkedProductId] = useState<string>('none');
 
   const onSubmit = async (data: ExpenseFormData) => {
     if (!currentCurrencyAccount) return;
@@ -93,11 +93,11 @@ export function ExpenseForm({ onSuccess }: Props) {
       expenseDate: data.expenseDate,
       notes: data.notes,
       receiptUrl: data.receiptUrl || undefined,
-      productServiceId: linkedProductId || null,
+      productServiceId: linkedProductId && linkedProductId !== 'none' ? linkedProductId : null,
     });
     
     reset();
-    setLinkedProductId('');
+    setLinkedProductId('none');
     setOpen(false);
     onSuccess?.();
   };
@@ -187,7 +187,7 @@ export function ExpenseForm({ onSuccess }: Props) {
                     <SelectValue placeholder="Link to a product or service..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {products.filter(p => p.isActive).map(p => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}

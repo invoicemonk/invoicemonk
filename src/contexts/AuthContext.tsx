@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIdleTimeout } from '@/hooks/use-idle-timeout';
-import { addTags } from '@/lib/onesignal';
+import { addTags, loginUser, logoutUser } from '@/lib/onesignal';
 
 interface Profile {
   id: string;
@@ -75,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           // Fire-and-forget login tracking — update last_login_at
           if (event === 'SIGNED_IN') {
+            loginUser(session.user.id);
             addTags({ last_login: String(Date.now()) });
           }
 
@@ -187,6 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    logoutUser();
     await supabase.auth.signOut({ scope: 'global' });
     setProfile(null);
   };
