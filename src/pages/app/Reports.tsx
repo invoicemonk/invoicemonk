@@ -58,7 +58,7 @@ export default function Reports() {
 
   const generateReport = useGenerateReport();
 
-  const handleGenerateReport = async (reportId: ReportType, format: 'json' | 'csv' = 'json') => {
+  const handleGenerateReport = async (reportId: ReportType, format: 'json' | 'csv' | 'pdf' = 'csv') => {
     setGeneratingReport(`${reportId}-${format}`);
     try {
       await generateReport.mutateAsync({
@@ -192,11 +192,13 @@ export default function Reports() {
           <TabsContent key={cat.id} value={cat.id} className="mt-4">
             <div className="grid gap-4 md:grid-cols-2">
               {REPORT_DEFINITIONS.filter(r => r.category === cat.id).map(report => {
-                const isGeneratingJson = generatingReport === `${report.id}-json`;
                 const isGeneratingCsv = generatingReport === `${report.id}-csv`;
-                const isGenerating = isGeneratingJson || isGeneratingCsv;
+                const isGeneratingJson = generatingReport === `${report.id}-json`;
+                const isGeneratingPdf = generatingReport === `${report.id}-pdf`;
+                const isGenerating = isGeneratingCsv || isGeneratingJson || isGeneratingPdf;
                 const tierLocked = !isPlatformAdmin && !hasTier(report.requiredTier as any);
                 const needsCurrencyAccount = report.requiresCurrencyAccount && !currentCurrencyAccount;
+                const isComplianceReport = report.category === 'compliance' && report.id !== 'export-history';
 
                 return (
                   <Card key={report.id} className={`transition-shadow ${tierLocked ? 'opacity-60' : 'hover:shadow-md'}`}>
@@ -220,28 +222,38 @@ export default function Reports() {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="flex items-center justify-end gap-2">
+                        {isComplianceReport && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGenerateReport(report.id, 'pdf')}
+                            disabled={isGenerating || tierLocked || needsCurrencyAccount}
+                          >
+                            {isGeneratingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
+                          </Button>
+                        )}
                         {report.exportable && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleGenerateReport(report.id, 'csv')}
+                            onClick={() => handleGenerateReport(report.id, 'json')}
                             disabled={isGenerating || tierLocked || needsCurrencyAccount}
                           >
-                            {isGeneratingCsv ? <Loader2 className="h-4 w-4 animate-spin" /> : 'CSV'}
+                            {isGeneratingJson ? <Loader2 className="h-4 w-4 animate-spin" /> : 'JSON'}
                           </Button>
                         )}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleGenerateReport(report.id, 'json')}
+                          onClick={() => handleGenerateReport(report.id, 'csv')}
                           disabled={isGenerating || tierLocked || needsCurrencyAccount}
                         >
-                          {isGeneratingJson ? (
+                          {isGeneratingCsv ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (
                             <Download className="h-4 w-4 mr-2" />
                           )}
-                          Generate
+                          Download
                         </Button>
                       </div>
                     </CardContent>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 
 export interface CurrencyAccount {
   id: string;
@@ -101,6 +102,7 @@ export function useCreateCurrencyAccount() {
       });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useCreateCurrencyAccount' });
       toast({
         title: 'Error creating currency account',
         description: error.message,
@@ -134,6 +136,7 @@ export function useUpdateCurrencyAccount() {
       });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useUpdateCurrencyAccount' });
       toast({
         title: 'Error updating currency account',
         description: error.message,
@@ -192,6 +195,7 @@ export function useDeleteCurrencyAccount() {
       });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useDeleteCurrencyAccount' });
       toast({
         title: 'Error deleting currency account',
         description: error.message,
@@ -225,6 +229,7 @@ export function useSetDefaultCurrencyAccount() {
       });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useSetDefaultCurrencyAccount' });
       toast({
         title: 'Error updating default account',
         description: error.message,

@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
       due_date: string | null
       notes: string | null
       terms: string | null
+      summary: string | null
       verification_id: string | null
       invoice_hash: string | null
       business_id: string | null

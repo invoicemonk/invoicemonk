@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 type BillingPeriod = 'monthly' | 'yearly';
 type Tier = 'professional' | 'business';
@@ -39,8 +40,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
         throw new Error('No checkout URL returned');
       }
     } catch (error) {
+      captureError(error, { hook: 'useCheckout', action: 'createCheckoutSession' });
       const message = error instanceof Error ? error.message : 'Failed to create checkout session';
-      console.error('Checkout error:', message);
       toast.error(message);
       options.onError?.(message);
     } finally {
@@ -67,8 +68,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
         throw new Error('No portal URL returned');
       }
     } catch (error) {
+      captureError(error, { hook: 'useCheckout', action: 'openCustomerPortal' });
       const message = error instanceof Error ? error.message : 'Failed to open customer portal';
-      console.error('Portal error:', message);
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -91,8 +92,8 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
       toast.success(data?.message || 'Subscription cancelled');
       return true;
     } catch (error) {
+      captureError(error, { hook: 'useCheckout', action: 'cancelSubscription' });
       const message = error instanceof Error ? error.message : 'Failed to cancel subscription';
-      console.error('Cancel error:', message);
       toast.error(message);
       return false;
     } finally {

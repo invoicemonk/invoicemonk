@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import * as Sentry from '@sentry/react';
+import posthog from 'posthog-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIdleTimeout } from '@/hooks/use-idle-timeout';
 import { addTags, loginUser, logoutUser } from '@/lib/onesignal';
@@ -67,6 +69,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          Sentry.setUser({ id: session.user.id, email: session.user.email });
+          posthog.identify(session.user.id, { email: session.user.email });
           // Use setTimeout to avoid potential race conditions with Supabase
           setTimeout(async () => {
             const profileData = await fetchProfile(session.user.id);
@@ -95,6 +99,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             triggerReferralAttribution();
           }
         } else {
+          Sentry.setUser(null);
+          posthog.reset();
           setProfile(null);
         }
         
@@ -189,6 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     logoutUser();
+    Sentry.setUser(null);
+    posthog.reset();
     await supabase.auth.signOut({ scope: 'global' });
     setProfile(null);
   };

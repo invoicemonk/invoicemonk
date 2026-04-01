@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 export interface Receipt {
   id: string;
@@ -180,6 +181,7 @@ export function useGenerateReceipt() {
       toast.success('Receipt generated successfully');
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useGenerateReceipt' });
       toast.error(`Failed to generate receipt: ${error.message}`);
     },
   });
@@ -233,6 +235,7 @@ export function useDownloadReceiptPdf() {
       toast.success('Receipt PDF downloaded successfully');
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useDownloadReceiptPdf' });
       toast.error(`Failed to download PDF: ${error.message}`);
     },
   });

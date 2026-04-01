@@ -1000,7 +1000,7 @@ Deno.serve(async (req) => {
 
     if (!brevoApiKey) {
       console.error('BREVO_API_KEY not configured')
-      captureException(error instanceof Error ? error : new Error(String(error)), { function_name: 'send-invoice-email' })
+      captureException(new Error('BREVO_API_KEY not configured'), { function_name: 'send-invoice-email' })
       return new Response(
         JSON.stringify({ success: false, error: 'Email sending is not configured. Please configure BREVO_API_KEY.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

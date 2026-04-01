@@ -68,6 +68,9 @@ interface ViewInvoiceResponse {
     verification_id: string
   }
   issuer_tier?: string
+  is_flagged?: boolean
+  flag_reason?: string
+  online_payments_enabled?: boolean
   error?: string
 }
 
@@ -277,7 +280,7 @@ Deno.serve(async (req) => {
       },
       issuer_tier: issuerTier,
       is_flagged: isFlagged,
-      flag_reason: isFlagged ? flagReason : undefined,
+      flag_reason: isFlagged ? (flagReason ?? undefined) : undefined,
       online_payments_enabled: onlinePaymentsEnabled
     }
 

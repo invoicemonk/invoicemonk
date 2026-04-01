@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 
 export interface SupportTicket {
   id: string;
@@ -210,6 +211,7 @@ export function useCreateSupportTicket() {
       });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useCreateSupportTicket' });
       toast({
         title: 'Failed to create ticket',
         description: error.message,
@@ -264,6 +266,7 @@ export function useAddTicketMessage() {
       });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useAddTicketMessage' });
       toast({
         title: 'Failed to send message',
         description: error.message,
@@ -304,6 +307,7 @@ export function useUpdateTicketStatus() {
       });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useUpdateTicketStatus' });
       toast({
         title: 'Failed to update ticket',
         description: error.message,

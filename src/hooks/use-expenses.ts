@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 
 export interface Expense {
   id: string;
@@ -213,6 +214,7 @@ export function useCreateExpense(businessId?: string, currencyAccountId?: string
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useCreateExpense' });
       toast({
         title: 'Error creating expense',
         description: error.message,
@@ -262,6 +264,7 @@ export function useUpdateExpense() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdateExpense' });
       toast({
         title: 'Error updating expense',
         description: error.message,
@@ -296,6 +299,7 @@ export function useDeleteExpense() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useDeleteExpense' });
       toast({
         title: 'Error deleting expense',
         description: error.message,

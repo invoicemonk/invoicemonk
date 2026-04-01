@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 
 export interface UserPreferences {
   user_id: string;
@@ -130,6 +131,7 @@ export function useUpdatePreferences() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdatePreferences' });
       toast({
         title: 'Error saving preferences',
         description: error.message,

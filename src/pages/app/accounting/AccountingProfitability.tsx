@@ -69,7 +69,7 @@ export default function AccountingProfitability() {
       <motion.div variants={item} className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Revenue</p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">Total Collected</p>
             {isLoading ? <Skeleton className="h-8 w-28" /> : (
               <p className="text-2xl font-bold truncate" title={formatCurrency(data?.gross_revenue ?? 0, currency)}>
                 {formatCompactCurrency(data?.gross_revenue ?? 0, currency)}
@@ -115,7 +115,7 @@ export default function AccountingProfitability() {
         <motion.div variants={item}>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Revenue vs Expenses</CardTitle>
+              <CardTitle className="text-lg">Collections vs Expenses</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[320px] w-full">
@@ -127,10 +127,10 @@ export default function AccountingProfitability() {
                     <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false}
                       tickFormatter={(v) => formatCompactCurrency(v, currency)} width={70} />
                     <Tooltip
-                      formatter={(value: number, name: string) => [formatCurrency(value, currency), name === 'revenue' ? 'Revenue' : 'Expenses']}
+                      formatter={(value: number, name: string) => [formatCurrency(value, currency), name === 'revenue' ? 'Collected' : 'Expenses']}
                       labelFormatter={(l) => new Date(l).toLocaleDateString('en', { month: 'long', year: 'numeric' })}
                       contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                    <Legend formatter={(v) => (v === 'revenue' ? 'Revenue' : 'Expenses')} />
+                    <Legend formatter={(v) => (v === 'revenue' ? 'Collected' : 'Expenses')} />
                     <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} opacity={0.7} />
                   </BarChart>

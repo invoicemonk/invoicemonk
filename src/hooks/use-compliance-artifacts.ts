@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 interface ComplianceArtifact {
   id: string;
@@ -70,6 +71,7 @@ export function useGenerateArtifacts() {
       }
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useGenerateArtifacts' });
       toast.error(`Failed to generate artifacts: ${error.message}`);
     },
   });
@@ -93,6 +95,7 @@ export function useGenerateXmlArtifact() {
       }
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useGenerateXmlArtifact' });
       toast.error(`XML generation failed: ${error.message}`);
     },
   });

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 interface RegulatorySubmission {
   id: string;
@@ -86,6 +87,7 @@ export function useSubmitToRegulator() {
       }
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useSubmitToRegulator' });
       toast.error(`Submission failed: ${error.message}`);
     },
   });

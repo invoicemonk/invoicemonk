@@ -151,7 +151,7 @@ export default function AccountingResult() {
                 {moneyIn > 0 ? `${Math.round((whatsLeft / moneyIn) * 100)}%` : '0%'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Of money in retained
+                Of collections retained
               </p>
             </CardContent>
           </Card>
@@ -172,7 +172,7 @@ export default function AccountingResult() {
                 {moneyIn > 0 ? `${Math.round((moneyOut / moneyIn) * 100)}%` : '0%'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Of money in spent
+                Of collections spent
               </p>
             </CardContent>
           </Card>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Client = Tables<'clients'>;
@@ -133,6 +134,7 @@ export function useCreateClient() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useCreateClient' });
       toast({
         title: 'Error creating client',
         description: error.message,
@@ -194,6 +196,7 @@ export function useUpdateClient() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdateClient' });
       toast({
         title: 'Error updating client',
         description: error.message,
@@ -238,6 +241,7 @@ export function useDeleteClient() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useDeleteClient' });
       toast({
         title: 'Error deleting client',
         description: error.message,

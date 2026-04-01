@@ -1853,6 +1853,97 @@ export type Database = {
           },
         ]
       }
+      recurring_expenses: {
+        Row: {
+          amount: number
+          business_id: string | null
+          category: string
+          created_at: string
+          currency: string
+          currency_account_id: string | null
+          description: string | null
+          end_date: string | null
+          frequency: string
+          id: string
+          is_active: boolean
+          last_generated_at: string | null
+          next_expense_date: string
+          notes: string | null
+          product_service_id: string | null
+          receipt_url: string | null
+          start_date: string
+          updated_at: string
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          business_id?: string | null
+          category: string
+          created_at?: string
+          currency?: string
+          currency_account_id?: string | null
+          description?: string | null
+          end_date?: string | null
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          next_expense_date?: string
+          notes?: string | null
+          product_service_id?: string | null
+          receipt_url?: string | null
+          start_date?: string
+          updated_at?: string
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          currency_account_id?: string | null
+          description?: string | null
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          next_expense_date?: string
+          notes?: string | null
+          product_service_id?: string | null
+          receipt_url?: string | null
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_expenses_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_currency_account_id_fkey"
+            columns: ["currency_account_id"]
+            isOneToOne: false
+            referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_clicks: {
         Row: {
           created_at: string
@@ -2752,25 +2843,15 @@ export type Database = {
         }
         Returns: Json
       }
-      get_cashflow_summary:
-        | {
-            Args: {
-              _business_id: string
-              _currency_account_id?: string
-              _end_date?: string
-              _start_date?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _business_id: string
-              _currency_account_id?: string
-              _end_date?: string
-              _start_date?: string
-            }
-            Returns: Json
-          }
+      get_cashflow_summary: {
+        Args: {
+          _business_id: string
+          _currency_account_id?: string
+          _end_date?: string
+          _start_date?: string
+        }
+        Returns: Json
+      }
       get_dashboard_stats: {
         Args: {
           _business_id: string

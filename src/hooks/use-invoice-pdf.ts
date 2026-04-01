@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
+import { captureError } from '@/lib/sentry';
 
 interface GeneratePdfParams {
   invoiceId: string;
@@ -75,6 +76,7 @@ export function useDownloadInvoicePdf() {
       }
     },
     onError: (error) => {
+      captureError(error, { hook: 'useDownloadInvoicePdf' });
       toast({
         title: 'PDF generation failed',
         description: sanitizeErrorMessage(error),

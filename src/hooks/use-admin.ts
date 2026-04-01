@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 import { Database } from '@/integrations/supabase/types';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -302,8 +303,8 @@ export function useUpdateUserRole() {
       toast.success('User role updated successfully');
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdateUserRole' });
       toast.error(error instanceof Error ? error.message : 'Failed to update user role');
-      console.error('Update role error:', error);
     },
   });
 }
@@ -357,8 +358,8 @@ export function useAdminUpdateSubscription() {
       toast.success('Subscription updated successfully');
     },
     onError: (error) => {
+      captureError(error, { hook: 'useAdminUpdateSubscription' });
       toast.error(error instanceof Error ? error.message : 'Failed to update subscription');
-      console.error('Update subscription error:', error);
     },
   });
 }
@@ -392,8 +393,8 @@ export function useAdminCloseAccount() {
       toast.success('Account closed successfully. Financial records preserved per retention policy.');
     },
     onError: (error) => {
+      captureError(error, { hook: 'useAdminCloseAccount' });
       toast.error(error instanceof Error ? error.message : 'Failed to close account');
-      console.error('Close account error:', error);
     },
   });
 }
@@ -418,6 +419,7 @@ export function useBanUser() {
       toast.success('User has been suspended');
     },
     onError: (error) => {
+      captureError(error, { hook: 'useBanUser' });
       toast.error(error instanceof Error ? error.message : 'Failed to suspend user');
     },
   });
@@ -439,6 +441,7 @@ export function useUnbanUser() {
       toast.success('User has been reactivated');
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUnbanUser' });
       toast.error(error instanceof Error ? error.message : 'Failed to reactivate user');
     },
   });

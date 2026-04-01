@@ -44,7 +44,7 @@ function formatNaira(v: number) {
 
 // --- Data ---
 const stats = [
-  { title: 'Total Revenue', value: 6195000, icon: DollarSign, change: '+12.5%', up: true },
+  { title: 'Total Collected', value: 6195000, icon: DollarSign, change: '+12.5%', up: true },
   { title: 'Outstanding', value: 2890000, icon: Clock, change: '-8.2%', up: false },
   { title: 'Paid This Month', value: 3030000, icon: CheckCircle2, change: '+24.1%', up: true },
   { title: 'Draft Invoices', value: 1, icon: FileEdit, isCurrency: false },

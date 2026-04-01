@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           }
         }
       } catch (err) {
-        errors.push(`Exception processing ${sub.id}: ${err.message}`);
+        errors.push(`Exception processing ${sub.id}: ${(err as Error).message}`);
       }
     }
 
@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
     console.error("Unexpected error:", err);
     captureException(err, { function_name: 'sync-subscriptions' })
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: (err as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -82,7 +82,7 @@ export function useCashflowSummary(
         _currency_account_id: currencyAccountId || null,
         _start_date: startDate || null,
         _end_date: endDate || null,
-      });
+      } as any);
 
       if (error) throw error;
       return data as unknown as CashflowSummary;
@@ -134,7 +134,7 @@ export function useProfitabilityStats(
         _currency_account_id: currencyAccountId || null,
         _start_date: startDate || null,
         _end_date: endDate || null,
-      });
+      } as any);
 
       if (error) throw error;
       return data as unknown as ProfitabilityStats;

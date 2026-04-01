@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
+import { captureError } from '@/lib/sentry';
 import { addTags } from '@/lib/onesignal';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
@@ -213,6 +214,7 @@ export function useCreateInvoice() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useCreateInvoice' });
       toast({
         title: 'Error creating invoice',
         description: sanitizeErrorMessage(error),
@@ -306,6 +308,7 @@ export function useUpdateInvoice() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdateInvoice' });
       toast({
         title: 'Error updating invoice',
         description: sanitizeErrorMessage(error),
@@ -345,6 +348,7 @@ export function useIssueInvoice() {
       });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useIssueInvoice' });
       console.error('Issue invoice error:', error);
       toast({
         title: 'Error issuing invoice',
@@ -463,6 +467,7 @@ export function useVoidInvoice() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useVoidInvoice' });
       toast({
         title: 'Error voiding invoice',
         description: sanitizeErrorMessage(error),
@@ -532,6 +537,7 @@ export function useRecordPayment() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useRecordPayment' });
       toast({
         title: 'Error recording payment',
         description: sanitizeErrorMessage(error),
@@ -584,6 +590,7 @@ export function useDeleteInvoice() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useDeleteInvoice' });
       toast({
         title: 'Error deleting invoice',
         description: sanitizeErrorMessage(error),

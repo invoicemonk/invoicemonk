@@ -27,7 +27,7 @@ export function ProfitabilityCard({ data, isLoading, currency }: Props) {
         {/* KPI row */}
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground mb-1">Revenue</p>
+            <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
             {isLoading ? <Skeleton className="h-7 w-24" /> : (
               <p className="text-xl font-bold truncate" title={formatCurrency(data?.gross_revenue ?? 0, currency)}>
                 {formatCompactCurrency(data?.gross_revenue ?? 0, currency)}
@@ -86,7 +86,7 @@ export function ProfitabilityCard({ data, isLoading, currency }: Props) {
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     formatCurrency(value, currency),
-                    name === 'revenue' ? 'Revenue' : 'Expenses',
+                    name === 'revenue' ? 'Collected' : 'Expenses',
                   ]}
                   labelFormatter={(label) => {
                     const d = new Date(label);
@@ -98,7 +98,7 @@ export function ProfitabilityCard({ data, isLoading, currency }: Props) {
                     borderRadius: '8px',
                   }}
                 />
-                <Legend formatter={(value) => (value === 'revenue' ? 'Revenue' : 'Expenses')} />
+                <Legend formatter={(value) => (value === 'revenue' ? 'Collected' : 'Expenses')} />
                 <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} opacity={0.7} />
               </BarChart>

@@ -143,13 +143,11 @@ export default function Dashboard() {
   // Cashflow date range for RPCs (ISO date strings)
   const cashflowStartDate = useMemo(() => {
     if (dateRange) return format(dateRange.start, 'yyyy-MM-dd');
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return format(d, 'yyyy-MM-dd');
+    return undefined; // all_time: pass null to RPCs
   }, [dateRange]);
   const cashflowEndDate = useMemo(() => {
     if (dateRange) return format(dateRange.end, 'yyyy-MM-dd');
-    return format(new Date(), 'yyyy-MM-dd');
+    return undefined; // all_time: pass null to RPCs
   }, [dateRange]);
   
   // All hooks now use currency account scoping
@@ -200,7 +198,7 @@ export default function Dashboard() {
 
   const statsCards = [
     {
-      title: 'Total Revenue',
+      title: 'Total Collected',
       value: statsLoading ? null : formatCompactCurrency(stats?.totalRevenue || 0, stats?.currency),
       fullValue: statsLoading ? null : formatCurrency(stats?.totalRevenue || 0, stats?.currency),
       change: dateRangePreset === 'all_time' ? 'All time revenue' : 'In selected period',
@@ -416,9 +414,9 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  Revenue Trend
+                  Collections Trend
                 </CardTitle>
-                <CardDescription>Monthly revenue over the past 12 months</CardDescription>
+                <CardDescription>Monthly collections over the past 12 months</CardDescription>
               </CardHeader>
               <CardContent>
                 {trendLoading ? (
@@ -433,7 +431,7 @@ export default function Dashboard() {
                         <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
                         <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value, revenueTrend.currency).replace(/\.00$/, '')} width={80} className="text-muted-foreground" />
                         <Tooltip 
-                          formatter={(value: number) => [formatCurrency(value, revenueTrend.currency), 'Revenue']}
+                          formatter={(value: number) => [formatCurrency(value, revenueTrend.currency), 'Collected']}
                           labelFormatter={(label) => `Month: ${label}`}
                           contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                         />

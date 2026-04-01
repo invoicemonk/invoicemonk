@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 
 export interface ProductService {
   id: string;
@@ -133,6 +134,7 @@ export function useCreateProductService() {
       toast({ title: `${data.type === 'product' ? 'Product' : 'Service'} created`, description: `${data.name} has been added.` });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useCreateProductService' });
       const isDuplicateSku = error?.code === '23505';
       toast({
         title: isDuplicateSku ? 'SKU already in use' : 'Error creating item',
@@ -194,6 +196,7 @@ export function useUpdateProductService() {
       toast({ title: 'Item updated', description: `${data.name} has been saved.` });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useUpdateProductService' });
       const isDuplicateSku = error?.code === '23505';
       toast({
         title: isDuplicateSku ? 'SKU already in use' : 'Error updating item',
@@ -225,6 +228,7 @@ export function useArchiveProductService() {
       toast({ title: 'Status updated' });
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useArchiveProductService' });
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });

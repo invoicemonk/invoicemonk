@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { captureError } from "@/lib/sentry";
 
 export function useOnlinePayment() {
   const [loading, setLoading] = useState(false);
@@ -13,6 +14,7 @@ export function useOnlinePayment() {
       });
 
       if (error) {
+        captureError(error, { hook: 'useOnlinePayment', action: 'createPaymentSession' });
         toast.error(error.message || "Failed to create payment session");
         return null;
       }
@@ -30,7 +32,7 @@ export function useOnlinePayment() {
       toast.error("No checkout URL received");
       return null;
     } catch (err) {
-      console.error("Payment session error:", err);
+      captureError(err, { hook: 'useOnlinePayment', action: 'createPaymentSession' });
       toast.error("Failed to initiate payment");
       return null;
     } finally {
@@ -52,6 +54,7 @@ export function useStripeConnect() {
       });
 
       if (error) {
+        captureError(error, { hook: 'useStripeConnect', action: 'initiateConnect' });
         toast.error(error.message || "Failed to start Stripe Connect setup");
         return null;
       }
@@ -69,7 +72,7 @@ export function useStripeConnect() {
       toast.error("No onboarding URL received");
       return null;
     } catch (err) {
-      console.error("Stripe Connect error:", err);
+      captureError(err, { hook: 'useStripeConnect', action: 'initiateConnect' });
       toast.error("Failed to initiate Stripe Connect");
       return null;
     } finally {
@@ -91,6 +94,7 @@ export function usePaystackSubaccount() {
       });
 
       if (error) {
+        captureError(error, { hook: 'usePaystackSubaccount', action: 'createSubaccount' });
         toast.error(error.message || "Failed to create Paystack subaccount");
         return null;
       }
@@ -108,7 +112,7 @@ export function usePaystackSubaccount() {
       toast.error("Failed to set up bank account");
       return null;
     } catch (err) {
-      console.error("Paystack subaccount error:", err);
+      captureError(err, { hook: 'usePaystackSubaccount', action: 'createSubaccount' });
       toast.error("Failed to set up bank account");
       return null;
     } finally {

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 import { useNavigate } from 'react-router-dom';
 
 export function useDeleteBusiness() {
@@ -30,6 +31,7 @@ export function useDeleteBusiness() {
       navigate('/dashboard');
     },
     onError: (error: any) => {
+      captureError(error, { hook: 'useDeleteBusiness' });
       const message = error?.message || 'Failed to delete business';
       toast({
         title: 'Cannot delete business',

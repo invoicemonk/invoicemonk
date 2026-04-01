@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
+import { captureError } from '@/lib/sentry';
 import type { Tables } from '@/integrations/supabase/types';
 
 export type PaymentMethod = Tables<'payment_methods'>;
@@ -173,6 +174,7 @@ export function useCreatePaymentMethod() {
       toast({ title: 'Payment method added', description: `${data.display_name} has been configured.` });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useCreatePaymentMethod' });
       toast({ title: 'Error', description: sanitizeErrorMessage(error), variant: 'destructive' });
     },
   });
@@ -232,6 +234,7 @@ export function useUpdatePaymentMethod() {
       toast({ title: 'Payment method updated' });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useUpdatePaymentMethod' });
       toast({ title: 'Error', description: sanitizeErrorMessage(error), variant: 'destructive' });
     },
   });
@@ -276,6 +279,7 @@ export function useDeletePaymentMethod() {
       toast({ title: 'Payment method deleted' });
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useDeletePaymentMethod' });
       toast({ title: 'Error', description: sanitizeErrorMessage(error), variant: 'destructive' });
     },
   });

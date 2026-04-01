@@ -37,6 +37,8 @@ interface VerificationResponse {
     currency: string
     integrity_valid: boolean
   }
+  is_flagged?: boolean
+  flag_reason?: string
   error?: string
 }
 
@@ -212,7 +214,7 @@ Deno.serve(async (req) => {
         integrity_valid: integrityValid
       },
       is_flagged: isFlagged,
-      flag_reason: isFlagged ? flagReason : undefined
+      flag_reason: isFlagged ? (flagReason ?? undefined) : undefined
     }
 
     // Fire-and-forget: Log to verification_access_logs (lightweight, auto-expiring)

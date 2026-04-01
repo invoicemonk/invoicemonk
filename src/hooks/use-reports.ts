@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 export type ReportType =
   | 'invoice-register'
@@ -17,7 +18,7 @@ export type ReportType =
   | 'audit-export'
   | 'export-history';
 
-export type ReportFormat = 'json' | 'csv';
+export type ReportFormat = 'json' | 'csv' | 'pdf';
 
 export type ReportCategory = 'revenue' | 'receipts' | 'expenses' | 'accounting' | 'compliance';
 
@@ -101,7 +102,7 @@ async function generateReport<T>(request: ReportRequest): Promise<ReportResponse
 export function useGenerateReport() {
   return useMutation({
     mutationFn: async (request: ReportRequest) => {
-      if (request.format === 'csv') {
+      if (request.format === 'csv' || request.format === 'pdf') {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
           throw new Error('Not authenticated');
@@ -126,10 +127,11 @@ export function useGenerateReport() {
         }
 
         const blob = await response.blob();
+        const ext = request.format === 'pdf' ? 'html' : 'csv';
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${request.report_type}-${request.year}.csv`;
+        a.download = `${request.report_type}-${request.year}.${ext}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -138,11 +140,24 @@ export function useGenerateReport() {
         return { success: true } as ReportResponse;
       }
 
-      return generateReport(request);
+      // JSON format: fetch and download as .json file
+      const result = await generateReport(request);
+      if (result.success) {
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${request.report_type}-${request.year}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+      return result;
     },
     onSuccess: (data, variables) => {
       if (data.success) {
-        toast.success(`${variables.report_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} generated`);
+        toast.success(`${variables.report_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} downloaded`);
       } else if (data.upgrade_required) {
         toast.error('Upgrade required to access this report');
       } else {
@@ -150,6 +165,7 @@ export function useGenerateReport() {
       }
     },
     onError: (error: Error) => {
+      captureError(error, { hook: 'useGenerateReport' });
       toast.error(error.message || 'Failed to generate report');
     },
   });

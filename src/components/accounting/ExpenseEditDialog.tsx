@@ -54,7 +54,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
   const activeProducts = products.filter((p) => p.isActive);
 
   const [linkedProductId, setLinkedProductId] = useState<string>(
-    (expense as any).productServiceId || ''
+    (expense as any).productServiceId || 'none'
   );
 
   const {
@@ -91,7 +91,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
       notes: expense.notes || '',
       receiptUrl: expense.receiptUrl || null,
     });
-    setLinkedProductId((expense as any).productServiceId || '');
+    setLinkedProductId((expense as any).productServiceId || 'none');
   }, [expense, reset]);
 
   const onSubmit = async (data: ExpenseFormData) => {
@@ -105,7 +105,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
         expenseDate: data.expenseDate,
         notes: data.notes,
         receiptUrl: data.receiptUrl || undefined,
-        productServiceId: linkedProductId || null,
+        productServiceId: linkedProductId && linkedProductId !== 'none' ? linkedProductId : null,
       },
     });
     
@@ -115,7 +115,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>Edit Expense</DialogTitle>
@@ -194,7 +194,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
                     <SelectValue placeholder="Link to a product or service..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {activeProducts.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}

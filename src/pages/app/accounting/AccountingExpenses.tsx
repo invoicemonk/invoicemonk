@@ -7,15 +7,18 @@ import { AccountingDisclaimer } from '@/components/accounting/AccountingDisclaim
 import { MoneyFlowCard } from '@/components/accounting/MoneyFlowCard';
 import { ExpenseForm } from '@/components/accounting/ExpenseForm';
 import { ExpenseList } from '@/components/accounting/ExpenseList';
+import { RecurringExpenseDialog } from '@/components/accounting/RecurringExpenseDialog';
+import { RecurringExpenseList } from '@/components/accounting/RecurringExpenseList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
+import { useRecurringExpenses } from '@/hooks/use-recurring-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
-
 import { formatCurrency } from '@/lib/utils';
 
 const getCategoryLabel = (value: string) => {
@@ -41,10 +44,13 @@ export default function AccountingExpenses() {
     activeCurrency,
     dateRange ?? undefined
   );
+  const { data: recurringExpenses, isLoading: isLoadingRecurring } = useRecurringExpenses(
+    business?.id,
+    currentCurrencyAccount?.id
+  );
 
   const currency = activeCurrency || business?.default_currency || '';
 
-  // Calculate total
   const totalExpenses = useMemo(() => {
     return (expenses || []).reduce((sum, e) => sum + e.amount, 0);
   }, [expenses]);
@@ -69,7 +75,6 @@ export default function AccountingExpenses() {
         </div>
         <div className="flex items-center gap-3">
           <AccountingPeriodSelector value={period} onChange={setPeriod} />
-          <ExpenseForm />
         </div>
       </div>
 
@@ -131,15 +136,45 @@ export default function AccountingExpenses() {
         </Card>
       </div>
 
-      {/* Expenses list */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ExpenseList expenses={expenses || []} isLoading={isLoadingExpenses} />
-        </CardContent>
-      </Card>
+      {/* Tabs for All Expenses vs Recurring */}
+      <Tabs defaultValue="all">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="all">All Expenses</TabsTrigger>
+            <TabsTrigger value="recurring">Recurring</TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <RecurringExpenseDialog />
+            <ExpenseForm />
+          </div>
+        </div>
+
+        <TabsContent value="all">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Expenses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExpenseList expenses={expenses || []} isLoading={isLoadingExpenses} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recurring">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recurring Expenses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecurringExpenseList
+                expenses={recurringExpenses || []}
+                isLoading={isLoadingRecurring}
+                currency={currency}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <AccountingDisclaimer type="expenses" />
     </motion.div>

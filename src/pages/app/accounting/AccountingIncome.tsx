@@ -57,6 +57,7 @@ export default function AccountingIncome() {
   const filteredInvoices = (invoices || []).filter(inv => {
     if (inv.status === 'draft') return false;
     if (!inv.issued_at) return false;
+    if (!dateRange) return true; // all_time - show all
     const issuedDate = new Date(inv.issued_at);
     return issuedDate >= dateRange.start && issuedDate <= dateRange.end;
   }).slice(0, 10);

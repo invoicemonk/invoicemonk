@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { captureError } from '@/lib/sentry';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Business = Tables<'businesses'>;
@@ -59,6 +60,7 @@ export function useUploadBusinessLogo() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUploadBusinessLogo' });
       toast({
         title: 'Error uploading logo',
         description: error.message,
@@ -110,6 +112,7 @@ export function useDeleteBusinessLogo() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useDeleteBusinessLogo' });
       toast({
         title: 'Error removing logo',
         description: error.message,
@@ -263,6 +266,7 @@ export function useCreateBusiness() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useCreateBusiness' });
       toast({
         title: 'Error creating business',
         description: error.message,
@@ -324,6 +328,7 @@ export function useUpdateBusiness() {
       });
     },
     onError: (error) => {
+      captureError(error, { hook: 'useUpdateBusiness' });
       toast({
         title: 'Error saving profile',
         description: error.message,

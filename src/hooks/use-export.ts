@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { captureError } from '@/lib/sentry';
 
 interface ExportParams {
   export_type: 'invoices' | 'audit_logs' | 'payments' | 'clients' | 'expenses';
@@ -37,7 +38,7 @@ export function useExportRecords() {
       });
 
       if (error) {
-        console.error('Export error:', error);
+        captureError(error, { hook: 'useExportRecords' });
         toast.error('Export failed', { description: error.message || 'An unexpected error occurred' });
         return false;
       }
@@ -74,7 +75,7 @@ export function useExportRecords() {
 
       return false;
     } catch (err) {
-      console.error('Export error:', err);
+      captureError(err, { hook: 'useExportRecords' });
       toast.error('Export failed', { description: 'An unexpected error occurred' });
       return false;
     } finally {
