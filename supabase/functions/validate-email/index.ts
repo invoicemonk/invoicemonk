@@ -1,5 +1,8 @@
-import { corsHeaders } from "@supabase/supabase-js/cors";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 
 const EmailSchema = z.object({
   email: z.string().email().max(255),
