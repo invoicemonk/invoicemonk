@@ -129,6 +129,31 @@ const Signup = () => {
   const watchedEmail = form.watch('email');
   const isDisposable = watchedEmail?.includes('@') && isDisposableEmail(watchedEmail);
 
+  const handleEmailBlur = useCallback(async () => {
+    const email = form.getValues('email');
+    // Skip if empty, invalid format, or already caught by static list
+    if (!email || !email.includes('@') || !z.string().email().safeParse(email).success || isDisposableEmail(email)) {
+      setApiDisposable(false);
+      return;
+    }
+    setIsValidatingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-email', {
+        body: { email },
+      });
+      if (!error && data?.is_disposable) {
+        setApiDisposable(true);
+      } else {
+        setApiDisposable(false);
+      }
+    } catch {
+      // API failure — don't block signup
+      setApiDisposable(false);
+    } finally {
+      setIsValidatingEmail(false);
+    }
+  }, [form]);
+
   return (
     <AuthLayout variant="signup">
       {/* Header */}
