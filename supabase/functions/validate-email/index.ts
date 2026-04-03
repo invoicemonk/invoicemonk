@@ -23,8 +23,6 @@ Deno.serve(async (req) => {
     }
 
     const email = body.email;
-
-    const email = body.email;
     const apiKey = Deno.env.get("ABSTRACTAPI_EMAIL_KEY");
 
     if (!apiKey) {
