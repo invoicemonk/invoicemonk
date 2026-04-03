@@ -4,9 +4,9 @@ const corsHeaders = {
 };
 
 
-const EmailSchema = z.object({
-  email: z.string().email().max(255),
-});
+function isValidEmail(email: unknown): email is string {
+  return typeof email === 'string' && email.length <= 255 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
