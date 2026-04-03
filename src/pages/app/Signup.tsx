@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -13,6 +13,7 @@ import { Eye, EyeOff, Loader2, Mail, Lock, User, Shield, FileCheck } from 'lucid
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { isDisposableEmail } from '@/lib/disposable-emails';
+import { supabase } from '@/integrations/supabase/client';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
@@ -36,6 +37,8 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiDisposable, setApiDisposable] = useState(false);
+  const [isValidatingEmail, setIsValidatingEmail] = useState(false);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -126,6 +129,31 @@ const Signup = () => {
   const watchedEmail = form.watch('email');
   const isDisposable = watchedEmail?.includes('@') && isDisposableEmail(watchedEmail);
 
+  const handleEmailBlur = useCallback(async () => {
+    const email = form.getValues('email');
+    // Skip if empty, invalid format, or already caught by static list
+    if (!email || !email.includes('@') || !z.string().email().safeParse(email).success || isDisposableEmail(email)) {
+      setApiDisposable(false);
+      return;
+    }
+    setIsValidatingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-email', {
+        body: { email },
+      });
+      if (!error && data?.is_disposable) {
+        setApiDisposable(true);
+      } else {
+        setApiDisposable(false);
+      }
+    } catch {
+      // API failure — don't block signup
+      setApiDisposable(false);
+    } finally {
+      setIsValidatingEmail(false);
+    }
+  }, [form]);
+
   return (
     <AuthLayout variant="signup">
       {/* Header */}
@@ -159,22 +187,29 @@ const Signup = () => {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDisposable ? 'text-destructive' : 'text-muted-foreground'}`} />
+              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDisposable || apiDisposable ? 'text-destructive' : 'text-muted-foreground'}`} />
               <Input
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                className={`pl-10 ${isDisposable ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                className={`pl-10 ${isDisposable || apiDisposable ? 'border-destructive focus-visible:ring-destructive' : ''} ${isValidatingEmail ? 'pr-10' : ''}`}
                 {...form.register('email')}
+                onBlur={(e) => {
+                  form.register('email').onBlur(e);
+                  handleEmailBlur();
+                }}
               />
+              {isValidatingEmail && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+              )}
             </div>
-            {isDisposable && (
+            {(isDisposable || apiDisposable) && (
               <div className="flex items-center gap-2 text-sm text-destructive">
                 <Shield className="w-4 h-4 shrink-0" />
                 <span>Temporary/disposable emails are not allowed. Please use a permanent email address.</span>
               </div>
             )}
-            {!isDisposable && form.formState.errors.email && (
+            {!isDisposable && !apiDisposable && form.formState.errors.email && (
               <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
             )}
           </div>
@@ -259,7 +294,7 @@ const Signup = () => {
             <p className="text-sm text-destructive">{form.formState.errors.acceptTerms.message}</p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isLoading || isDisposable}>
+          <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
