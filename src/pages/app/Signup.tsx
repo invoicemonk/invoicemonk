@@ -37,6 +37,8 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiDisposable, setApiDisposable] = useState(false);
+  const [isValidatingEmail, setIsValidatingEmail] = useState(false);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
