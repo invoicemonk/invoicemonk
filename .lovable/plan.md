@@ -1,65 +1,70 @@
 
 
-# Block Disposable/Temporary Email Signups
+# Integrate AbstractAPI for Disposable Email Blocking
 
 ## Problem
-Users are registering with temporary/disposable email services (e.g., guerrillamail, tempmail, mailinator), which undermines platform trust, enables abuse, and reduces engagement quality.
+The current static blocklist (~250 domains) is being bypassed -- new disposable email services appear constantly. AbstractAPI maintains a live, continuously updated database and can detect disposable emails the static list misses.
 
 ## Approach
-Implement a **dual-layer block** -- client-side validation for instant feedback, plus server-side validation in the Supabase auth trigger to prevent bypassing.
+Create an edge function that calls AbstractAPI's email validation endpoint. The signup form calls this function **on blur** (when the user leaves the email field) for a server-side check, while keeping the existing static blocklist as an instant first layer.
 
-### Layer 1: Client-Side Disposable Email Check
+## Architecture
 
-**File: `src/lib/disposable-emails.ts`** (new)
+```text
+User types email
+  │
+  ├─ Keystroke: instant static blocklist check (existing, stays)
+  │
+  └─ On blur (after @ present + valid format):
+       │
+       Frontend calls edge function "validate-email"
+         │
+         Edge function calls AbstractAPI
+         https://emailvalidation.abstractapi.com/v1/?api_key=KEY&email=EMAIL
+         │
+         Returns { is_disposable: true/false, deliverable: ... }
+         │
+       Frontend shows warning + disables submit if disposable
+```
 
-Create a comprehensive blocklist of ~200+ known disposable email domains (mailinator.com, guerrillamail.com, tempmail.com, yopmail.com, throwaway.email, etc.) and a helper function `isDisposableEmail(email: string): boolean` that extracts the domain and checks against the list.
+## Changes
 
-**File: `src/pages/app/Signup.tsx`**
+### 1. Add `ABSTRACTAPI_EMAIL_KEY` secret
+Store the API key `72d05304adb849a5b513b553ae6d055c` as a Lovable-managed secret.
 
-Add a `.refine()` to the `email` field in the Zod schema that calls `isDisposableEmail()` and rejects with a clear message: "Please use a permanent email address. Temporary/disposable emails are not allowed."
+### 2. New edge function: `supabase/functions/validate-email/index.ts`
+- Accepts `{ email: string }` POST body
+- Validates input with Zod
+- Calls `https://emailvalidation.abstractapi.com/v1/?api_key=${key}&email=${email}`
+- Returns `{ is_disposable: boolean, deliverability: string, is_valid: boolean }`
+- Falls back gracefully (returns `is_disposable: false`) if AbstractAPI is down, so signups aren't blocked by an API outage
+- `verify_jwt = false` not needed -- use anon key auth from frontend
 
-### Layer 2: Server-Side Validation (Database Trigger)
+### 3. Update `src/pages/app/Signup.tsx`
+- Add state: `apiDisposable`, `isValidatingEmail`
+- On email field blur (only if email is valid format and passes static check): call the edge function
+- Show a subtle loading spinner next to the email field while validating
+- If AbstractAPI says disposable: show the same warning style as the static check, disable submit
+- If AbstractAPI is unreachable: silently pass (don't block the user)
+- Disable submit when `isDisposable || apiDisposable || isValidatingEmail`
 
-**Migration SQL:**
+### 4. Keep existing layers
+- Static blocklist in `disposable-emails.ts` remains as instant first layer
+- Database trigger on `profiles` table remains as server-side safety net
+- AbstractAPI adds the dynamic, continuously-updated middle layer
 
-Create a `validate_email_domain()` function as a trigger on `auth.users` -- **wait, we cannot attach triggers to `auth` schema tables** per Supabase restrictions.
-
-**Alternative server-side approach:** Create an edge function `validate-signup-email` that the signup form calls before `signUp()`, or use a database function called post-signup to flag/disable accounts with disposable emails.
-
-Actually, the most practical and effective approach for Supabase:
-
-1. **Client-side blocklist** (primary defense -- covers 95% of cases)
-2. **Post-signup database check** via a trigger on `profiles` table (which IS in public schema and gets created on signup) that flags accounts using disposable emails
-
-### Layer 2 (revised): Profile Insert Trigger
-
-**Migration:**
-- Create a `disposable_email_domains` table with a `domain` column containing all blocked domains
-- Create a `check_disposable_email()` trigger function on `profiles` INSERT that checks if the email domain is in the blocklist -- if so, set `account_status = 'suspended'` and log the reason
-- This catches any bypass of the frontend check
-
-### Files to Create/Modify
+## Files Changed
 
 | File | Change |
-|------|--------|
-| `src/lib/disposable-emails.ts` | New file with blocklist of ~200+ disposable domains and checker function |
-| `src/pages/app/Signup.tsx` | Add `.refine()` on email field to reject disposable emails with clear error message |
-| **Database migration** | Create `disposable_email_domains` table + trigger on `profiles` to auto-suspend accounts using disposable emails |
-| `supabase/functions/view-invoice/index.ts` | Add `business_id` to select query (existing build error fix) |
+|---|---|
+| Secret: `ABSTRACTAPI_EMAIL_KEY` | Add API key as managed secret |
+| `supabase/functions/validate-email/index.ts` | New edge function calling AbstractAPI |
+| `src/pages/app/Signup.tsx` | Add on-blur API validation with loading state |
 
-### Disposable Domain Categories to Block
-
-The blocklist will include domains from these categories:
-- **Temporary inbox services**: mailinator.com, guerrillamail.com, tempmail.com, throwaway.email
-- **Anonymous email**: yopmail.com, sharklasers.com, grr.la, dispostable.com
-- **10-minute mail variants**: 10minutemail.com, minutemail.com, temp-mail.org
-- **Popular abuse domains**: maildrop.cc, trashmail.com, fakeinbox.com, mohmal.com
-- Total: ~250 domains covering the vast majority of disposable services
-
-### User Experience
-
-When a user enters a disposable email:
-- The form shows an inline error: "Please use a permanent email address. Temporary or disposable emails are not allowed."
-- The submit button remains disabled
-- If somehow bypassed, the profile trigger suspends the account immediately
+## UX Flow
+1. User types disposable email → instant static warning (no API call)
+2. User types email not in static list → on blur, edge function checks with AbstractAPI (~500ms)
+3. If AbstractAPI flags it → warning appears, submit disabled
+4. If AbstractAPI is down → no warning, static list + DB trigger still protect
+5. Small spinner appears next to email field during API check
 
