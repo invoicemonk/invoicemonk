@@ -14,13 +14,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const parsed = EmailSchema.safeParse(await req.json());
-    if (!parsed.success) {
+    const body = await req.json();
+    if (!isValidEmail(body?.email)) {
       return new Response(
         JSON.stringify({ error: "Invalid email", is_disposable: false }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const email = body.email;
 
     const { email } = parsed.data;
     const apiKey = Deno.env.get("ABSTRACTAPI_EMAIL_KEY");
