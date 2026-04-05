@@ -4,6 +4,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { initSentry, captureException } from '../_shared/sentry.ts'
 initSentry()
 
+function safeISODate(epochSeconds: number | undefined | null): string | undefined {
+  if (!epochSeconds) return undefined;
+  const d = new Date(epochSeconds * 1000);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -807,15 +813,15 @@ async function doUpdateSubscription(
     : subscription.status === "trialing" ? "trialing"
     : "active";
 
+  const updateData: Record<string, any> = { tier, status, updated_at: new Date().toISOString() };
+  const periodStart = safeISODate(subscription.current_period_start);
+  const periodEnd = safeISODate(subscription.current_period_end);
+  if (periodStart) updateData.current_period_start = periodStart;
+  if (periodEnd) updateData.current_period_end = periodEnd;
+
   await supabase
     .from("subscriptions")
-    .update({
-      tier,
-      status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("user_id", userId);
 
   console.log("Updated subscription for user:", userId, "tier:", tier, "status:", status);
@@ -848,15 +854,15 @@ async function doUpdateSubscriptionByBusiness(
     : subscription.status === "trialing" ? "trialing"
     : "active";
 
+  const updateData2: Record<string, any> = { tier, status, updated_at: new Date().toISOString() };
+  const ps2 = safeISODate(subscription.current_period_start);
+  const pe2 = safeISODate(subscription.current_period_end);
+  if (ps2) updateData2.current_period_start = ps2;
+  if (pe2) updateData2.current_period_end = pe2;
+
   await supabase
     .from("subscriptions")
-    .update({
-      tier,
-      status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData2)
     .eq("business_id", businessId);
 
   console.log("Updated subscription for business:", businessId, "tier:", tier, "status:", status);
@@ -878,34 +884,30 @@ async function updateSubscriptionByBusiness(
     .maybeSingle();
 
   if (existingSub) {
-    await supabase
-      .from("subscriptions")
-      .update({
-        tier,
-        status: "active",
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscription.id,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        pricing_region: pricingRegion,
-        billing_currency: billingCurrency,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existingSub.id);
+    const upd: Record<string, any> = {
+      tier, status: "active", stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: subscription.id,
+      pricing_region: pricingRegion, billing_currency: billingCurrency,
+      updated_at: new Date().toISOString(),
+    };
+    const ps3 = safeISODate(subscription.current_period_start);
+    const pe3 = safeISODate(subscription.current_period_end);
+    if (ps3) upd.current_period_start = ps3;
+    if (pe3) upd.current_period_end = pe3;
+
+    await supabase.from("subscriptions").update(upd).eq("id", existingSub.id);
   } else {
-    await supabase
-      .from("subscriptions")
-      .insert({
-        business_id: businessId,
-        tier,
-        status: "active",
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscription.id,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        pricing_region: pricingRegion,
-        billing_currency: billingCurrency,
-      });
+    const ins: Record<string, any> = {
+      business_id: businessId, tier, status: "active",
+      stripe_customer_id: stripeCustomerId, stripe_subscription_id: subscription.id,
+      pricing_region: pricingRegion, billing_currency: billingCurrency,
+    };
+    const ps4 = safeISODate(subscription.current_period_start);
+    const pe4 = safeISODate(subscription.current_period_end);
+    if (ps4) ins.current_period_start = ps4;
+    if (pe4) ins.current_period_end = pe4;
+
+    await supabase.from("subscriptions").insert(ins);
   }
   console.log("Updated subscription for business:", businessId);
 }
