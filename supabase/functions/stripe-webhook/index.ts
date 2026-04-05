@@ -4,6 +4,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { initSentry, captureException } from '../_shared/sentry.ts'
 initSentry()
 
+function safeISODate(epochSeconds: number | undefined | null): string | undefined {
+  if (!epochSeconds) return undefined;
+  const d = new Date(epochSeconds * 1000);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
