@@ -1,36 +1,78 @@
+# Add Welcome Email + Detailed Professional Upgrade Onboarding Email
 
+## What's Missing Today
 
-# Fix: RangeError "Invalid time value" in stripe-webhook
+1. **No welcome email** -- When a user signs up, nothing is sent. They only get a verification email from Supabase Auth, then silence until lifecycle campaigns kick in 48-72 hours later.
+2. **Upgrade email is too shallow** -- The current upgrade email (in stripe-webhook) just lists 4 bullet points. No step-by-step guidance, no links to specific features, no "from the founder" personal touch.
 
-## Root Cause
+## What Gets Built
 
-The Sentry error shows `RangeError: Invalid time value` at `doUpdateSubscriptionByBusiness` (line ~856-857). This happens when `subscription.current_period_start` or `subscription.current_period_end` is `undefined` or `null`, causing `new Date(undefined * 1000)` which produces an invalid Date, and `.toISOString()` then throws.
+### 1. Welcome Email (sent immediately after signup)
 
-This occurs during `customer.subscription.updated` events where Stripe may send a subscription object with missing period fields (e.g., during cancellation transitions or incomplete subscriptions).
+A warm, personal email from the founder that:
 
-## Fix
+- Welcomes the user by name
+- Introduces Invoicemonk's core value (compliance-first invoicing)
+- Provides a 4-step quick start guide with direct links:
+  1. Complete your business profile → `/settings`
+  2. Add your first client → `/clients`
+  3. Create your first invoice → `/invoices/new`
+  4. Set up payment methods → `/settings` (payment methods section)
+- Mentions the Quick Setup Checklist on the dashboard
+- Includes a personal sign-off from the founder
+- Links to support/help
 
-Add null guards before creating Date objects from `current_period_start` and `current_period_end` in all three helper functions: `doUpdateSubscriptionByBusiness`, `doUpdateSubscription`, and `updateSubscriptionByBusiness`.
+**Trigger**: Called from `track-auth-event` edge function when `event_type === "sign_up"`
 
-If the value is missing, either skip updating that field or fall back to the current timestamp.
+### 2. Enhanced Professional Upgrade Email
+
+Replace the current generic upgrade email with a detailed onboarding guide that:
+
+- Congratulates the user personally
+- Lists their new Professional-tier capabilities with links to each feature:
+  - **Team collaboration** (up to 5 members) → `/team`
+  - **Custom branding** (remove watermark, add logo) → `/settings`
+  - **Unlimited invoices & receipts** → `/invoices/new`
+  - **Unlimited currency accounts** → `/settings`
+  - **Audit logs & compliance** → `/audit-logs`
+  - **Data exports** → `/reports`
+  - **AI receipt scanning** → `/expenses`
+  - **Advanced accounting** → `/accounting`
+- Includes a "Getting Started with Professional" section with 3 recommended first steps
+- Has a personal sign-off from the founder
+- Shows billing details (plan name, next billing date)
+
+### 3. Business-tier Upgrade Email (bonus)
+
+Same structure but highlights Business-specific features:
+
+- **Unlimited team members**
+- **API access**
+- Everything in Professional, plus the above
+
+## Technical Approach
+
+### File: `supabase/functions/track-auth-event/index.ts`
+
+- After successfully logging the sign_up event, fetch the user's profile (name, email)
+- Call Brevo API to send the welcome email
+- Non-blocking: if the email fails, log the error but don't fail the event tracking
+
+### File: `supabase/functions/stripe-webhook/index.ts`
+
+- Replace the `upgradeEmailTemplate` function with tier-specific templates
+- `professionalUpgradeEmailTemplate` -- detailed guide for Professional features
+- `businessUpgradeEmailTemplate` -- detailed guide for Business features
+- Keep the existing `sendUpgradeEmail` function structure, just pass the appropriate template based on tier
+
+## No New Dependencies
+
+Both changes use the existing Brevo integration already in place. No new edge functions needed.
 
 ## Files Changed
 
-| File | Change |
-|---|---|
-| `supabase/functions/stripe-webhook/index.ts` | Guard `current_period_start` and `current_period_end` against null/undefined before `new Date()` in all three subscription update functions (lines ~815-816, ~856-857, ~888-889, ~904-905) |
 
-## Detail
-
-Replace raw `new Date(subscription.current_period_end * 1000).toISOString()` with a safe helper:
-
-```typescript
-function safeISODate(epochSeconds: number | undefined | null): string | undefined {
-  if (!epochSeconds) return undefined;
-  const d = new Date(epochSeconds * 1000);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-```
-
-Then use it in the update objects, filtering out undefined values so they don't overwrite existing good data.
-
+| File                                           | Change                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| `supabase/functions/track-auth-event/index.ts` | Add welcome email sending after sign_up event logging                          |
+| `supabase/functions/stripe-webhook/index.ts`   | Replace generic upgrade template with tier-specific detailed onboarding guides |
