@@ -107,22 +107,6 @@ export default function PlanSelection() {
           </p>
         </motion.div>
 
-        {/* Above-the-fold free plan CTA */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-center mb-6"
-        >
-          <Button
-            variant="link"
-            onClick={handleSkip}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Not ready to choose? Continue with Free plan
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </motion.div>
 
         {/* Billing Toggle */}
         <motion.div 
@@ -234,14 +218,17 @@ export default function PlanSelection() {
                       ) : (
                         <Button 
                           className="w-full" 
-                          variant={isRecommended ? 'default' : 'outline'}
+                          variant={isRecommended ? 'default' : tier === 'starter' ? 'default' : 'outline'}
                           onClick={() => handleSelectPlan(tier)}
                           disabled={checkoutLoading || !!loadingTier}
                         >
                           {isLoadingThis ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : tier === 'starter' ? (
-                            'Start Free'
+                            <>
+                              Continue with Free plan
+                              <ArrowRight className="h-4 w-4 ml-2" />
+                            </>
                           ) : (
                             <>
                               Get Started
@@ -258,21 +245,6 @@ export default function PlanSelection() {
           })}
         </div>
 
-        {/* Skip Link */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-center"
-        >
-          <Button 
-            variant="ghost" 
-            onClick={handleSkip}
-            className="text-muted-foreground"
-          >
-            Skip for now — continue with Free plan
-          </Button>
-        </motion.div>
       </div>
     </div>
   );
