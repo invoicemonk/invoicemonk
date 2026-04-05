@@ -67,7 +67,7 @@ function professionalUpgradeEmailTemplate(userName: string, nextBillingDate: str
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Hi ${userName},</p>
-    <p>I'm Ayo, the founder of InvoiceMonk. Thank you for upgrading to Professional — you've just unlocked the full power of the platform. Here's everything you can now do:</p>
+    <p>I'm Olayinka, the founder of Invoicemonk. Thank you for upgrading to Professional — you've just unlocked the full power of the platform. Here's everything you can now do:</p>
 
     <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
       <p style="margin: 0; color: #155a4a; font-size: 14px;">
@@ -153,13 +153,13 @@ function professionalUpgradeEmailTemplate(userName: string, nextBillingDate: str
 
     <p style="margin-top: 25px;">
       Cheers,<br>
-      <strong>Ayo</strong><br>
-      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+      <strong>Olayinka</strong><br>
+      <span style="color: #666; font-size: 13px;">Founder, Invoicemonk</span>
     </p>
 
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+      Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -180,7 +180,7 @@ function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string)
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Hi ${userName},</p>
-    <p>I'm Ayo, the founder of InvoiceMonk. Thank you for upgrading to the Business plan — you now have access to absolutely everything on the platform. Here's what's included:</p>
+    <p>I'm Ayo, the founder of Invoicemonk. Thank you for upgrading to the Business plan — you now have access to absolutely everything on the platform. Here's what's included:</p>
 
     <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
       <p style="margin: 0; color: #155a4a; font-size: 14px;">
@@ -202,7 +202,7 @@ function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string)
       <tr>
         <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">🔌</td>
         <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-          <strong>API Access</strong> — Integrate InvoiceMonk into your workflows<br>
+          <strong>API Access</strong> — Integrate Invoicemonk into your workflows<br>
           <a href="https://app.invoicemonk.com/docs/api" style="color: #1d6b5a; font-size: 13px;">View API docs →</a>
         </td>
       </tr>
@@ -237,7 +237,7 @@ function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string)
     <p style="margin-top: 25px;">
       Cheers,<br>
       <strong>Ayo</strong><br>
-      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+      <span style="color: #666; font-size: 13px;">Founder, Invoicemonk</span>
     </p>
 
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -276,7 +276,7 @@ function starterUpgradeEmailTemplate(userName: string, nextBillingDate: string):
     <p style="margin-top: 25px;">
       Cheers,<br>
       <strong>Ayo</strong><br>
-      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+      <span style="color: #666; font-size: 13px;">Founder, Invoicemonk</span>
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
