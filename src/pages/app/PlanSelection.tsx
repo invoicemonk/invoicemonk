@@ -42,7 +42,7 @@ export default function PlanSelection() {
   
   const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
-  const { tier: currentTier } = useSubscription();
+  const { subscription } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
 
   const markPlanSelected = async () => {
@@ -53,9 +53,27 @@ export default function PlanSelection() {
 
   const queryClient = useQueryClient();
 
-  const handleSelectPlan = async (tier: TierKey) => {
-    if (tier === 'starter') {
+  const handleSelectPlan = async (planTier: TierKey) => {
+    if (planTier === 'starter') {
       addTags({ plan_type: 'free' });
+
+      // Create the starter subscription now that user has explicitly chosen
+      const { data: membership } = await supabase
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', user!.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (membership?.business_id) {
+        await supabase.from('subscriptions').insert({
+          business_id: membership.business_id,
+          tier: 'starter',
+          status: 'active',
+          current_period_start: new Date().toISOString(),
+        });
+      }
+
       await markPlanSelected();
       await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
       navigate('/dashboard');
@@ -63,8 +81,8 @@ export default function PlanSelection() {
     }
 
     addTags({ plan_type: 'paid' });
-    setLoadingTier(tier);
-    await createCheckoutSession(tier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
+    setLoadingTier(planTier);
+    await createCheckoutSession(planTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
     setLoadingTier(null);
   };
 
@@ -135,7 +153,7 @@ export default function PlanSelection() {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
             const isRecommended = tier === 'professional';
-            const isCurrent = tier === currentTier;
+            const isCurrent = subscription ? tier === subscription.tier : false;
             const isLoadingThis = loadingTier === tier;
             
             // Get features dynamically from tier_limits table
