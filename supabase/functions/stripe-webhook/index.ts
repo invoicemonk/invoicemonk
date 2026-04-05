@@ -53,7 +53,203 @@ async function sendBrevoEmail(
   }
 }
 
-function upgradeEmailTemplate(userName: string, tierName: string, nextBillingDate: string): string {
+function professionalUpgradeEmailTemplate(userName: string, nextBillingDate: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+  <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+  </div>
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
+    <h1 style="margin: 0; font-size: 22px;">🎉 Welcome to Professional!</h1>
+    <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Your upgrade is confirmed and active</p>
+  </div>
+  <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
+    <p>Hi ${userName},</p>
+    <p>I'm Ayo, the founder of InvoiceMonk. Thank you for upgrading to Professional — you've just unlocked the full power of the platform. Here's everything you can now do:</p>
+
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
+        <strong>Plan:</strong> Professional<br>
+        <strong>Next billing date:</strong> ${nextBillingDate}
+      </p>
+    </div>
+
+    <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">✨ What's Now Unlocked</h2>
+
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; width: 28px;">👥</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Team Collaboration</strong> — Invite up to 5 team members<br>
+          <a href="https://app.invoicemonk.com/team" style="color: #1d6b5a; font-size: 13px;">Invite your team →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">🎨</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Custom Branding</strong> — Remove the watermark, add your logo & brand color<br>
+          <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a; font-size: 13px;">Set up branding →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">📄</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Unlimited Invoices & Receipts</strong> — No more monthly limits<br>
+          <a href="https://app.invoicemonk.com/invoices/new" style="color: #1d6b5a; font-size: 13px;">Create an invoice →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">💱</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Unlimited Currency Accounts</strong> — Invoice in any currency<br>
+          <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a; font-size: 13px;">Add currencies →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">📸</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>AI Receipt Scanning</strong> — Snap a receipt, auto-extract data<br>
+          <a href="https://app.invoicemonk.com/expenses" style="color: #1d6b5a; font-size: 13px;">Scan a receipt →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">📊</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Advanced Accounting</strong> — Profitability, income & expense analysis<br>
+          <a href="https://app.invoicemonk.com/accounting" style="color: #1d6b5a; font-size: 13px;">View accounting →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">🔒</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Audit Logs & Compliance</strong> — Full activity trail for regulatory compliance<br>
+          <a href="https://app.invoicemonk.com/audit-logs" style="color: #1d6b5a; font-size: 13px;">View audit logs →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; vertical-align: top;">📥</td>
+        <td style="padding: 10px 0;">
+          <strong>Data Exports</strong> — Export invoices, expenses, and reports<br>
+          <a href="https://app.invoicemonk.com/reports" style="color: #1d6b5a; font-size: 13px;">Generate reports →</a>
+        </td>
+      </tr>
+    </table>
+
+    <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">🏁 Recommended First Steps</h2>
+
+    <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin: 15px 0;">
+      <p style="margin: 0 0 8px;"><strong>1.</strong> <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Upload your logo</a> to remove the InvoiceMonk watermark</p>
+      <p style="margin: 0 0 8px;"><strong>2.</strong> <a href="https://app.invoicemonk.com/team" style="color: #1d6b5a;">Invite a team member</a> to help with invoicing</p>
+      <p style="margin: 0;"><strong>3.</strong> <a href="https://app.invoicemonk.com/expenses" style="color: #1d6b5a;">Try AI Receipt Scanning</a> — snap a physical receipt and watch it auto-fill</p>
+    </div>
+
+    <div style="text-align: center; margin: 25px 0;">
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
+    </div>
+
+    <p>If you ever need help, just reply to this email or use the chat widget on the platform.</p>
+
+    <p style="margin-top: 25px;">
+      Cheers,<br>
+      <strong>Ayo</strong><br>
+      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #999; font-size: 11px; text-align: center;">
+      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+  <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+  </div>
+  <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
+    <h1 style="margin: 0; font-size: 22px;">🎉 Welcome to Business!</h1>
+    <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">You've unlocked the most powerful InvoiceMonk plan</p>
+  </div>
+  <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
+    <p>Hi ${userName},</p>
+    <p>I'm Ayo, the founder of InvoiceMonk. Thank you for upgrading to the Business plan — you now have access to absolutely everything on the platform. Here's what's included:</p>
+
+    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
+      <p style="margin: 0; color: #155a4a; font-size: 14px;">
+        <strong>Plan:</strong> Business<br>
+        <strong>Next billing date:</strong> ${nextBillingDate}
+      </p>
+    </div>
+
+    <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">✨ Business-Exclusive Features</h2>
+
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; width: 28px;">👥</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>Unlimited Team Members</strong> — Invite your entire team<br>
+          <a href="https://app.invoicemonk.com/team" style="color: #1d6b5a; font-size: 13px;">Manage your team →</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;">🔌</td>
+        <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+          <strong>API Access</strong> — Integrate InvoiceMonk into your workflows<br>
+          <a href="https://app.invoicemonk.com/docs/api" style="color: #1d6b5a; font-size: 13px;">View API docs →</a>
+        </td>
+      </tr>
+    </table>
+
+    <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">Plus Everything in Professional</h2>
+
+    <table style="width: 100%; border-collapse: collapse; color: #555;">
+      <tr><td style="padding: 6px 0;">🎨 Custom Branding — <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Set up →</a></td></tr>
+      <tr><td style="padding: 6px 0;">📄 Unlimited Invoices & Receipts — <a href="https://app.invoicemonk.com/invoices/new" style="color: #1d6b5a;">Create →</a></td></tr>
+      <tr><td style="padding: 6px 0;">💱 Unlimited Currency Accounts — <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Add currencies →</a></td></tr>
+      <tr><td style="padding: 6px 0;">📸 AI Receipt Scanning — <a href="https://app.invoicemonk.com/expenses" style="color: #1d6b5a;">Scan a receipt →</a></td></tr>
+      <tr><td style="padding: 6px 0;">📊 Advanced Accounting — <a href="https://app.invoicemonk.com/accounting" style="color: #1d6b5a;">View →</a></td></tr>
+      <tr><td style="padding: 6px 0;">🔒 Audit Logs & Compliance — <a href="https://app.invoicemonk.com/audit-logs" style="color: #1d6b5a;">View →</a></td></tr>
+      <tr><td style="padding: 6px 0;">📥 Data Exports — <a href="https://app.invoicemonk.com/reports" style="color: #1d6b5a;">Reports →</a></td></tr>
+    </table>
+
+    <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">🏁 Recommended First Steps</h2>
+
+    <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin: 15px 0;">
+      <p style="margin: 0 0 8px;"><strong>1.</strong> <a href="https://app.invoicemonk.com/team" style="color: #1d6b5a;">Invite your team</a> — unlimited seats on Business</p>
+      <p style="margin: 0 0 8px;"><strong>2.</strong> <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Upload your logo</a> to remove the watermark</p>
+      <p style="margin: 0;"><strong>3.</strong> <a href="https://app.invoicemonk.com/docs/api" style="color: #1d6b5a;">Explore the API</a> for custom integrations</p>
+    </div>
+
+    <div style="text-align: center; margin: 25px 0;">
+      <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
+    </div>
+
+    <p>If you ever need help, just reply to this email or use the chat widget on the platform.</p>
+
+    <p style="margin-top: 25px;">
+      Cheers,<br>
+      <strong>Ayo</strong><br>
+      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #999; font-size: 11px; text-align: center;">
+      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+function starterUpgradeEmailTemplate(userName: string, nextBillingDate: string): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -66,23 +262,22 @@ function upgradeEmailTemplate(userName: string, tierName: string, nextBillingDat
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Hi ${userName},</p>
-    <p>Thank you for upgrading to the <strong>${tierName}</strong> plan! Your subscription is now active.</p>
+    <p>Thank you for upgrading to the <strong>Starter</strong> plan! Your subscription is now active.</p>
     <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d6b5a;">
       <p style="margin: 0; color: #155a4a; font-size: 14px;">
-        <strong>Plan:</strong> ${tierName}<br>
+        <strong>Plan:</strong> Starter<br>
         <strong>Next billing date:</strong> ${nextBillingDate}
       </p>
     </div>
-    <p>You now have access to all the features included in your plan. Here are some things you can do:</p>
-    <ul style="color: #555;">
-      <li>Create unlimited invoices and receipts</li>
-      <li>Add team members to your business</li>
-      <li>Use custom branding on your invoices</li>
-      <li>Access audit logs and data exports</li>
-    </ul>
+    <p>You now have access to unlimited invoices and receipts, plus up to 3 currency accounts and 2 payment methods.</p>
     <div style="text-align: center; margin: 25px 0;">
       <a href="https://app.invoicemonk.com/dashboard" style="display: inline-block; background: #1d6b5a; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Go to Dashboard →</a>
     </div>
+    <p style="margin-top: 25px;">
+      Cheers,<br>
+      <strong>Ayo</strong><br>
+      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+    </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
       Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
@@ -90,6 +285,28 @@ function upgradeEmailTemplate(userName: string, tierName: string, nextBillingDat
   </div>
 </body>
 </html>`;
+}
+
+function getUpgradeEmailTemplate(userName: string, tier: string, nextBillingDate: string): { subject: string; html: string } {
+  const tierLower = tier.toLowerCase();
+  if (tierLower === 'professional') {
+    return {
+      subject: `Welcome to Professional, ${userName}! Here's everything you've unlocked`,
+      html: professionalUpgradeEmailTemplate(userName, nextBillingDate),
+    };
+  }
+  if (tierLower === 'business') {
+    return {
+      subject: `Welcome to Business, ${userName}! You've unlocked the full platform`,
+      html: businessUpgradeEmailTemplate(userName, nextBillingDate),
+    };
+  }
+  // Starter or fallback
+  const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+  return {
+    subject: `Your InvoiceMonk ${tierName} plan is now active!`,
+    html: starterUpgradeEmailTemplate(userName, nextBillingDate),
+  };
 }
 
 async function sendUpgradeEmail(
