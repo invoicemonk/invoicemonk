@@ -193,6 +193,26 @@ serve(async (req) => {
       });
     }
 
+    // Send welcome email for sign_up events (non-blocking)
+    if (event_type === "sign_up") {
+      const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+      if (brevoApiKey) {
+        const { data: profile } = await serviceClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profile?.email) {
+          // Fire and forget — don't block the response
+          sendWelcomeEmail(brevoApiKey, profile.email, profile.full_name || "there")
+            .catch((err) => console.error("Welcome email background error:", err));
+        }
+      } else {
+        console.log("BREVO_API_KEY not configured, skipping welcome email");
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

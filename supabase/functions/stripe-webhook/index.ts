@@ -346,19 +346,21 @@ async function sendUpgradeEmail(
       return;
     }
 
-    const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const name = profile.full_name || "there";
     const nextBilling = new Date(periodEnd).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
 
+    const { subject, html } = getUpgradeEmailTemplate(name, tier, nextBilling);
+
     const sent = await sendBrevoEmail(
       brevoApiKey,
       profile.email,
-      profile.full_name || "there",
-      `Your InvoiceMonk ${tierName} plan is now active!`,
-      upgradeEmailTemplate(profile.full_name || "there", tierName, nextBilling)
+      name,
+      subject,
+      html
     );
 
     console.log(sent ? "Upgrade email sent to:" : "Failed to send upgrade email to:", profile.email);
