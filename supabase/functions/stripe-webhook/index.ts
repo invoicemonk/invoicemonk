@@ -813,15 +813,15 @@ async function doUpdateSubscription(
     : subscription.status === "trialing" ? "trialing"
     : "active";
 
+  const updateData: Record<string, any> = { tier, status, updated_at: new Date().toISOString() };
+  const periodStart = safeISODate(subscription.current_period_start);
+  const periodEnd = safeISODate(subscription.current_period_end);
+  if (periodStart) updateData.current_period_start = periodStart;
+  if (periodEnd) updateData.current_period_end = periodEnd;
+
   await supabase
     .from("subscriptions")
-    .update({
-      tier,
-      status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("user_id", userId);
 
   console.log("Updated subscription for user:", userId, "tier:", tier, "status:", status);
