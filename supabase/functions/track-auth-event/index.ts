@@ -155,7 +155,7 @@ serve(async (req) => {
 
     // Parse body
     const { event_type } = await req.json();
-    if (!event_type || !["sign_in", "sign_up"].includes(event_type)) {
+    if (!event_type || !["sign_in", "sign_up", "plan_selected"].includes(event_type)) {
       return new Response(JSON.stringify({ error: "Invalid event_type" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -176,25 +176,28 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { error: insertError } = await serviceClient
-      .from("user_login_events")
-      .insert({
-        user_id: userId,
-        event_type,
-        ip_address: ip,
-        user_agent: userAgent,
-      });
+    // Only log login events for sign_in/sign_up (not plan_selected)
+    if (event_type === "sign_in" || event_type === "sign_up") {
+      const { error: insertError } = await serviceClient
+        .from("user_login_events")
+        .insert({
+          user_id: userId,
+          event_type,
+          ip_address: ip,
+          user_agent: userAgent,
+        });
 
-    if (insertError) {
-      console.error("Failed to insert login event:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to log event" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (insertError) {
+        console.error("Failed to insert login event:", insertError);
+        return new Response(JSON.stringify({ error: "Failed to log event" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    // Send welcome email for sign_up events (non-blocking)
-    if (event_type === "sign_up") {
+    // Send welcome email when user selects their plan (non-blocking)
+    if (event_type === "plan_selected") {
       const brevoApiKey = Deno.env.get("BREVO_API_KEY");
       if (brevoApiKey) {
         const { data: profile } = await serviceClient
@@ -204,7 +207,6 @@ serve(async (req) => {
           .maybeSingle();
 
         if (profile?.email) {
-          // Fire and forget — don't block the response
           sendWelcomeEmail(brevoApiKey, profile.email, profile.full_name || "there")
             .catch((err) => console.error("Welcome email background error:", err));
         }

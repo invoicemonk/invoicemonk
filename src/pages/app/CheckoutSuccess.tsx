@@ -23,6 +23,11 @@ export default function CheckoutSuccess() {
         // Mark plan as selected after successful checkout
         await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
         addTags({ stripe_checkout_completed: 'true' });
+
+        // Trigger welcome email (non-blocking)
+        supabase.functions.invoke('track-auth-event', {
+          body: { event_type: 'plan_selected' },
+        }).catch(() => {});
         
         // Broadly invalidate all subscription and business queries
         queryClient.invalidateQueries({ queryKey: ['subscription'] });

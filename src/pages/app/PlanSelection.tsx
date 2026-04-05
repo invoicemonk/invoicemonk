@@ -75,6 +75,12 @@ export default function PlanSelection() {
       }
 
       await markPlanSelected();
+
+      // Trigger welcome email (non-blocking)
+      supabase.functions.invoke('track-auth-event', {
+        body: { event_type: 'plan_selected' },
+      }).catch(() => {});
+
       await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
       navigate('/dashboard');
       return;
