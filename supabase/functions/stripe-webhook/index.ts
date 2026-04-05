@@ -884,34 +884,30 @@ async function updateSubscriptionByBusiness(
     .maybeSingle();
 
   if (existingSub) {
-    await supabase
-      .from("subscriptions")
-      .update({
-        tier,
-        status: "active",
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscription.id,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        pricing_region: pricingRegion,
-        billing_currency: billingCurrency,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existingSub.id);
+    const upd: Record<string, any> = {
+      tier, status: "active", stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: subscription.id,
+      pricing_region: pricingRegion, billing_currency: billingCurrency,
+      updated_at: new Date().toISOString(),
+    };
+    const ps3 = safeISODate(subscription.current_period_start);
+    const pe3 = safeISODate(subscription.current_period_end);
+    if (ps3) upd.current_period_start = ps3;
+    if (pe3) upd.current_period_end = pe3;
+
+    await supabase.from("subscriptions").update(upd).eq("id", existingSub.id);
   } else {
-    await supabase
-      .from("subscriptions")
-      .insert({
-        business_id: businessId,
-        tier,
-        status: "active",
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscription.id,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        pricing_region: pricingRegion,
-        billing_currency: billingCurrency,
-      });
+    const ins: Record<string, any> = {
+      business_id: businessId, tier, status: "active",
+      stripe_customer_id: stripeCustomerId, stripe_subscription_id: subscription.id,
+      pricing_region: pricingRegion, billing_currency: billingCurrency,
+    };
+    const ps4 = safeISODate(subscription.current_period_start);
+    const pe4 = safeISODate(subscription.current_period_end);
+    if (ps4) ins.current_period_start = ps4;
+    if (pe4) ins.current_period_end = pe4;
+
+    await supabase.from("subscriptions").insert(ins);
   }
   console.log("Updated subscription for business:", businessId);
 }
