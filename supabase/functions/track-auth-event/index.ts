@@ -115,6 +115,38 @@ async function sendWelcomeEmail(
   }
 }
 
+/**
+ * Sync user data to Brevo as a contact (fire-and-forget).
+ * Calls the sync-brevo-contact edge function internally.
+ */
+async function syncBrevoContact(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  email: string,
+  attributes: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const url = `${supabaseUrl}/functions/v1/sync-brevo-contact`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ email, attributes }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`sync-brevo-contact error (${response.status}):`, text);
+    } else {
+      await response.text();
+      console.log("Brevo contact synced for:", email);
+    }
+  } catch (err) {
+    console.error("Failed to sync Brevo contact:", err);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -196,21 +228,81 @@ serve(async (req) => {
       }
     }
 
+    // Fetch profile data for Brevo sync
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("email, full_name, created_at, has_selected_plan")
+      .eq("id", userId)
+      .maybeSingle();
+
+    // Fetch the user's default business for extra attributes
+    const { data: membership } = await serviceClient
+      .from("business_members")
+      .select("business_id, businesses(name, jurisdiction, default_currency)")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    const businessData = membership?.businesses as
+      | { name: string; jurisdiction: string | null; default_currency: string | null }
+      | null;
+
+    // Fetch current subscription tier
+    const { data: subscription } = membership?.business_id
+      ? await serviceClient
+          .from("subscriptions")
+          .select("tier")
+          .eq("business_id", membership.business_id)
+          .eq("status", "active")
+          .maybeSingle()
+      : { data: null };
+
+    // --- Brevo contact sync (non-blocking) ---
+    if (profile?.email) {
+      const nameParts = (profile.full_name || "").split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      if (event_type === "sign_up") {
+        syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
+          FIRSTNAME: firstName,
+          LASTNAME: lastName,
+          PLAN: subscription?.tier || "starter",
+          SIGNUP_DATE: profile.created_at
+            ? new Date(profile.created_at).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+          COUNTRY: businessData?.jurisdiction || "",
+          BUSINESS_NAME: businessData?.name || "",
+          HAS_SELECTED_PLAN: profile.has_selected_plan ?? false,
+        }).catch((err) => console.error("Brevo sync bg error:", err));
+      }
+
+      if (event_type === "sign_in") {
+        syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
+          LAST_LOGIN: new Date().toISOString().split("T")[0],
+          PLAN: subscription?.tier || "starter",
+        }).catch((err) => console.error("Brevo sync bg error:", err));
+      }
+
+      if (event_type === "plan_selected") {
+        syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
+          FIRSTNAME: firstName,
+          LASTNAME: lastName,
+          PLAN: subscription?.tier || "starter",
+          HAS_SELECTED_PLAN: true,
+          COUNTRY: businessData?.jurisdiction || "",
+          BUSINESS_NAME: businessData?.name || "",
+        }).catch((err) => console.error("Brevo sync bg error:", err));
+      }
+    }
+
     // Send welcome email when user selects their plan (non-blocking)
     if (event_type === "plan_selected") {
       const brevoApiKey = Deno.env.get("BREVO_API_KEY");
-      if (brevoApiKey) {
-        const { data: profile } = await serviceClient
-          .from("profiles")
-          .select("email, full_name")
-          .eq("id", userId)
-          .maybeSingle();
-
-        if (profile?.email) {
-          sendWelcomeEmail(brevoApiKey, profile.email, profile.full_name || "there")
-            .catch((err) => console.error("Welcome email background error:", err));
-        }
-      } else {
+      if (brevoApiKey && profile?.email) {
+        sendWelcomeEmail(brevoApiKey, profile.email, profile.full_name || "there")
+          .catch((err) => console.error("Welcome email background error:", err));
+      } else if (!brevoApiKey) {
         console.log("BREVO_API_KEY not configured, skipping welcome email");
       }
     }
