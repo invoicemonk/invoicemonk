@@ -1,78 +1,88 @@
-# Add Welcome Email + Detailed Professional Upgrade Onboarding Email
 
-## What's Missing Today
 
-1. **No welcome email** -- When a user signs up, nothing is sent. They only get a verification email from Supabase Auth, then silence until lifecycle campaigns kick in 48-72 hours later.
-2. **Upgrade email is too shallow** -- The current upgrade email (in stripe-webhook) just lists 4 bullet points. No step-by-step guidance, no links to specific features, no "from the founder" personal touch.
+# Fix: "Database error saving new user" on Signup
 
-## What Gets Built
+## Root Cause
 
-### 1. Welcome Email (sent immediately after signup)
+The signup flow triggers this chain:
 
-A warm, personal email from the founder that:
+1. User signs up → Supabase inserts into `auth.users`
+2. Trigger `on_auth_user_created` → `handle_new_user()` creates profile + role (succeeds)
+3. Trigger `on_auth_user_created_default_business` → `create_default_business()` creates a business and inserts the owner into `business_members`
+4. The `business_members` INSERT fires the `enforce_team_member_limit` trigger → `check_team_member_limit()`
+5. Since the new business has no subscription, the tier defaults to `'starter'`, which has `team_members_limit = 1`
+6. The function counts existing members (`COUNT(*) >= 1` is true because the owner row is being inserted), so it raises an exception
+7. The entire transaction rolls back — no user, no profile, no business is created
 
-- Welcomes the user by name
-- Introduces Invoicemonk's core value (compliance-first invoicing)
-- Provides a 4-step quick start guide with direct links:
-  1. Complete your business profile → `/settings`
-  2. Add your first client → `/clients`
-  3. Create your first invoice → `/invoices/new`
-  4. Set up payment methods → `/settings` (payment methods section)
-- Mentions the Quick Setup Checklist on the dashboard
-- Includes a personal sign-off from the founder
-- Links to support/help
+**The team member limit check is incorrectly blocking the business owner from being added as the first member of their own business.**
 
-**Trigger**: Called from `track-auth-event` edge function when `event_type === "sign_up"`
+## Fix
 
-### 2. Enhanced Professional Upgrade Email
+Modify `check_team_member_limit` to skip validation when the member being added has the `'owner'` role. The owner is the person who created the business and should never be blocked by team limits.
 
-Replace the current generic upgrade email with a detailed onboarding guide that:
+## Migration SQL
 
-- Congratulates the user personally
-- Lists their new Professional-tier capabilities with links to each feature:
-  - **Team collaboration** (up to 5 members) → `/team`
-  - **Custom branding** (remove watermark, add logo) → `/settings`
-  - **Unlimited invoices & receipts** → `/invoices/new`
-  - **Unlimited currency accounts** → `/settings`
-  - **Audit logs & compliance** → `/audit-logs`
-  - **Data exports** → `/reports`
-  - **AI receipt scanning** → `/expenses`
-  - **Advanced accounting** → `/accounting`
-- Includes a "Getting Started with Professional" section with 3 recommended first steps
-- Has a personal sign-off from the founder
-- Shows billing details (plan name, next billing date)
+```sql
+CREATE OR REPLACE FUNCTION public.check_team_member_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _tier subscription_tier;
+  _limit_value INTEGER;
+  _current_count INTEGER;
+BEGIN
+  -- Owner should never be blocked by team limits
+  IF NEW.role = 'owner' THEN
+    RETURN NEW;
+  END IF;
 
-### 3. Business-tier Upgrade Email (bonus)
-
-Same structure but highlights Business-specific features:
-
-- **Unlimited team members**
-- **API access**
-- Everything in Professional, plus the above
-
-## Technical Approach
-
-### File: `supabase/functions/track-auth-event/index.ts`
-
-- After successfully logging the sign_up event, fetch the user's profile (name, email)
-- Call Brevo API to send the welcome email
-- Non-blocking: if the email fails, log the error but don't fail the event tracking
-
-### File: `supabase/functions/stripe-webhook/index.ts`
-
-- Replace the `upgradeEmailTemplate` function with tier-specific templates
-- `professionalUpgradeEmailTemplate` -- detailed guide for Professional features
-- `businessUpgradeEmailTemplate` -- detailed guide for Business features
-- Keep the existing `sendUpgradeEmail` function structure, just pass the appropriate template based on tier
-
-## No New Dependencies
-
-Both changes use the existing Brevo integration already in place. No new edge functions needed.
+  -- Get tier from business subscription
+  SELECT s.tier INTO _tier
+  FROM subscriptions s
+  WHERE s.business_id = NEW.business_id AND s.status = 'active'
+  ORDER BY s.created_at DESC LIMIT 1;
+  
+  IF _tier IS NULL THEN 
+    _tier := 'starter'; 
+  END IF;
+  
+  -- Get limit from tier_limits (single source of truth)
+  SELECT limit_value INTO _limit_value
+  FROM tier_limits
+  WHERE tier = _tier AND feature = 'team_members_limit';
+  
+  -- If limit is 0, NO team access at all
+  IF _limit_value = 0 THEN
+    RAISE EXCEPTION 'Team access is not available on your current plan. Please upgrade to Professional or Business to add team members.';
+  END IF;
+  
+  -- If limit is NULL, unlimited
+  IF _limit_value IS NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Check current count (exclude the owner)
+  SELECT COUNT(*) INTO _current_count
+  FROM business_members
+  WHERE business_id = NEW.business_id;
+  
+  IF _current_count >= _limit_value THEN
+    RAISE EXCEPTION 'Team member limit reached (% members). Please upgrade to add more team members.', _limit_value;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+```
 
 ## Files Changed
 
+| File | Change |
+|---|---|
+| New migration | `CREATE OR REPLACE FUNCTION check_team_member_limit` — add early return when `NEW.role = 'owner'` |
 
-| File                                           | Change                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `supabase/functions/track-auth-event/index.ts` | Add welcome email sending after sign_up event logging                          |
-| `supabase/functions/stripe-webhook/index.ts`   | Replace generic upgrade template with tier-specific detailed onboarding guides |
+No frontend changes needed. This is a database-only fix.
+
