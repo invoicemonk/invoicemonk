@@ -1,88 +1,80 @@
 
-
-# Fix: "Database error saving new user" on Signup
+# Fix: Signup Still Fails Because Owner Is Being Inserted Twice
 
 ## Root Cause
 
-The signup flow triggers this chain:
+The earlier team-limit fix addressed one failure path, but the current codebase still has a second signup blocker:
 
-1. User signs up → Supabase inserts into `auth.users`
-2. Trigger `on_auth_user_created` → `handle_new_user()` creates profile + role (succeeds)
-3. Trigger `on_auth_user_created_default_business` → `create_default_business()` creates a business and inserts the owner into `business_members`
-4. The `business_members` INSERT fires the `enforce_team_member_limit` trigger → `check_team_member_limit()`
-5. Since the new business has no subscription, the tier defaults to `'starter'`, which has `team_members_limit = 1`
-6. The function counts existing members (`COUNT(*) >= 1` is true because the owner row is being inserted), so it raises an exception
-7. The entire transaction rolls back — no user, no profile, no business is created
+1. `handle_new_user()` creates the profile and user role
+2. `create_default_business()` creates the default business
+3. The existing `add_business_creator_as_owner_trigger` automatically inserts the creator into `business_members` as `owner`
+4. But the latest `create_default_business()` function also manually inserts the same owner into `business_members`
+5. `business_members` has a unique constraint on `(user_id, business_id)`, so the second insert fails
+6. Supabase surfaces that as the generic toast: `"Database error saving new user"`
 
-**The team member limit check is incorrectly blocking the business owner from being added as the first member of their own business.**
+So the current error is now most likely a duplicate-owner insert, not the team-member limit anymore.
 
-## Fix
+## Implementation Plan
 
-Modify `check_team_member_limit` to skip validation when the member being added has the `'owner'` role. The owner is the person who created the business and should never be blocked by team limits.
+### 1. Fix the duplicate owner insertion
+Create a new migration that updates `public.create_default_business()` so it only:
+- creates the business
+- returns `NEW`
 
-## Migration SQL
+It should no longer insert into `public.business_members` directly, because the existing `add_business_creator_as_owner_trigger` already handles that.
 
-```sql
-CREATE OR REPLACE FUNCTION public.check_team_member_limit()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  _tier subscription_tier;
-  _limit_value INTEGER;
-  _current_count INTEGER;
-BEGIN
-  -- Owner should never be blocked by team limits
-  IF NEW.role = 'owner' THEN
-    RETURN NEW;
-  END IF;
+### 2. Add a defensive safeguard
+Update `public.add_business_creator_as_owner()` to be idempotent:
+- either `INSERT ... ON CONFLICT DO NOTHING`
+- or insert only when that owner membership does not already exist
 
-  -- Get tier from business subscription
-  SELECT s.tier INTO _tier
-  FROM subscriptions s
-  WHERE s.business_id = NEW.business_id AND s.status = 'active'
-  ORDER BY s.created_at DESC LIMIT 1;
-  
-  IF _tier IS NULL THEN 
-    _tier := 'starter'; 
-  END IF;
-  
-  -- Get limit from tier_limits (single source of truth)
-  SELECT limit_value INTO _limit_value
-  FROM tier_limits
-  WHERE tier = _tier AND feature = 'team_members_limit';
-  
-  -- If limit is 0, NO team access at all
-  IF _limit_value = 0 THEN
-    RAISE EXCEPTION 'Team access is not available on your current plan. Please upgrade to Professional or Business to add team members.';
-  END IF;
-  
-  -- If limit is NULL, unlimited
-  IF _limit_value IS NULL THEN
-    RETURN NEW;
-  END IF;
-  
-  -- Check current count (exclude the owner)
-  SELECT COUNT(*) INTO _current_count
-  FROM business_members
-  WHERE business_id = NEW.business_id;
-  
-  IF _current_count >= _limit_value THEN
-    RAISE EXCEPTION 'Team member limit reached (% members). Please upgrade to add more team members.', _limit_value;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$;
-```
+This prevents future regressions if another code path accidentally tries to add the owner again.
 
-## Files Changed
+### 3. Preserve the previous owner-limit bypass
+Keep the already-added `check_team_member_limit()` owner bypass in place. That migration is still valid and should remain, because once the duplicate insert is removed, the owner row still needs to bypass team-member limits during signup.
+
+### 4. Verify the signup flow end-to-end
+After the migration:
+- create a fresh account
+- confirm profile row is created
+- confirm default business is created
+- confirm exactly one `business_members` row exists for the owner
+- confirm signup no longer throws the database error
+
+## Files to Change
 
 | File | Change |
 |---|---|
-| New migration | `CREATE OR REPLACE FUNCTION check_team_member_limit` — add early return when `NEW.role = 'owner'` |
+| New Supabase migration | Update `create_default_business()` to remove the manual owner insert |
+| New Supabase migration | Harden `add_business_creator_as_owner()` with idempotent insert logic |
 
-No frontend changes needed. This is a database-only fix.
+## Technical Details
 
+Current conflict in the schema:
+
+```text
+auth.users insert
+  -> create_default_business()
+      -> INSERT businesses
+          -> add_business_creator_as_owner_trigger
+              -> INSERT business_members (owner)
+      -> INSERT business_members (owner) again   <-- duplicate
+```
+
+The unique constraint already exists on `business_members`:
+
+```text
+UNIQUE(user_id, business_id)
+```
+
+So the correct architecture is:
+
+```text
+create_default_business() -> create business only
+add_business_creator_as_owner_trigger -> add owner membership once
+```
+
+## Notes
+
+- No frontend change is required to stop this specific error.
+- If desired, a later follow-up can improve signup error reporting so backend trigger failures are easier to diagnose from the UI.
