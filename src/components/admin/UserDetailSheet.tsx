@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert, Globe, Monitor } from 'lucide-react';
+import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert, Globe, Monitor, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useBanUser, useUnbanUser } from '@/hooks/use-admin';
 import { useQuery } from '@tanstack/react-query';
@@ -34,6 +34,7 @@ interface UserProfile {
   created_at: string | null;
   updated_at: string | null;
   user_roles?: { role: string }[];
+  business_memberships?: { role: string; business: { id: string; name: string; jurisdiction: string } }[];
 }
 
 interface UserDetailSheetProps {
@@ -161,6 +162,30 @@ export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetPro
             </div>
 
             <Separator />
+
+            {/* Businesses */}
+            {user.business_memberships && user.business_memberships.length > 0 && (
+              <>
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Businesses</h4>
+                  <div className="space-y-2">
+                    {user.business_memberships.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between bg-muted rounded-md p-2.5">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{m.business.name}</p>
+                            <p className="text-xs text-muted-foreground">{m.business.jurisdiction}</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs capitalize">{m.role}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
 
             {/* Ban/Unban Action */}
             <div className="space-y-2">

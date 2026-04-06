@@ -80,9 +80,24 @@ export function useAdminUsers(search?: string) {
         rolesMap.set(r.user_id, existing);
       });
 
+      // Fetch business memberships for all users
+      const { data: memberships } = await supabase
+        .from('business_members')
+        .select('user_id, role, business:businesses!inner(id, name, jurisdiction)')
+        .in('user_id', userIds)
+        .not('accepted_at', 'is', null);
+
+      const businessMap = new Map<string, any[]>();
+      memberships?.forEach((m: any) => {
+        const existing = businessMap.get(m.user_id) || [];
+        existing.push({ role: m.role, business: m.business });
+        businessMap.set(m.user_id, existing);
+      });
+
       return profiles.map(profile => ({
         ...profile,
-        user_roles: rolesMap.get(profile.id)?.map(role => ({ role })) || []
+        user_roles: rolesMap.get(profile.id)?.map(role => ({ role })) || [],
+        business_memberships: businessMap.get(profile.id) || [],
       }));
     },
     refetchOnWindowFocus: true,
@@ -116,7 +131,35 @@ export function useAdminBusinesses(search?: string) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data;
+
+      // Fetch owner info for each business
+      const businessIds = (data || []).map(b => b.id);
+      const { data: ownerMembers } = await supabase
+        .from('business_members')
+        .select('business_id, user_id, role')
+        .in('business_id', businessIds)
+        .eq('role', 'owner');
+
+      const ownerUserIds = [...new Set((ownerMembers || []).map(m => m.user_id))];
+      let ownerProfiles: any[] = [];
+      if (ownerUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', ownerUserIds);
+        ownerProfiles = profiles || [];
+      }
+
+      const ownerMap = new Map<string, any>();
+      ownerMembers?.forEach(m => {
+        const profile = ownerProfiles.find(p => p.id === m.user_id);
+        if (profile) ownerMap.set(m.business_id, profile);
+      });
+
+      return (data || []).map(business => ({
+        ...business,
+        owner: ownerMap.get(business.id) || null,
+      }));
     },
     refetchOnWindowFocus: true,
     refetchInterval: 60000, // 1 minute

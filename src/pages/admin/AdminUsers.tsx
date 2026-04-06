@@ -11,7 +11,8 @@ import {
   Eye,
   AlertCircle,
   Ban,
-  UserCheck
+  UserCheck,
+  Building2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -186,6 +187,7 @@ export default function AdminUsers() {
                 <TableHead>User</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Businesses</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -205,7 +207,7 @@ export default function AdminUsers() {
                 ))
               ) : users?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
+                  <TableCell colSpan={7} className="text-center py-12">
                     <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                     <p className="text-muted-foreground">No users found</p>
                   </TableCell>
@@ -232,6 +234,21 @@ export default function AdminUsers() {
                     </TableCell>
                     <TableCell>
                       {getRoleBadge((user as any).user_roles || [])}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const memberships = (user as any).business_memberships || [];
+                        if (memberships.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
+                        return (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm truncate max-w-[120px]">{memberships[0].business.name}</span>
+                            {memberships.length > 1 && (
+                              <Badge variant="outline" className="text-xs ml-1">+{memberships.length - 1}</Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(user.account_status) || (

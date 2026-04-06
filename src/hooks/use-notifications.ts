@@ -59,7 +59,7 @@ export function useNotifications(limit = 20, businessId?: string) {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('notifications-realtime')
+      .channel(`notifications-realtime-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {

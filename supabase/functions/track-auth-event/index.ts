@@ -243,9 +243,10 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const businessData = membership?.businesses as
-      | { name: string; jurisdiction: string | null; default_currency: string | null }
-      | null;
+    const businessArr = membership?.businesses as
+      | { name: string; jurisdiction: string | null; default_currency: string | null }[]
+      | undefined;
+    const businessData = businessArr?.[0] ?? null;
 
     // Fetch current subscription tier
     const { data: subscription } = membership?.business_id

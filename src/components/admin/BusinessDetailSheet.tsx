@@ -6,7 +6,9 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar, ShieldAlert } from 'lucide-react';
+import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar, ShieldAlert, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +32,7 @@ interface BusinessData {
   flag_reason?: string | null;
   business_members?: { count: number }[];
   subscriptions?: { tier: string; status: string }[];
+  owner?: { id: string; full_name: string | null; email: string; avatar_url: string | null } | null;
 }
 
 interface BusinessDetailSheetProps {
@@ -130,6 +133,28 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
           </div>
 
           <Separator />
+
+          {/* Owner */}
+          {business.owner && (
+            <>
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Owner</h4>
+                <div className="flex items-center gap-3 bg-muted rounded-md p-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={business.owner.avatar_url || undefined} />
+                    <AvatarFallback>
+                      {business.owner.full_name?.[0]?.toUpperCase() || business.owner.email[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{business.owner.full_name || 'Unnamed'}</p>
+                    <p className="text-xs text-muted-foreground">{business.owner.email}</p>
+                  </div>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
 
           {/* Status & Subscription */}
           <div className="space-y-4">

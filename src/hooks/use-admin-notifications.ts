@@ -92,7 +92,7 @@ export function useAdminNotifications(limit = 50, category?: AdminNotificationCa
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('admin-notifications-realtime')
+      .channel(`admin-notifications-realtime-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {

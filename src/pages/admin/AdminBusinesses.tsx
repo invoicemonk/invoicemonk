@@ -135,6 +135,7 @@ export default function AdminBusinesses() {
               <TableRow>
                 <TableHead>Business</TableHead>
                 <TableHead>Legal Name</TableHead>
+                <TableHead>Owner</TableHead>
                 <TableHead>Jurisdiction</TableHead>
                 <TableHead>Members</TableHead>
                 <TableHead>Subscription</TableHead>
@@ -157,7 +158,7 @@ export default function AdminBusinesses() {
                 ))
               ) : businesses?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={8} className="text-center py-12">
                     <Building2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                     <p className="text-muted-foreground">No businesses found</p>
                   </TableCell>
@@ -174,6 +175,17 @@ export default function AdminBusinesses() {
                       </span>
                     </TableCell>
                     <TableCell>{business.legal_name || '-'}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const owner = (business as any).owner;
+                        if (!owner) return <span className="text-muted-foreground text-sm">—</span>;
+                        return (
+                          <span className="text-sm truncate max-w-[140px] block">
+                            {owner.full_name || owner.email}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Globe className="h-3 w-3 text-muted-foreground" />
