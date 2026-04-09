@@ -68,6 +68,8 @@ interface VerificationResponse {
   issuer_tier?: string;
   is_flagged?: boolean;
   flag_reason?: string;
+  verification_status?: string | null;
+  verification_source?: string | null;
   error?: string;
 }
 
