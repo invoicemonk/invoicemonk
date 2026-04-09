@@ -42,6 +42,7 @@ const mainNavItems = [
   { title: 'Invoices', url: '/admin/invoices', icon: FileText },
   { title: 'Partners', url: '/admin/partners', icon: Users },
   
+  { title: 'Risk Monitoring', url: '/admin/risk-monitoring', icon: ShieldAlert },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
   { title: 'Audit Logs', url: '/admin/audit-logs', icon: History },
 ];

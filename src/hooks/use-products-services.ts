@@ -183,7 +183,7 @@ export function useUpdateProductService() {
 
       const { data, error } = await supabase
         .from('products_services')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', id)
         .select()
         .single();

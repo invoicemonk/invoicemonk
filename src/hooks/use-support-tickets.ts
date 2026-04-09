@@ -290,7 +290,7 @@ export function useUpdateTicketStatus() {
 
       const { data, error } = await supabase
         .from('support_tickets')
-        .update(updates)
+        .update(updates as any)
         .eq('id', ticketId)
         .select()
         .single();

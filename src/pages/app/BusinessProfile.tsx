@@ -1017,18 +1017,18 @@ export default function BusinessProfile() {
         </Card>
       </div>
 
-      {/* Payment Methods Section */}
+      {/* Online Payments */}
+      {business && (
+        <OnlinePaymentsSettingsCard business={business} />
+      )}
+
+      {/* Manual Payment Instructions */}
       {business && (
         <PaymentMethodsSection
           businessId={business.id}
           canManage={true}
           canDelete={true}
         />
-      )}
-
-      {/* Online Payments */}
-      {business && (
-        <OnlinePaymentsSettingsCard business={business} />
       )}
 
       {/* Danger Zone — only for non-default businesses */}

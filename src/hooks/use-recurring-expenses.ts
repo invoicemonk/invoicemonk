@@ -193,7 +193,7 @@ export function useUpdateRecurringExpense() {
 
       const { data, error } = await supabase
         .from('recurring_expenses')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();

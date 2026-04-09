@@ -65,12 +65,12 @@ export function PaymentMethodsSection({ businessId, canManage, canDelete }: Paym
     <>
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Payment Methods
+            Manual Payment Instructions
           </CardTitle>
           <CardDescription>
-            Configure how clients can pay you. Payment instructions appear on invoices and receipts.
+            Add offline payment details (bank transfer, Wise, crypto, etc.) that appear on your invoices. These are informational only — for online payments, use the section above.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

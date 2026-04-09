@@ -94,6 +94,7 @@ import AdminTemplates from "./pages/admin/AdminTemplates";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPartners from "./pages/admin/AdminPartners";
 import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions";
+import AdminRiskMonitoring from "./pages/admin/AdminRiskMonitoring";
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
@@ -300,6 +301,7 @@ const App = () => (
             <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/regulatory-submissions" element={<AdminRegulatorySubmissions />} />
+            <Route path="/admin/risk-monitoring" element={<AdminRiskMonitoring />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

@@ -57,7 +57,7 @@ export function useUpdateLink() {
 
       const { data, error } = await supabase
         .from('referral_links')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();

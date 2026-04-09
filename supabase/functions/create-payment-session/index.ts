@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     // Look up invoice by verification_id (server-side, never trust client amounts)
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select('id, business_id, invoice_number, total_amount, amount_paid, currency, status, verification_id, recipient_snapshot')
+      .select('id, business_id, invoice_number, total_amount, amount_paid, currency, status, verification_id, recipient_snapshot, user_id')
       .eq('verification_id', verification_id)
       .maybeSingle()
 
@@ -114,8 +114,105 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Determine provider based on jurisdiction and currency
+    // Block payments if payout provider is not set up (CRITICAL: prevents money going to platform)
     const usePaystack = business.jurisdiction === 'NG' && invoice.currency === 'NGN'
+    if (usePaystack) {
+      if (!business.paystack_subaccount_code || business.paystack_subaccount_status !== 'active') {
+        return new Response(JSON.stringify({ error: 'This business has not completed payment setup. Please contact the business directly.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } else {
+      if (!business.stripe_connect_account_id || business.stripe_connect_status !== 'active') {
+        return new Response(JSON.stringify({ error: 'This business has not completed payment setup. Please contact the business directly.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Self-payment detection: check if the payer is a member of the business
+    const authHeader = req.headers.get('authorization')
+    if (authHeader) {
+      try {
+        const payerToken = authHeader.replace('Bearer ', '')
+        const { data: { user: payerUser } } = await supabase.auth.getUser(payerToken)
+        if (payerUser) {
+          const { data: memberCheck } = await supabase
+            .from('business_members')
+            .select('id')
+            .eq('business_id', invoice.business_id)
+            .eq('user_id', payerUser.id)
+            .maybeSingle()
+
+          if (memberCheck) {
+            // Log fraud flag
+            await supabase.from('fraud_flags').insert({
+              business_id: invoice.business_id,
+              invoice_id: invoice.id,
+              user_id: payerUser.id,
+              reason: 'SELF_PAYMENT_ATTEMPT',
+              severity: 'critical',
+              metadata: { invoice_number: invoice.invoice_number, payer_email: payerUser.email },
+            })
+
+            // Audit log
+            try {
+              await supabase.rpc('log_audit_event', {
+                _event_type: 'SELF_PAYMENT_BLOCKED',
+                _entity_type: 'online_payment',
+                _entity_id: invoice.id,
+                _user_id: payerUser.id,
+                _business_id: invoice.business_id,
+                _metadata: { invoice_number: invoice.invoice_number },
+              })
+            } catch (auditErr) {
+              console.error('Audit log error:', auditErr)
+            }
+
+            return new Response(JSON.stringify({ error: 'You cannot pay your own invoice' }), {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+        }
+      } catch (authErr) {
+        // If token is invalid, skip self-payment check (anonymous payer)
+        console.log('Could not verify payer identity, proceeding as anonymous')
+      }
+    }
+
+    // Check subscription tier — free starter plan cannot use online payments
+    const { data: bizSub } = await supabase
+      .from('subscriptions')
+      .select('tier')
+      .eq('business_id', invoice.business_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!bizSub || bizSub.tier === 'starter') {
+      // Also check user-level subscription as fallback
+      const { data: userSub } = await supabase
+        .from('subscriptions')
+        .select('tier')
+        .eq('user_id', invoice.user_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!userSub || userSub.tier === 'starter') {
+        return new Response(JSON.stringify({ error: 'Online payments require a paid plan' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Determine provider based on jurisdiction and currency (reuse usePaystack from line 118)
     const provider = usePaystack ? 'paystack' : 'stripe'
 
     const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'

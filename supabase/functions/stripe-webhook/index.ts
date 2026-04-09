@@ -588,6 +588,41 @@ serve(async (req) => {
           });
 
           console.log(`Stripe invoice payment processed: ${effectiveAmount} ${inv.currency} for ${inv.invoice_number}`);
+
+          // Post-payment fraud flagging: check if payer email matches business contact email
+          try {
+            const payerEmail = (session.customer_details?.email || '').toLowerCase().trim()
+            if (payerEmail && businessId) {
+              const { data: biz } = await supabase
+                .from('businesses')
+                .select('contact_email')
+                .eq('id', businessId)
+                .maybeSingle()
+
+              if (biz?.contact_email && biz.contact_email.toLowerCase().trim() === payerEmail) {
+                await supabase.from('fraud_flags').insert({
+                  business_id: businessId,
+                  invoice_id: inv.id,
+                  reason: 'PAYER_EMAIL_MATCHES_BUSINESS',
+                  severity: 'high',
+                  metadata: { payer_email: payerEmail, business_email: biz.contact_email, invoice_number: inv.invoice_number, provider: 'stripe' },
+                })
+
+                await supabase.rpc('log_audit_event', {
+                  _event_type: 'PAYMENT_FLAGGED',
+                  _entity_type: 'online_payment',
+                  _entity_id: inv.id,
+                  _business_id: businessId,
+                  _metadata: { reason: 'PAYER_EMAIL_MATCHES_BUSINESS', payer_email: payerEmail },
+                })
+
+                console.log(`Fraud flag: payer email matches business email for invoice ${inv.invoice_number}`)
+              }
+            }
+          } catch (flagErr) {
+            console.error('Fraud flagging error:', flagErr)
+          }
+
           break;
         }
 

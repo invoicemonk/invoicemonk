@@ -245,7 +245,7 @@ export function useUpdateExpense() {
 
       const { data, error } = await supabase
         .from('expenses')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();

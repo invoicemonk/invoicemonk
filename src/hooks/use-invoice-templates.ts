@@ -162,7 +162,7 @@ export function useUpdateTemplate() {
 
       const { data, error } = await supabase
         .from('invoice_templates')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();

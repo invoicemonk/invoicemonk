@@ -101,6 +101,7 @@ interface InvoiceViewResponse {
   is_flagged?: boolean;
   flag_reason?: string;
   online_payments_enabled?: boolean;
+  connect_setup_incomplete?: boolean;
   error?: string;
 }
 
@@ -697,20 +698,33 @@ const InvoiceView = () => {
                 <div className="flex flex-wrap gap-3 justify-center">
                   {/* Pay Online Button — only show when balance > 0, not voided/paid, not flagged, and online payments enabled */}
                   {balanceDue > 0 && invoice.status !== "voided" && invoice.status !== "paid" && !data?.is_flagged && data?.online_payments_enabled && (
-                    <Button
-                      onClick={handlePayOnline}
-                      disabled={creatingPayment}
-                      variant="default"
-                      size="lg"
-                      className="bg-primary"
-                    >
-                      {creatingPayment ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Wallet className="mr-2 h-4 w-4" />
-                      )}
-                      Pay {formatCurrency(balanceDue, invoice.currency)} Online
-                    </Button>
+                    <div className="flex flex-col items-center gap-2">
+                      <Button
+                        onClick={handlePayOnline}
+                        disabled={creatingPayment}
+                        variant="default"
+                        size="lg"
+                        className="bg-primary"
+                      >
+                        {creatingPayment ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Wallet className="mr-2 h-4 w-4" />
+                        )}
+                        Pay {formatCurrency(balanceDue, invoice.currency)} Online
+                      </Button>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Shield className="h-3 w-3" />
+                        Payments processed securely. Funds go directly to the business.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Connect setup incomplete message */}
+                  {balanceDue > 0 && invoice.status !== "voided" && invoice.status !== "paid" && !data?.is_flagged && data?.connect_setup_incomplete && (
+                    <p className="text-sm text-muted-foreground">
+                      Online payments are not yet available for this invoice. Please contact the business directly.
+                    </p>
                   )}
 
                   <Button

@@ -92,7 +92,7 @@ export default function CountryConfirmation() {
       }
       const { error } = await supabase
         .from('businesses')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', businessId);
 
       if (error) throw error;

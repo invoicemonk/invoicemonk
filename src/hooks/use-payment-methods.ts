@@ -11,10 +11,6 @@ export const PROVIDER_TYPES = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'wise', label: 'Wise' },
   { value: 'payoneer', label: 'Payoneer' },
-  { value: 'paypal', label: 'PayPal' },
-  { value: 'stripe_link', label: 'Stripe Link' },
-  { value: 'flutterwave', label: 'Flutterwave' },
-  { value: 'paystack', label: 'Paystack' },
   { value: 'crypto', label: 'Crypto' },
   { value: 'other', label: 'Other' },
 ] as const;
@@ -39,21 +35,6 @@ export const PROVIDER_INSTRUCTION_FIELDS: Record<string, { key: string; label: s
   payoneer: [
     { key: 'email', label: 'Payoneer Email', required: true, placeholder: 'e.g. billing@acme.com' },
     { key: 'account_holder', label: 'Account Holder', placeholder: 'e.g. Acme Ltd' },
-  ],
-  paypal: [
-    { key: 'email', label: 'PayPal Email', required: true, placeholder: 'e.g. billing@acme.com' },
-    { key: 'paypal_me', label: 'PayPal.Me Link', placeholder: 'e.g. https://paypal.me/acme' },
-  ],
-  stripe_link: [
-    { key: 'payment_link', label: 'Stripe Payment Link', required: true, placeholder: 'e.g. https://buy.stripe.com/...' },
-  ],
-  flutterwave: [
-    { key: 'payment_link', label: 'Flutterwave Payment Link', required: true, placeholder: 'e.g. https://flutterwave.com/pay/...' },
-    { key: 'account_name', label: 'Account Name', placeholder: 'e.g. Acme Ltd' },
-  ],
-  paystack: [
-    { key: 'payment_link', label: 'Paystack Payment Link', required: true, placeholder: 'e.g. https://paystack.com/pay/...' },
-    { key: 'account_name', label: 'Account Name', placeholder: 'e.g. Acme Ltd' },
   ],
   crypto: [
     { key: 'wallet_address', label: 'Wallet Address', required: true, placeholder: 'e.g. 0x...' },
@@ -209,7 +190,7 @@ export function useUpdatePaymentMethod() {
 
       const { data, error } = await supabase
         .from('payment_methods')
-        .update(updates)
+        .update(updates as any)
         .eq('id', input.id)
         .select()
         .single();

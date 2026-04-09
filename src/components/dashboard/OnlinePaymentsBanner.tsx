@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useBusiness } from '@/contexts/BusinessContext';
 
 export function OnlinePaymentsBanner() {
-  const { currentBusiness } = useBusiness();
+  const { currentBusiness, tier } = useBusiness();
   const businessId = currentBusiness?.id;
   const storageKey = businessId ? `online-payments-banner-dismissed-${businessId}` : null;
 
@@ -21,7 +21,8 @@ export function OnlinePaymentsBanner() {
     if (storageKey) localStorage.setItem(storageKey, 'true');
   };
 
-  if (dismissed || !businessId) return null;
+  // Hide for free starter users — they can't use online payments
+  if (dismissed || !businessId || tier === 'starter') return null;
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-primary/20 bg-primary/5 p-4 sm:p-5">

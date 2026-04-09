@@ -851,6 +851,63 @@ export type Database = {
         }
         Relationships: []
       }
+      fraud_flags: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          invoice_id: string | null
+          metadata: Json
+          reason: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          user_id: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json
+          reason: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json
+          reason?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_flags_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_flags_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           amount: number
@@ -3046,6 +3103,8 @@ export type Database = {
         | "REGULATORY_STATUS_CHANGED"
         | "USER_SUSPENDED"
         | "USER_REACTIVATED"
+        | "SELF_PAYMENT_BLOCKED"
+        | "PAYMENT_FLAGGED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
       invoice_status:
@@ -3249,6 +3308,8 @@ export const Constants = {
         "REGULATORY_STATUS_CHANGED",
         "USER_SUSPENDED",
         "USER_REACTIVATED",
+        "SELF_PAYMENT_BLOCKED",
+        "PAYMENT_FLAGGED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],

@@ -15,6 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useStripeConnect, usePaystackSubaccount } from '@/hooks/use-online-payments';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { Link } from 'react-router-dom';
 
 // Nigerian banks list (common ones)
 const NIGERIAN_BANKS = [
@@ -55,6 +57,8 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
   const { toast } = useToast();
   const { initiateConnect, loading: connectLoading } = useStripeConnect();
   const { createSubaccount, loading: paystackLoading } = usePaystackSubaccount();
+  const { tier } = useBusiness();
+  const isFreeStarterTier = tier === 'starter';
 
   const [bankCode, setBankCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -128,17 +132,35 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Upgrade prompt for free tier */}
+        {isFreeStarterTier && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+            <p className="text-sm font-medium text-foreground">Upgrade to accept online payments</p>
+            <p className="text-xs text-muted-foreground">
+              Online payments are available on paid plans. Upgrade to let clients pay your invoices instantly via card.
+            </p>
+            <Button size="sm" variant="default" asChild>
+              <Link to={`/b/${business.id}/billing`}>
+                Upgrade Plan <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        )}
+
         {/* Toggle */}
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
             <p className="text-sm font-medium">Enable online payments</p>
             <p className="text-xs text-muted-foreground">
-              A "Pay Online" button will appear on your public invoice pages.
+              {isFreeStarterTier
+                ? 'Available on paid plans only.'
+                : 'A "Pay Online" button will appear on your public invoice pages.'}
             </p>
           </div>
           <Switch
-            checked={business.online_payments_enabled || false}
+            checked={!isFreeStarterTier && (business.online_payments_enabled || false)}
             onCheckedChange={handleTogglePayments}
+            disabled={isFreeStarterTier}
           />
         </div>
 
@@ -282,12 +304,22 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
           )}
         </div>
 
+        {/* Warning: payments enabled but Connect not active */}
+        {!isFreeStarterTier && business.online_payments_enabled && stripeStatus !== 'active' && paystackStatus !== 'active' && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Online payments are enabled but your payout account is not connected. Clients cannot pay until setup is complete.
+            </p>
+          </div>
+        )}
+
         {/* Status message */}
         <div className="rounded-lg bg-muted/50 p-3">
           <p className="text-xs text-muted-foreground">
             {(stripeStatus === 'active' || paystackStatus === 'active')
-              ? '✓ Payments go directly to your connected account. A small platform fee is deducted automatically.'
-              : 'Payments are currently collected by Invoicemonk. Connect your account above to receive payouts directly.'}
+              ? '✓ Payments are processed securely via Stripe. Funds go directly to your account.'
+              : 'Connect your payout account above to start receiving payments directly.'}
           </p>
         </div>
       </CardContent>

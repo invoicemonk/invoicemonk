@@ -71,6 +71,7 @@ interface ViewInvoiceResponse {
   is_flagged?: boolean
   flag_reason?: string
   online_payments_enabled?: boolean
+  connect_setup_incomplete?: boolean
   error?: string
 }
 
@@ -186,20 +187,8 @@ Deno.serve(async (req) => {
     let isFlagged = false
     let flagReason: string | null = null
     let onlinePaymentsEnabled = false
-    if (invoice.business_id) {
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('is_flagged, flag_reason, online_payments_enabled')
-        .eq('id', invoice.business_id)
-        .maybeSingle()
-      if (businessData) {
-        isFlagged = businessData.is_flagged || false
-        flagReason = businessData.flag_reason || null
-        onlinePaymentsEnabled = !isFlagged && (businessData.online_payments_enabled || false)
-      }
-    }
 
-    // Get issuer's subscription tier
+    // Get issuer's subscription tier first (needed for online payments check)
     const { data: subscription } = await supabase
       .from('subscriptions')
       .select('tier')
@@ -210,6 +199,35 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     const issuerTier = subscription?.tier || 'starter'
+
+    let connectSetupIncomplete = false
+
+    if (invoice.business_id) {
+      const { data: businessData } = await supabase
+        .from('businesses')
+        .select('is_flagged, flag_reason, online_payments_enabled, jurisdiction, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status')
+        .eq('id', invoice.business_id)
+        .maybeSingle()
+      if (businessData) {
+        isFlagged = businessData.is_flagged || false
+        flagReason = businessData.flag_reason || null
+
+        // Determine provider
+        const usePaystack = businessData.jurisdiction === 'NG' && invoice.currency === 'NGN'
+        const providerReady = usePaystack
+          ? (businessData.paystack_subaccount_code && businessData.paystack_subaccount_status === 'active')
+          : (businessData.stripe_connect_account_id && businessData.stripe_connect_status === 'active')
+
+        // Online payments only available for paid plans AND when provider is set up
+        if (!isFlagged && (businessData.online_payments_enabled || false) && issuerTier !== 'starter') {
+          if (providerReady) {
+            onlinePaymentsEnabled = true
+          } else {
+            connectSetupIncomplete = true
+          }
+        }
+      }
+    }
 
     // Log the view event (for analytics)
     try {
@@ -281,7 +299,8 @@ Deno.serve(async (req) => {
       issuer_tier: issuerTier,
       is_flagged: isFlagged,
       flag_reason: isFlagged ? (flagReason ?? undefined) : undefined,
-      online_payments_enabled: onlinePaymentsEnabled
+      online_payments_enabled: onlinePaymentsEnabled,
+      connect_setup_incomplete: connectSetupIncomplete
     }
 
     return new Response(JSON.stringify(response), {
