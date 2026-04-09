@@ -329,7 +329,9 @@ export default function BusinessProfile() {
             <h1 className="text-3xl font-bold tracking-tight">Business Settings</h1>
             {business && (
               <IdentityLevelBadge 
-                level={(business as any).business_identity_level || 'unverified'} 
+                level={(business as any).verification_status || (business as any).business_identity_level || 'unverified'}
+                source={(business as any).verification_source}
+                rejectionReason={(business as any).rejection_reason}
               />
             )}
           </div>
