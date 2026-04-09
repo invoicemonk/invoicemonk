@@ -96,6 +96,7 @@ import AdminPartners from "./pages/admin/AdminPartners";
 import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions";
 import AdminRiskMonitoring from "./pages/admin/AdminRiskMonitoring";
 import AdminVerifications from "./pages/admin/AdminVerifications";
+import AdminSecurity from "./pages/admin/AdminSecurity";
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
@@ -304,6 +305,7 @@ const App = () => (
             <Route path="/admin/regulatory-submissions" element={<AdminRegulatorySubmissions />} />
             <Route path="/admin/risk-monitoring" element={<AdminRiskMonitoring />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
+            <Route path="/admin/security" element={<AdminSecurity />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

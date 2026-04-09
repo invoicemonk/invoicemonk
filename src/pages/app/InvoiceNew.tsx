@@ -297,6 +297,7 @@ export default function InvoiceNew() {
       })(),
       regulatory_status: 'not_required',
       reminder_count: 0,
+      trust_score: 100,
       last_reminder_sent_at: null,
       clients: selectedClient || null,
       is_reverse_charge: isReverseCharge,

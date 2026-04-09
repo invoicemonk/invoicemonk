@@ -122,6 +122,7 @@ export default function AdminInvoices() {
                 <TableHead>Client</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Trust</TableHead>
                 <TableHead>Issued</TableHead>
                 <TableHead>Integrity</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -143,7 +144,7 @@ export default function AdminInvoices() {
                 ))
               ) : invoices?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={9} className="text-center py-12">
                     <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                     <p className="text-muted-foreground">No invoices found</p>
                   </TableCell>
@@ -165,6 +166,13 @@ export default function AdminInvoices() {
                       {formatCurrency(Number(invoice.total_amount), invoice.currency)}
                     </TableCell>
                     <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const score = (invoice as any).trust_score ?? 100;
+                        const color = score >= 70 ? 'text-green-600' : score >= 40 ? 'text-yellow-600' : 'text-destructive';
+                        return <span className={`font-mono text-sm font-medium ${color}`}>{score}</span>;
+                      })()}
+                    </TableCell>
                     <TableCell>
                       {invoice.issued_at 
                         ? format(new Date(invoice.issued_at), 'MMM d, yyyy')

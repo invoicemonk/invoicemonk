@@ -1,0 +1,1 @@
+ALTER TABLE public.invoices ADD COLUMN trust_score integer DEFAULT 100;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -14,6 +14,8 @@ import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { supabase } from '@/integrations/supabase/client';
+
+const TURNSTILE_SITE_KEY = '0x4AAAAAAAkZ2xm_NhJMLnfb'; // Cloudflare Turnstile site key
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
@@ -39,9 +41,31 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiDisposable, setApiDisposable] = useState(false);
   const [isValidatingEmail, setIsValidatingEmail] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Load Turnstile script
+  useEffect(() => {
+    if (document.getElementById('cf-turnstile-script')) return;
+    const script = document.createElement('script');
+    script.id = 'cf-turnstile-script';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad';
+    script.async = true;
+    (window as any).onTurnstileLoad = () => {
+      if (turnstileRef.current && (window as any).turnstile) {
+        (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => setTurnstileToken(token),
+          'expired-callback': () => setTurnstileToken(null),
+          theme: 'auto',
+        });
+      }
+    };
+    document.head.appendChild(script);
+  }, []);
 
   // Capture referral code from URL param or cookie
   useEffect(() => {
@@ -76,7 +100,41 @@ const Signup = () => {
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    if (!turnstileToken) {
+      toast({
+        title: 'Verification required',
+        description: 'Please complete the CAPTCHA verification.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
+
+    // Verify Turnstile token server-side
+    try {
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('validate-email', {
+        body: { email: data.email, turnstile_token: turnstileToken },
+      });
+
+      if (verifyError || verifyData?.turnstile_valid === false) {
+        setIsLoading(false);
+        toast({
+          title: 'Verification failed',
+          description: 'CAPTCHA verification failed. Please try again.',
+          variant: 'destructive',
+        });
+        // Reset turnstile
+        if ((window as any).turnstile && turnstileRef.current) {
+          (window as any).turnstile.reset(turnstileRef.current);
+          setTurnstileToken(null);
+        }
+        return;
+      }
+    } catch {
+      // If verification fails, don't block signup
+    }
+
     const { error } = await signUp(data.email, data.password, data.fullName);
     setIsLoading(false);
 
@@ -294,7 +352,10 @@ const Signup = () => {
             <p className="text-sm text-destructive">{form.formState.errors.acceptTerms.message}</p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail}>
+          {/* Turnstile CAPTCHA */}
+          <div ref={turnstileRef} className="flex justify-center" />
+
+          <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail || !turnstileToken}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

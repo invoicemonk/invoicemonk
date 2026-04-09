@@ -1100,6 +1100,7 @@ export type Database = {
           template_snapshot: Json | null
           terms: string | null
           total_amount: number
+          trust_score: number | null
           updated_at: string
           user_id: string | null
           verification_id: string | null
@@ -1148,6 +1149,7 @@ export type Database = {
           template_snapshot?: Json | null
           terms?: string | null
           total_amount?: number
+          trust_score?: number | null
           updated_at?: string
           user_id?: string | null
           verification_id?: string | null
@@ -1196,6 +1198,7 @@ export type Database = {
           template_snapshot?: Json | null
           terms?: string | null
           total_amount?: number
+          trust_score?: number | null
           updated_at?: string
           user_id?: string | null
           verification_id?: string | null

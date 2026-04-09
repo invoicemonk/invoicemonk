@@ -48,6 +48,116 @@ interface IssueInvoiceResponse {
   error?: string
 }
 
+// Compute trust score based on business/user signals
+async function computeTrustScore(
+  // deno-lint-ignore no-explicit-any
+  supabaseService: any,
+  businessId: string,
+  totalAmount: number
+): Promise<number> {
+  let score = 100
+
+  try {
+    // Check business verification status
+    const { data: business } = await supabaseService
+      .from('businesses')
+      .select('verification_status, is_flagged, created_at')
+      .eq('id', businessId)
+      .maybeSingle()
+
+    if (business) {
+      // Unverified business: -30
+      if (business.verification_status !== 'verified') score -= 30
+      // Flagged business: -25
+      if (business.is_flagged) score -= 25
+      // Account < 7 days old: -20
+      const ageMs = Date.now() - new Date(business.created_at).getTime()
+      if (ageMs < 7 * 24 * 60 * 60 * 1000) score -= 20
+    }
+
+    // Amount > $5,000 equivalent: -10
+    if (totalAmount > 5000) score -= 10
+
+    // No previous issued invoices: -15
+    const { count } = await supabaseService
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .neq('status', 'draft')
+
+    if (count === 0) score -= 15
+  } catch (err) {
+    console.error('Trust score computation error:', err)
+  }
+
+  return Math.max(0, score)
+}
+
+// Validate invoice sanity before issuance
+async function validateInvoiceSanity(
+  // deno-lint-ignore no-explicit-any
+  supabaseService: any,
+  invoiceId: string,
+  businessId: string,
+  totalAmount: number
+): Promise<string | null> {
+  // Amount must be > 0
+  if (totalAmount <= 0) {
+    return 'Invoice total amount must be greater than zero.'
+  }
+
+  // Must have at least one line item with description, quantity, and price
+  const { data: items, error: itemsError } = await supabaseService
+    .from('invoice_items')
+    .select('description, quantity, unit_price')
+    .eq('invoice_id', invoiceId)
+
+  if (itemsError || !items || items.length === 0) {
+    return 'Invoice must have at least one line item.'
+  }
+
+  const validItems = items.filter(
+    // deno-lint-ignore no-explicit-any
+    (item: any) => item.description && item.quantity > 0 && item.unit_price > 0
+  )
+  if (validItems.length === 0) {
+    return 'Each line item must have a description, quantity > 0, and unit price > 0.'
+  }
+
+  // Flag (don't block) new accounts with high amounts
+  const { data: business } = await supabaseService
+    .from('businesses')
+    .select('created_at')
+    .eq('id', businessId)
+    .maybeSingle()
+
+  if (business) {
+    const ageMs = Date.now() - new Date(business.created_at).getTime()
+    const isNew = ageMs < 30 * 24 * 60 * 60 * 1000 // < 30 days
+
+    if (isNew && totalAmount > 10000) {
+      // Insert fraud flag but don't block
+      try {
+        await supabaseService.from('fraud_flags').insert({
+          business_id: businessId,
+          invoice_id: invoiceId,
+          reason: 'HIGH_AMOUNT_NEW_ACCOUNT',
+          severity: 'medium',
+          metadata: {
+            total_amount: totalAmount,
+            account_age_days: Math.floor(ageMs / (24 * 60 * 60 * 1000)),
+          },
+        })
+        console.log('Fraud flag created for high amount on new account')
+      } catch (err) {
+        console.error('Failed to create fraud flag:', err)
+      }
+    }
+  }
+
+  return null // No blocking error
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -124,8 +234,52 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Service client for validations that bypass RLS
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Rate limiting: check invoice issuance rate
+    const rateLimitAllowed = await checkRateLimit(supabaseServiceKey, userId, 'issue_invoice', 30, 3600)
+    if (!rateLimitAllowed) {
+      return rateLimitResponse(corsHeaders)
+    }
+
+    // Fetch invoice details for sanity checks
+    const { data: invoiceData } = await supabaseService
+      .from('invoices')
+      .select('total_amount, business_id')
+      .eq('id', body.invoice_id)
+      .maybeSingle()
+
+    if (!invoiceData) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invoice not found' } as IssueInvoiceResponse),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Invoice sanity checks
+    const sanityError = await validateInvoiceSanity(
+      supabaseService,
+      body.invoice_id,
+      invoiceData.business_id,
+      Number(invoiceData.total_amount)
+    )
+    if (sanityError) {
+      return new Response(
+        JSON.stringify({ success: false, error: sanityError } as IssueInvoiceResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Compute trust score
+    const trustScore = await computeTrustScore(
+      supabaseService,
+      invoiceData.business_id,
+      Number(invoiceData.total_amount)
+    )
+
     // Call the database function to issue the invoice
-    // This function handles: hash generation, verification_id, status update, and audit logging
     const { data: issuedInvoice, error: issueError } = await supabase
       .rpc('issue_invoice', { _invoice_id: body.invoice_id })
 
@@ -140,10 +294,13 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Update trust score on the issued invoice
+    await supabaseService
+      .from('invoices')
+      .update({ trust_score: trustScore })
+      .eq('id', issuedInvoice.id)
+
     // Create notification for invoice issued
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey)
-    
     await createNotification(
       supabaseService,
       userId,
@@ -156,7 +313,6 @@ Deno.serve(async (req) => {
     )
 
     // Check if this is the first invoice for the business
-    // Count non-draft invoices for this business (excluding the current one)
     const { count: invoiceCount, error: countError } = await supabaseService
       .from('invoices')
       .select('*', { count: 'exact', head: true })
@@ -164,7 +320,6 @@ Deno.serve(async (req) => {
       .neq('status', 'draft')
 
     if (!countError && invoiceCount === 1) {
-      // This is the first invoice! Notify platform admins
       await supabaseService.rpc('notify_admin_first_invoice_issued', {
         _business_id: issuedInvoice.business_id,
         _invoice_id: issuedInvoice.id,

@@ -115,10 +115,6 @@ async function sendWelcomeEmail(
   }
 }
 
-/**
- * Sync user data to Brevo as a contact (fire-and-forget).
- * Calls the sync-brevo-contact edge function internally.
- */
 async function syncBrevoContact(
   supabaseUrl: string,
   serviceRoleKey: string,
@@ -148,6 +144,91 @@ async function syncBrevoContact(
   }
 }
 
+// Detect login from a new country and create a fraud flag
+async function detectGeoAnomaly(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  userId: string,
+  ip: string | null
+): Promise<void> {
+  if (!ip) return;
+
+  try {
+    // Look up country from IP using a free service
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    let country: string | null = null;
+
+    try {
+      const geoRes = await fetch(`https://ipapi.co/${ip}/country/`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (geoRes.ok) {
+        country = (await geoRes.text()).trim();
+        if (country.length > 5) country = null; // invalid response
+      }
+    } catch {
+      clearTimeout(timeout);
+      return; // Can't determine country, skip
+    }
+
+    if (!country) return;
+
+    // Get previous login countries for this user (last 30 events)
+    const { data: previousEvents } = await serviceClient
+      .from('user_login_events')
+      .select('metadata')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    const previousCountries = new Set<string>();
+    if (previousEvents) {
+      for (const evt of previousEvents) {
+        const c = (evt.metadata as any)?.country;
+        if (c) previousCountries.add(c);
+      }
+    }
+
+    // If there are previous countries and this one is new, flag it
+    if (previousCountries.size > 0 && !previousCountries.has(country)) {
+      // Find a business for this user to attach the flag
+      const { data: membership } = await serviceClient
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (membership?.business_id) {
+        await serviceClient.from('fraud_flags').insert({
+          business_id: membership.business_id,
+          user_id: userId,
+          reason: 'NEW_LOGIN_COUNTRY',
+          severity: 'low',
+          metadata: {
+            new_country: country,
+            previous_countries: Array.from(previousCountries),
+            ip_address: ip,
+          },
+        });
+        console.log(`Geo anomaly flag created: user ${userId} logged in from new country ${country}`);
+      }
+    }
+
+    // Store country in the login event metadata (update the just-inserted row)
+    await serviceClient
+      .from('user_login_events')
+      .update({ metadata: { country } })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+  } catch (err) {
+    console.error('Geo anomaly detection error:', err);
+    // Non-critical — don't fail the request
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -162,7 +243,7 @@ serve(async (req) => {
       });
     }
 
-    // Decode JWT directly to extract user_id — avoids session validation issues
+    // Decode JWT directly to extract user_id
     const token = authHeader.replace("Bearer ", "");
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[1]) {
@@ -225,6 +306,13 @@ serve(async (req) => {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // Geo anomaly detection (non-blocking)
+      if (event_type === "sign_in") {
+        detectGeoAnomaly(serviceClient, userId, ip).catch((err) =>
+          console.error("Geo anomaly bg error:", err)
+        );
       }
     }
 

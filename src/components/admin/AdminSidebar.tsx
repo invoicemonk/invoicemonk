@@ -42,7 +42,7 @@ const mainNavItems = [
   { title: 'Businesses', url: '/admin/businesses', icon: Building2 },
   { title: 'Invoices', url: '/admin/invoices', icon: FileText },
   { title: 'Partners', url: '/admin/partners', icon: Users },
-  
+  { title: 'Security', url: '/admin/security', icon: ShieldAlert },
   { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
   { title: 'Risk Monitoring', url: '/admin/risk-monitoring', icon: ShieldAlert },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
