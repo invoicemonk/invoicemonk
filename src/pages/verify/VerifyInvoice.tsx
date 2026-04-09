@@ -389,6 +389,50 @@ const VerifyInvoice = () => {
                   </CardContent>
                 </Card>
 
+                {/* Business Verification Trust Badge */}
+                {data.verification_status && (
+                  <Card className={`mb-6 ${
+                    data.verification_status === 'verified' 
+                      ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20' 
+                      : data.verification_status === 'unverified'
+                      ? 'border-destructive/30 bg-destructive/5'
+                      : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20'
+                  }`}>
+                    <CardContent className="pt-6 pb-4">
+                      <div className="flex items-center gap-3">
+                        {data.verification_status === 'verified' ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : data.verification_status === 'unverified' ? (
+                          <ShieldAlert className="h-5 w-5 text-destructive" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                        )}
+                        <div>
+                          <p className="font-semibold text-sm">
+                            {data.verification_status === 'verified' 
+                              ? data.verification_source === 'stripe_kyc' ? 'Verified via Stripe KYC'
+                                : data.verification_source === 'government_api' ? 'Verified via Government API'
+                                : 'Verified by Invoicemonk'
+                              : data.verification_status === 'self_declared' ? 'Self-Declared — Not independently verified'
+                              : data.verification_status === 'unverified' ? 'Unverified Business'
+                              : `Verification: ${data.verification_status.replace('_', ' ')}`
+                            }
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {data.verification_status === 'verified' 
+                              ? 'This business has completed identity verification.'
+                              : data.verification_status === 'self_declared'
+                              ? 'The business provided tax information but it has not been independently verified.'
+                              : data.verification_status === 'unverified'
+                              ? 'This business has not completed identity verification. Exercise caution.'
+                              : 'Verification is in progress.'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Legal Identity Cards - Only if snapshots exist */}
                 {(data.invoice.issuer_identity || data.invoice.recipient_identity) && (
                   <Card className="mb-6 border-green-200 dark:border-green-800">
