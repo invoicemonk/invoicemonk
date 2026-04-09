@@ -126,18 +126,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check if business is flagged for fraud
+    // Check if business is flagged for fraud + get verification status
     let isFlagged = false
     let flagReason: string | null = null
+    let verificationStatus: string | null = null
+    let verificationSource: string | null = null
     if (invoice.business_id) {
       const { data: business } = await supabase
         .from('businesses')
-        .select('is_flagged, flag_reason')
+        .select('is_flagged, flag_reason, verification_status, verification_source')
         .eq('id', invoice.business_id)
         .maybeSingle()
       if (business) {
         isFlagged = business.is_flagged || false
         flagReason = business.flag_reason || null
+        verificationStatus = business.verification_status || null
+        verificationSource = business.verification_source || null
       }
     }
 
@@ -214,7 +218,9 @@ Deno.serve(async (req) => {
         integrity_valid: integrityValid
       },
       is_flagged: isFlagged,
-      flag_reason: isFlagged ? (flagReason ?? undefined) : undefined
+      flag_reason: isFlagged ? (flagReason ?? undefined) : undefined,
+      verification_status: verificationStatus,
+      verification_source: verificationSource
     }
 
     // Fire-and-forget: Log to verification_access_logs (lightweight, auto-expiring)

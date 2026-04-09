@@ -75,13 +75,22 @@ Deno.serve(async (req) => {
     // Check if business already has a Connect account
     const { data: business } = await adminSupabase
       .from('businesses')
-      .select('id, name, contact_email, stripe_connect_account_id, stripe_connect_status')
+      .select('id, name, contact_email, stripe_connect_account_id, stripe_connect_status, verification_status')
       .eq('id', business_id)
       .maybeSingle()
 
     if (!business) {
       return new Response(JSON.stringify({ error: 'Business not found' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Block unverified or rejected businesses from connecting
+    const vStatus = business.verification_status || 'unverified'
+    if (vStatus === 'rejected') {
+      return new Response(JSON.stringify({ error: 'Your business verification was rejected. Please contact support.' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

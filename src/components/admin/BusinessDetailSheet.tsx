@@ -6,7 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar, ShieldAlert, User } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Building2, Globe, Users, Mail, Phone, MapPin, FileText, Calendar, ShieldAlert, User, ShieldCheck, Clock, XCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -28,6 +29,10 @@ interface BusinessData {
   created_at: string;
   updated_at: string;
   business_identity_level: 'unverified' | 'self_declared' | 'verified' | 'nrs_linked' | 'regulator_linked' | null;
+  verification_status?: string | null;
+  verification_source?: string | null;
+  verified_at?: string | null;
+  rejection_reason?: string | null;
   is_flagged?: boolean;
   flag_reason?: string | null;
   business_members?: { count: number }[];
@@ -45,6 +50,9 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
   const [isFlagged, setIsFlagged] = useState(business?.is_flagged || false);
   const [flagReason, setFlagReason] = useState(business?.flag_reason || '');
   const [saving, setSaving] = useState(false);
+  const [verificationAction, setVerificationAction] = useState<'verified' | 'rejected' | ''>('');
+  const [verificationReason, setVerificationReason] = useState('');
+  const [verificationSaving, setVerificationSaving] = useState(false);
 
   // Sync state when a different business is opened
   useEffect(() => {
@@ -167,8 +175,12 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
               </div>
               
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Identity Level</p>
-                <IdentityLevelBadge level={business.business_identity_level} />
+                <p className="text-sm text-muted-foreground">Verification</p>
+                <IdentityLevelBadge 
+                  level={(business.verification_status || business.business_identity_level || 'unverified') as any}
+                  source={(business.verification_source) as any}
+                  rejectionReason={business.rejection_reason}
+                />
               </div>
 
               <div className="space-y-1">
@@ -260,7 +272,87 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
             </div>
           </div>
 
-          {/* Fraud Flagging */}
+          {/* Verification Review */}
+          <Separator />
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Verification Review
+            </h4>
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <span className="font-medium capitalize">{business.verification_status || 'unverified'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Source</span>
+                <span className="font-medium">{business.verification_source || 'none'}</span>
+              </div>
+              {business.verified_at && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Verified at</span>
+                  <span className="font-medium">{format(new Date(business.verified_at), 'MMM d, yyyy')}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Action</Label>
+              <Select value={verificationAction} onValueChange={(v) => setVerificationAction(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select action..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="verified">Approve (Verified)</SelectItem>
+                  <SelectItem value="rejected">Reject</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {verificationAction === 'rejected' && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Rejection reason (required)</Label>
+                <Textarea
+                  placeholder="Reason for rejecting verification..."
+                  value={verificationReason}
+                  onChange={(e) => setVerificationReason(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            )}
+
+            {verificationAction && (
+              <Button
+                size="sm"
+                variant={verificationAction === 'rejected' ? 'destructive' : 'default'}
+                disabled={verificationSaving || (verificationAction === 'rejected' && !verificationReason.trim())}
+                onClick={async () => {
+                  setVerificationSaving(true);
+                  try {
+                    const { error } = await supabase.rpc('admin_set_verification', {
+                      _business_id: business.id,
+                      _status: verificationAction,
+                      _source: verificationAction === 'verified' ? 'manual_review' : null,
+                      _reason: verificationAction === 'rejected' ? verificationReason : null,
+                    } as any);
+                    if (error) throw error;
+                    toast.success(verificationAction === 'verified' ? 'Business verified' : 'Business verification rejected');
+                    setVerificationAction('');
+                    setVerificationReason('');
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to update verification');
+                  } finally {
+                    setVerificationSaving(false);
+                  }
+                }}
+              >
+                {verificationSaving ? 'Saving...' : verificationAction === 'verified' ? 'Approve Verification' : 'Reject Verification'}
+              </Button>
+            )}
+          </div>
+
+          {/* Fraud Controls */}
           <Separator />
           <div className="space-y-4">
             <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">

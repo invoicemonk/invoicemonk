@@ -120,6 +120,9 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
     }
   };
 
+  const verificationStatus = business.verification_status || 'unverified';
+  const isVerified = verificationStatus === 'verified';
+
   return (
     <Card>
       <CardHeader>
@@ -132,6 +135,23 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Verification gate */}
+        {!isVerified && !isFreeStarterTier && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-amber-600" />
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Business verification required</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Complete business verification to accept online payments. You can verify by completing Stripe Connect onboarding or uploading identity documents for manual review.
+            </p>
+            <Button size="sm" variant="outline" asChild>
+              <Link to={`/b/${business.id}/settings`}>
+                Go to Verification <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        )}
         {/* Upgrade prompt for free tier */}
         {isFreeStarterTier && (
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">

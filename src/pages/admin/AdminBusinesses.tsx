@@ -8,7 +8,8 @@ import {
   CreditCard,
   Eye,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Shield
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,7 @@ export default function AdminBusinesses() {
                 <TableHead>Legal Name</TableHead>
                 <TableHead>Owner</TableHead>
                 <TableHead>Jurisdiction</TableHead>
+                <TableHead>Verification</TableHead>
                 <TableHead>Members</TableHead>
                 <TableHead>Subscription</TableHead>
                 <TableHead>Created</TableHead>
@@ -191,6 +193,23 @@ export default function AdminBusinesses() {
                         <Globe className="h-3 w-3 text-muted-foreground" />
                         {business.jurisdiction}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const vs = (business as any).verification_status || 'unverified';
+                        const variantMap: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+                          verified: 'default',
+                          pending_review: 'secondary',
+                          self_declared: 'outline',
+                          rejected: 'destructive',
+                          unverified: 'outline',
+                        };
+                        return (
+                          <Badge variant={variantMap[vs] || 'outline'} className="capitalize text-xs">
+                            {vs.replace('_', ' ')}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
