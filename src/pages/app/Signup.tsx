@@ -42,6 +42,7 @@ const Signup = () => {
   const [apiDisposable, setApiDisposable] = useState(false);
   const [isValidatingEmail, setIsValidatingEmail] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReady, setTurnstileReady] = useState(false);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
@@ -58,8 +59,9 @@ const Signup = () => {
       if (turnstileRef.current && (window as any).turnstile) {
         (window as any).turnstile.render(turnstileRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
-          callback: (token: string) => setTurnstileToken(token),
+          callback: (token: string) => { setTurnstileToken(token); setTurnstileReady(true); },
           'expired-callback': () => setTurnstileToken(null),
+          'error-callback': () => setTurnstileReady(false),
           theme: 'auto',
         });
       }
@@ -100,7 +102,7 @@ const Signup = () => {
   });
 
   const onSubmit = async (data: SignupFormData) => {
-    if (!turnstileToken) {
+    if (!turnstileToken && turnstileReady) {
       toast({
         title: 'Verification required',
         description: 'Please complete the CAPTCHA verification.',
@@ -355,7 +357,7 @@ const Signup = () => {
           {/* Turnstile CAPTCHA */}
           <div ref={turnstileRef} className="flex justify-center" />
 
-          <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail || !turnstileToken}>
+          <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
