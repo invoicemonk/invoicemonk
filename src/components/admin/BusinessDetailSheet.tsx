@@ -50,6 +50,9 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
   const [isFlagged, setIsFlagged] = useState(business?.is_flagged || false);
   const [flagReason, setFlagReason] = useState(business?.flag_reason || '');
   const [saving, setSaving] = useState(false);
+  const [verificationAction, setVerificationAction] = useState<'verified' | 'rejected' | ''>('');
+  const [verificationReason, setVerificationReason] = useState('');
+  const [verificationSaving, setVerificationSaving] = useState(false);
 
   // Sync state when a different business is opened
   useEffect(() => {
@@ -172,8 +175,12 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
               </div>
               
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Identity Level</p>
-                <IdentityLevelBadge level={business.business_identity_level} />
+                <p className="text-sm text-muted-foreground">Verification</p>
+                <IdentityLevelBadge 
+                  level={(business.verification_status || business.business_identity_level || 'unverified') as any}
+                  source={(business.verification_source) as any}
+                  rejectionReason={business.rejection_reason}
+                />
               </div>
 
               <div className="space-y-1">
