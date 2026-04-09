@@ -86,6 +86,7 @@ export function useUploadVerificationDocument() {
           uploaded_by: user.id,
           document_type: documentType,
           file_url: fileUrl,
+          file_path: filePath,
           file_name: file.name,
         } as any)
         .select()
@@ -121,6 +122,8 @@ export function useSubmitForReview() {
         .update({
           verification_status: 'pending_review',
           verification_source: 'manual_review',
+          document_verification_status: 'pending_review',
+          verification_submitted_at: new Date().toISOString(),
         } as any)
         .eq('id', businessId);
 

@@ -31,6 +31,7 @@ const Team = lazy(() => import('@/pages/app/Team'));
 const Billing = lazy(() => import('@/pages/app/Billing'));
 import { PaymentMethodsSection } from '@/components/payment-methods/PaymentMethodsSection';
 import { OnlinePaymentsSettingsCard } from '@/components/settings/OnlinePaymentsSettingsCard';
+import { VerificationDocumentsSection } from '@/components/settings/VerificationDocumentsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +111,9 @@ export default function BusinessProfile() {
     businessType: '',
     allowedCurrencies: [] as string[],
     brandColor: '',
+    entityType: 'business' as 'individual' | 'business' | 'nonprofit',
+    governmentIdType: '' as string,
+    governmentIdValue: '',
   });
 
   // Check for duplicate business name
@@ -128,7 +132,6 @@ export default function BusinessProfile() {
   useEffect(() => {
     if (business) {
       const addressData = business.address as AddressData | null;
-      // Cast to include new fields
       const businessExtended = business as typeof business & { 
         is_vat_registered?: boolean; 
         vat_registration_number?: string;
@@ -136,6 +139,9 @@ export default function BusinessProfile() {
         business_type?: string;
         allowed_currencies?: string[];
         brand_color?: string;
+        entity_type?: string;
+        government_id_type?: string;
+        government_id_value?: string;
       };
 
       setFormData({
@@ -159,6 +165,9 @@ export default function BusinessProfile() {
         businessType: businessExtended.business_type || '',
         allowedCurrencies: businessExtended.allowed_currencies || [],
         brandColor: businessExtended.brand_color || '',
+        entityType: (businessExtended.entity_type as any) || 'business',
+        governmentIdType: businessExtended.government_id_type || '',
+        governmentIdValue: businessExtended.government_id_value || '',
       });
     }
   }, [business]);
@@ -174,27 +183,26 @@ export default function BusinessProfile() {
 
     const businessData = {
       name: formData.name,
-      legal_name: formData.legalName || null,
+      legal_name: formData.entityType === 'individual' ? null : (formData.legalName || null),
       jurisdiction: formData.jurisdiction,
-      tax_id: formData.taxId || null,
-      cac_number: jurisdictionConfig.showCac ? (formData.cacNumber || null) : null,
+      tax_id: formData.governmentIdValue || formData.taxId || null,
+      cac_number: (jurisdictionConfig.showCac && formData.entityType !== 'individual') ? (formData.cacNumber || null) : null,
       contact_email: formData.email || null,
       contact_phone: formData.phone || null,
       address: Object.values(addressData).some(Boolean) ? addressData : null,
       invoice_prefix: formData.invoicePrefix || 'INV',
       invoice_number_digits: formData.invoiceNumberDigits || 4,
       default_currency: formData.defaultCurrency || null,
-      // VAT fields - only save if jurisdiction supports VAT
       is_vat_registered: jurisdictionConfig.showVat ? formData.isVatRegistered : false,
       vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 
         ? formData.vatRegistrationNumber || null 
         : null,
-      // Business type
       business_type: formData.businessType || null,
-      // Multi-currency: allowed currencies
       allowed_currencies: formData.allowedCurrencies || [],
-      // Brand color
       brand_color: formData.brandColor || null,
+      entity_type: formData.entityType,
+      government_id_type: formData.governmentIdType || null,
+      government_id_value: formData.governmentIdValue || null,
     };
 
     if (business) {
@@ -285,13 +293,15 @@ export default function BusinessProfile() {
       email: formData.email,
       addressCity: formData.city,
       addressCountry: formData.country,
-      // Jurisdiction-specific requirements
       jurisdiction: formData.jurisdiction,
       isVatRegistered: formData.isVatRegistered,
       vatRegistrationNumber: formData.vatRegistrationNumber,
       cacNumber: formData.cacNumber,
+      entityType: formData.entityType,
+      governmentIdValue: formData.governmentIdValue,
+      documentVerificationStatus: (business as any)?.document_verification_status,
     });
-  }, [formData]);
+  }, [formData, business]);
 
   if (isLoadingBusiness) {
     return (
@@ -557,36 +567,66 @@ export default function BusinessProfile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Business Identity
+              {formData.entityType === 'individual' ? 'Personal Identity' : 'Business Identity'}
             </CardTitle>
             <CardDescription>
-              Your legal business information as it will appear on invoices
+              {formData.entityType === 'individual' 
+                ? 'Your personal information as it will appear on invoices'
+                : 'Your legal business information as it will appear on invoices'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Entity Type Selector */}
             <div className="space-y-2">
-              <Label htmlFor="name">Business Name</Label>
+              <Label htmlFor="entityType">Entity Type</Label>
+              <Select 
+                value={formData.entityType}
+                onValueChange={(value: 'individual' | 'business' | 'nonprofit') => setFormData({ ...formData, entityType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Individual / Freelancer</SelectItem>
+                  <SelectItem value="business">Registered Business</SelectItem>
+                  <SelectItem value="nonprofit">Nonprofit / NGO</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This determines which fields are required for compliance
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                {formData.entityType === 'individual' ? 'Full Name or Trading Name' : 'Business Name'}
+              </Label>
               <Input
                 id="name"
-                placeholder="My Business"
+                placeholder={formData.entityType === 'individual' ? 'John Doe' : 'My Business'}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 maxLength={INPUT_LIMITS.NAME}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="legalName">Legal Name</Label>
-              <Input
-                id="legalName"
-                placeholder="My Business Ltd."
-                value={formData.legalName}
-                onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
-                maxLength={INPUT_LIMITS.LEGAL_NAME}
-              />
-              <p className="text-xs text-muted-foreground">
-                The registered legal name of your business entity
-              </p>
-            </div>
+
+            {/* Legal Name — hidden for individuals */}
+            {formData.entityType !== 'individual' && (
+              <div className="space-y-2">
+                <Label htmlFor="legalName">Legal Name</Label>
+                <Input
+                  id="legalName"
+                  placeholder="My Business Ltd."
+                  value={formData.legalName}
+                  onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
+                  maxLength={INPUT_LIMITS.LEGAL_NAME}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The registered legal name of your business entity
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="jurisdiction">Jurisdiction</Label>
               <Select 
@@ -606,26 +646,48 @@ export default function BusinessProfile() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxId">
-                {jurisdictionConfig.taxIdLabel} <span className="text-destructive">*</span>
+
+            {/* Government ID — replaces Tax ID */}
+            <div className="space-y-3">
+              <Label>
+                Government ID {formData.entityType === 'business' && <span className="text-destructive">*</span>}
+                {formData.entityType === 'individual' && <span className="text-xs text-muted-foreground ml-1">(Optional)</span>}
               </Label>
-              <Input
-                id="taxId"
-                placeholder={jurisdictionConfig.taxIdPlaceholder}
-                value={formData.taxId}
-                onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                maxLength={INPUT_LIMITS.TAX_ID}
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Select
+                  value={formData.governmentIdType}
+                  onValueChange={(value) => setFormData({ ...formData, governmentIdType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="ID Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TIN">TIN</SelectItem>
+                    <SelectItem value="SSN">SSN</SelectItem>
+                    <SelectItem value="NIN">NIN</SelectItem>
+                    <SelectItem value="EIN">EIN</SelectItem>
+                    <SelectItem value="VAT">VAT Number</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder={jurisdictionConfig.taxIdPlaceholder || 'Enter ID number'}
+                  value={formData.governmentIdValue}
+                  onChange={(e) => setFormData({ ...formData, governmentIdValue: e.target.value })}
+                  maxLength={INPUT_LIMITS.TAX_ID}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
-                {jurisdictionConfig.countryName
-                  ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
-                  : jurisdictionConfig.taxIdHint}
+                {formData.entityType === 'individual'
+                  ? 'Your government-issued ID number. Varies by country (TIN, SSN, NIN, etc.).'
+                  : jurisdictionConfig.countryName
+                    ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
+                    : jurisdictionConfig.taxIdHint}
               </p>
             </div>
 
-            {/* CAC/Registration Number - Only for jurisdictions that have it */}
-            {jurisdictionConfig.showCac && (
+            {/* CAC/Registration Number - Only for non-individuals in jurisdictions that have it */}
+            {jurisdictionConfig.showCac && formData.entityType !== 'individual' && (
               <div className="space-y-2">
                 <Label htmlFor="cacNumber">
                   {jurisdictionConfig.cacLabel}
@@ -1018,6 +1080,11 @@ export default function BusinessProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Business Verification Documents */}
+      {business && (
+        <VerificationDocumentsSection business={business} />
+      )}
 
       {/* Online Payments */}
       {business && (

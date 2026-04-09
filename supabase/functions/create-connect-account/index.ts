@@ -95,6 +95,13 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (vStatus === 'unverified') {
+      return new Response(JSON.stringify({ error: 'Please complete basic business details (TIN or registration number) before connecting Stripe.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' })
     const appUrl = Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
 

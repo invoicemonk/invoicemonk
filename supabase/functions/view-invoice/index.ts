@@ -205,12 +205,14 @@ Deno.serve(async (req) => {
     if (invoice.business_id) {
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('is_flagged, flag_reason, online_payments_enabled, jurisdiction, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status')
+        .select('is_flagged, flag_reason, online_payments_enabled, jurisdiction, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status, verification_status')
         .eq('id', invoice.business_id)
         .maybeSingle()
       if (businessData) {
         isFlagged = businessData.is_flagged || false
         flagReason = businessData.flag_reason || null
+
+        const businessVerified = businessData.verification_status === 'verified'
 
         // Determine provider
         const usePaystack = businessData.jurisdiction === 'NG' && invoice.currency === 'NGN'
@@ -218,8 +220,8 @@ Deno.serve(async (req) => {
           ? (businessData.paystack_subaccount_code && businessData.paystack_subaccount_status === 'active')
           : (businessData.stripe_connect_account_id && businessData.stripe_connect_status === 'active')
 
-        // Online payments only available for paid plans AND when provider is set up
-        if (!isFlagged && (businessData.online_payments_enabled || false) && issuerTier !== 'starter') {
+        // Online payments only available for verified businesses on paid plans AND when provider is set up
+        if (!isFlagged && businessVerified && (businessData.online_payments_enabled || false) && issuerTier !== 'starter') {
           if (providerReady) {
             onlinePaymentsEnabled = true
           } else {

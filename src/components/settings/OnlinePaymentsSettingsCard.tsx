@@ -180,7 +180,7 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
           <Switch
             checked={!isFreeStarterTier && (business.online_payments_enabled || false)}
             onCheckedChange={handleTogglePayments}
-            disabled={isFreeStarterTier}
+            disabled={isFreeStarterTier || !isVerified}
           />
         </div>
 
@@ -258,7 +258,7 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
                 <p className="text-xs text-muted-foreground">
                   Connect a Stripe account to receive international payments directly. Stripe handles identity verification.
                 </p>
-                <Button size="sm" onClick={handleStripeConnect} disabled={connectLoading}>
+                <Button size="sm" onClick={handleStripeConnect} disabled={connectLoading || !isVerified}>
                   {connectLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
                   Connect Stripe Account
                 </Button>
@@ -314,7 +314,7 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
                       />
                     </div>
                   </div>
-                  <Button size="sm" onClick={handlePaystackSetup} disabled={paystackLoading || !bankCode || !accountNumber}>
+                  <Button size="sm" onClick={handlePaystackSetup} disabled={paystackLoading || !bankCode || !accountNumber || !isVerified}>
                     {paystackLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
                     Verify & Connect
                   </Button>

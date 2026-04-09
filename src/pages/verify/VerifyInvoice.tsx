@@ -70,6 +70,7 @@ interface VerificationResponse {
   flag_reason?: string;
   verification_status?: string | null;
   verification_source?: string | null;
+  entity_type?: string | null;
   error?: string;
 }
 
@@ -412,10 +413,12 @@ const VerifyInvoice = () => {
                             {data.verification_status === 'verified' 
                               ? data.verification_source === 'stripe_kyc' ? 'Verified via Stripe KYC'
                                 : data.verification_source === 'government_api' ? 'Verified via Government API'
-                                : 'Verified by Invoicemonk'
+                                : data.entity_type === 'individual' ? 'Verified Individual (ID Verified)'
+                                : data.entity_type === 'nonprofit' ? 'Verified Organization'
+                                : 'Verified Business'
                               : data.verification_status === 'self_declared' ? 'Self-Declared — Not independently verified'
                               : data.verification_status === 'unverified' ? 'Unverified Business'
-                              : `Verification: ${data.verification_status.replace('_', ' ')}`
+                              : `Verification: ${data.verification_status?.replace('_', ' ')}`
                             }
                           </p>
                           <p className="text-xs text-muted-foreground">

@@ -1,6 +1,17 @@
 // Centralized jurisdiction configuration for dynamic compliance fields
 import { getCountryByCode } from './countries';
 
+export type GovernmentIdType = 'TIN' | 'SSN' | 'NIN' | 'EIN' | 'VAT' | 'OTHER';
+
+export const GOVERNMENT_ID_TYPES: { value: GovernmentIdType; label: string }[] = [
+  { value: 'TIN', label: 'Tax Identification Number (TIN)' },
+  { value: 'SSN', label: 'Social Security Number (SSN)' },
+  { value: 'NIN', label: 'National Identification Number (NIN)' },
+  { value: 'EIN', label: 'Employer Identification Number (EIN)' },
+  { value: 'VAT', label: 'VAT Number' },
+  { value: 'OTHER', label: 'Other Government ID' },
+];
+
 export interface JurisdictionConfig {
   name: string;
   currency: string;
@@ -38,6 +49,9 @@ export interface JurisdictionConfig {
   countryName: string;
   // Invoice number formatting
   invoiceNumberDigits?: number;
+  // Government ID defaults per jurisdiction
+  defaultIdType?: GovernmentIdType;
+  supportedIdTypes?: GovernmentIdType[];
 }
 
 // Detailed configurations for Tier 1 markets (full compliance labels)
@@ -72,6 +86,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '100001',
     postalCodeLabel: 'Postal Code',
     countryName: 'Nigeria',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'NIN', 'OTHER'],
   },
   GH: {
     name: 'Ghana',
@@ -101,6 +117,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: 'GA-123-4567',
     postalCodeLabel: 'Digital Address',
     countryName: 'Ghana',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   KE: {
     name: 'Kenya',
@@ -130,6 +148,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '00100',
     postalCodeLabel: 'Postal Code',
     countryName: 'Kenya',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   ZA: {
     name: 'South Africa',
@@ -159,6 +179,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '2000',
     postalCodeLabel: 'Postal Code',
     countryName: 'South Africa',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   EG: {
     name: 'Egypt',
@@ -188,6 +210,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '11511',
     postalCodeLabel: 'Postal Code',
     countryName: 'Egypt',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   RW: {
     name: 'Rwanda',
@@ -214,6 +238,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '',
     postalCodeLabel: 'Postal Code',
     countryName: 'Rwanda',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'OTHER'],
   },
   TZ: {
     name: 'Tanzania',
@@ -243,6 +269,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '',
     postalCodeLabel: 'Postal Code',
     countryName: 'Tanzania',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   UG: {
     name: 'Uganda',
@@ -269,6 +297,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '',
     postalCodeLabel: 'Postal Code',
     countryName: 'Uganda',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'OTHER'],
   },
   SN: {
     name: 'Senegal',
@@ -295,6 +325,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '',
     postalCodeLabel: 'Code Postal',
     countryName: 'Senegal',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'OTHER'],
   },
 
   // ============= AMERICAS =============
@@ -320,6 +352,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '10001',
     postalCodeLabel: 'ZIP Code',
     countryName: 'United States',
+    defaultIdType: 'EIN',
+    supportedIdTypes: ['EIN', 'SSN', 'TIN', 'OTHER'],
   },
   CA: {
     name: 'Canada',
@@ -343,6 +377,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: 'M5V 1A1',
     postalCodeLabel: 'Postal Code',
     countryName: 'Canada',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   MX: {
     name: 'Mexico',
@@ -366,6 +402,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '06600',
     postalCodeLabel: 'Código Postal',
     countryName: 'Mexico',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   BR: {
     name: 'Brazil',
@@ -389,6 +427,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '01310-100',
     postalCodeLabel: 'CEP',
     countryName: 'Brazil',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   AR: {
     name: 'Argentina',
@@ -412,6 +452,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: 'C1001',
     postalCodeLabel: 'Código Postal',
     countryName: 'Argentina',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   CL: {
     name: 'Chile',
@@ -435,6 +477,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '8320000',
     postalCodeLabel: 'Código Postal',
     countryName: 'Chile',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   CO: {
     name: 'Colombia',
@@ -458,6 +502,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '110111',
     postalCodeLabel: 'Código Postal',
     countryName: 'Colombia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
 
   // ============= EUROPE =============
@@ -490,6 +536,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: 'SW1A 1AA',
     postalCodeLabel: 'Postcode',
     countryName: 'United Kingdom',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   DE: {
     name: 'Germany',
@@ -520,6 +568,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '10115',
     postalCodeLabel: 'PLZ',
     countryName: 'Germany',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   FR: {
     name: 'France',
@@ -550,6 +600,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '75001',
     postalCodeLabel: 'Code Postal',
     countryName: 'France',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   NL: {
     name: 'Netherlands',
@@ -573,6 +625,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1012 AB',
     postalCodeLabel: 'Postcode',
     countryName: 'Netherlands',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   ES: {
     name: 'Spain',
@@ -596,6 +650,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '28001',
     postalCodeLabel: 'Código Postal',
     countryName: 'Spain',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   IT: {
     name: 'Italy',
@@ -622,6 +678,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '00100',
     postalCodeLabel: 'CAP',
     countryName: 'Italy',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   PL: {
     name: 'Poland',
@@ -651,6 +709,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '00-001',
     postalCodeLabel: 'Kod Pocztowy',
     countryName: 'Poland',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   SE: {
     name: 'Sweden',
@@ -674,6 +734,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '111 22',
     postalCodeLabel: 'Postnummer',
     countryName: 'Sweden',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   IE: {
     name: 'Ireland',
@@ -703,6 +765,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: 'D01 A1B2',
     postalCodeLabel: 'Eircode',
     countryName: 'Ireland',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   BE: {
     name: 'Belgium',
@@ -726,6 +790,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1000',
     postalCodeLabel: 'Postcode',
     countryName: 'Belgium',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   CH: {
     name: 'Switzerland',
@@ -749,6 +815,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '8001',
     postalCodeLabel: 'PLZ',
     countryName: 'Switzerland',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
 
   // ============= ASIA-PACIFIC =============
@@ -774,6 +842,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '2000',
     postalCodeLabel: 'Postcode',
     countryName: 'Australia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   IN: {
     name: 'India',
@@ -803,6 +873,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '400001',
     postalCodeLabel: 'PIN Code',
     countryName: 'India',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   JP: {
     name: 'Japan',
@@ -826,6 +898,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '100-0001',
     postalCodeLabel: '〒',
     countryName: 'Japan',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'OTHER'],
   },
   SG: {
     name: 'Singapore',
@@ -849,6 +923,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '018956',
     postalCodeLabel: 'Postal Code',
     countryName: 'Singapore',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   HK: {
     name: 'Hong Kong',
@@ -875,6 +951,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '',
     postalCodeLabel: '',
     countryName: 'Hong Kong',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'OTHER'],
   },
   AE: {
     name: 'United Arab Emirates',
@@ -904,6 +982,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '12345',
     postalCodeLabel: 'P.O. Box',
     countryName: 'United Arab Emirates',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   SA: {
     name: 'Saudi Arabia',
@@ -933,6 +1013,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '12345',
     postalCodeLabel: 'Postal Code',
     countryName: 'Saudi Arabia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   MY: {
     name: 'Malaysia',
@@ -962,6 +1044,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '50000',
     postalCodeLabel: 'Postcode',
     countryName: 'Malaysia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   ID: {
     name: 'Indonesia',
@@ -991,6 +1075,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '10110',
     postalCodeLabel: 'Kode Pos',
     countryName: 'Indonesia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   PH: {
     name: 'Philippines',
@@ -1020,6 +1106,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1000',
     postalCodeLabel: 'ZIP Code',
     countryName: 'Philippines',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   NZ: {
     name: 'New Zealand',
@@ -1043,6 +1131,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1010',
     postalCodeLabel: 'Postcode',
     countryName: 'New Zealand',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   // ============= EU HIGH-ENFORCEMENT =============
   BG: {
@@ -1067,6 +1157,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1000',
     postalCodeLabel: 'Postal Code',
     countryName: 'Bulgaria',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   RO: {
     name: 'Romania',
@@ -1096,6 +1188,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '010101',
     postalCodeLabel: 'Cod Poștal',
     countryName: 'Romania',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   HU: {
     name: 'Hungary',
@@ -1125,6 +1219,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '1011',
     postalCodeLabel: 'Irányítószám',
     countryName: 'Hungary',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
   RS: {
     name: 'Serbia',
@@ -1154,6 +1250,8 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     postalCodePlaceholder: '11000',
     postalCodeLabel: 'Poštanski Broj',
     countryName: 'Serbia',
+    defaultIdType: 'TIN',
+    supportedIdTypes: ['TIN', 'VAT', 'OTHER'],
   },
 };
 

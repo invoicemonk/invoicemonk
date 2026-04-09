@@ -39,6 +39,9 @@ interface VerificationResponse {
   }
   is_flagged?: boolean
   flag_reason?: string
+  verification_status?: string | null
+  verification_source?: string | null
+  entity_type?: string | null
   error?: string
 }
 
@@ -131,10 +134,11 @@ Deno.serve(async (req) => {
     let flagReason: string | null = null
     let verificationStatus: string | null = null
     let verificationSource: string | null = null
+    let entityType: string | null = null
     if (invoice.business_id) {
       const { data: business } = await supabase
         .from('businesses')
-        .select('is_flagged, flag_reason, verification_status, verification_source')
+        .select('is_flagged, flag_reason, verification_status, verification_source, entity_type')
         .eq('id', invoice.business_id)
         .maybeSingle()
       if (business) {
@@ -142,6 +146,7 @@ Deno.serve(async (req) => {
         flagReason = business.flag_reason || null
         verificationStatus = business.verification_status || null
         verificationSource = business.verification_source || null
+        entityType = business.entity_type || null
       }
     }
 
@@ -220,7 +225,8 @@ Deno.serve(async (req) => {
       is_flagged: isFlagged,
       flag_reason: isFlagged ? (flagReason ?? undefined) : undefined,
       verification_status: verificationStatus,
-      verification_source: verificationSource
+      verification_source: verificationSource,
+      entity_type: entityType,
     }
 
     // Fire-and-forget: Log to verification_access_logs (lightweight, auto-expiring)

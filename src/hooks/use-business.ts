@@ -298,14 +298,16 @@ export function useUpdateBusiness() {
         .eq('id', businessId)
         .single();
 
-      // Auto-upgrade to self_declared if tax_id or cac_number is being set
-      // and business is currently unverified
+      // Auto-upgrade to self_declared if government_id or tax_id or cac_number is being set
+      // and business is currently unverified (skip for individuals — they need doc verification)
       const currentVerification = (currentBusiness as any)?.verification_status || 'unverified';
+      const currentEntityType = (currentBusiness as any)?.entity_type || 'business';
       const updatesAny = updates as any;
-      if (currentVerification === 'unverified') {
+      if (currentVerification === 'unverified' && currentEntityType !== 'individual') {
         const hasTaxId = updatesAny.tax_id && updatesAny.tax_id.trim();
         const hasCac = updatesAny.cac_number && updatesAny.cac_number.trim();
-        if (hasTaxId || hasCac) {
+        const hasGovId = updatesAny.government_id_value && updatesAny.government_id_value.trim();
+        if (hasTaxId || hasCac || hasGovId) {
           updatesAny.verification_status = 'self_declared';
           updatesAny.verification_source = 'none';
         }

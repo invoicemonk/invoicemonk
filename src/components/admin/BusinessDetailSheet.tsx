@@ -236,16 +236,31 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
 
           <Separator />
 
-          {/* Tax & Invoicing */}
+          {/* Tax & Identity */}
           <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Tax & Invoicing</h4>
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Identity & Tax</h4>
             
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Tax ID</span>
-                <span className="font-mono">{business.tax_id || 'Not provided'}</span>
+                <span className="text-sm text-muted-foreground">Entity Type</span>
+                <Badge variant="outline" className="capitalize">{(business as any).entity_type || 'business'}</Badge>
               </div>
-              
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Gov ID Type</span>
+                <span className="font-mono">{(business as any).government_id_type || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Gov ID Value</span>
+                <span className="font-mono">{(business as any).government_id_value || 'Not provided'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Tax ID (legacy)</span>
+                <span className="font-mono">{business.tax_id || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Doc Verification</span>
+                <Badge variant="outline" className="capitalize">{((business as any).document_verification_status || 'not_uploaded').replace(/_/g, ' ')}</Badge>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Invoice Prefix</span>
                 <span className="font-mono">{business.invoice_prefix || 'INV'}</span>

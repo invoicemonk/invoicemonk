@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     // Check business is not flagged and has online payments enabled
     const { data: business } = await supabase
       .from('businesses')
-      .select('id, jurisdiction, is_flagged, name, online_payments_enabled, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status')
+      .select('id, jurisdiction, is_flagged, name, online_payments_enabled, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status, verification_status')
       .eq('id', invoice.business_id)
       .maybeSingle()
 
@@ -102,6 +102,14 @@ Deno.serve(async (req) => {
 
     if (business.is_flagged) {
       return new Response(JSON.stringify({ error: 'Payment is currently unavailable for this business' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Block payments for unverified businesses
+    if (business.verification_status !== 'verified') {
+      return new Response(JSON.stringify({ error: 'This business has not completed verification. Online payments are unavailable.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

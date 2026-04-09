@@ -9,6 +9,7 @@ import { Shield, ShieldCheck, ShieldAlert, BadgeCheck, Clock, XCircle } from 'lu
 
 type VerificationStatus = 'unverified' | 'self_declared' | 'pending_review' | 'verified' | 'rejected';
 type VerificationSource = 'none' | 'stripe_kyc' | 'manual_review' | 'government_api';
+type EntityType = 'individual' | 'business' | 'nonprofit';
 
 // Legacy support
 type LegacyLevel = 'nrs_linked' | 'regulator_linked';
@@ -20,21 +21,28 @@ interface IdentityLevelBadgeProps {
   source?: VerificationSource | null;
   /** Rejection reason (shown in tooltip when rejected) */
   rejectionReason?: string | null;
+  /** Entity type for contextual labels */
+  entityType?: EntityType | null;
   className?: string;
 }
 
-function getConfig(status: string, source?: string | null, rejectionReason?: string | null) {
+function getConfig(status: string, source?: string | null, rejectionReason?: string | null, entityType?: string | null) {
+  const entityLabel = entityType === 'individual' ? 'Individual' 
+    : entityType === 'nonprofit' ? 'Organization' 
+    : 'Business';
+
   switch (status) {
     case 'verified':
       return {
         label: source === 'stripe_kyc' ? 'Verified via Stripe' 
              : source === 'government_api' ? 'Regulator Linked'
-             : 'Verified by Invoicemonk',
+             : entityType === 'individual' ? 'Verified Individual (ID Verified)'
+             : `Verified ${entityLabel}`,
         description: source === 'stripe_kyc' 
-          ? 'This business has been verified through Stripe KYC. Identity is confirmed.'
+          ? `This ${entityLabel.toLowerCase()} has been verified through Stripe KYC. Identity is confirmed.`
           : source === 'government_api'
-          ? 'This business is linked to a government regulatory system for e-invoicing compliance.'
-          : 'This business has been manually verified by the Invoicemonk team.',
+          ? `This ${entityLabel.toLowerCase()} is linked to a government regulatory system for e-invoicing compliance.`
+          : `This ${entityLabel.toLowerCase()} has been manually verified by the Invoicemonk team.`,
         variant: 'default' as const,
         icon: source === 'government_api' ? BadgeCheck : ShieldCheck,
         colorClass: 'text-green-600 dark:text-green-400',
@@ -46,6 +54,14 @@ function getConfig(status: string, source?: string | null, rejectionReason?: str
         variant: 'secondary' as const,
         icon: Clock,
         colorClass: 'text-amber-600 dark:text-amber-400',
+      };
+    case 'requires_action':
+      return {
+        label: 'Action Required',
+        description: 'Additional information or documents are needed. Check your business settings for details.',
+        variant: 'outline' as const,
+        icon: ShieldAlert,
+        colorClass: 'text-orange-600 dark:text-orange-400',
       };
     case 'self_declared':
       return {
@@ -79,7 +95,9 @@ function getConfig(status: string, source?: string | null, rejectionReason?: str
     default:
       return {
         label: 'Unverified',
-        description: 'No verification completed. Add your tax ID or complete Stripe Connect to get verified.',
+        description: entityType === 'individual' 
+          ? 'No verification completed. Upload a government-issued ID or complete Stripe Connect to get verified.'
+          : 'No verification completed. Add your tax ID or complete Stripe Connect to get verified.',
         variant: 'secondary' as const,
         icon: ShieldAlert,
         colorClass: 'text-muted-foreground',
@@ -87,9 +105,9 @@ function getConfig(status: string, source?: string | null, rejectionReason?: str
   }
 }
 
-export function IdentityLevelBadge({ level, source, rejectionReason, className }: IdentityLevelBadgeProps) {
+export function IdentityLevelBadge({ level, source, rejectionReason, entityType, className }: IdentityLevelBadgeProps) {
   const effectiveLevel = level || 'unverified';
-  const config = getConfig(effectiveLevel, source, rejectionReason);
+  const config = getConfig(effectiveLevel, source, rejectionReason, entityType);
   const Icon = config.icon;
 
   return (
