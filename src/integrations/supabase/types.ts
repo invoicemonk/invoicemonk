@@ -217,11 +217,17 @@ export type Database = {
           paystack_subaccount_status: string
           registration_status: string | null
           regulator_code: string | null
+          rejection_reason: string | null
           stripe_connect_account_id: string | null
           stripe_connect_status: string
           tax_id: string | null
           updated_at: string
           vat_registration_number: string | null
+          verification_notes: string | null
+          verification_source: string
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           address?: Json | null
@@ -256,11 +262,17 @@ export type Database = {
           paystack_subaccount_status?: string
           registration_status?: string | null
           regulator_code?: string | null
+          rejection_reason?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_status?: string
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
+          verification_notes?: string | null
+          verification_source?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           address?: Json | null
@@ -295,11 +307,17 @@ export type Database = {
           paystack_subaccount_status?: string
           registration_status?: string | null
           regulator_code?: string | null
+          rejection_reason?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_status?: string
           tax_id?: string | null
           updated_at?: string
           vat_registration_number?: string | null
+          verification_notes?: string | null
+          verification_source?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: []
       }
@@ -2816,11 +2834,71 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_documents: {
+        Row: {
+          business_id: string
+          created_at: string
+          document_type: string
+          file_name: string
+          file_url: string
+          id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          uploaded_by: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          document_type: string
+          file_name: string
+          file_url: string
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          uploaded_by: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          document_type?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_documents_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_set_verification: {
+        Args: {
+          _business_id: string
+          _notes?: string
+          _reason?: string
+          _source?: string
+          _status: string
+        }
+        Returns: undefined
+      }
       ban_user: {
         Args: { _reason: string; _user_id: string }
         Returns: undefined
