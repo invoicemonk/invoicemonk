@@ -291,12 +291,25 @@ export function useUpdateBusiness() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Get current state for audit log
+      // Get current state for audit log and self-declared check
       const { data: currentBusiness } = await supabase
         .from('businesses')
         .select('*')
         .eq('id', businessId)
         .single();
+
+      // Auto-upgrade to self_declared if tax_id or cac_number is being set
+      // and business is currently unverified
+      const currentVerification = (currentBusiness as any)?.verification_status || 'unverified';
+      const updatesAny = updates as any;
+      if (currentVerification === 'unverified') {
+        const hasTaxId = updatesAny.tax_id && updatesAny.tax_id.trim();
+        const hasCac = updatesAny.cac_number && updatesAny.cac_number.trim();
+        if (hasTaxId || hasCac) {
+          updatesAny.verification_status = 'self_declared';
+          updatesAny.verification_source = 'none';
+        }
+      }
 
       const { data: updatedBusiness, error } = await supabase
         .from('businesses')
@@ -306,6 +319,21 @@ export function useUpdateBusiness() {
         .single();
 
       if (error) throw error;
+
+      // Warn user if their verification was downgraded by the DB trigger
+      if (currentVerification === 'verified') {
+        const sensitiveDiff = 
+          (currentBusiness as any)?.tax_id !== updatesAny.tax_id ||
+          (currentBusiness as any)?.legal_name !== updatesAny.legal_name ||
+          (currentBusiness as any)?.jurisdiction !== updatesAny.jurisdiction;
+        if (sensitiveDiff && (updatedBusiness as any)?.verification_status === 'pending_review') {
+          toast({
+            title: 'Verification status reset',
+            description: 'Your verification status has been reset because you changed sensitive fields. It will need to be re-verified.',
+            variant: 'destructive',
+          });
+        }
+      }
 
       // Log audit event
       await supabase.rpc('log_audit_event', {
