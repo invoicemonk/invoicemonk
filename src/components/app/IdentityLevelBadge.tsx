@@ -5,64 +5,91 @@ import {
   TooltipTrigger,
   TooltipProvider 
 } from '@/components/ui/tooltip';
-import { Shield, ShieldCheck, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldAlert, BadgeCheck, Clock, XCircle } from 'lucide-react';
 
-type IdentityLevel = 'unverified' | 'self_declared' | 'verified' | 'nrs_linked' | 'regulator_linked' | null;
+type VerificationStatus = 'unverified' | 'self_declared' | 'pending_review' | 'verified' | 'rejected';
+type VerificationSource = 'none' | 'stripe_kyc' | 'manual_review' | 'government_api';
+
+// Legacy support
+type LegacyLevel = 'nrs_linked' | 'regulator_linked';
 
 interface IdentityLevelBadgeProps {
-  level: IdentityLevel;
+  /** New verification_status field */
+  level?: VerificationStatus | LegacyLevel | null;
+  /** New verification_source field */
+  source?: VerificationSource | null;
+  /** Rejection reason (shown in tooltip when rejected) */
+  rejectionReason?: string | null;
   className?: string;
 }
 
-const levelConfig: Record<NonNullable<IdentityLevel>, {
-  label: string;
-  description: string;
-  variant: 'default' | 'secondary' | 'outline' | 'destructive';
-  icon: typeof Shield;
-  colorClass: string;
-}> = {
-  unverified: {
-    label: 'Unverified',
-    description: 'No tax ID provided. Add your tax ID to upgrade to Self-Declared status.',
-    variant: 'secondary',
-    icon: ShieldAlert,
-    colorClass: 'text-muted-foreground',
-  },
-  self_declared: {
-    label: 'Self-Declared',
-    description: 'Tax ID provided but not externally verified. Your business details are based on your declaration.',
-    variant: 'outline',
-    icon: Shield,
-    colorClass: 'text-blue-600 dark:text-blue-400',
-  },
-  verified: {
-    label: 'Verified',
-    description: 'Your tax ID has been verified with external sources. Your business identity is confirmed.',
-    variant: 'default',
-    icon: ShieldCheck,
-    colorClass: 'text-green-600 dark:text-green-400',
-  },
-  // Legacy - kept for backward compatibility during transition
-  nrs_linked: {
-    label: 'Regulator Linked',
-    description: 'Your business is linked to a government regulatory system for e-invoicing compliance.',
-    variant: 'default',
-    icon: BadgeCheck,
-    colorClass: 'text-primary',
-  },
-  // New - global-first naming
-  regulator_linked: {
-    label: 'Regulator Linked',
-    description: 'Your business is linked to a government regulatory system for e-invoicing compliance.',
-    variant: 'default',
-    icon: BadgeCheck,
-    colorClass: 'text-primary',
-  },
-};
+function getConfig(status: string, source?: string | null, rejectionReason?: string | null) {
+  switch (status) {
+    case 'verified':
+      return {
+        label: source === 'stripe_kyc' ? 'Verified via Stripe' 
+             : source === 'government_api' ? 'Regulator Linked'
+             : 'Verified by Invoicemonk',
+        description: source === 'stripe_kyc' 
+          ? 'This business has been verified through Stripe KYC. Identity is confirmed.'
+          : source === 'government_api'
+          ? 'This business is linked to a government regulatory system for e-invoicing compliance.'
+          : 'This business has been manually verified by the Invoicemonk team.',
+        variant: 'default' as const,
+        icon: source === 'government_api' ? BadgeCheck : ShieldCheck,
+        colorClass: 'text-green-600 dark:text-green-400',
+      };
+    case 'pending_review':
+      return {
+        label: 'Pending Review',
+        description: 'Verification documents have been submitted and are awaiting admin review.',
+        variant: 'secondary' as const,
+        icon: Clock,
+        colorClass: 'text-amber-600 dark:text-amber-400',
+      };
+    case 'self_declared':
+      return {
+        label: 'Self-Declared',
+        description: 'Tax ID provided but not externally verified. Complete Stripe Connect or upload documents to get verified.',
+        variant: 'outline' as const,
+        icon: Shield,
+        colorClass: 'text-blue-600 dark:text-blue-400',
+      };
+    case 'rejected':
+      return {
+        label: 'Rejected',
+        description: rejectionReason 
+          ? `Verification was rejected: ${rejectionReason}`
+          : 'Verification was rejected. Please contact support or resubmit documents.',
+        variant: 'destructive' as const,
+        icon: XCircle,
+        colorClass: 'text-destructive',
+      };
+    // Legacy values
+    case 'nrs_linked':
+    case 'regulator_linked':
+      return {
+        label: 'Regulator Linked',
+        description: 'This business is linked to a government regulatory system for e-invoicing compliance.',
+        variant: 'default' as const,
+        icon: BadgeCheck,
+        colorClass: 'text-primary',
+      };
+    case 'unverified':
+    default:
+      return {
+        label: 'Unverified',
+        description: 'No verification completed. Add your tax ID or complete Stripe Connect to get verified.',
+        variant: 'secondary' as const,
+        icon: ShieldAlert,
+        colorClass: 'text-muted-foreground',
+      };
+  }
+}
 
-export function IdentityLevelBadge({ level, className }: IdentityLevelBadgeProps) {
+export function IdentityLevelBadge({ level, source, rejectionReason, className }: IdentityLevelBadgeProps) {
   const effectiveLevel = level || 'unverified';
-  const config = levelConfig[effectiveLevel];
+  const config = getConfig(effectiveLevel, source, rejectionReason);
   const Icon = config.icon;
 
   return (

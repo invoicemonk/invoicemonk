@@ -53,10 +53,23 @@ Deno.serve(async (req) => {
       status = 'restricted'
     }
 
+    // Build update payload — includes verification auto-upgrade
+    const updatePayload: Record<string, unknown> = {
+      stripe_connect_status: status,
+    }
+
+    // Auto-verify business when Stripe Connect is fully active
+    if (status === 'active') {
+      updatePayload.verification_status = 'verified'
+      updatePayload.verification_source = 'stripe_kyc'
+      updatePayload.verified_at = new Date().toISOString()
+      updatePayload.verified_by = null // System-initiated via Stripe
+    }
+
     // Update by stripe_connect_account_id
     const { error } = await supabase
       .from('businesses')
-      .update({ stripe_connect_status: status })
+      .update(updatePayload)
       .eq('stripe_connect_account_id', accountId)
 
     if (error) {
@@ -67,11 +80,11 @@ Deno.serve(async (req) => {
     if (businessId) {
       try {
         await supabase.rpc('log_audit_event', {
-          _event_type: 'STRIPE_CONNECT_STATUS_UPDATED',
+          _event_type: status === 'active' ? 'BUSINESS_VERIFIED' : 'STRIPE_CONNECT_STATUS_UPDATED',
           _entity_type: 'business',
           _entity_id: businessId,
           _business_id: businessId,
-          _metadata: { stripe_account_id: accountId, status },
+          _metadata: { stripe_account_id: accountId, status, verification_source: status === 'active' ? 'stripe_kyc' : undefined },
         })
       } catch (e) {
         console.error('Audit log error:', e)
