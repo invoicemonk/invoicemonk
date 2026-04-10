@@ -100,9 +100,10 @@ Deno.serve(async (req) => {
     }
 
     // Rate limit: 5 emails per hour
-    const rateLimitResult = await checkRateLimit(user.id, 'email-report', 5, 3600)
-    if (!rateLimitResult.allowed) {
-      return rateLimitResponse(corsHeaders, rateLimitResult.retryAfter)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const allowed = await checkRateLimit(serviceRoleKey, user.id, 'email-report', 3600, 5)
+    if (!allowed) {
+      return rateLimitResponse(corsHeaders)
     }
 
     const body = await req.json()
