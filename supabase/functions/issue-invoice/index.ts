@@ -258,6 +258,39 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Business profile completeness check
+    const { data: businessProfile } = await supabaseService
+      .from('businesses')
+      .select('name, legal_name, contact_email, jurisdiction, tax_id, address, entity_type')
+      .eq('id', invoiceData.business_id)
+      .maybeSingle()
+
+    if (businessProfile) {
+      const missingFields: string[] = []
+      if (!businessProfile.name?.trim()) missingFields.push('Business Name')
+      if (!businessProfile.contact_email?.trim()) missingFields.push('Contact Email')
+      if (!businessProfile.jurisdiction?.trim()) missingFields.push('Country')
+      
+      const address = businessProfile.address as { country?: string } | null
+      if (!address?.country?.trim()) missingFields.push('Address Country')
+
+      if (businessProfile.entity_type !== 'individual') {
+        if (!businessProfile.legal_name?.trim()) missingFields.push('Legal Name')
+        if (!businessProfile.tax_id?.trim()) missingFields.push('Tax ID')
+      }
+
+      if (missingFields.length > 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Business profile incomplete. Missing: ${missingFields.join(', ')}. Please complete your business profile before issuing invoices.`,
+            missing_fields: missingFields
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Invoice sanity checks
     const sanityError = await validateInvoiceSanity(
       supabaseService,

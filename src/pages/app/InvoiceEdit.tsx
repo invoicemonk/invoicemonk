@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
+import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { 
@@ -336,7 +337,20 @@ export default function InvoiceEdit() {
     navigate(`/invoices/${id}`);
   };
 
+  const profileMissingFields = getBusinessProfileMissingFields(currentBusiness);
+  const isProfileIncomplete = profileMissingFields.length > 0;
+
   const handleIssue = async () => {
+    // Check business profile completeness
+    if (isProfileIncomplete) {
+      toast({
+        title: 'Complete your business profile first',
+        description: `Missing: ${profileMissingFields.join(', ')}. Go to Business Settings to complete your profile.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!isEmailVerified) {
       toast({
         title: 'Email verification required',
@@ -1011,7 +1025,7 @@ export default function InvoiceEdit() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || showTinWarning}
+                  disabled={isLoading || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1021,6 +1035,15 @@ export default function InvoiceEdit() {
                   Issue Invoice
                 </Button>
               </div>
+
+              {isProfileIncomplete && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Missing: {profileMissingFields.join(', ')}. <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Complete your profile</Link>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <p className="text-xs text-muted-foreground text-center">
                 Once issued, this invoice becomes an immutable financial record.

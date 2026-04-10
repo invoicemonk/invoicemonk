@@ -294,7 +294,7 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
               <ShieldCheck className="h-4 w-4" />
               Verification Review
             </h4>
-            
+             
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Status</span>
@@ -304,6 +304,20 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
                 <span className="text-muted-foreground">Source</span>
                 <span className="font-medium">{business.verification_source || 'none'}</span>
               </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Subscription Tier</span>
+                <span className="font-medium capitalize">{subscription?.tier || 'none'}</span>
+              </div>
+              {subscription && (subscription.tier === 'starter' || subscription.status !== 'active') && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-2 text-xs text-amber-700 dark:text-amber-400">
+                  ⚠ This business is on the free plan or has an inactive subscription. Verification approval will be blocked by the database.
+                </div>
+              )}
+              {!subscription && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-2 text-xs text-amber-700 dark:text-amber-400">
+                  ⚠ No subscription found. Verification approval will be blocked by the database.
+                </div>
+              )}
               {business.verified_at && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Verified at</span>

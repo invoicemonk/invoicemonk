@@ -3,9 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, Upload, FileText, Loader2, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Shield, Upload, FileText, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, ArrowUpRight } from 'lucide-react';
 import { useVerificationDocuments, useUploadVerificationDocument, useSubmitForReview } from '@/hooks/use-verification-documents';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
+import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
+import { useNavigate } from 'react-router-dom';
 
 interface VerificationDocumentsSectionProps {
   business: {
@@ -41,6 +44,8 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
   const rejectionReason = (business as any).rejection_reason;
   const entityType = (business as any).entity_type || 'business';
   const isIndividual = entityType === 'individual';
+  const { isFree } = useSubscriptionContext();
+  const navigate = useNavigate();
 
   const documentTypes = isIndividual ? INDIVIDUAL_DOCUMENT_TYPES : BUSINESS_DOCUMENT_TYPES;
 
@@ -109,6 +114,19 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Free tier gate */}
+        {isFree && !isVerified && (
+          <Alert className="border-primary/30 bg-primary/5">
+            <ArrowUpRight className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>Business verification requires a paid plan. Upgrade to unlock verification and online payments.</span>
+              <Button size="sm" variant="default" onClick={() => navigate('/app/business/billing')}>
+                Upgrade
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Verified state */}
         {isVerified && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900 p-4 flex items-start gap-3">
@@ -192,7 +210,7 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
         )}
 
         {/* Upload section — only when canUpload */}
-        {canUpload && (
+        {canUpload && !isFree && (
           <div className="space-y-3">
             <p className="text-sm font-medium">
               {isIndividual ? 'Upload identity documents' : 'Upload verification documents'}
@@ -280,7 +298,7 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
         ) : null}
 
         {/* Submit for review button */}
-        {canUpload && documents && documents.length > 0 && (
+        {canUpload && !isFree && documents && documents.length > 0 && (
           <Button
             onClick={handleSubmitForReview}
             disabled={submitForReview.isPending}

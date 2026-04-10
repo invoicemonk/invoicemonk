@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
+import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -160,7 +161,16 @@ export default function InvoiceDetail() {
   const recipientSnapshot = invoice?.recipient_snapshot as RecipientSnapshot | null;
   const hasSnapshots = !!issuerSnapshot || !!recipientSnapshot;
 
+  const profileMissingFields = getBusinessProfileMissingFields(currentBusiness);
+  const isProfileIncomplete = profileMissingFields.length > 0;
+
   const handleIssue = async () => {
+    if (isProfileIncomplete) {
+      toast.error('Complete your business profile first', {
+        description: `Missing: ${profileMissingFields.join(', ')}. Go to Business Settings to complete your profile.`,
+      });
+      return;
+    }
     if (id) await issueInvoice.mutateAsync(id);
   };
 
@@ -264,7 +274,9 @@ export default function InvoiceDetail() {
               <Button variant="outline" onClick={() => navigate(`/invoices/${id}/edit`)}>
                 Edit Draft
               </Button>
-              <Button onClick={handleIssue} disabled={issueInvoice.isPending}>
+              <Button onClick={handleIssue} disabled={issueInvoice.isPending || isProfileIncomplete}
+                title={isProfileIncomplete ? `Missing: ${profileMissingFields.join(', ')}` : undefined}
+              >
                 {issueInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
                 Issue Invoice
               </Button>

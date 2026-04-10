@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
+import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
@@ -469,6 +470,9 @@ export default function InvoiceNew() {
     navigate('/invoices');
   };
 
+  const profileMissingFields = getBusinessProfileMissingFields(currentBusiness);
+  const isProfileIncomplete = profileMissingFields.length > 0;
+
   const handleIssue = async () => {
     // Validate business exists
     if (!currentBusiness?.id) {
@@ -478,6 +482,16 @@ export default function InvoiceNew() {
         variant: 'destructive',
       });
       navigate(`/b/${currentBusiness?.id}/settings`);
+      return;
+    }
+
+    // Check business profile completeness
+    if (isProfileIncomplete) {
+      toast({
+        title: 'Complete your business profile first',
+        description: `Missing: ${profileMissingFields.join(', ')}. Go to Business Settings to complete your profile.`,
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -1187,7 +1201,7 @@ export default function InvoiceNew() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || showTinWarning}
+                  disabled={isLoading || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1197,6 +1211,15 @@ export default function InvoiceNew() {
                   Issue Invoice
                 </Button>
               </div>
+
+              {isProfileIncomplete && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Missing: {profileMissingFields.join(', ')}. <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Complete your profile</Link>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <p className="text-xs text-muted-foreground text-center">
                 Once issued, this invoice becomes an immutable financial record.
