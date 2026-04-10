@@ -73,7 +73,7 @@ interface AddressData {
 }
 
 export default function BusinessProfile() {
-  const { currentBusiness: business, loading: isLoadingBusiness, canManageTeam, isPlatformAdmin } = useBusiness();
+  const { currentBusiness: business, loading: isLoadingBusiness, canManageTeam, isPlatformAdmin, isFree } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const createBusiness = useCreateBusiness();
   const uploadLogo = useUploadBusinessLogo();
@@ -86,9 +86,15 @@ export default function BusinessProfile() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'billing' | 'audit-logs'>('profile');
   
-  const { data: teamAccess } = useTeamAccess();
-  const hasTeamAccess = isPlatformAdmin || (teamAccess?.hasAccess ?? false);
+  const { data: teamAccess, isLoading: teamAccessLoading } = useTeamAccess();
+  const hasTeamAccess = isPlatformAdmin || (!isFree && (teamAccessLoading || (teamAccess?.hasAccess ?? false)));
   const showTeamTab = canManageTeam && hasTeamAccess;
+
+  useEffect(() => {
+    if (activeTab === 'team' && !showTeamTab) {
+      setActiveTab('profile');
+    }
+  }, [activeTab, showTeamTab]);
 
   const [formData, setFormData] = useState({
     name: '',

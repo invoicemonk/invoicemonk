@@ -172,6 +172,91 @@ export function useGenerateReport() {
 }
 
 // Hook to fetch audit events count for a given year
+interface EmailReportRequest extends ReportRequest {
+  recipient_email: string;
+  report_title: string;
+}
+
+export function useEmailReport() {
+  return useMutation({
+    mutationFn: async (request: EmailReportRequest) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Step 1: Generate the report data
+      const result = await generateReport(request);
+      if (!result.success) {
+        if (result.upgrade_required) {
+          throw new Error('Upgrade required to access this report');
+        }
+        throw new Error(result.error || 'Failed to generate report');
+      }
+
+      // Step 2: Convert to string for email
+      let reportData: string;
+      if (request.format === 'csv') {
+        // Fetch as CSV via raw fetch
+        const response = await fetch(
+          `https://skcxogeaerudoadluexz.supabase.co/functions/v1/generate-report`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrY3hvZ2VhZXJ1ZG9hZGx1ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyOTkyODcsImV4cCI6MjA4Mzg3NTI4N30._G14u4zLW4sTO0VIIgeNideez3vwBuxKAa_ef4rvImc',
+            },
+            body: JSON.stringify({
+              report_type: request.report_type,
+              year: request.year,
+              format: 'csv',
+              business_id: request.business_id,
+              currency_account_id: request.currency_account_id,
+            }),
+          }
+        );
+        if (!response.ok) {
+          throw new Error('Failed to generate CSV report');
+        }
+        reportData = await response.text();
+      } else {
+        reportData = JSON.stringify(result, null, 2);
+      }
+
+      // Step 3: Send via email-report edge function
+      const emailResponse = await supabase.functions.invoke('email-report', {
+        body: {
+          report_title: request.report_title,
+          report_data: reportData,
+          recipient_email: request.recipient_email,
+          format: request.format || 'csv',
+          year: request.year,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (emailResponse.error) {
+        throw new Error(emailResponse.error.message || 'Failed to email report');
+      }
+
+      const data = emailResponse.data as { success: boolean; error?: string; message?: string };
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to email report');
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || 'Report sent successfully');
+    },
+    onError: (error: Error) => {
+      captureError(error, { hook: 'useEmailReport' });
+      toast.error(error.message || 'Failed to email report');
+    },
+  });
+}
+
 export function useAuditEventsCount(year: number) {
   return useQuery({
     queryKey: ['audit-events-count', year],

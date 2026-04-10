@@ -14,8 +14,10 @@ import {
   AlertCircle,
   BarChart3,
   PieChart,
+  Mail,
 } from 'lucide-react';
 import Analytics from '@/pages/app/Analytics';
+import { EmailReportDialog } from '@/components/reports/EmailReportDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +54,7 @@ export default function Reports() {
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('revenue');
   const [activeView, setActiveView] = useState<'reports' | 'analytics'>('reports');
+  const [emailDialogReport, setEmailDialogReport] = useState<{ id: ReportType; title: string } | null>(null);
   const { canAccess, loading: isLoading, currentBusiness, hasTier, isPlatformAdmin } = useBusiness();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
   const hasReportsAccess = canAccess('reports_enabled');
@@ -222,6 +225,16 @@ export default function Reports() {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="flex items-center justify-end gap-2">
+                        {!tierLocked && !needsCurrencyAccount && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEmailDialogReport({ id: report.id, title: report.title })}
+                            title="Email this report"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        )}
                         {isComplianceReport && (
                           <Button
                             variant="ghost"
@@ -279,6 +292,18 @@ export default function Reports() {
         </CardContent>
       </Card>
         </div>
+      )}
+
+      {emailDialogReport && (
+        <EmailReportDialog
+          open={!!emailDialogReport}
+          onOpenChange={(open) => !open && setEmailDialogReport(null)}
+          reportId={emailDialogReport.id}
+          reportTitle={emailDialogReport.title}
+          year={parseInt(selectedYear)}
+          businessId={currentBusiness?.id}
+          currencyAccountId={currentCurrencyAccount?.id}
+        />
       )}
     </motion.div>
   );
