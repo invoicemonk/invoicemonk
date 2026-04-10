@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { stripUrls } from '@/lib/utils';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
@@ -10,7 +10,8 @@ import {
   Building2,
   User,
   Info,
-  Globe
+  Globe,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
+import { validateClient } from '@/lib/client-validation';
 
 interface Address {
   street?: string;
@@ -110,8 +112,19 @@ export default function ClientEdit() {
   // Check if client has any issued invoices (for edit lock)
   const hasIssuedInvoices = invoices?.some(inv => inv.status !== 'draft') || false;
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (field: string) => setTouched(prev => ({ ...prev, [field]: true }));
+
+  const validation = useMemo(
+    () => validateClient(formData, clientCountry),
+    [formData.name, formData.email, formData.phone, formData.tax_id, formData.client_type, clientCountry],
+  );
+
+  const fieldError = (field: string) =>
+    touched[field] ? validation.errors[field] : undefined;
+
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || !validation.valid) return;
     
     // Clean up empty address fields
     const addressData = Object.fromEntries(
@@ -121,10 +134,10 @@ export default function ClientEdit() {
     await updateClient.mutateAsync({
       clientId: id,
       updates: {
-        name: formData.name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        tax_id: formData.tax_id || null,
+        name: formData.name.trim(),
+        email: formData.email.trim() || null,
+        phone: formData.phone.trim() || null,
+        tax_id: formData.tax_id.trim() || null,
         notes: formData.notes ? stripUrls(formData.notes) : null,
         client_type: formData.client_type,
         cac_number: formData.client_type === 'company' ? (formData.cac_number || null) : null,
@@ -187,7 +200,7 @@ export default function ClientEdit() {
           <Button variant="outline" onClick={() => navigate(-1)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateClient.isPending || !formData.name.trim()}>
+          <Button onClick={handleSave} disabled={updateClient.isPending || !validation.valid}>
             {updateClient.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
@@ -206,7 +219,17 @@ export default function ClientEdit() {
             <CardDescription>Client name and contact details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Client Type */}
+            {/* Validation warnings */}
+            {validation.warnings.length > 0 && (
+              <div className="space-y-2">
+                {validation.warnings.map((w, i) => (
+                  <Alert key={i} className="border-yellow-500/50 bg-yellow-500/10">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-700 dark:text-yellow-400 text-sm">{w}</AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            )}
             <div className="space-y-3">
               <Label>Client Type</Label>
               <RadioGroup
@@ -259,9 +282,14 @@ export default function ClientEdit() {
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onBlur={() => markTouched('name')}
                 placeholder={formData.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
                 maxLength={INPUT_LIMITS.NAME}
+                className={fieldError('name') ? 'border-destructive' : ''}
               />
+              {fieldError('name') && (
+                <p className="text-xs text-destructive">{fieldError('name')}</p>
+              )}
             </div>
 
             {/* Contact Person (for companies) */}
@@ -279,15 +307,20 @@ export default function ClientEdit() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onBlur={() => markTouched('email')}
                 placeholder="client@example.com"
                 maxLength={INPUT_LIMITS.EMAIL}
+                className={fieldError('email') ? 'border-destructive' : ''}
               />
+              {fieldError('email') && (
+                <p className="text-xs text-destructive">{fieldError('email')}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -296,9 +329,14 @@ export default function ClientEdit() {
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onBlur={() => markTouched('phone')}
                 placeholder={`${jurisdictionConfig.phonePrefix} ...`}
                 maxLength={INPUT_LIMITS.PHONE}
+                className={fieldError('phone') ? 'border-destructive' : ''}
               />
+              {fieldError('phone') && (
+                <p className="text-xs text-destructive">{fieldError('phone')}</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { stripUrls } from '@/lib/utils';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import {
@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Globe,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -32,11 +34,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateClient } from '@/hooks/use-clients';
+import { useCreateClient, useClients } from '@/hooks/use-clients';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 import { gaEvents } from '@/hooks/use-google-analytics';
+import { validateClient, validateClientName, validateClientEmail, validateClientPhone, validateClientTaxId } from '@/lib/client-validation';
 
 interface AddClientDialogProps {
   open: boolean;
@@ -65,12 +68,14 @@ const EMPTY_CLIENT = {
 export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClientDialogProps) {
   const { currentBusiness } = useBusiness();
   const createClient = useCreateClient();
+  const { data: existingClients = [] } = useClients(currentBusiness?.id);
 
   const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || 'NG');
   const jurisdictionConfig = getJurisdictionConfig(clientCountry);
 
   const [newClient, setNewClient] = useState({ ...EMPTY_CLIENT });
   const [showAddress, setShowAddress] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Reset when dialog opens
   useEffect(() => {
@@ -78,6 +83,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
       setClientCountry(currentBusiness?.jurisdiction || 'NG');
       setNewClient({ ...EMPTY_CLIENT });
       setShowAddress(false);
+      setTouched({});
     }
   }, [open, currentBusiness?.jurisdiction]);
 
@@ -94,17 +100,42 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
     }
   }, [clientCountry, jurisdictionConfig.countryName]);
 
+  // Validation
+  const validation = useMemo(
+    () => validateClient(newClient, clientCountry),
+    [newClient.name, newClient.email, newClient.phone, newClient.tax_id, newClient.client_type, clientCountry],
+  );
+
+  // Duplicate detection
+  const duplicateWarning = useMemo(() => {
+    const email = newClient.email.trim().toLowerCase();
+    if (email) {
+      const dup = existingClients.find(c => c.email?.toLowerCase() === email);
+      if (dup) return `A client with this email already exists: "${dup.name}"`;
+    }
+    const name = newClient.name.trim().toLowerCase();
+    if (name && name.length >= 3) {
+      const dup = existingClients.find(c => c.name.toLowerCase() === name);
+      if (dup) return `A client with this exact name already exists`;
+    }
+    return null;
+  }, [newClient.name, newClient.email, existingClients]);
+
+  const allWarnings = [...validation.warnings, ...(duplicateWarning ? [duplicateWarning] : [])];
+
+  const markTouched = (field: string) => setTouched(prev => ({ ...prev, [field]: true }));
+
   const handleAddClient = async () => {
-    if (!newClient.name) return;
+    if (!validation.valid) return;
 
     const hasAddress = Object.values(newClient.address).some(v => v.trim() !== '');
     const addressData = hasAddress ? newClient.address : null;
 
     const result = await createClient.mutateAsync({
-      name: newClient.name,
-      email: newClient.email || null,
-      phone: newClient.phone || null,
-      tax_id: newClient.tax_id || null,
+      name: newClient.name.trim(),
+      email: newClient.email.trim() || null,
+      phone: newClient.phone.trim() || null,
+      tax_id: newClient.tax_id.trim() || null,
       client_type: newClient.client_type,
       cac_number: newClient.client_type === 'company' ? (newClient.cac_number || null) : null,
       contact_person: newClient.client_type === 'company' ? (newClient.contact_person || null) : null,
@@ -121,6 +152,9 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
     onOpenChange(false);
   };
 
+  const fieldError = (field: string) =>
+    touched[field] ? validation.errors[field] : undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -131,6 +165,20 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {/* Warnings */}
+          {allWarnings.length > 0 && (
+            <div className="space-y-2">
+              {allWarnings.map((w, i) => (
+                <Alert key={i} className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-700 dark:text-yellow-400 text-sm">
+                    {w}
+                  </AlertDescription>
+                </Alert>
+              ))}
+            </div>
+          )}
+
           {/* Client Type */}
           <div className="space-y-3">
             <Label>Client Type</Label>
@@ -166,8 +214,13 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
               value={newClient.name}
               onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+              onBlur={() => markTouched('name')}
               maxLength={INPUT_LIMITS.NAME}
+              className={fieldError('name') ? 'border-destructive' : ''}
             />
+            {fieldError('name') && (
+              <p className="text-xs text-destructive">{fieldError('name')}</p>
+            )}
           </div>
 
           {/* Contact Person (for companies) */}
@@ -188,7 +241,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Globe className="h-4 w-4 text-muted-foreground" />
-              Client Location
+              Client Location *
             </Label>
             <Select value={clientCountry} onValueChange={setClientCountry}>
               <SelectTrigger>
@@ -207,15 +260,20 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           {/* Contact Details */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="dialog-email">Email</Label>
+              <Label htmlFor="dialog-email">Email *</Label>
               <Input
                 id="dialog-email"
                 type="email"
                 placeholder="client@example.com"
                 value={newClient.email}
                 onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                onBlur={() => markTouched('email')}
                 maxLength={INPUT_LIMITS.EMAIL}
+                className={fieldError('email') ? 'border-destructive' : ''}
               />
+              {fieldError('email') && (
+                <p className="text-xs text-destructive">{fieldError('email')}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="dialog-phone">Phone</Label>
@@ -225,8 +283,13 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 placeholder={`${jurisdictionConfig.phonePrefix} ...`}
                 value={newClient.phone}
                 onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                onBlur={() => markTouched('phone')}
                 maxLength={INPUT_LIMITS.PHONE}
+                className={fieldError('phone') ? 'border-destructive' : ''}
               />
+              {fieldError('phone') && (
+                <p className="text-xs text-destructive">{fieldError('phone')}</p>
+              )}
             </div>
           </div>
 
@@ -244,12 +307,17 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
                 placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
                 value={newClient.tax_id}
                 onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
-                className="font-mono"
+                onBlur={() => markTouched('tax_id')}
+                className={`font-mono ${fieldError('tax_id') ? 'border-destructive' : ''}`}
                 maxLength={INPUT_LIMITS.TAX_ID}
               />
-              <p className="text-xs text-muted-foreground">
-                {jurisdictionConfig.clientTaxIdHint}
-              </p>
+              {fieldError('tax_id') ? (
+                <p className="text-xs text-destructive">{fieldError('tax_id')}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {jurisdictionConfig.clientTaxIdHint}
+                </p>
+              )}
             </div>
 
             {newClient.client_type === 'company' && jurisdictionConfig.showClientReg && (
@@ -373,7 +441,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           </Button>
           <Button
             onClick={handleAddClient}
-            disabled={!newClient.name || createClient.isPending}
+            disabled={!validation.valid || createClient.isPending}
           >
             {createClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Add Client

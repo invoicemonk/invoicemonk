@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
 import { 
@@ -57,6 +57,9 @@ import { gaEvents } from '@/hooks/use-google-analytics';
 import { COUNTRY_OPTIONS_WITH_OTHER } from '@/lib/countries';
 import { stripUrls } from '@/lib/utils';
 import { CsvImportDialog } from '@/components/import/CsvImportDialog';
+import { validateClient } from '@/lib/client-validation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -90,13 +93,42 @@ export default function Clients() {
     },
   });
   const [showAddress, setShowAddress] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Reset client country when dialog opens
   useEffect(() => {
     if (isAddDialogOpen) {
       setClientCountry(currentBusiness?.jurisdiction || '');
+      setTouched({});
     }
   }, [isAddDialogOpen, currentBusiness?.jurisdiction]);
+
+  const markTouched = (field: string) => setTouched(prev => ({ ...prev, [field]: true }));
+
+  const validation = useMemo(
+    () => validateClient(newClient, clientCountry),
+    [newClient.name, newClient.email, newClient.phone, newClient.tax_id, newClient.client_type, clientCountry],
+  );
+
+  // Duplicate detection
+  const duplicateWarning = useMemo(() => {
+    const email = newClient.email.trim().toLowerCase();
+    if (email) {
+      const dup = clients.find(c => c.email?.toLowerCase() === email);
+      if (dup) return `A client with this email already exists: "${dup.name}"`;
+    }
+    const name = newClient.name.trim().toLowerCase();
+    if (name && name.length >= 3) {
+      const dup = clients.find(c => c.name.toLowerCase() === name);
+      if (dup) return `A client with this exact name already exists`;
+    }
+    return null;
+  }, [newClient.name, newClient.email, clients]);
+
+  const allWarnings = [...validation.warnings, ...(duplicateWarning ? [duplicateWarning] : [])];
+
+  const fieldError = (field: string) =>
+    touched[field] ? validation.errors[field] : undefined;
 
   // Auto-fill country name when client country changes
   useEffect(() => {
@@ -117,7 +149,7 @@ export default function Clients() {
   );
 
   const handleAddClient = async () => {
-    if (!newClient.name) return;
+    if (!validation.valid) return;
     
     // Build address object only if any field is filled
     const hasAddress = Object.values(newClient.address).some(v => v.trim() !== '');
@@ -189,6 +221,17 @@ export default function Clients() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Warnings */}
+              {allWarnings.length > 0 && (
+                <div className="space-y-2">
+                  {allWarnings.map((w, i) => (
+                    <Alert key={i} className="border-yellow-500/50 bg-yellow-500/10">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-yellow-700 dark:text-yellow-400 text-sm">{w}</AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
               {/* Client Type */}
               <div className="space-y-3">
                 <Label>Client Type</Label>
@@ -224,8 +267,13 @@ export default function Clients() {
                   placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                  onBlur={() => markTouched('name')}
                   maxLength={INPUT_LIMITS.NAME}
+                  className={fieldError('name') ? 'border-destructive' : ''}
                 />
+                {fieldError('name') && (
+                  <p className="text-xs text-destructive">{fieldError('name')}</p>
+                )}
               </div>
 
               {/* Contact Person (for companies) */}
@@ -265,15 +313,20 @@ export default function Clients() {
               {/* Contact Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email *</Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="client@example.com"
                       value={newClient.email}
                       onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                      onBlur={() => markTouched('email')}
                       maxLength={INPUT_LIMITS.EMAIL}
+                      className={fieldError('email') ? 'border-destructive' : ''}
                     />
+                  {fieldError('email') && (
+                    <p className="text-xs text-destructive">{fieldError('email')}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
@@ -427,7 +480,7 @@ export default function Clients() {
               </Button>
               <Button 
                 onClick={handleAddClient} 
-                disabled={!newClient.name || createClient.isPending}
+                disabled={!validation.valid || createClient.isPending}
               >
                 {createClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Add Client
