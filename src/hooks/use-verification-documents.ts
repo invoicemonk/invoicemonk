@@ -129,13 +129,17 @@ export function useSubmitForReview() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, businessId) => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
       queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
       toast({
         title: 'Submitted for review',
         description: 'Your business will be reviewed by our team. You\'ll be notified of the result.',
       });
+      // Fire-and-forget: notify admins
+      supabase.functions.invoke('send-verification-notification', {
+        body: { type: 'submission', business_id: businessId },
+      }).catch(() => {});
     },
     onError: (error: Error) => {
       toast({

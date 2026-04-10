@@ -10,7 +10,10 @@ import {
   Mail,
   UserPlus,
   Ban,
-  Eye
+  Eye,
+  ShieldCheck,
+  ShieldX,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +40,9 @@ const iconMap: Record<NotificationType, React.ComponentType<{ className?: string
   INVOICE_VOIDED: Ban,
   INVOICE_VIEWED: Eye,
   CLIENT_ADDED: UserPlus,
+  VERIFICATION_APPROVED: ShieldCheck,
+  VERIFICATION_REJECTED: ShieldX,
+  VERIFICATION_REQUIRES_ACTION: ShieldAlert,
 };
 
 const colorMap: Record<NotificationType, string> = {
@@ -47,6 +53,9 @@ const colorMap: Record<NotificationType, string> = {
   INVOICE_VOIDED: 'text-orange-500 bg-orange-50',
   INVOICE_VIEWED: 'text-indigo-500 bg-indigo-50',
   CLIENT_ADDED: 'text-cyan-500 bg-cyan-50',
+  VERIFICATION_APPROVED: 'text-green-500 bg-green-50',
+  VERIFICATION_REJECTED: 'text-red-500 bg-red-50',
+  VERIFICATION_REQUIRES_ACTION: 'text-amber-500 bg-amber-50',
 };
 
 type FilterType = 'all' | 'unread' | 'invoices' | 'payments';

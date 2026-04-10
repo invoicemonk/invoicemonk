@@ -74,7 +74,7 @@ export default function AdminNotifications() {
               users: ['ADMIN_USER_REGISTERED', 'ADMIN_EMAIL_VERIFIED'],
               billing: ['ADMIN_SUBSCRIPTION_UPGRADED', 'ADMIN_SUBSCRIPTION_DOWNGRADED', 'ADMIN_PAYMENT_FAILED', 'ADMIN_FIRST_INVOICE_ISSUED'],
               support: ['SUPPORT_TICKET_CREATED', 'SUPPORT_TICKET_USER_REPLY'],
-              compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED'],
+              compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED', 'ADMIN_VERIFICATION_SUBMITTED'],
             };
             return catTypes[cat.value as AdminNotificationCategory]?.includes(n.type);
           });

@@ -82,6 +82,11 @@ const notificationConfig: Record<AdminNotificationType, {
     colorClass: 'text-orange-600 dark:text-orange-400',
     bgClass: 'bg-orange-100 dark:bg-orange-900/30'
   },
+  'ADMIN_VERIFICATION_SUBMITTED': { 
+    icon: FileText, 
+    colorClass: 'text-cyan-600 dark:text-cyan-400',
+    bgClass: 'bg-cyan-100 dark:bg-cyan-900/30'
+  },
 };
 
 // Default fallback config

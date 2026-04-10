@@ -3241,6 +3241,7 @@ export type Database = {
         | "USER_REACTIVATED"
         | "SELF_PAYMENT_BLOCKED"
         | "PAYMENT_FLAGGED"
+        | "BUSINESS_VERIFICATION_CHANGED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
       invoice_status:
@@ -3446,6 +3447,7 @@ export const Constants = {
         "USER_REACTIVATED",
         "SELF_PAYMENT_BLOCKED",
         "PAYMENT_FLAGGED",
+        "BUSINESS_VERIFICATION_CHANGED",
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],

@@ -23,7 +23,10 @@ export type NotificationType =
   | 'INVOICE_SENT'
   | 'INVOICE_VOIDED'
   | 'INVOICE_VIEWED'
-  | 'CLIENT_ADDED';
+  | 'CLIENT_ADDED'
+  | 'VERIFICATION_APPROVED'
+  | 'VERIFICATION_REJECTED'
+  | 'VERIFICATION_REQUIRES_ACTION';
 
 export function useNotifications(limit = 20, businessId?: string) {
   const { user } = useAuth();

@@ -1,4 +1,4 @@
-import { FileText, CreditCard, AlertCircle, Mail, UserPlus, XCircle, Eye } from 'lucide-react';
+import { FileText, CreditCard, AlertCircle, Mail, UserPlus, XCircle, Eye, ShieldCheck, ShieldX, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,9 @@ const notificationIcons: Record<NotificationType, React.ElementType> = {
   INVOICE_VOIDED: XCircle,
   INVOICE_VIEWED: Eye,
   CLIENT_ADDED: UserPlus,
+  VERIFICATION_APPROVED: ShieldCheck,
+  VERIFICATION_REJECTED: ShieldX,
+  VERIFICATION_REQUIRES_ACTION: ShieldAlert,
 };
 
 const notificationColors: Record<NotificationType, string> = {
@@ -27,6 +30,9 @@ const notificationColors: Record<NotificationType, string> = {
   INVOICE_VOIDED: 'text-orange-500 bg-orange-500/10',
   INVOICE_VIEWED: 'text-indigo-500 bg-indigo-500/10',
   CLIENT_ADDED: 'text-cyan-500 bg-cyan-500/10',
+  VERIFICATION_APPROVED: 'text-green-500 bg-green-500/10',
+  VERIFICATION_REJECTED: 'text-destructive bg-destructive/10',
+  VERIFICATION_REQUIRES_ACTION: 'text-amber-500 bg-amber-500/10',
 };
 
 export function NotificationItem({ notification, onClose }: NotificationItemProps) {

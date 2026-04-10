@@ -86,10 +86,21 @@ export function useAdminVerificationAction() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-verification-queue'] });
       queryClient.invalidateQueries({ queryKey: ['admin-business-documents'] });
       toast({ title: 'Verification updated', description: 'Business verification status has been updated.' });
+      // Fire-and-forget: notify business owner of outcome
+      const notifType = variables.status === 'verified' ? 'approved' : variables.status;
+      if (['approved', 'rejected', 'requires_action'].includes(notifType)) {
+        supabase.functions.invoke('send-verification-notification', {
+          body: {
+            type: notifType,
+            business_id: variables.businessId,
+            reason: variables.reason || variables.notes || undefined,
+          },
+        }).catch(() => {});
+      }
     },
     onError: (error: Error) => {
       toast({ title: 'Action failed', description: error.message, variant: 'destructive' });

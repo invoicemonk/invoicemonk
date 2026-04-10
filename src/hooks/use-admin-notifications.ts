@@ -28,7 +28,8 @@ export type AdminNotificationType =
   | 'SUPPORT_TICKET_CREATED'
   | 'SUPPORT_TICKET_USER_REPLY'
   | 'ADMIN_EXPORT_FAILED'
-  | 'ADMIN_VERIFICATION_FAILED';
+  | 'ADMIN_VERIFICATION_FAILED'
+  | 'ADMIN_VERIFICATION_SUBMITTED';
 
 // Whitelist of admin-only notification types
 // This prevents admins from seeing business-scoped user notifications
@@ -43,6 +44,7 @@ const ADMIN_ONLY_TYPES: AdminNotificationType[] = [
   'SUPPORT_TICKET_USER_REPLY',
   'ADMIN_EXPORT_FAILED',
   'ADMIN_VERIFICATION_FAILED',
+  'ADMIN_VERIFICATION_SUBMITTED',
 ];
 
 // Category mapping for filtering
@@ -50,7 +52,7 @@ export const ADMIN_NOTIFICATION_CATEGORIES = {
   users: ['ADMIN_USER_REGISTERED', 'ADMIN_EMAIL_VERIFIED'],
   billing: ['ADMIN_SUBSCRIPTION_UPGRADED', 'ADMIN_SUBSCRIPTION_DOWNGRADED', 'ADMIN_PAYMENT_FAILED', 'ADMIN_FIRST_INVOICE_ISSUED'],
   support: ['SUPPORT_TICKET_CREATED', 'SUPPORT_TICKET_USER_REPLY'],
-  compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED'],
+  compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED', 'ADMIN_VERIFICATION_SUBMITTED'],
 } as const;
 
 export type AdminNotificationCategory = keyof typeof ADMIN_NOTIFICATION_CATEGORIES;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,10 +16,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle2, XCircle, AlertTriangle, FileText, Image, ExternalLink, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, FileText, Image, Download, Eye, Loader2 } from 'lucide-react';
+import { VerificationPdfPreview } from './VerificationPdfPreview';
 import { useAdminBusinessDocuments, useAdminVerificationAction, type VerificationQueueItem } from '@/hooks/use-admin-verifications';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface VerificationDetailSheetProps {
   business: VerificationQueueItem | null;
@@ -27,10 +30,18 @@ interface VerificationDetailSheetProps {
 
 type ActionType = 'approve' | 'reject' | 'requires_action' | null;
 
+interface PreviewState {
+  blobUrl: string;
+  fileName: string;
+  type: 'image' | 'pdf' | 'other';
+}
+
 export function VerificationDetailSheet({ business, onClose }: VerificationDetailSheetProps) {
   const [actionType, setActionType] = useState<ActionType>(null);
   const [actionMessage, setActionMessage] = useState('');
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   const { data: documents, isLoading: loadingDocs } = useAdminBusinessDocuments(business?.id);
   const verificationAction = useAdminVerificationAction();
@@ -56,7 +67,7 @@ export function VerificationDetailSheet({ business, onClose }: VerificationDetai
     if (signedUrls[docId]) return signedUrls[docId];
     const { data } = await supabase.storage
       .from('verification-documents')
-      .createSignedUrl(filePath, 3600); // 1 hour
+      .createSignedUrl(filePath, 3600);
     if (data?.signedUrl) {
       setSignedUrls((prev) => ({ ...prev, [docId]: data.signedUrl }));
       return data.signedUrl;
@@ -64,23 +75,59 @@ export function VerificationDetailSheet({ business, onClose }: VerificationDetai
     return null;
   };
 
+  const isImage = (fileName: string) => /\.(png|jpg|jpeg|webp)$/i.test(fileName);
+  const isPdf = (fileName: string) => /\.pdf$/i.test(fileName);
+
   const openDocument = async (doc: { id: string; file_path: string | null; file_url: string; file_name: string }) => {
     const path = doc.file_path || doc.file_url;
     if (!path) return;
 
-    // If it's already a full URL (signed URL from upload time), open directly
-    if (path.startsWith('http')) {
-      window.open(path, '_blank');
-      return;
-    }
+    setOpeningDocId(doc.id);
 
-    // Generate fresh signed URL
-    const url = await getSignedUrl(path, doc.id);
-    if (url) window.open(url, '_blank');
+    try {
+      let url: string;
+
+      if (path.startsWith('http')) {
+        url = path;
+      } else {
+        const signed = await getSignedUrl(path, doc.id);
+        if (!signed) {
+          toast({ title: 'Failed to generate document URL', variant: 'destructive' });
+          return;
+        }
+        url = signed;
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const type = isImage(doc.file_name) ? 'image' : isPdf(doc.file_name) ? 'pdf' : 'other';
+
+      if (type === 'other') {
+        // For non-previewable files, trigger download directly
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = doc.file_name;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        setPreview({ blobUrl, fileName: doc.file_name, type });
+      }
+    } catch {
+      toast({ title: 'Could not load document', variant: 'destructive' });
+    } finally {
+      setOpeningDocId(null);
+    }
   };
 
-  const isImage = (fileName: string) => /\.(png|jpg|jpeg|webp)$/i.test(fileName);
-  const isPdf = (fileName: string) => /\.pdf$/i.test(fileName);
+  const closePreview = () => {
+    if (preview) {
+      URL.revokeObjectURL(preview.blobUrl);
+      setPreview(null);
+    }
+  };
 
   const canTakeAction = business?.verification_status === 'pending_review' || business?.verification_status === 'requires_action';
 
@@ -174,9 +221,14 @@ export function VerificationDetailSheet({ business, onClose }: VerificationDetai
                             variant="ghost"
                             size="sm"
                             onClick={() => openDocument(doc)}
+                            disabled={openingDocId === doc.id}
                             className="shrink-0"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            {openingDocId === doc.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       ))}
@@ -222,6 +274,37 @@ export function VerificationDetailSheet({ business, onClose }: VerificationDetai
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Inline document preview dialog */}
+      <Dialog open={!!preview} onOpenChange={(open) => !open && closePreview()}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between gap-4">
+            <DialogTitle className="truncate">{preview?.fileName}</DialogTitle>
+            {preview && (
+              <a
+                href={preview.blobUrl}
+                download={preview.fileName}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </a>
+            )}
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto rounded-md border bg-muted/30">
+            {preview?.type === 'image' && (
+              <img
+                src={preview.blobUrl}
+                alt={preview.fileName}
+                className="max-w-full max-h-[70vh] mx-auto object-contain"
+              />
+            )}
+            {preview?.type === 'pdf' && (
+              <VerificationPdfPreview blobUrl={preview.blobUrl} fileName={preview.fileName} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation dialog */}
       <AlertDialog open={!!actionType} onOpenChange={(open) => !open && setActionType(null)}>
