@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Globe, Shield, FileText, ArrowRight, Loader2, CreditCard } from 'lucide-react';
+import { Globe, Shield, FileText, ArrowRight, Loader2, CreditCard, User, Building2, Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,7 @@ export default function CountryConfirmation() {
     } catch {}
     return '';
   });
+  const [entityType, setEntityType] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch user's first business directly (no BusinessProvider needed)
@@ -78,13 +79,14 @@ export default function CountryConfirmation() {
   const sampleAmount = currency ? getSmartPrefillAmount(currency) : 100;
 
   const handleContinue = async () => {
-    if (!selectedCountry || !businessId || !currency) return;
+    if (!selectedCountry || !businessId || !currency || !entityType) return;
 
     setIsSaving(true);
     try {
       const updatePayload: Record<string, any> = {
         jurisdiction: selectedCountry,
         default_currency: currency,
+        entity_type: entityType,
       };
       // Set jurisdiction-aware invoice number digits default
       if (jurisdictionConfig?.invoiceNumberDigits) {
@@ -183,7 +185,38 @@ export default function CountryConfirmation() {
           </Select>
         </div>
 
-        {/* Dynamic Compliance Preview */}
+        {/* Entity Type Selector */}
+        <div className="space-y-3">
+          <Label>What type of entity are you?</Label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: 'individual', label: 'Individual', desc: 'Freelancer or sole proprietor', icon: User },
+              { value: 'business', label: 'Business', desc: 'Registered company or partnership', icon: Building2 },
+              { value: 'nonprofit', label: 'Nonprofit', desc: 'Charity or non-profit organization', icon: Heart },
+            ].map((opt) => {
+              const Icon = opt.icon;
+              const isSelected = entityType === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEntityType(opt.value)}
+                  className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-all ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border hover:border-primary/40'
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  <span className="text-xs text-muted-foreground leading-tight">{opt.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+
         {selectedCountry && currency && jurisdictionConfig && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -261,7 +294,7 @@ export default function CountryConfirmation() {
           className="w-full h-12"
           size="lg"
           onClick={handleContinue}
-          disabled={!selectedCountry || isSaving}
+          disabled={!selectedCountry || !entityType || isSaving}
         >
           {isSaving ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
