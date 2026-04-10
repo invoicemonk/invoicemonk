@@ -1,4 +1,5 @@
 import { isDisposableEmail } from './disposable-emails';
+import { getJurisdictionConfig } from './jurisdiction-config';
 
 // ── Name validation ──────────────────────────────────────────────────
 
@@ -80,9 +81,17 @@ export function validateClientPhone(phone: string): {
 export function validateClientTaxId(
   taxId: string,
   _jurisdiction?: string,
+  required?: boolean,
 ): { valid: boolean; error?: string } {
   const trimmed = taxId.trim();
-  if (!trimmed) return { valid: true }; // optional
+  if (!trimmed) {
+    if (required) {
+      const config = _jurisdiction ? getJurisdictionConfig(_jurisdiction) : null;
+      const label = config?.clientTaxIdLabel || 'Tax ID';
+      return { valid: false, error: `${label} is required for clients in ${config?.name || 'this country'}` };
+    }
+    return { valid: true }; // optional
+  }
   if (trimmed.length < 3) {
     return { valid: false, error: 'Tax ID is too short' };
   }
@@ -114,6 +123,9 @@ export function validateClient(
   const errors: Record<string, string> = {};
   const warnings: string[] = [];
 
+  const jurisdictionConfig = _jurisdiction ? getJurisdictionConfig(_jurisdiction) : null;
+  const taxIdRequired = jurisdictionConfig?.clientTaxIdRequired ?? false;
+
   const nameResult = validateClientName(data.name, data.client_type);
   if (!nameResult.valid && nameResult.error) errors.name = nameResult.error;
 
@@ -124,7 +136,7 @@ export function validateClient(
   const phoneResult = validateClientPhone(data.phone);
   if (!phoneResult.valid && phoneResult.error) errors.phone = phoneResult.error;
 
-  const taxResult = validateClientTaxId(data.tax_id, _jurisdiction);
+  const taxResult = validateClientTaxId(data.tax_id, _jurisdiction, taxIdRequired);
   if (!taxResult.valid && taxResult.error) errors.tax_id = taxResult.error;
 
   return {

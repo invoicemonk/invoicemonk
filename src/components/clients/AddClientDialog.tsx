@@ -301,7 +301,10 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dialog-tax_id">{jurisdictionConfig.clientTaxIdLabel}</Label>
+              <Label htmlFor="dialog-tax_id">
+                {jurisdictionConfig.clientTaxIdLabel}
+                {jurisdictionConfig.clientTaxIdRequired && ' *'}
+              </Label>
               <Input
                 id="dialog-tax_id"
                 placeholder={jurisdictionConfig.clientTaxIdPlaceholder}

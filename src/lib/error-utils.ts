@@ -12,6 +12,8 @@ export function sanitizeErrorMessage(error: unknown): string {
   
   // Strip Supabase-specific patterns
   const patterns: [RegExp, string][] = [
+    [/Invoice blocked by compliance checks/i, 'This invoice cannot be issued yet. Please review your business profile and ensure all required fields are complete.'],
+    [/function .* does not exist/i, 'A system error occurred. Please contact support.'],
     [/new row violates row-level security policy/i, 'You do not have permission to perform this action.'],
     [/JWT expired/i, 'Your session has expired. Please log in again.'],
     [/invalid input syntax for type uuid/i, 'Invalid record reference. Please refresh and try again.'],
