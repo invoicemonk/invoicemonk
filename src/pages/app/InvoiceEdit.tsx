@@ -344,8 +344,8 @@ export default function InvoiceEdit() {
     // Check business profile completeness
     if (isProfileIncomplete) {
       toast({
-        title: 'Complete your business profile first',
-        description: `Missing: ${profileMissingFields.join(', ')}. Go to Business Settings to complete your profile.`,
+        title: `Complete your business profile (${profileMissingFields.length} field${profileMissingFields.length === 1 ? '' : 's'} remaining)`,
+        description: `You need to add: ${profileMissingFields.join(', ')} before you can issue invoices.`,
         variant: 'destructive',
       });
       return;
@@ -1040,7 +1040,7 @@ export default function InvoiceEdit() {
                 <Alert variant="destructive" className="mt-2">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    Missing: {profileMissingFields.join(', ')}. <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Complete your profile</Link>
+                    Complete these {profileMissingFields.length} fields to issue invoices: {profileMissingFields.join(', ')}. <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Complete your profile</Link>
                   </AlertDescription>
                 </Alert>
               )}

@@ -5,8 +5,9 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink, Plus
+  Ban, DollarSign, Loader2, Clock, AlertCircle, AlertTriangle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink, Plus
 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -166,8 +167,8 @@ export default function InvoiceDetail() {
 
   const handleIssue = async () => {
     if (isProfileIncomplete) {
-      toast.error('Complete your business profile first', {
-        description: `Missing: ${profileMissingFields.join(', ')}. Go to Business Settings to complete your profile.`,
+      toast.error(`Complete your business profile (${profileMissingFields.length} field${profileMissingFields.length === 1 ? '' : 's'} remaining)`, {
+        description: `You need to add: ${profileMissingFields.join(', ')} before you can issue invoices. Go to Business Settings to complete your profile.`,
       });
       return;
     }
@@ -275,7 +276,7 @@ export default function InvoiceDetail() {
                 Edit Draft
               </Button>
               <Button onClick={handleIssue} disabled={issueInvoice.isPending || isProfileIncomplete}
-                title={isProfileIncomplete ? `Missing: ${profileMissingFields.join(', ')}` : undefined}
+                title={isProfileIncomplete ? `Complete your profile — ${profileMissingFields.length} field${profileMissingFields.length === 1 ? '' : 's'} remaining: ${profileMissingFields.join(', ')}` : undefined}
               >
                 {issueInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
                 Issue Invoice
@@ -336,6 +337,19 @@ export default function InvoiceDetail() {
           )}
         </div>
       </div>
+
+      {/* Incomplete Profile Banner */}
+      {isProfileIncomplete && invoice.status === 'draft' && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Complete these {profileMissingFields.length} field{profileMissingFields.length === 1 ? '' : 's'} to issue invoices: {profileMissingFields.join(', ')}.{' '}
+            <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">
+              Go to Business Settings
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Immutability Notice */}
       {isImmutable && invoice.status !== 'voided' && (
