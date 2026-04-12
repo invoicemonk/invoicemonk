@@ -559,7 +559,7 @@ export default function InvoiceNew() {
       gaEvents.invoiceIssued(invoice.id, calculateTotal());
       // Then issue it
       await issueInvoice.mutateAsync(invoice.id);
-      navigate('/invoices');
+      navigate(`/b/${currentBusiness.id}/invoices/${invoice.id}`);
     }
   };
 
