@@ -3135,9 +3135,7 @@ export type Database = {
         Args: { _business_id: string; _user_id: string }
         Returns: boolean
       }
-      issue_invoice:
-        | { Args: { _invoice_id: string }; Returns: Json }
-        | { Args: { _invoice_id: string; _user_id: string }; Returns: Json }
+      issue_invoice: { Args: { _invoice_id: string }; Returns: Json }
       log_audit_event: {
         Args: {
           _business_id?: string

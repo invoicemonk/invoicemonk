@@ -1,0 +1,1 @@
+UPDATE public.invoices SET status = 'issued' WHERE id IN ('853b8bc8-71ea-484b-82d3-cc5e4c6d96b0', '3e589d89-56a8-4a24-b8ad-9c8dfd20ecb7') AND status = 'sent';
