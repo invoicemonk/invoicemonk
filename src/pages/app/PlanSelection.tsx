@@ -65,14 +65,7 @@ export default function PlanSelection() {
         .limit(1)
         .maybeSingle();
 
-      if (membership?.business_id) {
-        await supabase.from('subscriptions').insert({
-          business_id: membership.business_id,
-          tier: 'starter',
-          status: 'active',
-          current_period_start: new Date().toISOString(),
-        });
-      }
+      // Starter subscription already exists from auto-creation trigger; no insert needed.
 
       await markPlanSelected();
 
@@ -159,7 +152,10 @@ export default function PlanSelection() {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
             const isRecommended = tier === 'professional';
-            const isCurrent = subscription ? tier === subscription.tier : false;
+            // On this page, never treat starter as "current" — user hasn't chosen yet.
+            const isCurrent = subscription && subscription.tier !== 'starter'
+              ? tier === subscription.tier
+              : false;
             const isLoadingThis = loadingTier === tier;
             
             // Get features dynamically from tier_limits table
