@@ -23,11 +23,16 @@ export function TawkTo() {
     document.head.appendChild(script);
 
     return () => {
-      document.head.removeChild(script);
-      const tawkElements = document.querySelectorAll('[id^="tawk-"]');
-      tawkElements.forEach((el) => el.remove());
-      delete (window as any).Tawk_API;
-      delete (window as any).Tawk_LoadStart;
+      try { window.Tawk_API?.hideWidget(); } catch {}
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+      setTimeout(() => {
+        const tawkElements = document.querySelectorAll('[id^="tawk-"]');
+        tawkElements.forEach((el) => el.remove());
+        delete (window as any).Tawk_API;
+        delete (window as any).Tawk_LoadStart;
+      }, 100);
     };
   }, []);
 
