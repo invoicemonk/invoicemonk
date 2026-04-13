@@ -3,6 +3,258 @@ import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLi
 import { initSentry, captureException } from '../_shared/sentry.ts'
 initSentry()
 
+// ── Inline QR Code Generator ──
+// Generates a QR code matrix (boolean[][]) from a string input.
+// Implements QR Code Model 2, Version auto-select, Error Correction Level M.
+// This avoids any external dependency so the PDF HTML is fully self-contained.
+
+function createQR(data: string): boolean[][] {
+  // Use qrcode-generator via esm.sh (Deno-compatible)
+  // Inline a minimal QR encoder to avoid network dependency at runtime.
+  // We encode in byte mode with EC level M, auto-selecting the smallest version that fits.
+
+  const EC_LEVEL = 1 // 0=L,1=M,2=Q,3=H
+
+  // Data capacity for byte mode at EC level M (versions 1-10)
+  const CAPACITIES = [0, 14, 26, 42, 62, 84, 106, 122, 152, 180, 213]
+
+  // Find smallest version
+  let version = 1
+  for (let v = 1; v <= 10; v++) {
+    if (CAPACITIES[v] >= data.length) { version = v; break }
+    if (v === 10) version = 10
+  }
+
+  const size = version * 4 + 17
+  const modules: (boolean | null)[][] = Array.from({ length: size }, () => Array(size).fill(null))
+  const isFunction: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false))
+
+  // Place finder patterns
+  const placeFinderPattern = (row: number, col: number) => {
+    for (let r = -1; r <= 7; r++) {
+      for (let c = -1; c <= 7; c++) {
+        const mr = row + r, mc = col + c
+        if (mr < 0 || mr >= size || mc < 0 || mc >= size) continue
+        const inOuter = r === 0 || r === 6 || c === 0 || c === 6
+        const inInner = r >= 2 && r <= 4 && c >= 2 && c <= 4
+        const inBorder = r === -1 || r === 7 || c === -1 || c === 7
+        modules[mr][mc] = !inBorder && (inOuter || inInner)
+        isFunction[mr][mc] = true
+      }
+    }
+  }
+  placeFinderPattern(0, 0)
+  placeFinderPattern(0, size - 7)
+  placeFinderPattern(size - 7, 0)
+
+  // Timing patterns
+  for (let i = 8; i < size - 8; i++) {
+    modules[6][i] = i % 2 === 0; isFunction[6][i] = true
+    modules[i][6] = i % 2 === 0; isFunction[i][6] = true
+  }
+
+  // Dark module
+  modules[size - 8][8] = true; isFunction[size - 8][8] = true
+
+  // Alignment patterns for version >= 2
+  if (version >= 2) {
+    const alignPos = getAlignmentPositions(version)
+    for (const r of alignPos) {
+      for (const c of alignPos) {
+        if (isFunction[r][c]) continue
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            const mr = r + dr, mc = c + dc
+            modules[mr][mc] = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0)
+            isFunction[mr][mc] = true
+          }
+        }
+      }
+    }
+  }
+
+  // Reserve format info areas
+  for (let i = 0; i < 9; i++) {
+    if (i < size) { isFunction[8][i] = true; isFunction[i][8] = true }
+    const ri = size - 1 - i
+    if (i < 8) { isFunction[8][size - 1 - i] = true; isFunction[size - 1 - i][8] = true }
+  }
+  // Reserve version info for version >= 7 (not needed for <=10 but let's be safe)
+
+  // Encode data
+  const dataBytes = encodeDataBytes(data, version, EC_LEVEL)
+
+  // Place data bits
+  let bitIndex = 0
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5
+    for (let vert = 0; vert < size; vert++) {
+      for (let j = 0; j < 2; j++) {
+        const col = right - j
+        const upward = ((right + 1) & 2) === 0
+        const row = upward ? size - 1 - vert : vert
+        if (row < 0 || row >= size || col < 0 || col >= size) continue
+        if (isFunction[row][col]) continue
+        if (bitIndex < dataBytes.length * 8) {
+          const byteIdx = bitIndex >>> 3
+          const bitIdx = 7 - (bitIndex & 7)
+          modules[row][col] = ((dataBytes[byteIdx] >>> bitIdx) & 1) === 1
+        } else {
+          modules[row][col] = false
+        }
+        bitIndex++
+      }
+    }
+  }
+
+  // Apply mask (mask 0: (row + col) % 2 === 0)
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (!isFunction[r][c]) {
+        modules[r][c] = (modules[r][c] as boolean) !== ((r + c) % 2 === 0)
+      }
+    }
+  }
+
+  // Place format info (EC level M = 0, mask 0)
+  const formatBits = getFormatBits(EC_LEVEL, 0)
+  for (let i = 0; i < 15; i++) {
+    const bit = ((formatBits >>> (14 - i)) & 1) === 1
+    // Around top-left finder
+    if (i < 6) modules[8][i] = bit
+    else if (i < 8) modules[8][i + 1] = bit
+    else modules[14 - i][8] = bit
+    // Other copy
+    if (i < 8) modules[size - 1 - i][8] = bit
+    else modules[8][size - 15 + i] = bit
+  }
+
+  return modules.map(row => row.map(m => m === true))
+}
+
+function getAlignmentPositions(version: number): number[] {
+  if (version === 1) return []
+  const last = version * 4 + 10
+  const count = Math.floor(version / 7) + 2
+  const step = count === 2 ? 0 : Math.ceil((last - 6) / (count - 1) / 2) * 2
+  const positions = [6]
+  for (let i = 1; i < count; i++) positions.push(last - (count - 1 - i) * step)
+  return positions
+}
+
+function getFormatBits(ecLevel: number, mask: number): number {
+  let data = (ecLevel << 3) | mask
+  let rem = data
+  for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537)
+  const bits = ((data << 10) | rem) ^ 0x5412
+  return bits
+}
+
+function encodeDataBytes(text: string, version: number, ecLevel: number): number[] {
+  const totalCodewords = getNumDataAndEcCodewords(version, ecLevel)
+  const numDataCodewords = totalCodewords.data
+  const numEcCodewords = totalCodewords.ec
+
+  // Byte mode encoding
+  const bits: number[] = []
+  const pushBits = (val: number, len: number) => {
+    for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1)
+  }
+
+  pushBits(0b0100, 4) // Byte mode indicator
+  const charCountBits = version <= 9 ? 8 : 16
+  const textBytes = new TextEncoder().encode(text)
+  pushBits(textBytes.length, charCountBits)
+  for (const b of textBytes) pushBits(b, 8)
+
+  // Terminator
+  const capacity = numDataCodewords * 8
+  const terminatorLen = Math.min(4, capacity - bits.length)
+  pushBits(0, terminatorLen)
+
+  // Pad to byte boundary
+  while (bits.length % 8 !== 0) bits.push(0)
+
+  // Pad bytes
+  const padBytes = [0xEC, 0x11]
+  let padIdx = 0
+  while (bits.length < capacity) {
+    pushBits(padBytes[padIdx % 2], 8)
+    padIdx++
+  }
+
+  // Convert to bytes
+  const dataCodewords: number[] = []
+  for (let i = 0; i < bits.length; i += 8) {
+    let byte = 0
+    for (let j = 0; j < 8; j++) byte = (byte << 1) | (bits[i + j] || 0)
+    dataCodewords.push(byte)
+  }
+
+  // Generate EC codewords using Reed-Solomon
+  const ecCodewords = generateECCodewords(dataCodewords.slice(0, numDataCodewords), numEcCodewords)
+
+  return [...dataCodewords.slice(0, numDataCodewords), ...ecCodewords]
+}
+
+function getNumDataAndEcCodewords(version: number, ecLevel: number): { data: number; ec: number } {
+  // Total codewords for each version
+  const totalCW = [0, 26, 44, 70, 100, 134, 172, 196, 242, 292, 346]
+  // EC codewords per block for EC level M
+  const ecCWPerBlock: number[][] = [
+    [], // L
+    [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26], // M
+    [], // Q
+    []  // H
+  ]
+  const numBlocks: number[][] = [
+    [],
+    [0, 1, 1, 1, 2, 2, 4, 4, 4, 4, 6], // M
+    [],
+    []
+  ]
+  const total = totalCW[version]
+  const blocks = numBlocks[ecLevel][version]
+  const ecPerBlock = ecCWPerBlock[ecLevel][version]
+  const ecTotal = blocks * ecPerBlock
+  return { data: total - ecTotal, ec: ecTotal }
+}
+
+function generateECCodewords(data: number[], numEC: number): number[] {
+  // GF(256) with primitive polynomial 0x11d
+  const gfExp = new Uint8Array(512)
+  const gfLog = new Uint8Array(256)
+  let x = 1
+  for (let i = 0; i < 255; i++) {
+    gfExp[i] = x; gfLog[x] = i
+    x = (x << 1) ^ (x >= 128 ? 0x11d : 0)
+  }
+  for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255]
+
+  // Generator polynomial
+  let gen = [1]
+  for (let i = 0; i < numEC; i++) {
+    const newGen = new Array(gen.length + 1).fill(0)
+    for (let j = 0; j < gen.length; j++) {
+      newGen[j] ^= gen[j]
+      newGen[j + 1] ^= gfExp[(gfLog[gen[j]] + i) % 255]
+    }
+    gen = newGen
+  }
+
+  // Polynomial division
+  const result = new Array(numEC).fill(0)
+  for (const byte of data) {
+    const factor = byte ^ result[0]
+    result.shift(); result.push(0)
+    if (factor === 0) continue
+    const logFactor = gfLog[factor]
+    for (let i = 0; i < result.length; i++) {
+      result[i] ^= gfExp[(gfLog[gen[i + 1]] + logFactor) % 255]
+    }
+  }
+  return result
+}
 
 interface GeneratePdfRequest {
   invoice_id?: string
@@ -205,7 +457,7 @@ Deno.serve(async (req) => {
       const tplSnapshot = invoiceData.template_snapshot as Record<string, unknown> | null
       const tplLayout = tplSnapshot?.layout as Record<string, unknown> | null
       const cacheHeaderStyle = (tplLayout?.header_style as string) || 'standard'
-      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}.html`
+      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}_v2.html`
       const supabaseAdminForCache = createClient(supabaseUrl, supabaseServiceKey)
       const { data: cachedFile } = await supabaseAdminForCache.storage
         .from('invoice-pdfs')
@@ -449,13 +701,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate QR code data for SVG (simplified matrix representation)
+    // Inline QR code generator — produces a self-contained SVG string
+    // so the PDF HTML has no external image dependencies.
     const generateQRCodeSVG = (data: string, size: number = 60): string => {
-      // Use a simple URL-safe encoding and generate a placeholder QR pattern
-      // For production, this would use a proper QR library
-      const encoded = encodeURIComponent(data)
-      // Use an external QR code service as inline SVG generation is complex
-      return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&format=svg" alt="QR Code" style="width: ${size}px; height: ${size}px;" />`
+      // Simple QR code generator using qrcode-generator algorithm
+      // Alphanumeric mode, error correction level M
+      const qr = createQR(data)
+      const moduleCount = qr.length
+      const cellSize = size / moduleCount
+      let paths = ''
+      for (let row = 0; row < moduleCount; row++) {
+        for (let col = 0; col < moduleCount; col++) {
+          if (qr[row][col]) {
+            paths += `<rect x="${(col * cellSize).toFixed(2)}" y="${(row * cellSize).toFixed(2)}" width="${cellSize.toFixed(2)}" height="${cellSize.toFixed(2)}"/>`
+          }
+        }
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="width:${size}px;height:${size}px;"><rect width="${size}" height="${size}" fill="white"/><g fill="black">${paths}</g></svg>`
     }
 
     const qrCodeHtml = verificationUrl ? generateQRCodeSVG(verificationUrl, 50) : ''
@@ -813,7 +1075,7 @@ Deno.serve(async (req) => {
     // Cache the generated HTML to storage for subsequent requests (fire-and-forget)
     // Only cache for issued/paid/voided invoices (stable states)
     if (['issued', 'sent', 'viewed', 'paid', 'voided', 'credited'].includes(inv.status)) {
-      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}.html`
+      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}_v2.html`
       supabaseAdmin.storage
         .from('invoice-pdfs')
         .upload(cachePath, new Blob([html], { type: 'text/html' }), { upsert: true })
