@@ -408,7 +408,7 @@ export default function InvoiceEdit() {
     });
 
     await issueInvoice.mutateAsync(id);
-    navigate('/invoices');
+    navigate(`/b/${currentBusiness?.id}/invoices/${id}`);
   };
 
   const isLoading = updateInvoice.isPending || issueInvoice.isPending;

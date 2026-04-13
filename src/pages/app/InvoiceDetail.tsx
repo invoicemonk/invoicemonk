@@ -73,7 +73,7 @@ export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: invoice, isLoading, error } = useInvoice(id);
+  const { data: invoice, isLoading, error, refetch: refetchInvoice } = useInvoice(id);
   const { data: auditLogs } = useInvoiceAuditLogs(id);
   const { data: creditNote } = useCreditNoteByInvoice(id);
   const { data: payments } = useInvoicePayments(id);
@@ -172,7 +172,10 @@ export default function InvoiceDetail() {
       });
       return;
     }
-    if (id) await issueInvoice.mutateAsync(id);
+    if (id) {
+      await issueInvoice.mutateAsync(id);
+      await refetchInvoice();
+    }
   };
 
   const handleDownloadPdf = () => {
