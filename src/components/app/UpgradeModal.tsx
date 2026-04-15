@@ -58,7 +58,7 @@ export function UpgradeModal() {
           <div className="mx-auto sm:mx-0 mb-3 p-2.5 rounded-full bg-primary/10 w-fit">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <DialogTitle>Upgrade to Professional</DialogTitle>
+          <DialogTitle>Upgrade to Pro</DialogTitle>
           <DialogDescription>
             You're growing fast! Unlock unlimited invoicing and full compliance features.
           </DialogDescription>

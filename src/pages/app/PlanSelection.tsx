@@ -11,7 +11,8 @@ import {
   Building2, 
   Loader2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Mail
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,13 +27,30 @@ import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
 import { addTags } from '@/lib/onesignal';
 
+const BIZ_FEATURES = [
+  'Everything in SME',
+  'E-invoicing & government submission',
+  'Dedicated account manager',
+  'Custom integrations',
+  'SLA guarantee',
+  'Unlimited everything',
+  'Priority support',
+];
+
+type TierKey = 'starter' | 'professional' | 'business';
+
+const TIER_DISPLAY: Record<TierKey | 'biz', { name: string; description: string }> = {
+  starter: { name: 'Starter', description: 'For individuals getting started' },
+  professional: { name: 'Pro', description: 'For growing businesses' },
+  business: { name: 'SME', description: 'For scaling companies' },
+  biz: { name: 'Biz', description: 'Enterprise with e-invoicing & compliance' },
+};
+
 const planIcons = {
   starter: Zap,
   professional: Shield,
   business: Building2,
 };
-
-type TierKey = 'starter' | 'professional' | 'business';
 
 export default function PlanSelection() {
   const navigate = useNavigate();
@@ -40,7 +58,7 @@ export default function PlanSelection() {
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   
-  const { pricingByTier, formatPrice, countryCode, isLoading: pricingLoading } = useRegionalPricing();
+  const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { subscription } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
@@ -56,24 +74,10 @@ export default function PlanSelection() {
   const handleSelectPlan = async (planTier: TierKey) => {
     if (planTier === 'starter') {
       addTags({ plan_type: 'free' });
-
-      // Create the starter subscription now that user has explicitly chosen
-      const { data: membership } = await supabase
-        .from('business_members')
-        .select('business_id')
-        .eq('user_id', user!.id)
-        .limit(1)
-        .maybeSingle();
-
-      // Starter subscription already exists from auto-creation trigger; no insert needed.
-
       await markPlanSelected();
-
-      // Trigger welcome email (non-blocking)
       supabase.functions.invoke('track-auth-event', {
         body: { event_type: 'plan_selected' },
       }).catch(() => {});
-
       await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
       navigate('/dashboard');
       return;
@@ -81,15 +85,8 @@ export default function PlanSelection() {
 
     addTags({ plan_type: 'paid' });
     setLoadingTier(planTier);
-    await createCheckoutSession(planTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', undefined, countryCode);
+    await createCheckoutSession(planTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly');
     setLoadingTier(null);
-  };
-
-  const handleSkip = async () => {
-    addTags({ plan_type: 'free' });
-    await markPlanSelected();
-    await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
-    navigate('/dashboard');
   };
 
   const tiers: TierKey[] = ['starter', 'professional', 'business'];
@@ -104,7 +101,7 @@ export default function PlanSelection() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -124,7 +121,6 @@ export default function PlanSelection() {
           </p>
         </motion.div>
 
-
         {/* Billing Toggle */}
         <motion.div 
           initial={{ opacity: 0 }}
@@ -142,44 +138,28 @@ export default function PlanSelection() {
           />
           <Label htmlFor="billing-toggle" className={isYearly ? 'font-semibold' : 'text-muted-foreground'}>
             Yearly
-            <Badge variant="secondary" className="ml-2">Save 20%</Badge>
+            <Badge variant="secondary" className="ml-2">Save ~17%</Badge>
           </Label>
         </motion.div>
 
         {/* Plan Cards */}
-        <div className="grid gap-6 mb-8 md:grid-cols-3">
+        <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-4">
           {tiers.map((tier, index) => {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
+            const display = TIER_DISPLAY[tier];
             const isRecommended = tier === 'professional';
-            // On this page, never treat starter as "current" — user hasn't chosen yet.
             const isCurrent = subscription && subscription.tier !== 'starter'
               ? tier === subscription.tier
               : false;
             const isLoadingThis = loadingTier === tier;
-            
-            // Get features dynamically from tier_limits table
             const features = buildFeatureList(tier);
             
             const price = pricing 
               ? (isYearly && pricing.yearly_price 
-                  ? pricing.yearly_price / 12 // Show monthly equivalent
+                  ? pricing.yearly_price / 12
                   : pricing.monthly_price)
               : 0;
-
-            const getTierDisplayName = (t: TierKey) => {
-              if (t === 'starter') return 'Free';
-              return t.charAt(0).toUpperCase() + t.slice(1);
-            };
-
-            const getTierDescription = (t: TierKey) => {
-              switch (t) {
-                case 'starter': return 'For individuals getting started';
-                case 'professional': return 'For growing businesses';
-                case 'business': return 'For enterprises with advanced needs';
-                default: return '';
-              }
-            };
 
             return (
               <motion.div
@@ -202,11 +182,9 @@ export default function PlanSelection() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Icon className="h-5 w-5" />
-                      {getTierDisplayName(tier)}
+                      {display.name}
                     </CardTitle>
-                    <CardDescription>
-                      {getTierDescription(tier)}
-                    </CardDescription>
+                    <CardDescription>{display.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
                     <div className="mb-4">
@@ -263,8 +241,50 @@ export default function PlanSelection() {
               </motion.div>
             );
           })}
-        </div>
 
+          {/* Biz (Contact Sales) Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="relative h-full flex flex-col border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  {TIER_DISPLAY.biz.name}
+                </CardTitle>
+                <CardDescription>{TIER_DISPLAY.biz.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <div className="mb-4">
+                  <span className="text-4xl font-bold">Custom</span>
+                  <span className="text-muted-foreground ml-1">pricing</span>
+                </div>
+                
+                <Separator className="mb-4" />
+                
+                <ul className="space-y-3 flex-1">
+                  {BIZ_FEATURES.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                
+                <div className="mt-6">
+                  <Button className="w-full" variant="outline" asChild>
+                    <a href="mailto:sales@invoicemonk.com">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Contact Sales
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

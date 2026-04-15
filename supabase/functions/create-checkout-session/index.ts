@@ -45,7 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const { tier, billingPeriod = "monthly", countryCode, businessId } = await req.json();
+    const { tier, billingPeriod = "monthly", businessId } = await req.json();
 
     // Validate tier
     const tierError = validateEnum(tier, 'tier', VALID_TIERS);
@@ -65,24 +65,6 @@ serve(async (req) => {
       );
     }
 
-    // Validate countryCode if provided (ISO 3166-1 alpha-2)
-    if (countryCode) {
-      const countryError = validateString(countryCode, 'countryCode', 3);
-      if (countryError) {
-        return new Response(
-          JSON.stringify({ error: countryError }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        );
-      }
-      // Additional validation: must be 2 uppercase letters
-      if (!/^[A-Z]{2}$/.test(countryCode.toUpperCase())) {
-        return new Response(
-          JSON.stringify({ error: "countryCode must be a valid 2-letter country code" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        );
-      }
-    }
-
     if (tier === "starter") {
       return new Response(
         JSON.stringify({ error: "Cannot create checkout for starter tier" }),
@@ -97,39 +79,13 @@ serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    // Get user's business for country detection
-    const { data: businessMember } = await supabaseClient
-      .from("business_members")
-      .select("business_id, businesses(jurisdiction)")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    // Extract jurisdiction safely
-    const businessData = businessMember?.businesses as { jurisdiction?: string } | null;
-    
-    // Determine region: use provided countryCode, business jurisdiction, or default
-    const region = countryCode?.toUpperCase() || businessData?.jurisdiction || "US";
-
-    // Get pricing for this region and tier
-    const { data: pricing, error: pricingError } = await supabaseClient
+    // Always use default USD pricing — no more country-based lookup
+    const { data: finalPricing } = await supabaseClient
       .from("pricing_regions")
       .select("*")
-      .eq("country_code", region)
       .eq("tier", tier)
+      .eq("is_default", true)
       .maybeSingle();
-
-    // Fallback to default pricing if region not found
-    let finalPricing = pricing;
-    if (!finalPricing) {
-      const { data: defaultPricing } = await supabaseClient
-        .from("pricing_regions")
-        .select("*")
-        .eq("tier", tier)
-        .eq("is_default", true)
-        .maybeSingle();
-      finalPricing = defaultPricing;
-    }
 
     if (!finalPricing) {
       return new Response(
@@ -153,7 +109,6 @@ serve(async (req) => {
     // Determine the business to bill (use provided businessId or user's default)
     let targetBusinessId = businessId;
     if (!targetBusinessId) {
-      // Get user's default business
       const { data: businessMemberData } = await supabaseClient
         .from("business_members")
         .select("business_id, businesses(is_default)")
@@ -212,9 +167,10 @@ serve(async (req) => {
     if (!priceId) {
       const priceAmount = billingPeriod === "yearly" ? finalPricing.yearly_price : finalPricing.monthly_price;
       
-      // Search for existing product
+      const tierDisplayName = tier === "professional" ? "Pro" : "SME";
+      
       const products = await stripe.products.search({
-        query: `name:'Invoicemonk ${tier.charAt(0).toUpperCase() + tier.slice(1)}'`,
+        query: `name:'Invoicemonk ${tierDisplayName}'`,
       });
 
       let productId: string;
@@ -222,15 +178,14 @@ serve(async (req) => {
         productId = products.data[0].id;
       } else {
         const product = await stripe.products.create({
-          name: `Invoicemonk ${tier.charAt(0).toUpperCase() + tier.slice(1)}`,
+          name: `Invoicemonk ${tierDisplayName}`,
           description: tier === "professional" 
             ? "For growing businesses - Unlimited invoices, full compliance suite" 
-            : "For enterprises - Unlimited everything with dedicated support",
+            : "For scaling companies - Unlimited everything with dedicated support",
         });
         productId = product.id;
       }
 
-      // Create the price
       const price = await stripe.prices.create({
         product: productId,
         unit_amount: priceAmount,
@@ -246,7 +201,7 @@ serve(async (req) => {
 
       priceId = price.id;
 
-      // Update the pricing_regions table with the new price ID (using service role)
+      // Update the pricing_regions table with the new price ID
       const supabaseAdmin = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -258,11 +213,9 @@ serve(async (req) => {
         .eq("id", finalPricing.id);
     }
 
-    // Get the app URL for redirects
     const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
-    // Cancel any existing free subscriptions with conflicting currency
-    // This prevents Stripe's "cannot combine currencies on a single customer" error
+    // Cancel any existing subscriptions with conflicting currency
     try {
       const existingStripeSubs = await stripe.subscriptions.list({
         customer: customerId,
@@ -281,10 +234,8 @@ serve(async (req) => {
     } catch (cancelErr) {
       console.error("Error cancelling conflicting subscriptions:", cancelErr);
       captureException(cancelErr, { function_name: 'create-checkout-session' })
-      // Continue anyway — the checkout may still work if there's no actual conflict
     }
 
-    // Create checkout session with business_id in metadata
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
