@@ -1,73 +1,65 @@
-# Welcome to your Lovable project
+# Invoicemonk App
 
-## Project info
+## Overview
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+This repository contains the Invoicemonk web application. Invoicemonk is a compliance-first invoicing and accounting platform for freelancers, consultants, agencies, and small businesses.
 
-## How can I edit this code?
+Key themes:
+- Multi-country compliance and jurisdiction-aware invoices
+- Tax-ready invoice structure with audit trails and immutable records
+- Multi-currency invoicing and correct FX handling
+- Free-to-start onboarding with a SaaS web application
 
-There are several ways of editing your application.
+## URLs
 
-**Use Lovable**
+- App: https://app.invoicemonk.com
+- Marketing website: https://invoicemonk.com
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Requirements
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 18+ (recommended)
+- npm 10+ or compatible package manager
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Local setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Open the local URL shown by Vite to access the web app in your browser.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Available scripts
 
-**Use GitHub Codespaces**
+- `npm run dev` - start the Vite development server
+- `npm run build` - build the production app
+- `npm run preview` - preview the production build locally
+- `npm run lint` - run ESLint checks
+- `npm run test` - run Vitest tests
+- `npm run test:watch` - run Vitest in watch mode
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
+## Technology stack
 
 This project is built with:
 
 - Vite
-- TypeScript
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
+- shadcn-ui
+- Supabase
+- Vitest
+- ESLint
 
-## How can I deploy this project?
+## Notes
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- The app is designed to support invoicing workflows that require correct country-specific tax fields, audit-ready document records, and multi-currency billing.
+- The marketing site at `https://invoicemonk.com` provides product details, pricing, compliance information, and customer-facing resources.
+- The app is accessible at `https://app.invoicemonk.com` for user login and onboarding.
