@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
 
 export default function AdminBilling() {
   const { data: stats, isLoading } = useAdminStats();
@@ -44,6 +45,9 @@ export default function AdminBilling() {
           </div>
         </div>
       </motion.div>
+
+      {/* Revenue Metrics (MRR/ARR with date filter) */}
+      <RevenueStatsSection />
 
       {/* Subscription Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

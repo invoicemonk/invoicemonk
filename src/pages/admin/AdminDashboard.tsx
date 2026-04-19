@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
 import { Link } from 'react-router-dom';
 import {
   BarChart,
@@ -135,6 +136,9 @@ export default function AdminDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Revenue Metrics (MRR/ARR with date filter) */}
+      <RevenueStatsSection />
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
