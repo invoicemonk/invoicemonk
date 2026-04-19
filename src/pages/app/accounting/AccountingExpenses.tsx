@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TrendingDown, PieChart } from 'lucide-react';
+import { TrendingDown, PieChart, Store, ArrowRight } from 'lucide-react';
 import { AccountingNavTabs } from '@/components/accounting/AccountingNavTabs';
 import { AccountingPeriodSelector, getAccountingDateRange, getPeriodLabel } from '@/components/accounting/AccountingPeriodSelector';
 import { AccountingDisclaimer } from '@/components/accounting/AccountingDisclaimer';
@@ -11,10 +12,12 @@ import { RecurringExpenseDialog } from '@/components/accounting/RecurringExpense
 import { RecurringExpenseList } from '@/components/accounting/RecurringExpenseList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useAccountingPreferences, AccountingPeriod } from '@/hooks/use-accounting-preferences';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useRecurringExpenses } from '@/hooks/use-recurring-expenses';
 import { useExpensesByCategory } from '@/hooks/use-accounting-stats';
+import { useVendorAnalytics } from '@/hooks/use-vendors';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -30,6 +33,7 @@ export default function AccountingExpenses() {
   const { data: preferences } = useAccountingPreferences();
   const { currentBusiness: business } = useBusiness();
   const { currentCurrencyAccount, activeCurrency } = useCurrencyAccount();
+  const { businessId } = useParams<{ businessId: string }>();
   const [period, setPeriod] = useState<AccountingPeriod>(preferences?.defaultAccountingPeriod || 'monthly');
   
   const dateRange = getAccountingDateRange(period);
@@ -47,6 +51,11 @@ export default function AccountingExpenses() {
   const { data: recurringExpenses, isLoading: isLoadingRecurring } = useRecurringExpenses(
     business?.id,
     currentCurrencyAccount?.id
+  );
+  const { data: vendorAnalytics, isLoading: isLoadingVendors } = useVendorAnalytics(
+    business?.id,
+    currentCurrencyAccount?.id,
+    dateRange ?? undefined
   );
 
   const currency = activeCurrency || business?.default_currency || '';
@@ -135,6 +144,53 @@ export default function AccountingExpenses() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Top Vendors */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Top Vendors · {getPeriodLabel(period)}
+          </CardTitle>
+          <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
+            <Link to={`/b/${businessId}/vendors`}>
+              View all <ArrowRight className="ml-1 h-3 w-3" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoadingVendors ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-6" />
+              ))}
+            </div>
+          ) : vendorAnalytics && vendorAnalytics.length > 0 ? (
+            <div className="space-y-3">
+              {vendorAnalytics.slice(0, 5).map((v) => (
+                <div key={v.vendor_id} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <Link
+                      to={`/b/${businessId}/vendors`}
+                      className="text-foreground hover:text-primary truncate max-w-[60%]"
+                    >
+                      {v.name}
+                    </Link>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(v.total, currency)} · {v.count}
+                    </span>
+                  </div>
+                  <Progress value={v.percent} className="h-2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No vendor expenses yet — vendors are created automatically when you record an expense.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs for All Expenses vs Recurring */}
       <Tabs defaultValue="all">

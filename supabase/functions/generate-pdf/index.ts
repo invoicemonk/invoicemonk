@@ -457,7 +457,7 @@ Deno.serve(async (req) => {
       const tplSnapshot = invoiceData.template_snapshot as Record<string, unknown> | null
       const tplLayout = tplSnapshot?.layout as Record<string, unknown> | null
       const cacheHeaderStyle = (tplLayout?.header_style as string) || 'standard'
-      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}_v2.html`
+      const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}_v4.html`
       const supabaseAdminForCache = createClient(supabaseUrl, supabaseServiceKey)
       const { data: cachedFile } = await supabaseAdminForCache.storage
         .from('invoice-pdfs')
@@ -513,6 +513,9 @@ Deno.serve(async (req) => {
       payment_method_snapshot: { provider_type?: string; display_name?: string; instructions?: Record<string, string> } | null
       clients?: { name?: string; email?: string; address?: Record<string, unknown> } | null
       invoice_items?: InvoiceItem[]
+      kind?: string
+      parent_invoice_id?: string | null
+      deposit_percent?: number | null
     }
 
     // Create a service client for tier checks
@@ -649,15 +652,30 @@ Deno.serve(async (req) => {
     const taxGroups = Object.values(taxGroupMap)
     const hasMultipleTaxGroups = taxGroups.length > 1
 
-    const itemsHtml = items.map(item => `
+    // Split heading + multi-line description (stored as "heading\ndescription")
+    const escapeHtmlMin = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const itemsHtml = items.map(item => {
+      const raw = item.description || ''
+      const nl = raw.indexOf('\n')
+      const heading = nl === -1 ? raw : raw.slice(0, nl)
+      const longDesc = nl === -1 ? '' : raw.slice(nl + 1)
+      const headingHtml = `<strong>${escapeHtmlMin(heading)}</strong>`
+      const descHtml = longDesc
+        ? `<div style="font-size:9px;color:#555;white-space:pre-line;margin-top:2px;">${escapeHtmlMin(longDesc)}</div>`
+        : ''
+      const taxHtml = !isNigerianVatRegistered && item.tax_label && item.tax_rate > 0
+        ? `<br><span style="font-size:8px;color:#888;">${item.tax_label}: ${item.tax_rate}%</span>`
+        : ''
+      return `
       <tr>
-        <td>${item.description}${!isNigerianVatRegistered && item.tax_label && item.tax_rate > 0 ? `<br><span style="font-size:8px;color:#888;">${item.tax_label}: ${item.tax_rate}%</span>` : ''}</td>
+        <td>${headingHtml}${descHtml}${taxHtml}</td>
         <td class="right">${item.quantity}</td>
         <td class="right">${formatCurrency(item.unit_price, inv.currency)}</td>
         ${isNigerianVatRegistered ? `<td class="right">${item.tax_rate === 0 ? 'Exempt' : item.tax_rate + '%'}</td>` : ''}
         <td class="right">${formatCurrency(item.amount, inv.currency)}</td>
       </tr>
-    `).join('')
+    `
+    }).join('')
 
     // Status color mapping
     const statusColors: Record<string, { bg: string; color: string }> = {
@@ -670,8 +688,45 @@ Deno.serve(async (req) => {
     }
     const statusStyle = statusColors[inv.status] || statusColors['issued']
 
-    // Calculate balance due
-    const balanceDue = inv.total_amount - (inv.amount_paid || 0)
+    // ── Deposit / Final invoice metadata ──
+    const invoiceKind = (inv.kind as string) || 'standard'
+    const isDepositInvoice = invoiceKind === 'deposit'
+    const isFinalInvoice = invoiceKind === 'final'
+    const depositPercent = inv.deposit_percent ?? null
+    type ParentDeposit = { invoice_number: string; amount_paid: number; total_amount: number; deposit_percent: number | null; currency: string }
+    let parentDeposit: ParentDeposit | null = null
+    if (isFinalInvoice && inv.parent_invoice_id) {
+      const supabaseAdminForParent = createClient(supabaseUrl, supabaseServiceKey)
+      const { data: parent } = await supabaseAdminForParent
+        .from('invoices')
+        .select('invoice_number, amount_paid, total_amount, deposit_percent, currency')
+        .eq('id', inv.parent_invoice_id)
+        .maybeSingle()
+      if (parent) parentDeposit = parent as unknown as ParentDeposit
+    }
+    const depositCreditAmount = parentDeposit ? Number(parentDeposit.amount_paid || 0) : 0
+
+    // Calculate balance due, accounting for deposit credit on final invoices
+    const effectiveCredits = (inv.amount_paid || 0) + (isFinalInvoice ? depositCreditAmount : 0)
+    const balanceDue = Math.max(0, inv.total_amount - effectiveCredits)
+
+    // Kind badge HTML (inserted next to invoice number in headers) — high-contrast for visibility
+    const kindBadgeHtml = (isDepositInvoice || isFinalInvoice)
+      ? `<span style="display:inline-block;padding:3px 10px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:${isDepositInvoice ? '#0369a1' : '#7c3aed'};color:#ffffff;margin-left:8px;vertical-align:middle;">${isDepositInvoice ? `Deposit${depositPercent ? ` · ${depositPercent}%` : ''}` : 'Final Invoice'}</span>`
+      : ''
+
+    // Prominent deposit/final info banner shown above items table
+    const depositBannerHtml = isDepositInvoice
+      ? `<div style="padding: 8px 12px; margin-bottom: 10px; background: #eff6ff; border-left: 4px solid #0369a1; border-radius: 3px; font-size: 10px; color: #0c4a6e;">
+          <strong style="text-transform:uppercase;letter-spacing:0.5px;font-size:9px;">Deposit Invoice${depositPercent ? ` · ${depositPercent}% advance` : ''}</strong>
+          <div style="margin-top:2px;">This is an advance/down-payment invoice. A separate final invoice will be issued and will credit any amount paid here.</div>
+        </div>`
+      : (isFinalInvoice && parentDeposit
+        ? `<div style="padding: 8px 12px; margin-bottom: 10px; background: #f5f3ff; border-left: 4px solid #7c3aed; border-radius: 3px; font-size: 10px; color: #4c1d95;">
+            <strong style="text-transform:uppercase;letter-spacing:0.5px;font-size:9px;">Final Invoice</strong>
+            <div style="margin-top:2px;">Linked to deposit invoice <strong>${parentDeposit.invoice_number}</strong>${depositCreditAmount > 0 ? ` — ${formatCurrency(depositCreditAmount, inv.currency)} already paid is credited below.` : '.'}</div>
+          </div>`
+        : '')
 
     // Subtle footer branding - no aggressive watermark
     // Free/Starter users get professional-looking invoices with subtle footer badge
@@ -759,6 +814,7 @@ Deno.serve(async (req) => {
 
     // Items table HTML
     const itemsTableHtml = `
+      ${depositBannerHtml}
       <table class="no-break">
         <thead><tr>
           <th style="width: ${isNigerianVatRegistered ? '45%' : '55%'};">Description</th>
@@ -802,10 +858,18 @@ Deno.serve(async (req) => {
             <span>${isNigerianVatRegistered ? 'Total (incl. VAT)' : 'Total'}</span>
             <span>${formatCurrency(inv.total_amount, inv.currency)}</span>
           </div>
+          ${isFinalInvoice && parentDeposit && depositCreditAmount > 0 ? `
+          <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #0369a1;">
+            <span>Less: Deposit (${parentDeposit.invoice_number})</span><span>-${formatCurrency(depositCreditAmount, inv.currency)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #1a1a1a; border-top: 1px solid #d1d5db; padding-top: 4px; margin-top: 2px;">
+            <span>Net Due After Deposit</span><span>${formatCurrency(Math.max(0, inv.total_amount - depositCreditAmount), inv.currency)}</span>
+          </div>` : ''}
           ${inv.amount_paid > 0 ? `
           <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; color: #059669;">
             <span>Paid</span><span>-${formatCurrency(inv.amount_paid, inv.currency)}</span>
-          </div>
+          </div>` : ''}
+          ${(inv.amount_paid > 0 || (isFinalInvoice && depositCreditAmount > 0)) ? `
           <div style="display: flex; justify-content: space-between; font-weight: 600; background: #fef3c7; padding: 4px 6px; margin: 4px -6px 0; border-radius: 3px;">
             <span>Balance Due</span><span>${formatCurrency(balanceDue, inv.currency)}</span>
           </div>` : ''}
@@ -863,7 +927,7 @@ Deno.serve(async (req) => {
           <div style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px;">
             <div>
               <div style="font-size: 18px; font-weight: 700; color: #4b5563;">INVOICE</div>
-              <div style="font-size: 11px; color: #9ca3af;">${inv.invoice_number}</div>
+              <div style="font-size: 11px; color: #9ca3af;">${inv.invoice_number}${kindBadgeHtml}</div>
             </div>
             <div style="text-align: right; font-size: 10px; color: #6b7280;">
               <div>Issued: ${formatDate(inv.issue_date)}</div>
@@ -900,7 +964,7 @@ Deno.serve(async (req) => {
                 ${showLogo && issuerLogoUrl ? `<img src="${issuerLogoUrl}" alt="Logo" style="height: 40px; max-width: 80px; object-fit: contain; background: rgba(255,255,255,0.9); border-radius: 4px; padding: 4px;" />` : ''}
                 <div>
                   <div style="font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">INVOICE</div>
-                  <div style="font-size: 11px; opacity: 0.8;">${inv.invoice_number}</div>
+                  <div style="font-size: 11px; opacity: 0.8;">${inv.invoice_number}${kindBadgeHtml}</div>
                 </div>
               </div>
               <div style="text-align: right; font-size: 10px; opacity: 0.9;">
@@ -952,7 +1016,7 @@ Deno.serve(async (req) => {
             ${issuerAddress ? `<div style="font-size: 9px; color: #666;">${issuerAddress}</div>` : ''}
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid ${tplPrimaryColor}30;">
-            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Invoice No</div><div style="font-weight: 600; font-family: monospace;">${inv.invoice_number}</div></div>
+            <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Invoice No</div><div style="font-weight: 600; font-family: monospace;">${inv.invoice_number}${kindBadgeHtml}</div></div>
             <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Date</div><div style="font-weight: 500;">${formatDate(inv.issue_date)}</div></div>
             <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Due Date</div><div style="font-weight: 500;">${formatDate(inv.due_date)}</div></div>
             <div><div style="font-size: 9px; font-weight: 600; color: #666; text-transform: uppercase;">Status</div><div style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div></div>
@@ -1015,7 +1079,7 @@ Deno.serve(async (req) => {
             </div>
             <div style="text-align: right;">
               <div style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a;">INVOICE</div>
-              <div style="font-size: 12px; color: #666; margin-top: 2px;">${inv.invoice_number}</div>
+              <div style="font-size: 12px; color: #666; margin-top: 2px;">${inv.invoice_number}${kindBadgeHtml}</div>
               <div style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 4px; background: ${statusStyle.bg}; color: ${statusStyle.color};">${inv.status.toUpperCase()}</div>
             </div>
           </div>
@@ -1075,7 +1139,7 @@ Deno.serve(async (req) => {
     // Cache the generated HTML to storage for subsequent requests (fire-and-forget)
     // Only cache for issued/paid/voided invoices (stable states)
     if (['issued', 'sent', 'viewed', 'paid', 'voided', 'credited'].includes(inv.status)) {
-      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}_v2.html`
+      const cachePath = `${inv.business_id || 'personal'}/${inv.id}_${tplHeaderStyle}_v4.html`
       supabaseAdmin.storage
         .from('invoice-pdfs')
         .upload(cachePath, new Blob([html], { type: 'text/html' }), { upsert: true })

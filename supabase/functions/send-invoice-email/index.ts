@@ -189,8 +189,21 @@ function buildItemRows(ctx: PdfBuildContext) {
   }))
 
   const itemRows = ctx.items.map(item => {
-    const base = [
-      { text: item.description || '', fontSize: 9, margin: [3, 3, 3, 3] },
+    const raw = item.description || ''
+    const nl = raw.indexOf('\n')
+    const heading = nl === -1 ? raw : raw.slice(0, nl)
+    const longDesc = nl === -1 ? '' : raw.slice(nl + 1)
+    const descCell = longDesc
+      ? {
+          stack: [
+            { text: heading, fontSize: 9, bold: true },
+            { text: longDesc, fontSize: 8, color: '#555555', margin: [0, 1, 0, 0] as [number, number, number, number] },
+          ],
+          margin: [3, 3, 3, 3] as [number, number, number, number],
+        }
+      : { text: heading, fontSize: 9, margin: [3, 3, 3, 3] as [number, number, number, number] }
+    const base: unknown[] = [
+      descCell,
       { text: String(item.quantity), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] },
       { text: formatCurrencyPdf(item.unit_price, ctx.currency), fontSize: 9, alignment: 'right' as const, margin: [3, 3, 3, 3] },
     ]

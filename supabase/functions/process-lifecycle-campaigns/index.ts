@@ -266,6 +266,52 @@ function campaignITemplate(userName: string, invoiceCount: number): string {
 }
 
 // =============================================
+// Founder-led plain-text templates
+// =============================================
+
+function inactiveCheckinTemplate(userName: string): string {
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+<p>Hi ${userName},</p>
+<p>I noticed you signed up for Invoicemonk a little while ago but haven't sent your first invoice yet.</p>
+<p>Quick question — what brought you to Invoicemonk in the first place, and what's stopping you from getting started?</p>
+<p>Was it:</p>
+<ul>
+  <li>The setup felt confusing?</li>
+  <li>You're missing a feature you need?</li>
+  <li>Something else got in the way?</li>
+</ul>
+<p>Just hit reply — even one line helps me improve the product.</p>
+<p>Thanks,<br>The Invoicemonk team</p>
+</div>`
+}
+
+function churnFollowupTemplate(userName: string): string {
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+<p>Hi ${userName},</p>
+<p>Following up on my last note — I saw you downgraded recently and I'm trying to understand what we could have done better.</p>
+<p>Could you share one line on what was missing or wrong? It really helps us prioritize what to fix.</p>
+<p>Just reply to this email.</p>
+<p>Thanks,<br>The Invoicemonk team</p>
+</div>`
+}
+
+function inactiveFollowupTemplate(userName: string): string {
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+<p>Hi ${userName},</p>
+<p>Just checking in once more — still haven't seen you send an invoice.</p>
+<p>If there's anything blocking you, I'd love to hear it. Even a one-word answer helps:</p>
+<ul>
+  <li>"confusing"</li>
+  <li>"missing X feature"</li>
+  <li>"signed up by mistake"</li>
+  <li>"already using something else"</li>
+</ul>
+<p>Whatever it is, just reply. No pitch — just trying to learn.</p>
+<p>Thanks,<br>The Invoicemonk team</p>
+</div>`
+}
+
+// =============================================
 // Main Handler
 // =============================================
 
@@ -306,6 +352,9 @@ Deno.serve(async (req) => {
       campaign_g: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
       campaign_h: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
       campaign_i: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
+      inactive_checkin: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
+      churn_followup: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
+      inactive_followup: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
     }
 
     let timedOut = false
@@ -1142,6 +1191,205 @@ Deno.serve(async (req) => {
       } catch (campaignErr) {
         console.error('Campaign I failed:', campaignErr)
         captureException(campaignErr, { function_name: 'process-lifecycle-campaigns' })
+      }
+    }
+
+    // =============================================
+    // Inactive User Check-in: signed up 7-14 days ago, zero invoices issued
+    // =============================================
+    if (!checkTimeout('Inactive Check-in')) {
+      try {
+        console.log('Inactive Check-in: scanning targets...')
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
+        const { data: candidates } = await adminClient
+          .from('profiles')
+          .select('id, email, full_name, created_at')
+          .gte('created_at', fourteenDaysAgo)
+          .lte('created_at', sevenDaysAgo)
+          .not('email', 'is', null)
+          .limit(100)
+
+        if (candidates && candidates.length > 0) {
+          for (const cand of candidates) {
+            try {
+              // Skip if already sent
+              const { data: already } = await adminClient
+                .from('lifecycle_events')
+                .select('id')
+                .eq('user_id', cand.id)
+                .eq('event_type', 'inactive_user_checkin')
+                .limit(1)
+                .maybeSingle()
+              if (already) { summary.inactive_checkin.skipped++; continue }
+
+              // Skip if user has issued any invoices
+              const { count } = await adminClient
+                .from('invoices')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', cand.id)
+                .neq('status', 'draft')
+              if ((count ?? 0) > 0) { summary.inactive_checkin.skipped++; continue }
+
+              summary.inactive_checkin.targeted++
+              const daysSince = Math.floor((now.getTime() - new Date(cand.created_at).getTime()) / (24 * 60 * 60 * 1000))
+              const sent = await sendBrevoEmail(
+                brevoApiKey,
+                smtpFrom,
+                'The Invoicemonk team',
+                cand.email,
+                "Quick question about your Invoicemonk signup",
+                inactiveCheckinTemplate(cand.full_name || 'there')
+              )
+              if (sent) {
+                await adminClient.from('lifecycle_events').insert({
+                  user_id: cand.id,
+                  event_type: 'inactive_user_checkin',
+                  metadata: { sent_at: now.toISOString(), days_since_signup: daysSince },
+                })
+                summary.inactive_checkin.sent++
+              } else {
+                summary.inactive_checkin.errors++
+              }
+            } catch (e) {
+              summary.inactive_checkin.errors++
+              captureException(e, { function_name: 'process-lifecycle-campaigns' })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Inactive checkin failed:', e)
+        captureException(e, { function_name: 'process-lifecycle-campaigns' })
+      }
+    }
+
+    // =============================================
+    // Churn Follow-up: 4+ days after a churn_feedback row with no details
+    // =============================================
+    if (!checkTimeout('Churn Follow-up')) {
+      try {
+        console.log('Churn Follow-up: scanning targets...')
+        const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString()
+
+        const { data: feedbacks } = await adminClient
+          .from('churn_feedback')
+          .select('id, user_id, created_at, details')
+          .lte('created_at', fourDaysAgo)
+          .or('details.is.null,details.eq.')
+          .limit(100)
+
+        if (feedbacks && feedbacks.length > 0) {
+          for (const fb of feedbacks) {
+            try {
+              const { data: already } = await adminClient
+                .from('lifecycle_events')
+                .select('id')
+                .eq('user_id', fb.user_id)
+                .eq('event_type', 'churn_followup')
+                .limit(1)
+                .maybeSingle()
+              if (already) { summary.churn_followup.skipped++; continue }
+
+              const profile = await getUserProfile(fb.user_id)
+              if (!profile) { summary.churn_followup.skipped++; continue }
+
+              summary.churn_followup.targeted++
+              const sent = await sendBrevoEmail(
+                brevoApiKey,
+                smtpFrom,
+                'The Invoicemonk team',
+                profile.email,
+                'One quick follow-up',
+                churnFollowupTemplate(profile.name)
+              )
+              if (sent) {
+                await adminClient.from('lifecycle_events').insert({
+                  user_id: fb.user_id,
+                  event_type: 'churn_followup',
+                  metadata: { sent_at: now.toISOString(), churn_feedback_id: fb.id },
+                })
+                summary.churn_followup.sent++
+              } else {
+                summary.churn_followup.errors++
+              }
+            } catch (e) {
+              summary.churn_followup.errors++
+              captureException(e, { function_name: 'process-lifecycle-campaigns' })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Churn follow-up failed:', e)
+        captureException(e, { function_name: 'process-lifecycle-campaigns' })
+      }
+    }
+
+    // =============================================
+    // Inactive Follow-up: 4+ days after inactive_user_checkin if still zero invoices
+    // =============================================
+    if (!checkTimeout('Inactive Follow-up')) {
+      try {
+        console.log('Inactive Follow-up: scanning targets...')
+        const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString()
+
+        const { data: checkins } = await adminClient
+          .from('lifecycle_events')
+          .select('id, user_id, created_at')
+          .eq('event_type', 'inactive_user_checkin')
+          .lte('created_at', fourDaysAgo)
+          .limit(100)
+
+        if (checkins && checkins.length > 0) {
+          for (const ck of checkins) {
+            try {
+              const { data: already } = await adminClient
+                .from('lifecycle_events')
+                .select('id')
+                .eq('user_id', ck.user_id)
+                .eq('event_type', 'inactive_followup')
+                .limit(1)
+                .maybeSingle()
+              if (already) { summary.inactive_followup.skipped++; continue }
+
+              const { count } = await adminClient
+                .from('invoices')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', ck.user_id)
+                .neq('status', 'draft')
+              if ((count ?? 0) > 0) { summary.inactive_followup.skipped++; continue }
+
+              const profile = await getUserProfile(ck.user_id)
+              if (!profile) { summary.inactive_followup.skipped++; continue }
+
+              summary.inactive_followup.targeted++
+              const sent = await sendBrevoEmail(
+                brevoApiKey,
+                smtpFrom,
+                'The Invoicemonk team',
+                profile.email,
+                'One last check-in',
+                inactiveFollowupTemplate(profile.name)
+              )
+              if (sent) {
+                await adminClient.from('lifecycle_events').insert({
+                  user_id: ck.user_id,
+                  event_type: 'inactive_followup',
+                  metadata: { sent_at: now.toISOString(), checkin_event_id: ck.id },
+                })
+                summary.inactive_followup.sent++
+              } else {
+                summary.inactive_followup.errors++
+              }
+            } catch (e) {
+              summary.inactive_followup.errors++
+              captureException(e, { function_name: 'process-lifecycle-campaigns' })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Inactive follow-up failed:', e)
+        captureException(e, { function_name: 'process-lifecycle-campaigns' })
       }
     }
 

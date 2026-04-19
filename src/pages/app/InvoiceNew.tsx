@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { INPUT_LIMITS } from '@/lib/input-limits';
+import { INPUT_LIMITS, combineLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -71,6 +71,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCountryName } from '@/lib/countries';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
 import { stripUrls } from '@/lib/utils';
+import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
+import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
+import type { Database } from '@/integrations/supabase/types';
+
+type InvoiceKind = Database['public']['Enums']['invoice_kind'];
 
 function getSmartPrefillAmount(currency: string): number {
   const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
@@ -83,7 +88,10 @@ function getSmartPrefillAmount(currency: string): number {
 interface InvoiceItem {
   id: string;
   productServiceId?: string | null;
+  /** Short title / heading for the line item (first line of stored description). */
   description: string;
+  /** Optional multi-line itemised description (stored after the first newline). */
+  longDescription?: string;
   quantity: number;
   unitPrice: number;
   taxRate: number;
@@ -164,6 +172,11 @@ export default function InvoiceNew() {
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', description: '', quantity: 1, unitPrice: 0, taxRate: defaultVatRate, isVatExempt: false }
   ]);
+
+  // Deposit / final invoice state
+  const [invoiceKind, setInvoiceKind] = useState<InvoiceKind>('standard');
+  const [depositPercent, setDepositPercent] = useState<number | null>(null);
+  const [parentInvoiceId, setParentInvoiceId] = useState<string | null>(null);
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
@@ -300,12 +313,15 @@ export default function InvoiceNew() {
       reminder_count: 0,
       trust_score: 100,
       last_reminder_sent_at: null,
+      kind: invoiceKind,
+      parent_invoice_id: parentInvoiceId,
+      deposit_percent: depositPercent,
       clients: selectedClient || null,
       is_reverse_charge: isReverseCharge,
       invoice_items: validItems.map((item, index) => ({
         id: `item-${index}`,
         invoice_id: 'preview',
-        description: item.description,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
@@ -432,6 +448,16 @@ export default function InvoiceNew() {
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
+    // Final invoice must have a linked parent
+    if (invoiceKind === 'final' && !parentInvoiceId) {
+      toast({
+        title: 'Deposit invoice required',
+        description: 'A final invoice must reference a previously paid deposit invoice.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const invoice = await createInvoice.mutateAsync({
       invoice: {
         business_id: currentBusiness.id,
@@ -450,9 +476,12 @@ export default function InvoiceNew() {
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
+        kind: invoiceKind,
+        parent_invoice_id: parentInvoiceId,
+        deposit_percent: depositPercent,
       },
       items: validItems.map(item => ({
-        description: item.description,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
@@ -543,7 +572,7 @@ export default function InvoiceNew() {
         payment_method_id: selectedPaymentMethodId || null,
       },
       items: validItems.map(item => ({
-        description: item.description,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
@@ -882,6 +911,19 @@ export default function InvoiceNew() {
             </CardContent>
           </Card>
 
+          {/* Deposit / Final Invoice */}
+          <DepositInvoiceSection
+            businessId={currentBusiness?.id}
+            clientId={selectedClientId}
+            currency={currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency)}
+            kind={invoiceKind}
+            depositPercent={depositPercent}
+            parentInvoiceId={parentInvoiceId}
+            onKindChange={setInvoiceKind}
+            onDepositPercentChange={setDepositPercent}
+            onParentInvoiceIdChange={setParentInvoiceId}
+          />
+
           {/* Payment Method Selector */}
           {paymentMethods && paymentMethods.length > 0 && (
             <Card>
@@ -944,14 +986,18 @@ export default function InvoiceNew() {
                         }}
                       />
                       <div className="space-y-2">
-                        <Label>Description</Label>
+                        <Label>Item / Heading</Label>
                         <Input
-                          placeholder="Service or product description"
+                          placeholder="e.g. Website Redesign Package"
                           value={item.description}
                           onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                          maxLength={INPUT_LIMITS.SHORT_TEXT}
+                          maxLength={INPUT_LIMITS.LINE_ITEM_HEADING}
                         />
                       </div>
+                      <LineItemDescriptionField
+                        value={item.longDescription || ''}
+                        onChange={(val) => updateItem(item.id, 'longDescription', val)}
+                      />
                       <div className="grid gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
                           <Label>Quantity</Label>

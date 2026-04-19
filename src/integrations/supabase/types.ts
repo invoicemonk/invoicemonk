@@ -339,6 +339,36 @@ export type Database = {
         }
         Relationships: []
       }
+      churn_feedback: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          new_tier: string
+          previous_tier: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          new_tier: string
+          previous_tier: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          new_tier?: string
+          previous_tier?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: Json | null
@@ -772,6 +802,7 @@ export type Database = {
           updated_at: string
           user_id: string
           vendor: string | null
+          vendor_id: string | null
         }
         Insert: {
           amount: number
@@ -793,6 +824,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           vendor?: string | null
+          vendor_id?: string | null
         }
         Update: {
           amount?: number
@@ -814,6 +846,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vendor?: string | null
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -835,6 +868,13 @@ export type Database = {
             columns: ["product_service_id"]
             isOneToOne: false
             referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -1069,6 +1109,7 @@ export type Database = {
           currency: string
           currency_account_id: string | null
           currency_locked_at: string | null
+          deposit_percent: number | null
           discount_amount: number
           due_date: string | null
           exchange_rate_snapshot: Json | null
@@ -1081,8 +1122,10 @@ export type Database = {
           issued_at: string | null
           issued_by: string | null
           issuer_snapshot: Json | null
+          kind: Database["public"]["Enums"]["invoice_kind"]
           last_reminder_sent_at: string | null
           notes: string | null
+          parent_invoice_id: string | null
           payment_method_id: string | null
           payment_method_snapshot: Json | null
           recipient_snapshot: Json | null
@@ -1118,6 +1161,7 @@ export type Database = {
           currency?: string
           currency_account_id?: string | null
           currency_locked_at?: string | null
+          deposit_percent?: number | null
           discount_amount?: number
           due_date?: string | null
           exchange_rate_snapshot?: Json | null
@@ -1130,8 +1174,10 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           issuer_snapshot?: Json | null
+          kind?: Database["public"]["Enums"]["invoice_kind"]
           last_reminder_sent_at?: string | null
           notes?: string | null
+          parent_invoice_id?: string | null
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
@@ -1167,6 +1213,7 @@ export type Database = {
           currency?: string
           currency_account_id?: string | null
           currency_locked_at?: string | null
+          deposit_percent?: number | null
           discount_amount?: number
           due_date?: string | null
           exchange_rate_snapshot?: Json | null
@@ -1179,8 +1226,10 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           issuer_snapshot?: Json | null
+          kind?: Database["public"]["Enums"]["invoice_kind"]
           last_reminder_sent_at?: string | null
           notes?: string | null
+          parent_invoice_id?: string | null
           payment_method_id?: string | null
           payment_method_snapshot?: Json | null
           recipient_snapshot?: Json | null
@@ -1226,6 +1275,13 @@ export type Database = {
             columns: ["currency_account_id"]
             isOneToOne: false
             referencedRelation: "currency_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_parent_invoice_id_fkey"
+            columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -2828,6 +2884,56 @@ export type Database = {
         }
         Relationships: []
       }
+      vendors: {
+        Row: {
+          address: Json | null
+          business_id: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: Json | null
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json | null
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendors_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       verification_access_logs: {
         Row: {
           accessed_at: string
@@ -2937,6 +3043,8 @@ export type Database = {
           document_count: number
           document_verification_status: string
           entity_type: string
+          government_id_type: string
+          government_id_value: string
           id: string
           jurisdiction: string
           legal_name: string
@@ -3244,6 +3352,7 @@ export type Database = {
         | "BUSINESS_VERIFICATION_CHANGED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
+      invoice_kind: "standard" | "deposit" | "final"
       invoice_status:
         | "draft"
         | "issued"
@@ -3451,6 +3560,7 @@ export const Constants = {
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],
+      invoice_kind: ["standard", "deposit", "final"],
       invoice_status: [
         "draft",
         "issued",

@@ -53,7 +53,8 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useTeamAccess } from '@/hooks/use-tier-features';
 import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
-import { getJurisdictionConfig } from '@/lib/jurisdiction-config';
+import { getJurisdictionConfig, getGroupedIdTypes, GOVERNMENT_ID_LABELS, type GovernmentIdType } from '@/lib/jurisdiction-config';
+import { validateGovernmentId } from '@/lib/government-id-validation';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
@@ -659,38 +660,68 @@ export default function BusinessProfile() {
                 Government ID {formData.entityType === 'business' && <span className="text-destructive">*</span>}
                 {formData.entityType === 'individual' && <span className="text-xs text-muted-foreground ml-1">(Optional)</span>}
               </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Select
-                  value={formData.governmentIdType}
-                  onValueChange={(value) => setFormData({ ...formData, governmentIdType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="ID Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TIN">TIN</SelectItem>
-                    <SelectItem value="SSN">SSN</SelectItem>
-                    <SelectItem value="NIN">NIN</SelectItem>
-                    <SelectItem value="EIN">EIN</SelectItem>
-                    <SelectItem value="VAT">VAT Number</SelectItem>
-                    <SelectItem value="OTHER">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder={jurisdictionConfig.taxIdPlaceholder || 'Enter ID number'}
-                  value={formData.governmentIdValue}
-                  onChange={(e) => setFormData({ ...formData, governmentIdValue: e.target.value })}
-                  maxLength={INPUT_LIMITS.TAX_ID}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formData.entityType === 'individual'
-                  ? 'Your government-issued ID number. Varies by country (TIN, SSN, NIN, etc.).'
-                  : jurisdictionConfig.countryName
-                    ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
-                    : jurisdictionConfig.taxIdHint}
-              </p>
+              {(() => {
+                const grouped = getGroupedIdTypes(formData.jurisdiction);
+                const selectedType = formData.governmentIdType as GovernmentIdType | '';
+                const selectedLabel = selectedType ? GOVERNMENT_ID_LABELS[selectedType as GovernmentIdType] : undefined;
+                const placeholder = selectedLabel?.example || jurisdictionConfig.taxIdPlaceholder || 'Enter ID number';
+                const validation = validateGovernmentId(selectedType || undefined, formData.governmentIdValue, formData.jurisdiction);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Select
+                        value={formData.governmentIdType}
+                        onValueChange={(value) => setFormData({ ...formData, governmentIdType: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="ID Type" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {grouped.recommended.length > 0 && (
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                              {grouped.countryName ? `Recommended for ${grouped.countryName}` : 'Recommended'}
+                            </div>
+                          )}
+                          {grouped.recommended.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {GOVERNMENT_ID_LABELS[type].long}
+                            </SelectItem>
+                          ))}
+                          {grouped.other.length > 0 && (
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                              Other
+                            </div>
+                          )}
+                          {grouped.other.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {GOVERNMENT_ID_LABELS[type].long}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder={placeholder}
+                        value={formData.governmentIdValue}
+                        onChange={(e) => setFormData({ ...formData, governmentIdValue: e.target.value })}
+                        maxLength={INPUT_LIMITS.TAX_ID}
+                        aria-invalid={!validation.valid}
+                      />
+                    </div>
+                    {!validation.valid && validation.message && (
+                      <p className="text-xs text-destructive">{validation.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {formData.entityType === 'individual'
+                        ? 'Your government-issued ID number. Varies by country.'
+                        : jurisdictionConfig.countryName
+                          ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
+                          : jurisdictionConfig.taxIdHint}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
+
 
             {/* CAC/Registration Number - Only for non-individuals in jurisdictions that have it */}
             {jurisdictionConfig.showCac && formData.entityType !== 'individual' && (

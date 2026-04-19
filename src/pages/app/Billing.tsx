@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { DowngradeFeedbackDialog } from '@/components/billing/DowngradeFeedbackDialog';
 import { 
   CreditCard, 
   Check,
@@ -56,9 +57,24 @@ export default function Billing() {
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackTiers, setFeedbackTiers] = useState<{ previous: string; next: string } | null>(null);
+  const previousTierRef = useRef<string | null>(null);
 
   useEffect(() => {
     gaEvents.subscriptionViewed(tier);
+  }, [tier]);
+
+  // Detect downgrades (tier dropped) and prompt for feedback once
+  useEffect(() => {
+    if (!tier) return;
+    const tierOrder: Record<string, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+    const prev = previousTierRef.current;
+    if (prev && tierOrder[tier] < tierOrder[prev]) {
+      setFeedbackTiers({ previous: prev, next: tier });
+      setFeedbackOpen(true);
+    }
+    previousTierRef.current = tier;
   }, [tier]);
 
   const handleUpgrade = async (newTier: TierKey) => {
@@ -348,6 +364,15 @@ export default function Billing() {
           )}
         </CardContent>
       </Card>
+
+      {feedbackTiers && (
+        <DowngradeFeedbackDialog
+          open={feedbackOpen}
+          onOpenChange={setFeedbackOpen}
+          previousTier={feedbackTiers.previous}
+          newTier={feedbackTiers.next}
+        />
+      )}
     </motion.div>
   );
 }

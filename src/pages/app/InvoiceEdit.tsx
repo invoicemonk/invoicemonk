@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { INPUT_LIMITS } from '@/lib/input-limits';
+import { INPUT_LIMITS, combineLineItemDescription, splitLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useNavigate, useParams, Link } from 'react-router-dom';
@@ -66,11 +66,19 @@ import { ProductServiceCombobox } from '@/components/products/ProductServiceComb
 import { useProductsServices } from '@/hooks/use-products-services';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
 import { stripUrls } from '@/lib/utils';
+import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
+import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
+import type { Database } from '@/integrations/supabase/types';
+
+type InvoiceKind = Database['public']['Enums']['invoice_kind'];
 
 interface InvoiceItem {
   id: string;
   productServiceId?: string | null;
+  /** Short title / heading for the line item (first line of stored description). */
   description: string;
+  /** Optional multi-line itemised description (stored after the first newline). */
+  longDescription?: string;
   quantity: number;
   unitPrice: number;
   taxRate: number;
@@ -131,6 +139,11 @@ export default function InvoiceEdit() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
 
+  // Deposit / final invoice state
+  const [invoiceKind, setInvoiceKind] = useState<InvoiceKind>('standard');
+  const [depositPercent, setDepositPercent] = useState<number | null>(null);
+  const [parentInvoiceId, setParentInvoiceId] = useState<string | null>(null);
+
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
 
   // Fetch payment methods for the invoice's currency account
@@ -168,15 +181,19 @@ export default function InvoiceEdit() {
       
       
       if (invoice.invoice_items && invoice.invoice_items.length > 0) {
-        setItems(invoice.invoice_items.map(item => ({
-          id: item.id,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: Number(item.unit_price),
-          taxRate: item.tax_rate,
-          taxLabel: (item as any).tax_label || '',
-          isVatExempt: item.tax_rate === 0 && isNigerianVatRegistered,
-        })));
+        setItems(invoice.invoice_items.map(item => {
+          const { heading, description } = splitLineItemDescription(item.description);
+          return {
+            id: item.id,
+            description: heading,
+            longDescription: description,
+            quantity: item.quantity,
+            unitPrice: Number(item.unit_price),
+            taxRate: item.tax_rate,
+            taxLabel: (item as any).tax_label || '',
+            isVatExempt: item.tax_rate === 0 && isNigerianVatRegistered,
+          };
+        }));
       } else {
         setItems([{ 
           id: '1', 
@@ -188,6 +205,9 @@ export default function InvoiceEdit() {
         }]);
       }
       setIsReverseCharge((invoice as any).is_reverse_charge || false);
+      setInvoiceKind(((invoice as any).kind as InvoiceKind) || 'standard');
+      setDepositPercent((invoice as any).deposit_percent ?? null);
+      setParentInvoiceId((invoice as any).parent_invoice_id ?? null);
       setIsInitialized(true);
     }
   }, [invoice, isInitialized, isNigerianVatRegistered, defaultVatRate]);
@@ -321,9 +341,12 @@ export default function InvoiceEdit() {
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
         is_reverse_charge: isReverseCharge,
+        kind: invoiceKind,
+        parent_invoice_id: parentInvoiceId,
+        deposit_percent: depositPercent,
       },
       items: validItems.map(item => ({
-        description: item.description,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
@@ -394,9 +417,12 @@ export default function InvoiceEdit() {
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
         is_reverse_charge: isReverseCharge,
+        kind: invoiceKind,
+        parent_invoice_id: parentInvoiceId,
+        deposit_percent: depositPercent,
       },
       items: validItems.map(item => ({
-        description: item.description,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
@@ -720,13 +746,18 @@ export default function InvoiceEdit() {
                         }}
                       />
                       <div className="space-y-2">
-                        <Label>Description</Label>
+                        <Label>Item / Heading</Label>
                         <Input
-                          placeholder="Service or product description"
+                          placeholder="e.g. Website Redesign Package"
                           value={item.description}
                           onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                          maxLength={INPUT_LIMITS.LINE_ITEM_HEADING}
                         />
                       </div>
+                      <LineItemDescriptionField
+                        value={item.longDescription || ''}
+                        onChange={(val) => updateItem(item.id, 'longDescription', val)}
+                      />
                       <div className="grid gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
                           <Label>Quantity</Label>
@@ -817,6 +848,20 @@ export default function InvoiceEdit() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Deposit / Final Invoice */}
+          <DepositInvoiceSection
+            businessId={currentBusiness?.id}
+            clientId={selectedClientId}
+            currency={currency}
+            kind={invoiceKind}
+            depositPercent={depositPercent}
+            parentInvoiceId={parentInvoiceId}
+            onKindChange={setInvoiceKind}
+            onDepositPercentChange={setDepositPercent}
+            onParentInvoiceIdChange={setParentInvoiceId}
+            currentInvoiceId={id}
+          />
 
           {/* Payment Method Selector */}
           {paymentMethods && paymentMethods.length > 0 && (

@@ -54,6 +54,7 @@ import AccountingResult from "./pages/app/accounting/AccountingResult";
 
 // Expenses page (standalone entry point)
 import Expenses from "./pages/app/Expenses";
+import Vendors from "./pages/app/Vendors";
 import Receivables from "./pages/app/Receivables";
 import Import from "./pages/app/Import";
 import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
@@ -97,6 +98,7 @@ import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions
 import AdminRiskMonitoring from "./pages/admin/AdminRiskMonitoring";
 import AdminVerifications from "./pages/admin/AdminVerifications";
 import AdminSecurity from "./pages/admin/AdminSecurity";
+import AdminFeedback from "./pages/admin/AdminFeedback";
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
@@ -242,6 +244,7 @@ const App = () => (
             
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />
+            <Route path="/b/:businessId/vendors" element={<Vendors />} />
             
             {/* Receivables Intelligence */}
             <Route path="/b/:businessId/receivables" element={
@@ -306,6 +309,7 @@ const App = () => (
             <Route path="/admin/risk-monitoring" element={<AdminRiskMonitoring />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/security" element={<AdminSecurity />} />
+            <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

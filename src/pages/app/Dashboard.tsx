@@ -23,6 +23,7 @@ import { ComplianceAnalyticsCard } from '@/components/dashboard/ComplianceAnalyt
 import { QuickSetupChecklist } from '@/components/dashboard/QuickSetupChecklist';
 import { ImmutabilityBanner } from '@/components/dashboard/ImmutabilityBanner';
 import { OnlinePaymentsBanner } from '@/components/dashboard/OnlinePaymentsBanner';
+import { FrEInvoicingBanner } from '@/components/dashboard/FrEInvoicingBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -382,6 +383,13 @@ export default function Dashboard() {
           <motion.div variants={item}>
             <OnlinePaymentsBanner />
           </motion.div>
+
+          {/* France e-invoicing mandate notice (Sept 2026) */}
+          {currentBusiness?.jurisdiction === 'FR' && (
+            <motion.div variants={item}>
+              <FrEInvoicingBanner />
+            </motion.div>
+          )}
 
            {/* Quick Setup Checklist */}
           <motion.div variants={item}>

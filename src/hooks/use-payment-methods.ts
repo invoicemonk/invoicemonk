@@ -17,16 +17,112 @@ export const PROVIDER_TYPES = [
 
 export type ProviderType = typeof PROVIDER_TYPES[number]['value'];
 
-// Provider-specific instruction field definitions
-export const PROVIDER_INSTRUCTION_FIELDS: Record<string, { key: string; label: string; required?: boolean; placeholder?: string }[]> = {
-  bank_transfer: [
+export type ProviderField = {
+  key: string;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  inputMode?: 'text' | 'numeric' | 'decimal';
+};
+
+// SEPA-zone currencies (extend as needed)
+const SEPA_CURRENCIES = new Set(['EUR']);
+
+// Common African defaults (no IBAN, simple account # + bank name)
+const AFRICA_DEFAULT_CURRENCIES = new Set(['NGN', 'GHS', 'KES', 'ZAR', 'UGX', 'TZS', 'RWF', 'EGP', 'XOF', 'XAF']);
+
+/**
+ * Returns the currency-appropriate set of bank_transfer instruction fields.
+ * Falls back to a universal set when no currency is provided.
+ */
+export function getBankTransferFields(currencyCode?: string, _jurisdiction?: string): ProviderField[] {
+  const c = currencyCode?.toUpperCase();
+
+  if (c && SEPA_CURRENCIES.has(c)) {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme GmbH' },
+      { key: 'iban', label: 'IBAN', required: true, placeholder: 'DE89 3704 0044 0532 0130 00' },
+      { key: 'swift_code', label: 'BIC / SWIFT', required: true, placeholder: 'COBADEFFXXX' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. Commerzbank' },
+    ];
+  }
+
+  if (c === 'GBP') {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Ltd' },
+      { key: 'sort_code', label: 'Sort Code', required: true, placeholder: '12-34-56', inputMode: 'numeric' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder: '12345678', inputMode: 'numeric' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. Barclays' },
+    ];
+  }
+
+  if (c === 'USD') {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Inc.' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder: '123456789', inputMode: 'numeric' },
+      { key: 'routing_number', label: 'ACH Routing Number', required: true, placeholder: '021000021', inputMode: 'numeric' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. Chase' },
+      { key: 'swift_code', label: 'SWIFT (for international wires)', placeholder: 'CHASUS33' },
+    ];
+  }
+
+  if (c === 'INR') {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Pvt Ltd' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder: '012345678901', inputMode: 'numeric' },
+      { key: 'ifsc_code', label: 'IFSC Code', required: true, placeholder: 'HDFC0001234' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. HDFC Bank' },
+    ];
+  }
+
+  if (c === 'CAD') {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Inc.' },
+      { key: 'transit_number', label: 'Transit Number', required: true, placeholder: '12345', inputMode: 'numeric' },
+      { key: 'institution_number', label: 'Institution Number', required: true, placeholder: '003', inputMode: 'numeric' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder: '1234567', inputMode: 'numeric' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. RBC' },
+    ];
+  }
+
+  if (c === 'AUD') {
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Pty Ltd' },
+      { key: 'bsb', label: 'BSB', required: true, placeholder: '123-456', inputMode: 'numeric' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder: '12345678', inputMode: 'numeric' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. CommBank' },
+    ];
+  }
+
+  if (c && AFRICA_DEFAULT_CURRENCIES.has(c)) {
+    const placeholder =
+      c === 'NGN' ? '0123456789' :
+      c === 'KES' ? '01100123456' :
+      c === 'GHS' ? '1234567890' : '0000000000';
+    const bank =
+      c === 'NGN' ? 'e.g. First Bank' :
+      c === 'KES' ? 'e.g. Equity Bank' :
+      c === 'ZAR' ? 'e.g. Standard Bank' : 'e.g. your bank';
+    return [
+      { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Ltd' },
+      { key: 'account_number', label: 'Account Number', required: true, placeholder, inputMode: 'numeric' },
+      { key: 'bank_name', label: 'Bank Name', required: true, placeholder: bank },
+      { key: 'swift_code', label: 'SWIFT / BIC (optional)', placeholder: 'For international transfers' },
+    ];
+  }
+
+  // Universal fallback
+  return [
     { key: 'account_name', label: 'Account Name', required: true, placeholder: 'e.g. Acme Ltd' },
-    { key: 'account_number', label: 'Account Number', required: true, placeholder: 'e.g. 0123456789' },
-    { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. First Bank' },
-    { key: 'routing_number', label: 'Routing / Sort Code', placeholder: 'e.g. 044150149' },
-    { key: 'swift_code', label: 'SWIFT / BIC', placeholder: 'e.g. FBNINGLA' },
-    { key: 'iban', label: 'IBAN', placeholder: 'e.g. NG...' },
-  ],
+    { key: 'account_number', label: 'Account Number / IBAN', required: true, placeholder: 'Account number or IBAN' },
+    { key: 'bank_name', label: 'Bank Name', required: true, placeholder: 'e.g. your bank' },
+    { key: 'swift_code', label: 'SWIFT / BIC', placeholder: 'e.g. ABCDEF12' },
+  ];
+}
+
+// Provider-specific instruction field definitions
+export const PROVIDER_INSTRUCTION_FIELDS: Record<string, ProviderField[]> = {
+  bank_transfer: getBankTransferFields(),
   wise: [
     { key: 'email', label: 'Wise Email', required: true, placeholder: 'e.g. billing@acme.com' },
     { key: 'account_holder', label: 'Account Holder', placeholder: 'e.g. Acme Ltd' },

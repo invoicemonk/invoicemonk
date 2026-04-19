@@ -1,5 +1,6 @@
 import { isDisposableEmail } from './disposable-emails';
 import { getJurisdictionConfig } from './jurisdiction-config';
+import { validateFrBusinessId, validateTvaIntra } from './fr-validation';
 
 // ── Name validation ──────────────────────────────────────────────────
 
@@ -91,6 +92,15 @@ export function validateClientTaxId(
       return { valid: false, error: `${label} is required for clients in ${config?.name || 'this country'}` };
     }
     return { valid: true }; // optional
+  }
+  // Jurisdiction-specific deep validation.
+  if (_jurisdiction === 'FR') {
+    const upper = trimmed.toUpperCase().replace(/\s+/g, '');
+    const result = upper.startsWith('FR')
+      ? validateTvaIntra(upper)
+      : validateFrBusinessId(upper);
+    if (!result.valid) return { valid: false, error: result.error };
+    return { valid: true };
   }
   if (trimmed.length < 3) {
     return { valid: false, error: 'Tax ID is too short' };

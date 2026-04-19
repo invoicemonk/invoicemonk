@@ -27,7 +27,7 @@ import { EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useCreateRecurringExpense, FREQUENCY_OPTIONS } from '@/hooks/use-recurring-expenses';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
-import { VendorCombobox } from './VendorCombobox';
+import { VendorPicker } from '@/components/vendors/VendorPicker';
 import { ReceiptUpload } from './ReceiptUpload';
 import { useProductsServices } from '@/hooks/use-products-services';
 
@@ -182,7 +182,7 @@ export function RecurringExpenseDialog() {
 
             <div className="space-y-2">
               <Label>Vendor / Supplier</Label>
-              <VendorCombobox value={watch('vendor')} onChange={(val) => setValue('vendor', val)} />
+              <VendorPicker value={watch('vendor')} onChange={({ vendor }) => setValue('vendor', vendor)} />
             </div>
 
             {activeProducts.length > 0 && (

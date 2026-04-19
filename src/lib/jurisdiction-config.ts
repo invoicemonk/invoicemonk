@@ -1,16 +1,72 @@
 // Centralized jurisdiction configuration for dynamic compliance fields
 import { getCountryByCode } from './countries';
 
-export type GovernmentIdType = 'TIN' | 'SSN' | 'NIN' | 'EIN' | 'VAT' | 'OTHER';
+export type GovernmentIdType =
+  | 'TIN' | 'SSN' | 'NIN' | 'EIN' | 'VAT'
+  | 'SIRET' | 'SIREN' | 'CRO' | 'UTR'
+  | 'ABN' | 'ACN' | 'NZBN'
+  | 'RFC' | 'CURP' | 'CNPJ' | 'CPF' | 'RUT' | 'NIT' | 'BN'
+  | 'KRA_PIN' | 'URA_TIN'
+  | 'PASSPORT' | 'NATIONAL_ID' | 'DRIVERS_LICENSE'
+  | 'OTHER';
 
-export const GOVERNMENT_ID_TYPES: { value: GovernmentIdType; label: string }[] = [
-  { value: 'TIN', label: 'Tax Identification Number (TIN)' },
-  { value: 'SSN', label: 'Social Security Number (SSN)' },
-  { value: 'NIN', label: 'National Identification Number (NIN)' },
-  { value: 'EIN', label: 'Employer Identification Number (EIN)' },
-  { value: 'VAT', label: 'VAT Number' },
-  { value: 'OTHER', label: 'Other Government ID' },
+export const GOVERNMENT_ID_LABELS: Record<GovernmentIdType, { short: string; long: string; example?: string }> = {
+  TIN: { short: 'TIN', long: 'Tax Identification Number', example: '123456789' },
+  SSN: { short: 'SSN', long: 'Social Security Number (US)', example: '123-45-6789' },
+  NIN: { short: 'NIN', long: 'National Identification Number', example: '12345678901' },
+  EIN: { short: 'EIN', long: 'Employer Identification Number (US)', example: '12-3456789' },
+  VAT: { short: 'VAT', long: 'VAT Number' },
+  SIRET: { short: 'SIRET', long: 'SIRET (France, 14 digits)', example: '12345678901234' },
+  SIREN: { short: 'SIREN', long: 'SIREN (France, 9 digits)', example: '123456789' },
+  CRO: { short: 'CRO', long: 'Companies Registration Office (Ireland)', example: '123456' },
+  UTR: { short: 'UTR', long: 'Unique Taxpayer Reference (UK)', example: '1234567890' },
+  ABN: { short: 'ABN', long: 'Australian Business Number', example: '12 345 678 901' },
+  ACN: { short: 'ACN', long: 'Australian Company Number', example: '123 456 789' },
+  NZBN: { short: 'NZBN', long: 'New Zealand Business Number', example: '9429041234567' },
+  RFC: { short: 'RFC', long: 'Registro Federal de Contribuyentes (Mexico)', example: 'XAXX010101000' },
+  CURP: { short: 'CURP', long: 'Clave Única de Registro de Población (Mexico)' },
+  CNPJ: { short: 'CNPJ', long: 'Cadastro Nacional da Pessoa Jurídica (Brazil)', example: '12.345.678/0001-90' },
+  CPF: { short: 'CPF', long: 'Cadastro de Pessoas Físicas (Brazil)', example: '123.456.789-00' },
+  RUT: { short: 'RUT', long: 'Rol Único Tributario (Chile/Uruguay)', example: '12.345.678-9' },
+  NIT: { short: 'NIT', long: 'Número de Identificación Tributaria (Colombia)', example: '900.123.456-7' },
+  BN: { short: 'BN', long: 'Business Number (Canada)', example: '123456789RC0001' },
+  KRA_PIN: { short: 'KRA PIN', long: 'KRA Personal Identification Number (Kenya)', example: 'A012345678Z' },
+  URA_TIN: { short: 'URA TIN', long: 'URA Taxpayer Identification Number (Uganda)', example: '1001234567' },
+  PASSPORT: { short: 'Passport', long: 'Passport Number' },
+  NATIONAL_ID: { short: 'National ID', long: 'National ID Card' },
+  DRIVERS_LICENSE: { short: "Driver's License", long: "Driver's License" },
+  OTHER: { short: 'Other', long: 'Other Government ID' },
+};
+
+export const GOVERNMENT_ID_TYPES: { value: GovernmentIdType; label: string }[] =
+  (Object.keys(GOVERNMENT_ID_LABELS) as GovernmentIdType[]).map((value) => ({
+    value,
+    label: GOVERNMENT_ID_LABELS[value].long,
+  }));
+
+/** Universal individual IDs available everywhere. */
+export const UNIVERSAL_INDIVIDUAL_ID_TYPES: GovernmentIdType[] = [
+  'PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE',
 ];
+
+/**
+ * Returns ID types grouped as { recommended, other } for the current jurisdiction.
+ * Recommended = jurisdiction's `supportedIdTypes` (plus universal individual IDs), preserving order.
+ * Other = all remaining types.
+ */
+export function getGroupedIdTypes(jurisdiction?: string): {
+  recommended: GovernmentIdType[];
+  other: GovernmentIdType[];
+  countryName?: string;
+} {
+  const config = jurisdiction ? getJurisdictionConfig(jurisdiction) : undefined;
+  const supported = config?.supportedIdTypes ?? [];
+  const recommendedSet = new Set<GovernmentIdType>([...supported, ...UNIVERSAL_INDIVIDUAL_ID_TYPES]);
+  const recommended = [...recommendedSet];
+  const all = Object.keys(GOVERNMENT_ID_LABELS) as GovernmentIdType[];
+  const other = all.filter((t) => !recommendedSet.has(t));
+  return { recommended, other, countryName: config?.countryName };
+}
 
 export interface JurisdictionConfig {
   name: string;
@@ -591,23 +647,24 @@ export const JURISDICTION_CONFIG: Record<string, JurisdictionConfig> = {
     currency: 'EUR',
     taxIdLabel: 'SIREN Number',
     taxIdPlaceholder: '123456789',
-    taxIdHint: 'Your 9-digit SIREN identification number',
+    taxIdHint: 'Your 9-digit SIREN identification number (Luhn-valid)',
     showCac: true,
     cacLabel: 'SIRET Number',
     cacPlaceholder: '12345678901234',
-    cacHint: 'Your 14-digit SIRET number (SIREN + NIC)',
-    cacRequired: false,
+    cacHint: 'Your 14-digit SIRET number (SIREN + 5-digit NIC). Required on every invoice from 1 Sept 2026.',
+    cacRequired: true,
     showVat: true,
-    vatLabel: 'TVA Number',
+    vatLabel: 'TVA intracommunautaire',
     vatPlaceholder: 'FR12345678901',
-    vatHint: 'Your French intra-community VAT number',
-    clientTaxIdLabel: 'SIREN/SIRET',
-    clientTaxIdPlaceholder: '123456789',
-    clientTaxIdHint: 'French business identifier',
+    vatHint: 'Your French intra-community VAT number (FR + 2-char key + 9-digit SIREN)',
+    clientTaxIdLabel: 'SIREN / SIRET',
+    clientTaxIdPlaceholder: '12345678901234',
+    clientTaxIdHint: 'French business identifier — required for B2B invoices under the Sept 2026 e-invoicing reform',
+    clientTaxIdRequired: true,
     showClientReg: true,
     clientRegLabel: 'SIRET Number',
     clientRegPlaceholder: '12345678901234',
-    clientRegHint: '14-digit establishment identifier',
+    clientRegHint: '14-digit establishment identifier (SIRET) for the recipient site',
     phonePrefix: '+33',
     cityPlaceholder: 'Paris',
     statePlaceholder: 'Île-de-France',

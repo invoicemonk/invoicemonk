@@ -15,6 +15,7 @@ export interface Expense {
   currency: string;
   expenseDate: string;
   vendor: string | null;
+  vendorId: string | null;
   receiptUrl: string | null;
   notes: string | null;
   createdAt: string;
@@ -27,6 +28,7 @@ export interface CreateExpenseInput {
   amount: number;
   expenseDate?: string;
   vendor?: string;
+  vendorId?: string | null;
   notes?: string;
   receiptUrl?: string;
   productServiceId?: string | null;
@@ -38,6 +40,7 @@ export interface UpdateExpenseInput {
   amount?: number;
   expenseDate?: string;
   vendor?: string;
+  vendorId?: string | null;
   notes?: string;
   receiptUrl?: string;
   productServiceId?: string | null;
@@ -116,6 +119,7 @@ export function useExpenses(
         currency: expense.currency,
         expenseDate: expense.expense_date,
         vendor: expense.vendor,
+        vendorId: expense.vendor_id,
         receiptUrl: expense.receipt_url,
         notes: expense.notes,
         createdAt: expense.created_at,
@@ -158,6 +162,7 @@ export function useExpense(expenseId: string) {
         currency: data.currency,
         expenseDate: data.expense_date,
         vendor: data.vendor,
+        vendorId: data.vendor_id,
         receiptUrl: data.receipt_url,
         notes: data.notes,
         createdAt: data.created_at,
@@ -191,6 +196,7 @@ export function useCreateExpense(businessId?: string, currencyAccountId?: string
           currency: currency, // Derived from currency account
           expense_date: input.expenseDate || new Date().toISOString().split('T')[0],
           vendor: input.vendor || null,
+          vendor_id: input.vendorId ?? null,
           notes: input.notes || null,
           receipt_url: input.receiptUrl || null,
           product_service_id: input.productServiceId ?? null,
@@ -239,6 +245,7 @@ export function useUpdateExpense() {
       // Note: currency is immutable, derived from currency account
       if (updates.expenseDate !== undefined) updateData.expense_date = updates.expenseDate;
       if (updates.vendor !== undefined) updateData.vendor = updates.vendor;
+      if (updates.vendorId !== undefined) updateData.vendor_id = updates.vendorId;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.receiptUrl !== undefined) updateData.receipt_url = updates.receiptUrl;
       if (updates.productServiceId !== undefined) updateData.product_service_id = updates.productServiceId ?? null;

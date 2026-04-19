@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useUpdateExpense, EXPENSE_CATEGORIES, Expense } from '@/hooks/use-expenses';
 import { ReceiptUpload, type ScanResult } from './ReceiptUpload';
-import { VendorCombobox } from './VendorCombobox';
+import { VendorPicker } from '@/components/vendors/VendorPicker';
 import { useProductsServices } from '@/hooks/use-products-services';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -27,6 +27,7 @@ const expenseSchema = z.object({
   description: z.string().max(200).optional(),
   amount: z.number().min(0.01, 'Amount must be greater than 0'),
   vendor: z.string().max(50).optional(),
+  vendorId: z.string().nullable().optional(),
   expenseDate: z.string().optional(),
   notes: z.string().max(200).optional(),
   receiptUrl: z.string().optional().nullable(),
@@ -61,6 +62,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
     defaultValues: {
       category: expense.category, description: expense.description || '',
       amount: expense.amount, vendor: expense.vendor || '',
+      vendorId: expense.vendorId ?? null,
       expenseDate: expense.expenseDate, notes: expense.notes || '',
       receiptUrl: expense.receiptUrl || null,
     },
@@ -73,6 +75,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
     reset({
       category: expense.category, description: expense.description || '',
       amount: expense.amount, vendor: expense.vendor || '',
+      vendorId: expense.vendorId ?? null,
       expenseDate: expense.expenseDate, notes: expense.notes || '',
       receiptUrl: expense.receiptUrl || null,
     });
@@ -108,7 +111,8 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
       id: expense.id,
       updates: {
         category: data.category, description: data.description, amount: data.amount,
-        vendor: data.vendor, expenseDate: data.expenseDate, notes: data.notes,
+        vendor: data.vendor, vendorId: data.vendorId ?? null,
+        expenseDate: data.expenseDate, notes: data.notes,
         receiptUrl: data.receiptUrl || undefined,
         productServiceId: linkedProductId && linkedProductId !== 'none' ? linkedProductId : null,
       },
@@ -173,7 +177,14 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
 
             <div className="space-y-2">
               <Label className="flex items-center">Vendor / Supplier<AiBadge field="vendor" /></Label>
-              <VendorCombobox value={watch('vendor')} onChange={(val) => setValue('vendor', val)} />
+              <VendorPicker
+                value={watch('vendor')}
+                vendorId={watch('vendorId')}
+                onChange={({ vendor_id, vendor }) => {
+                  setValue('vendor', vendor);
+                  setValue('vendorId', vendor_id);
+                }}
+              />
             </div>
 
             {activeProducts.length > 0 && (

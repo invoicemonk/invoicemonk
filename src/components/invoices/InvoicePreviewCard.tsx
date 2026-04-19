@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Lock } from 'lucide-react';
+import { Lock, Layers, Receipt as ReceiptIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Tables } from '@/integrations/supabase/types';
+import { useParentDepositInvoice } from '@/hooks/use-parent-deposit-invoice';
+import { splitLineItemDescription } from '@/lib/input-limits';
 
 type Invoice = Tables<'invoices'> & {
   clients?: Tables<'clients'> | null;
@@ -124,7 +126,17 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   const issuerSnapshot = invoice.issuer_snapshot as IssuerSnapshot | null;
   const recipientSnapshot = invoice.recipient_snapshot as RecipientSnapshot | null;
   const isImmutable = invoice.status !== 'draft';
-  
+
+  // ── Deposit / Final invoice metadata ──
+  const invoiceKind = (invoice as unknown as { kind?: string }).kind || 'standard';
+  const isDepositInvoice = invoiceKind === 'deposit';
+  const isFinalInvoice = invoiceKind === 'final';
+  const parentInvoiceId = (invoice as unknown as { parent_invoice_id?: string | null }).parent_invoice_id || null;
+  const depositPercent = (invoice as unknown as { deposit_percent?: number | null }).deposit_percent ?? null;
+  const { data: parentDeposit } = useParentDepositInvoice(isFinalInvoice ? parentInvoiceId : null);
+  // Amount actually credited from the deposit on the final invoice = what the deposit invoice received.
+  const depositCreditAmount = parentDeposit ? Number(parentDeposit.amount_paid || 0) : 0;
+
   const isNigerianInvoice = issuerSnapshot?.jurisdiction === 'NG' || business?.jurisdiction === 'NG';
   const isVatRegistered = issuerSnapshot?.is_vat_registered || business?.is_vat_registered;
   
@@ -180,6 +192,23 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   const issuerName = displayIssuer?.legal_name || displayIssuer?.name || 'Your Business';
   const recipientName = recipientSnapshot?.name || invoice.clients?.name || 'Client';
 
+  // Renders a small badge denoting deposit/final invoice. variant controls colour scheme.
+  const renderKindBadge = (variant: 'light' | 'dark' = 'light') => {
+    if (!isDepositInvoice && !isFinalInvoice) return null;
+    const isOnDark = variant === 'dark';
+    const baseClass = isOnDark
+      ? 'gap-1 border-white/30 text-white/90'
+      : 'gap-1 border-sky-300 text-sky-700 bg-sky-50';
+    return (
+      <Badge variant="outline" className={baseClass}>
+        {isDepositInvoice ? <ReceiptIcon className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
+        {isDepositInvoice
+          ? `Deposit Invoice${depositPercent ? ` (${depositPercent}%)` : ''}`
+          : 'Final Invoice'}
+      </Badge>
+    );
+  };
+
   // Shared components
   const renderLineItems = (tableClassName?: string, headerBg?: string) => (
     <table className={`w-full ${tableClassName || ''}`}>
@@ -196,10 +225,15 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
       </thead>
       <tbody>
         {invoice.invoice_items && invoice.invoice_items.length > 0 ? (
-          invoice.invoice_items.map((item) => (
+          invoice.invoice_items.map((item) => {
+            const { heading, description } = splitLineItemDescription(item.description);
+            return (
             <tr key={item.id} className="border-b border-border/50">
               <td className="py-3 px-2">
-                <p className="font-medium text-sm">{item.description}</p>
+                <p className="font-medium text-sm">{heading}</p>
+                {description && (
+                  <p className="text-xs text-muted-foreground whitespace-pre-line mt-1">{description}</p>
+                )}
                 {!isNigerianInvoice && item.tax_rate > 0 && (
                   <p className="text-xs text-muted-foreground">
                     {(item as any).tax_label ? `${(item as any).tax_label}: ${item.tax_rate}%` : `Tax: ${item.tax_rate}%`}
@@ -219,7 +253,8 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
                 {formatCurrency(Number(item.amount), invoice.currency)}
               </td>
             </tr>
-          ))
+            );
+          })
         ) : (
           <tr>
             <td colSpan={isNigerianInvoice ? 5 : 4} className="py-8 text-center text-muted-foreground">
@@ -272,6 +307,23 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
         <span>{isNigerianInvoice ? 'Total (incl. VAT)' : 'Total'}</span>
         <span className="tabular-nums">{formatCurrency(Number(invoice.total_amount), invoice.currency)}</span>
       </div>
+      {isFinalInvoice && parentDeposit && depositCreditAmount > 0 && (
+        <>
+          <div className="flex justify-between text-sm" style={{ color: '#0369a1' }}>
+            <span className="flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              Less: Deposit ({parentDeposit.invoice_number})
+            </span>
+            <span className="tabular-nums">-{formatCurrency(depositCreditAmount, invoice.currency)}</span>
+          </div>
+          <div className="flex justify-between text-base font-semibold">
+            <span>Net Due After Deposit</span>
+            <span className="tabular-nums">
+              {formatCurrency(Math.max(0, Number(invoice.total_amount) - depositCreditAmount), invoice.currency)}
+            </span>
+          </div>
+        </>
+      )}
       {Number(invoice.amount_paid) > 0 && (
         <>
           <div className="flex justify-between text-sm" style={{ color: '#059669' }}>
@@ -281,10 +333,24 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           <div className="flex justify-between font-semibold">
             <span>Balance Due</span>
             <span className="tabular-nums">
-              {formatCurrency(Number(invoice.total_amount) - Number(invoice.amount_paid), invoice.currency)}
+              {formatCurrency(
+                Math.max(
+                  0,
+                  Number(invoice.total_amount) - Number(invoice.amount_paid) - (isFinalInvoice ? depositCreditAmount : 0),
+                ),
+                invoice.currency,
+              )}
             </span>
           </div>
         </>
+      )}
+      {isFinalInvoice && parentDeposit && depositCreditAmount > 0 && Number(invoice.amount_paid) === 0 && (
+        <div className="flex justify-between font-semibold">
+          <span>Balance Due</span>
+          <span className="tabular-nums">
+            {formatCurrency(Math.max(0, Number(invoice.total_amount) - depositCreditAmount), invoice.currency)}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -410,6 +476,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground">INVOICE</h2>
               <p className="text-sm text-muted-foreground">{invoice.invoice_number}</p>
+              {(isDepositInvoice || isFinalInvoice) && <div className="mt-2">{renderKindBadge('light')}</div>}
             </div>
             <div className="text-right text-sm text-muted-foreground">
               <p>Issued: {formatDate(invoice.issue_date)}</p>
@@ -514,12 +581,15 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
                 {invoice.due_date && <p className="text-sm">Due: {formatDate(invoice.due_date)}</p>}
               </div>
             </div>
-            {isImmutable && (
-              <Badge variant="outline" className="mt-3 gap-1 border-white/30 text-white/90">
-                <Lock className="h-3 w-3" />
-                Immutable Record
-              </Badge>
-            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {isImmutable && (
+                <Badge variant="outline" className="gap-1 border-white/30 text-white/90">
+                  <Lock className="h-3 w-3" />
+                  Immutable Record
+                </Badge>
+              )}
+              {renderKindBadge('dark')}
+            </div>
           </div>
 
           <div className="px-8 py-6 space-y-6">
@@ -637,6 +707,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Invoice No</p>
               <p className="font-semibold font-mono">{invoice.invoice_number}</p>
+              {(isDepositInvoice || isFinalInvoice) && <div className="mt-1">{renderKindBadge('light')}</div>}
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</p>
@@ -755,12 +826,15 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
                 {invoice.summary && (
                   <p className="text-sm text-muted-foreground italic mt-2 max-w-md">{invoice.summary}</p>
                 )}
-                {isImmutable && (
-                  <Badge variant="outline" className="mt-2 gap-1">
-                    <Lock className="h-3 w-3" />
-                    Immutable Record
-                  </Badge>
-                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {isImmutable && (
+                    <Badge variant="outline" className="gap-1">
+                      <Lock className="h-3 w-3" />
+                      Immutable Record
+                    </Badge>
+                  )}
+                  {renderKindBadge('light')}
+                </div>
               </div>
             </div>
             <div className="text-right">

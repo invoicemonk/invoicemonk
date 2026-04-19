@@ -1,14 +1,20 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Upload, FileText, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { Shield, Upload, FileText, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, ArrowUpRight, Save } from 'lucide-react';
 import { useVerificationDocuments, useUploadVerificationDocument, useSubmitForReview } from '@/hooks/use-verification-documents';
 import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
 import { useSubscriptionContext } from '@/contexts/SubscriptionContext';
 import { useNavigate } from 'react-router-dom';
+import { getGroupedIdTypes, GOVERNMENT_ID_LABELS, type GovernmentIdType } from '@/lib/jurisdiction-config';
+import { validateGovernmentId } from '@/lib/government-id-validation';
+import { useUpdateBusiness } from '@/hooks/use-business';
+import { INPUT_LIMITS } from '@/lib/input-limits';
 
 interface VerificationDocumentsSectionProps {
   business: {
@@ -18,6 +24,9 @@ interface VerificationDocumentsSectionProps {
     rejection_reason?: string;
     entity_type?: string;
     verification_notes?: string;
+    jurisdiction?: string | null;
+    government_id_type?: string | null;
+    government_id_value?: string | null;
   };
 }
 
@@ -60,6 +69,37 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
   const isVerified = verificationStatus === 'verified';
   const requiresAction = verificationStatus === 'requires_action';
   const verificationNotes = (business as any).verification_notes;
+
+  // ==== Government ID state ====
+  const updateBusiness = useUpdateBusiness();
+  const initialIdType = (business as any).government_id_type ?? '';
+  const initialIdValue = (business as any).government_id_value ?? '';
+  const jurisdiction = (business as any).jurisdiction ?? '';
+  const [govIdType, setGovIdType] = useState<string>(initialIdType);
+  const [govIdValue, setGovIdValue] = useState<string>(initialIdValue);
+
+  // Sync local state when business changes (e.g., after save / refetch)
+  useEffect(() => {
+    setGovIdType(initialIdType);
+    setGovIdValue(initialIdValue);
+  }, [initialIdType, initialIdValue]);
+
+  const grouped = getGroupedIdTypes(jurisdiction);
+  const selectedLabel = govIdType ? GOVERNMENT_ID_LABELS[govIdType as GovernmentIdType] : undefined;
+  const idValidation = validateGovernmentId(govIdType || undefined, govIdValue, jurisdiction);
+  const govIdDirty = govIdType !== initialIdType || govIdValue !== initialIdValue;
+  const canSaveGovId = govIdDirty && (!govIdValue || idValidation.valid);
+
+  const handleSaveGovId = () => {
+    updateBusiness.mutate({
+      businessId: business.id,
+      updates: {
+        government_id_type: govIdType || null,
+        government_id_value: govIdValue || null,
+      } as any,
+    });
+  };
+
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,6 +154,80 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Government ID — collected here so users can complete it during verification */}
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-sm font-medium">
+              Government ID
+              {!isIndividual && <span className="text-destructive ml-0.5">*</span>}
+            </Label>
+            {govIdValue && idValidation.valid && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Format OK
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Provide your government-issued ID (tax/business number or personal ID). This appears on
+            your invoices and helps reviewers verify your identity faster.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select value={govIdType} onValueChange={setGovIdType}>
+              <SelectTrigger>
+                <SelectValue placeholder="ID Type" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {grouped.recommended.length > 0 && (
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                    {grouped.countryName ? `Recommended for ${grouped.countryName}` : 'Recommended'}
+                  </div>
+                )}
+                {grouped.recommended.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {GOVERNMENT_ID_LABELS[type].long}
+                  </SelectItem>
+                ))}
+                {grouped.other.length > 0 && (
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                    Other
+                  </div>
+                )}
+                {grouped.other.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {GOVERNMENT_ID_LABELS[type].long}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder={selectedLabel?.example || 'Enter ID number'}
+              value={govIdValue}
+              onChange={(e) => setGovIdValue(e.target.value)}
+              maxLength={INPUT_LIMITS.TAX_ID}
+              aria-invalid={govIdValue.length > 0 && !idValidation.valid}
+            />
+          </div>
+          {govIdValue.length > 0 && !idValidation.valid && idValidation.message && (
+            <p className="text-xs text-destructive">{idValidation.message}</p>
+          )}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveGovId}
+              disabled={!canSaveGovId || updateBusiness.isPending}
+            >
+              {updateBusiness.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save ID
+            </Button>
+          </div>
+        </div>
+
         {/* Free tier gate */}
         {isFree && !isVerified && (
           <Alert className="border-primary/30 bg-primary/5">

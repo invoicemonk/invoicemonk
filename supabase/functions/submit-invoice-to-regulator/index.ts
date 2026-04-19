@@ -8,6 +8,9 @@ const ADAPTERS: Record<string, { submissionRequired: boolean; regulatorCode: str
   NG: { submissionRequired: false, regulatorCode: 'NGA-NRS' },
   GB: { submissionRequired: false, regulatorCode: 'GBR-HMRC' },
   DE: { submissionRequired: false, regulatorCode: 'DEU-BFINV' },
+  // France: PDP routing not yet live (Phase 3). We accept Factur-X artifacts but
+  // do not auto-submit until a certified PDP partnership ships ahead of Sept 2026.
+  FR: { submissionRequired: false, regulatorCode: 'FRA-DGFIP' },
 }
 
 Deno.serve(async (req) => {

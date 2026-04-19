@@ -19,7 +19,7 @@ import { useCreateExpense, EXPENSE_CATEGORIES } from '@/hooks/use-expenses';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { ReceiptUpload, type ScanResult } from './ReceiptUpload';
-import { VendorCombobox } from './VendorCombobox';
+import { VendorPicker } from '@/components/vendors/VendorPicker';
 import { useProductsServices } from '@/hooks/use-products-services';
 
 const expenseSchema = z.object({
@@ -27,6 +27,7 @@ const expenseSchema = z.object({
   description: z.string().max(200).optional(),
   amount: z.number().min(0.01, 'Amount must be greater than 0'),
   vendor: z.string().max(50).optional(),
+  vendorId: z.string().nullable().optional(),
   expenseDate: z.string().optional(),
   notes: z.string().max(200).optional(),
   receiptUrl: z.string().optional().nullable(),
@@ -57,7 +58,7 @@ export function ExpenseForm({ onSuccess }: Props) {
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category: '', description: '', amount: 0, vendor: '',
+      category: '', description: '', amount: 0, vendor: '', vendorId: null,
       expenseDate: new Date().toISOString().split('T')[0], notes: '', receiptUrl: null,
     },
   });
@@ -97,7 +98,8 @@ export function ExpenseForm({ onSuccess }: Props) {
     if (!currentCurrencyAccount) return;
     await createExpense.mutateAsync({
       category: data.category, description: data.description, amount: data.amount,
-      vendor: data.vendor, expenseDate: data.expenseDate, notes: data.notes,
+      vendor: data.vendor, vendorId: data.vendorId ?? null,
+      expenseDate: data.expenseDate, notes: data.notes,
       receiptUrl: data.receiptUrl || undefined,
       productServiceId: linkedProductId && linkedProductId !== 'none' ? linkedProductId : null,
     });
@@ -166,7 +168,14 @@ export function ExpenseForm({ onSuccess }: Props) {
 
             <div className="space-y-2">
               <Label className="flex items-center">Vendor / Supplier<AiBadge field="vendor" /></Label>
-              <VendorCombobox value={watch('vendor')} onChange={(val) => setValue('vendor', val)} />
+              <VendorPicker
+                value={watch('vendor')}
+                vendorId={watch('vendorId')}
+                onChange={({ vendor_id, vendor }) => {
+                  setValue('vendor', vendor);
+                  setValue('vendorId', vendor_id);
+                }}
+              />
             </div>
 
             {products.filter(p => p.isActive).length > 0 && (

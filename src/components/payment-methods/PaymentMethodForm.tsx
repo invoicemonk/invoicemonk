@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PROVIDER_TYPES, PROVIDER_INSTRUCTION_FIELDS, type ProviderType } from '@/hooks/use-payment-methods';
+import { PROVIDER_TYPES, PROVIDER_INSTRUCTION_FIELDS, getBankTransferFields, type ProviderType } from '@/hooks/use-payment-methods';
 
 interface PaymentMethodFormProps {
   initialValues?: {
@@ -39,15 +39,17 @@ export function PaymentMethodForm({
   );
   const [isDefault, setIsDefault] = useState(initialValues?.is_default || false);
 
-  const fields = PROVIDER_INSTRUCTION_FIELDS[providerType] || [];
+  const fields = providerType === 'bank_transfer'
+    ? getBankTransferFields(currencyCode)
+    : (PROVIDER_INSTRUCTION_FIELDS[providerType] || []);
 
   const handleProviderChange = (value: string) => {
     setProviderType(value);
     setInstructions({});
-    // Auto-suggest display name
+    // Auto-suggest display name (only append currency suffix when one is actually selected)
     const provider = PROVIDER_TYPES.find(p => p.value === value);
     if (provider && !displayName) {
-      setDisplayName(`${provider.label}${currencyCode ? ` (${currencyCode})` : ''}`);
+      setDisplayName(currencyCode ? `${provider.label} (${currencyCode})` : provider.label);
     }
   };
 
@@ -84,7 +86,7 @@ export function PaymentMethodForm({
         <Input
           value={displayName}
           onChange={e => setDisplayName(e.target.value)}
-          placeholder="e.g. Bank Transfer (NGN)"
+          placeholder={currencyCode ? `e.g. Bank Transfer (${currencyCode})` : 'e.g. Bank Transfer'}
           maxLength={INPUT_LIMITS.SHORT_TEXT}
         />
       </div>
@@ -103,6 +105,7 @@ export function PaymentMethodForm({
                 onChange={e => handleFieldChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
                 maxLength={INPUT_LIMITS.SHORT_TEXT}
+                inputMode={(field as { inputMode?: 'text' | 'numeric' | 'decimal' }).inputMode}
               />
             </div>
           ))}

@@ -645,11 +645,23 @@ export default function Invoices() {
                       <TableCell className="font-medium">
                         <Link 
                           to={`/b/${currentBusiness?.id}/invoices/${invoice.id}`}
-                          className="hover:text-primary transition-colors flex items-center gap-2"
+                          className="hover:text-primary transition-colors flex items-center gap-2 flex-wrap"
                         >
-                          {invoice.invoice_number}
-                          {isImmutable(invoice.status) && (
-                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          <span className="flex items-center gap-1.5">
+                            {invoice.invoice_number}
+                            {isImmutable(invoice.status) && (
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </span>
+                          {(invoice as any).kind === 'deposit' && (
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-blue-500/40 text-blue-600 dark:text-blue-400">
+                              Deposit{(invoice as any).deposit_percent != null ? ` ${(invoice as any).deposit_percent}%` : ''}
+                            </Badge>
+                          )}
+                          {(invoice as any).kind === 'final' && (
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+                              Final
+                            </Badge>
                           )}
                         </Link>
                       </TableCell>

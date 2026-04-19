@@ -53,10 +53,22 @@ export default function AccountingIncome() {
   const { data: invoiceResult, isLoading: isLoadingInvoices } = useInvoices(business?.id);
   const invoices = invoiceResult?.data;
 
-  // Filter invoices by period and non-draft status
+  // Build a set of deposit IDs that have been "consumed" by a non-draft/non-voided final
+  // invoice — those should be hidden from income lists to avoid double-counting visually.
+  const consumedDepositIds = new Set(
+    (invoices || [])
+      .filter((inv) => (inv as { kind?: string }).kind === 'final'
+        && (inv as { parent_invoice_id?: string }).parent_invoice_id
+        && !['draft', 'voided'].includes(inv.status))
+      .map((inv) => (inv as { parent_invoice_id?: string }).parent_invoice_id as string),
+  );
+
+  // Filter invoices by period and non-draft status, hiding consumed deposits.
   const filteredInvoices = (invoices || []).filter(inv => {
     if (inv.status === 'draft') return false;
     if (!inv.issued_at) return false;
+    const kind = (inv as { kind?: string }).kind;
+    if (kind === 'deposit' && consumedDepositIds.has(inv.id)) return false;
     if (!dateRange) return true; // all_time - show all
     const issuedDate = new Date(inv.issued_at);
     return issuedDate >= dateRange.start && issuedDate <= dateRange.end;

@@ -22,6 +22,8 @@ import { useAdminBusinessDocuments, useAdminVerificationAction, type Verificatio
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { GOVERNMENT_ID_LABELS, type GovernmentIdType } from '@/lib/jurisdiction-config';
+import { validateGovernmentId } from '@/lib/government-id-validation';
 
 interface VerificationDetailSheetProps {
   business: VerificationQueueItem | null;
@@ -185,6 +187,52 @@ export function VerificationDetailSheet({ business, onClose }: VerificationDetai
                 </div>
 
                 <Separator />
+
+                {/* Government ID */}
+                {(() => {
+                  const idType = business.government_id_type;
+                  const idValue = business.government_id_value;
+                  if (!idType && !idValue) return null;
+                  const label = idType ? GOVERNMENT_ID_LABELS[idType as GovernmentIdType] : undefined;
+                  const validation = validateGovernmentId(idType ?? undefined, idValue ?? undefined, business.jurisdiction ?? undefined);
+                  return (
+                    <>
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Government ID</h3>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Type</p>
+                            <p className="font-medium">{label?.long || idType || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Value</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono font-medium break-all">{idValue || '—'}</p>
+                              {idValue && (
+                                validation.valid ? (
+                                  <Badge variant="outline" className="text-xs gap-1 shrink-0">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Format OK
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-xs gap-1 shrink-0">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Check format
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+                            {idValue && !validation.valid && validation.message && (
+                              <p className="text-xs text-destructive mt-1">{validation.message}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  );
+                })()}
+
 
                 {/* Documents */}
                 <div className="space-y-3">

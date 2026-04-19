@@ -28,6 +28,14 @@ const artifactTypeLabels: Record<string, string> = {
   MTD_VAT: 'Making Tax Digital (VAT)',
   ZUGFERD: 'ZUGFeRD',
   CRYPTO_STAMP: 'Cryptographic Stamp',
+  FACTUR_X: 'Factur-X (FR e-invoicing)',
+  CHORUS_PRO: 'Chorus Pro (FR B2G)',
+  EN_16931: 'EN 16931 European Standard',
+  E_FACTURA: 'RO e-Factura',
+  ONLINE_SZAMLA: 'NAV Online Számla (HU)',
+  SEF_INVOICE: 'SEF (RS)',
+  FE_SDI: 'FatturaPA (IT SDI)',
+  SAF_T: 'SAF-T Audit File',
 };
 
 export function ComplianceArtifactsSection({ invoiceId, invoiceStatus, complianceResult }: ComplianceArtifactsSectionProps) {

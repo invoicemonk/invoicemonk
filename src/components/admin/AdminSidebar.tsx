@@ -14,7 +14,8 @@ import {
   ArrowLeft,
   Clock,
   MessageCircle,
-  Bell
+  Bell,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ const mainNavItems = [
   { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
   { title: 'Risk Monitoring', url: '/admin/risk-monitoring', icon: ShieldAlert },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
+  { title: 'Feedback', url: '/admin/feedback', icon: MessageSquare },
   { title: 'Audit Logs', url: '/admin/audit-logs', icon: History },
 ];
 

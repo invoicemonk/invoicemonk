@@ -48,6 +48,16 @@ interface RecipientIdentity {
   phone: string | null;
 }
 
+interface RelatedInvoiceLink {
+  invoice_number: string;
+  verification_id: string | null;
+  status: string;
+  total_amount: number;
+  amount_paid: number;
+  currency: string;
+  deposit_percent?: number | null;
+}
+
 interface VerificationResponse {
   verified: boolean;
   invoice?: {
@@ -64,6 +74,10 @@ interface VerificationResponse {
     integrity_valid: boolean;
     tax_schema_version?: string;
     identity_snapshot_date?: string;
+    kind?: string;
+    deposit_percent?: number | null;
+    parent_deposit?: RelatedInvoiceLink | null;
+    child_finals?: RelatedInvoiceLink[];
   };
   issuer_tier?: string;
   is_flagged?: boolean;
@@ -389,6 +403,101 @@ const VerifyInvoice = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Deposit / Final invoice linkage */}
+                {(data.invoice.kind === 'deposit' || data.invoice.kind === 'final') && (
+                  <Card className="mb-6 border-primary/20 bg-primary/5">
+                    <CardContent className="pt-6 pb-5">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                          <FileText className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-3">
+                          <div>
+                            <h3 className="font-semibold">
+                              {data.invoice.kind === 'deposit' ? 'Deposit Invoice' : 'Final Invoice'}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {data.invoice.kind === 'deposit'
+                                ? 'This invoice collects an advance payment. The amount paid here is credited against a future final invoice.'
+                                : 'This invoice consumes a previously paid deposit. The deposit amount is credited against the total above.'}
+                            </p>
+                          </div>
+
+                          {data.invoice.kind === 'final' && data.invoice.parent_deposit && (
+                            <div className="rounded-lg border bg-card p-3 space-y-1.5">
+                              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                                Linked deposit invoice
+                              </p>
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                {data.invoice.parent_deposit.verification_id ? (
+                                  <Link
+                                    to={`/verify/invoice/${data.invoice.parent_deposit.verification_id}`}
+                                    className="font-mono font-semibold text-primary hover:underline"
+                                  >
+                                    {data.invoice.parent_deposit.invoice_number}
+                                  </Link>
+                                ) : (
+                                  <span className="font-mono font-semibold">
+                                    {data.invoice.parent_deposit.invoice_number}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {data.invoice.parent_deposit.status}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Amount credited (paid on deposit)</span>
+                                <span className="tabular-nums font-medium">
+                                  {formatCurrency(data.invoice.parent_deposit.amount_paid, data.invoice.parent_deposit.currency)}
+                                </span>
+                              </div>
+                              {data.invoice.parent_deposit.deposit_percent != null && (
+                                <p className="text-xs text-muted-foreground">
+                                  Deposit was {data.invoice.parent_deposit.deposit_percent}% of project value
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {data.invoice.kind === 'deposit' && data.invoice.child_finals && data.invoice.child_finals.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                                Consumed by final invoice{data.invoice.child_finals.length > 1 ? 's' : ''}
+                              </p>
+                              {data.invoice.child_finals.map((c) => (
+                                <div key={c.invoice_number} className="rounded-lg border bg-card p-3 flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {c.verification_id ? (
+                                      <Link
+                                        to={`/verify/invoice/${c.verification_id}`}
+                                        className="font-mono font-medium text-primary hover:underline truncate"
+                                      >
+                                        {c.invoice_number}
+                                      </Link>
+                                    ) : (
+                                      <span className="font-mono font-medium truncate">{c.invoice_number}</span>
+                                    )}
+                                    <Badge variant="outline" className="text-xs capitalize">{c.status}</Badge>
+                                  </div>
+                                  <span className="tabular-nums text-sm">
+                                    {formatCurrency(c.total_amount, c.currency)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {data.invoice.kind === 'deposit' && (!data.invoice.child_finals || data.invoice.child_finals.length === 0) && (
+                            <p className="text-xs text-muted-foreground italic">
+                              No final invoice has consumed this deposit yet.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Business Verification Trust Badge */}
                 {data.verification_status && (

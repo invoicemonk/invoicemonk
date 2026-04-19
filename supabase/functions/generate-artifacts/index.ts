@@ -66,22 +66,71 @@ function getAdapterByCountry(countryCode: string) {
   return Object.values(COMPLIANCE_ADAPTERS).find(a => a.countryCode === countryCode) || null
 }
 
+interface ParentDepositRef {
+  invoice_number: string
+  issue_date: string | null
+  total_amount: number
+  amount_paid: number
+  currency: string
+  verification_id: string | null
+}
+
 interface ArtifactBuilderInput {
   invoice: Record<string, unknown>
   issuerSnapshot: Record<string, unknown>
   recipientSnapshot: Record<string, unknown>
   taxSchemaSnapshot: Record<string, unknown> | null
   items: Record<string, unknown>[]
+  parentDeposit?: ParentDepositRef | null
+}
+
+/**
+ * UN/CEFACT Document Type Code (UNTDID 1001).
+ * - 380 = Commercial invoice (standard / final)
+ * - 386 = Prepayment / advance / deposit invoice
+ * - 384 = Corrected invoice (not used here yet)
+ *
+ * For deposit invoices we MUST emit 386 so receivers know the document
+ * represents an advance against a future final invoice. For final invoices
+ * that consume a deposit we emit 380 and reference the deposit via
+ * BillingReference (UBL) / BillingReferencedDocument (CII).
+ */
+function getInvoiceTypeCode(invoice: Record<string, unknown>): string {
+  const kind = (invoice.kind as string) || 'standard'
+  if (kind === 'deposit') return '386'
+  return '380'
+}
+
+/**
+ * Build the BillingReference / BillingReferencedDocument payload that links
+ * a final invoice to the deposit invoice it consumes. Returns null when
+ * there is no parent deposit (i.e. standard or deposit invoice).
+ */
+function buildBillingReference(parent: ParentDepositRef | null | undefined) {
+  if (!parent) return null
+  return {
+    InvoiceDocumentReference: {
+      ID: parent.invoice_number,
+      IssueDate: parent.issue_date,
+      DocumentTypeCode: '386',
+      // Amount of the deposit being applied as a credit against this final invoice
+      PrepaidAmount: parent.amount_paid || parent.total_amount,
+      CurrencyID: parent.currency,
+    },
+  }
 }
 
 // ---- Existing artifact builders ----
 
 function buildIRNArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const billingRef = buildBillingReference(input.parentDeposit)
   return {
     schema: 'IRN',
     version: '1.0',
     invoice_reference: input.invoice.invoice_number,
     invoice_id: input.invoice.id,
+    invoice_kind: input.invoice.kind || 'standard',
+    invoice_type_code: getInvoiceTypeCode(input.invoice),
     issue_date: input.invoice.issue_date,
     due_date: input.invoice.due_date,
     currency: input.invoice.currency,
@@ -109,11 +158,19 @@ function buildIRNArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
       tax_amount: item.tax_amount,
       amount: item.amount,
     })),
+    ...(billingRef ? { BillingReference: billingRef } : {}),
     generated_at: new Date().toISOString(),
   }
 }
 
 function buildUBLArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const billingRef = buildBillingReference(input.parentDeposit)
+  // For final invoices that consume a deposit, the LegalMonetaryTotal must
+  // include PrepaidAmount and PayableAmount = TaxInclusiveAmount - PrepaidAmount.
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'UBL_3_0',
     version: '3.0',
@@ -121,8 +178,9 @@ function buildUBLArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
     ID: input.invoice.invoice_number,
     IssueDate: input.invoice.issue_date,
     DueDate: input.invoice.due_date,
-    InvoiceTypeCode: '380',
+    InvoiceTypeCode: getInvoiceTypeCode(input.invoice),
     DocumentCurrencyCode: input.invoice.currency,
+    ...(billingRef ? { BillingReference: billingRef } : {}),
     AccountingSupplierParty: {
       Party: {
         PartyName: { Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name },
@@ -141,7 +199,8 @@ function buildUBLArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
       LineExtensionAmount: input.invoice.subtotal,
       TaxExclusiveAmount: input.invoice.subtotal,
       TaxInclusiveAmount: input.invoice.total_amount,
-      PayableAmount: input.invoice.total_amount,
+      ...(prepaid > 0 ? { PrepaidAmount: prepaid } : {}),
+      PayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
     },
     TaxTotal: {
       TaxAmount: input.invoice.tax_amount,
@@ -185,6 +244,10 @@ function buildMTDVATArtifact(input: ArtifactBuilderInput): Record<string, unknow
 }
 
 function buildZugferdArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'ZUGFERD',
     version: '2.2',
@@ -192,7 +255,7 @@ function buildZugferdArtifact(input: ArtifactBuilderInput): Record<string, unkno
     ExchangedDocument: {
       ID: input.invoice.invoice_number,
       IssueDateTime: input.invoice.issue_date,
-      TypeCode: '380',
+      TypeCode: getInvoiceTypeCode(input.invoice),
     },
     SupplyChainTradeTransaction: {
       ApplicableHeaderTradeAgreement: {
@@ -207,11 +270,21 @@ function buildZugferdArtifact(input: ArtifactBuilderInput): Record<string, unkno
       },
       ApplicableHeaderTradeSettlement: {
         InvoiceCurrencyCode: input.invoice.currency,
+        ...(input.parentDeposit
+          ? {
+              InvoiceReferencedDocument: {
+                IssuerAssignedID: input.parentDeposit.invoice_number,
+                FormattedIssueDateTime: input.parentDeposit.issue_date,
+                TypeCode: '386',
+              },
+            }
+          : {}),
         SpecifiedTradeSettlementHeaderMonetarySummation: {
           LineTotalAmount: input.invoice.subtotal,
           TaxTotalAmount: input.invoice.tax_amount,
           GrandTotalAmount: input.invoice.total_amount,
-          DuePayableAmount: input.invoice.total_amount,
+          ...(prepaid > 0 ? { TotalPrepaidAmount: prepaid } : {}),
+          DuePayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
         },
       },
     },
@@ -238,6 +311,11 @@ function buildCryptoStampArtifact(input: ArtifactBuilderInput): Record<string, u
 // ---- New EU artifact builders ----
 
 function buildEN16931Artifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const billingRef = buildBillingReference(input.parentDeposit)
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'EN_16931',
     version: '1.0.0',
@@ -245,8 +323,9 @@ function buildEN16931Artifact(input: ArtifactBuilderInput): Record<string, unkno
     InvoiceNumber: input.invoice.invoice_number,
     IssueDate: input.invoice.issue_date,
     DueDate: input.invoice.due_date,
-    InvoiceTypeCode: '380',
+    InvoiceTypeCode: getInvoiceTypeCode(input.invoice),
     DocumentCurrencyCode: input.invoice.currency,
+    ...(billingRef ? { BillingReference: billingRef } : {}),
     Seller: {
       Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
       TradingName: input.issuerSnapshot.business_name,
@@ -263,7 +342,8 @@ function buildEN16931Artifact(input: ArtifactBuilderInput): Record<string, unkno
       LineExtensionAmount: input.invoice.subtotal,
       TaxExclusiveAmount: input.invoice.subtotal,
       TaxInclusiveAmount: input.invoice.total_amount,
-      PayableAmount: input.invoice.total_amount,
+      ...(prepaid > 0 ? { PrepaidAmount: prepaid } : {}),
+      PayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
     },
     TaxBreakdown: {
       TaxableAmount: input.invoice.subtotal,
@@ -331,6 +411,11 @@ function buildSAFTArtifact(input: ArtifactBuilderInput): Record<string, unknown>
 }
 
 function buildEFacturaArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const billingRef = buildBillingReference(input.parentDeposit)
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'E_FACTURA',
     version: '1.0',
@@ -339,8 +424,9 @@ function buildEFacturaArtifact(input: ArtifactBuilderInput): Record<string, unkn
     ID: input.invoice.invoice_number,
     IssueDate: input.invoice.issue_date,
     DueDate: input.invoice.due_date,
-    InvoiceTypeCode: '380',
+    InvoiceTypeCode: getInvoiceTypeCode(input.invoice),
     DocumentCurrencyCode: input.invoice.currency,
+    ...(billingRef ? { BillingReference: billingRef } : {}),
     AccountingSupplierParty: {
       RegistrationName: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
       CompanyID: input.issuerSnapshot.tax_id,
@@ -357,7 +443,8 @@ function buildEFacturaArtifact(input: ArtifactBuilderInput): Record<string, unkn
       LineExtensionAmount: input.invoice.subtotal,
       TaxExclusiveAmount: input.invoice.subtotal,
       TaxInclusiveAmount: input.invoice.total_amount,
-      PayableAmount: input.invoice.total_amount,
+      ...(prepaid > 0 ? { PrepaidAmount: prepaid } : {}),
+      PayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
     },
     TaxTotal: { TaxAmount: input.invoice.tax_amount },
     InvoiceLine: input.items.map((item, idx) => ({
@@ -421,6 +508,11 @@ function buildOnlineSzamlaArtifact(input: ArtifactBuilderInput): Record<string, 
 }
 
 function buildSEFArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const billingRef = buildBillingReference(input.parentDeposit)
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'SEF_INVOICE',
     version: '1.0',
@@ -429,8 +521,9 @@ function buildSEFArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
     ID: input.invoice.invoice_number,
     IssueDate: input.invoice.issue_date,
     DueDate: input.invoice.due_date,
-    InvoiceTypeCode: '380',
+    InvoiceTypeCode: getInvoiceTypeCode(input.invoice),
     DocumentCurrencyCode: input.invoice.currency,
+    ...(billingRef ? { BillingReference: billingRef } : {}),
     Seller: {
       Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,
       PIB: input.issuerSnapshot.tax_id,
@@ -447,7 +540,8 @@ function buildSEFArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
       LineExtensionAmount: input.invoice.subtotal,
       TaxExclusiveAmount: input.invoice.subtotal,
       TaxInclusiveAmount: input.invoice.total_amount,
-      PayableAmount: input.invoice.total_amount,
+      ...(prepaid > 0 ? { PrepaidAmount: prepaid } : {}),
+      PayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
     },
     TaxTotal: { TaxAmount: input.invoice.tax_amount },
     InvoiceLines: input.items.map((item, idx) => ({
@@ -464,6 +558,10 @@ function buildSEFArtifact(input: ArtifactBuilderInput): Record<string, unknown> 
 }
 
 function buildFacturXArtifact(input: ArtifactBuilderInput): Record<string, unknown> {
+  const prepaid = input.parentDeposit
+    ? Number(input.parentDeposit.amount_paid || input.parentDeposit.total_amount || 0)
+    : 0
+  const payable = Math.max(0, Number(input.invoice.total_amount || 0) - prepaid)
   return {
     schema: 'FACTUR_X',
     version: '1.0',
@@ -472,7 +570,7 @@ function buildFacturXArtifact(input: ArtifactBuilderInput): Record<string, unkno
     ExchangedDocument: {
       ID: input.invoice.invoice_number,
       IssueDateTime: input.invoice.issue_date,
-      TypeCode: '380',
+      TypeCode: getInvoiceTypeCode(input.invoice),
     },
     SupplyChainTradeTransaction: {
       ApplicableHeaderTradeAgreement: {
@@ -489,11 +587,21 @@ function buildFacturXArtifact(input: ArtifactBuilderInput): Record<string, unkno
       },
       ApplicableHeaderTradeSettlement: {
         InvoiceCurrencyCode: input.invoice.currency,
+        ...(input.parentDeposit
+          ? {
+              InvoiceReferencedDocument: {
+                IssuerAssignedID: input.parentDeposit.invoice_number,
+                FormattedIssueDateTime: input.parentDeposit.issue_date,
+                TypeCode: '386',
+              },
+            }
+          : {}),
         SpecifiedTradeSettlementHeaderMonetarySummation: {
           LineTotalAmount: input.invoice.subtotal,
           TaxTotalAmount: input.invoice.tax_amount,
           GrandTotalAmount: input.invoice.total_amount,
-          DuePayableAmount: input.invoice.total_amount,
+          ...(prepaid > 0 ? { TotalPrepaidAmount: prepaid } : {}),
+          DuePayableAmount: prepaid > 0 ? payable : input.invoice.total_amount,
         },
       },
     },
@@ -551,7 +659,7 @@ function buildFatturaElettronicaArtifact(input: ArtifactBuilderInput): Record<st
     FatturaElettronicaBody: {
       DatiGenerali: {
         DatiGeneraliDocumento: {
-          TipoDocumento: 'TD01',
+          TipoDocumento: input.invoice.kind === 'deposit' ? 'TD02' : 'TD01',
           Divisa: input.invoice.currency,
           Data: input.invoice.issue_date,
           Numero: input.invoice.invoice_number,
@@ -698,12 +806,35 @@ Deno.serve(async (req) => {
       )
     }
 
+    // For final invoices that consume a deposit, fetch the parent deposit so
+    // builders can emit BillingReference / InvoiceReferencedDocument and the
+    // PrepaidAmount / DuePayableAmount totals correctly.
+    let parentDeposit: ParentDepositRef | null = null
+    if (invoice.kind === 'final' && invoice.parent_invoice_id) {
+      const { data: parent } = await supabase
+        .from('invoices')
+        .select('invoice_number, issue_date, total_amount, amount_paid, currency, verification_id')
+        .eq('id', invoice.parent_invoice_id)
+        .maybeSingle()
+      if (parent) {
+        parentDeposit = {
+          invoice_number: parent.invoice_number,
+          issue_date: parent.issue_date,
+          total_amount: Number(parent.total_amount || 0),
+          amount_paid: Number(parent.amount_paid || 0),
+          currency: parent.currency,
+          verification_id: parent.verification_id,
+        }
+      }
+    }
+
     const input: ArtifactBuilderInput = {
       invoice,
       issuerSnapshot,
       recipientSnapshot,
       taxSchemaSnapshot,
       items: invoice.invoice_items || [],
+      parentDeposit,
     }
 
     const serviceClient = createClient(

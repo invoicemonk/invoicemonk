@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { INPUT_LIMITS } from '@/lib/input-limits';
+import { INPUT_LIMITS, splitLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -26,6 +26,7 @@ import { useCreditNoteByInvoice } from '@/hooks/use-credit-notes';
 import { useInvoicePayments } from '@/hooks/use-payments';
 import { useInvoicePaymentProofs, useUploadPaymentProof } from '@/hooks/use-payment-proofs';
 import { useReceiptsByInvoice, useGenerateReceipt, useDownloadReceiptPdf } from '@/hooks/use-receipts';
+import { useParentDepositInvoice, useChildFinalInvoices } from '@/hooks/use-parent-deposit-invoice';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import { ComplianceArtifactsSection } from '@/components/invoices/ComplianceArtifactsSection';
 import { RegulatoryStatusSection } from '@/components/invoices/RegulatoryStatusSection';
@@ -79,6 +80,11 @@ export default function InvoiceDetail() {
   const { data: payments } = useInvoicePayments(id);
   const { data: paymentProofs } = useInvoicePaymentProofs(id);
   const { data: invoiceReceipts } = useReceiptsByInvoice(id);
+  // Deposit / final invoice linkage
+  const invoiceKind = (invoice as unknown as { kind?: string })?.kind || 'standard';
+  const parentInvoiceId = (invoice as unknown as { parent_invoice_id?: string | null })?.parent_invoice_id || null;
+  const { data: parentDeposit } = useParentDepositInvoice(invoiceKind === 'final' ? parentInvoiceId : null);
+  const { data: childFinals } = useChildFinalInvoices(invoiceKind === 'deposit' ? id : null);
   const issueInvoice = useIssueInvoice();
   const voidInvoice = useVoidInvoice();
   const recordPayment = useRecordPayment();
@@ -435,14 +441,22 @@ export default function InvoiceDetail() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invoice.invoice_items.map((item) => (
+                    {invoice.invoice_items.map((item) => {
+                      const { heading, description } = splitLineItemDescription(item.description);
+                      return (
                       <TableRow key={item.id}>
-                        <TableCell>{item.description}</TableCell>
+                        <TableCell>
+                          <p className="font-medium">{heading}</p>
+                          {description && (
+                            <p className="text-xs text-muted-foreground whitespace-pre-line mt-1">{description}</p>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(item.unit_price), invoice.currency)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(item.amount), invoice.currency)}</TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               ) : (
@@ -552,6 +566,83 @@ export default function InvoiceDetail() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Deposit / Final invoice linkage */}
+          {(invoiceKind === 'deposit' || invoiceKind === 'final') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  {invoiceKind === 'deposit' ? 'Deposit Invoice' : 'Final Invoice'}
+                </CardTitle>
+                <CardDescription>
+                  {invoiceKind === 'deposit'
+                    ? 'This invoice collects an advance/down payment. A future final invoice will credit the amount paid here.'
+                    : 'This invoice consumes a previously issued deposit invoice. The deposit amount is credited against the total below.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {invoiceKind === 'final' && parentDeposit && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Linked deposit</p>
+                        <Link
+                          to={`/b/${currentBusiness?.id}/invoices/${parentDeposit.id}`}
+                          className="font-mono text-base font-semibold text-primary hover:underline"
+                        >
+                          {parentDeposit.invoice_number}
+                        </Link>
+                      </div>
+                      <Badge variant="outline">{parentDeposit.status}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Deposit total</span>
+                      <span className="tabular-nums">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: parentDeposit.currency || invoice.currency }).format(Number(parentDeposit.total_amount))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span className="text-muted-foreground">Amount credited (paid on deposit)</span>
+                      <span className="tabular-nums" style={{ color: '#0369a1' }}>
+                        -{new Intl.NumberFormat('en-US', { style: 'currency', currency: parentDeposit.currency || invoice.currency }).format(Number(parentDeposit.amount_paid || 0))}
+                      </span>
+                    </div>
+                    {parentDeposit.deposit_percent != null && (
+                      <p className="text-xs text-muted-foreground">Deposit was {parentDeposit.deposit_percent}% of project value</p>
+                    )}
+                  </div>
+                )}
+                {invoiceKind === 'final' && !parentDeposit && parentInvoiceId && (
+                  <p className="text-muted-foreground italic">Loading linked deposit…</p>
+                )}
+                {invoiceKind === 'deposit' && (childFinals?.length ?? 0) === 0 && (
+                  <p className="text-muted-foreground italic">No final invoice has consumed this deposit yet.</p>
+                )}
+                {invoiceKind === 'deposit' && childFinals && childFinals.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Consumed by final invoice{childFinals.length > 1 ? 's' : ''}</p>
+                    {childFinals.map((c) => (
+                      <Link
+                        key={c.id}
+                        to={`/b/${currentBusiness?.id}/invoices/${c.id}`}
+                        className="flex items-center justify-between rounded border p-3 hover:bg-muted/40"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono font-medium">{c.invoice_number}</span>
+                          <Badge variant="outline" className="text-xs">{c.status}</Badge>
+                        </div>
+                        <span className="tabular-nums text-sm">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: c.currency }).format(Number(c.total_amount))}
+                        </span>
+                      </Link>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -789,6 +880,41 @@ export default function InvoiceDetail() {
               This does not erase the original invoice. A credit note will be created.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* Cascade warning: voiding a deposit that has been consumed by final invoice(s) */}
+          {invoiceKind === 'deposit' && childFinals && childFinals.length > 0 && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <p className="font-semibold">
+                  This deposit invoice has been consumed by {childFinals.length} final invoice{childFinals.length > 1 ? 's' : ''}.
+                </p>
+                <p className="text-sm">
+                  Voiding it will leave the linked final invoice{childFinals.length > 1 ? 's' : ''} crediting an amount that no longer represents a valid receivable. You should review and likely void {childFinals.length > 1 ? 'them' : 'it'} as well:
+                </p>
+                <ul className="text-sm list-disc pl-5">
+                  {childFinals.map((c) => (
+                    <li key={c.id} className="font-mono">
+                      {c.invoice_number} <span className="font-sans text-xs">({c.status})</span>
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Informational warning: voiding a final invoice that consumed a deposit */}
+          {invoiceKind === 'final' && parentDeposit && (
+            <Alert className="mt-2 border-amber-500/40 bg-amber-500/5">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-sm">
+                This final invoice credits deposit{' '}
+                <span className="font-mono font-medium">{parentDeposit.invoice_number}</span>.
+                The deposit invoice itself will remain valid and stay marked as paid — only this final invoice will be voided.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="py-4">
             <Label>Reason (required)</Label>
             <Textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} className="mt-2" placeholder="Enter reason..." maxLength={INPUT_LIMITS.TEXTAREA} />

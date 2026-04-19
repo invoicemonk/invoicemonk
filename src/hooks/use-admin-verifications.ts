@@ -15,6 +15,8 @@ export interface VerificationQueueItem {
   jurisdiction: string | null;
   created_at: string;
   document_count: number;
+  government_id_type?: string | null;
+  government_id_value?: string | null;
 }
 
 export interface VerificationDocument {
