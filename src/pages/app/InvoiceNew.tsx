@@ -546,6 +546,16 @@ export default function InvoiceNew() {
 
     if (!validateForm()) return;
 
+    // Final invoice must have a linked parent
+    if (invoiceKind === 'final' && !parentInvoiceId) {
+      toast({
+        title: 'Deposit invoice required',
+        description: 'A final invoice must reference a previously paid deposit invoice.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
@@ -570,6 +580,9 @@ export default function InvoiceNew() {
         exchange_rate_to_primary: null,
         exchange_rate_snapshot: null,
         payment_method_id: selectedPaymentMethodId || null,
+        kind: invoiceKind,
+        parent_invoice_id: parentInvoiceId,
+        deposit_percent: depositPercent,
       },
       items: validItems.map(item => ({
         description: combineLineItemDescription(item.description, item.longDescription || ''),

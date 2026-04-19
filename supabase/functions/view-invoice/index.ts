@@ -45,6 +45,16 @@ interface PaymentMethodSnapshot {
   instructions: Record<string, string>
 }
 
+interface RelatedInvoiceLink {
+  invoice_number: string
+  verification_id: string | null
+  status: string
+  total_amount: number
+  amount_paid: number
+  currency: string
+  deposit_percent?: number | null
+}
+
 interface ViewInvoiceResponse {
   success: boolean
   invoice?: {
@@ -66,6 +76,10 @@ interface ViewInvoiceResponse {
     payment_method_snapshot: PaymentMethodSnapshot | null
     items: InvoiceItem[]
     verification_id: string
+    kind?: string
+    deposit_percent?: number | null
+    parent_deposit?: RelatedInvoiceLink | null
+    child_finals?: RelatedInvoiceLink[]
   }
   issuer_tier?: string
   is_flagged?: boolean
@@ -128,6 +142,9 @@ Deno.serve(async (req) => {
         issuer_snapshot,
         recipient_snapshot,
         payment_method_snapshot,
+        kind,
+        parent_invoice_id,
+        deposit_percent,
         invoice_items (
           id,
           description,
@@ -276,6 +293,45 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch deposit/final invoice linkage
+    const invoiceKind = (invoice as { kind?: string }).kind || 'standard'
+    const parentInvoiceId = (invoice as { parent_invoice_id?: string | null }).parent_invoice_id || null
+    let parentDeposit: RelatedInvoiceLink | null = null
+    let childFinals: RelatedInvoiceLink[] = []
+
+    if (invoiceKind === 'final' && parentInvoiceId) {
+      const { data: parent } = await supabase
+        .from('invoices')
+        .select('invoice_number, verification_id, status, total_amount, amount_paid, currency, deposit_percent')
+        .eq('id', parentInvoiceId)
+        .maybeSingle()
+      if (parent) {
+        parentDeposit = {
+          invoice_number: parent.invoice_number,
+          verification_id: parent.verification_id,
+          status: parent.status,
+          total_amount: Number(parent.total_amount),
+          amount_paid: Number(parent.amount_paid || 0),
+          currency: parent.currency,
+          deposit_percent: parent.deposit_percent,
+        }
+      }
+    } else if (invoiceKind === 'deposit') {
+      const { data: children } = await supabase
+        .from('invoices')
+        .select('invoice_number, verification_id, status, total_amount, amount_paid, currency')
+        .eq('parent_invoice_id', invoice.id)
+        .order('created_at', { ascending: false })
+      childFinals = (children || []).map((c) => ({
+        invoice_number: c.invoice_number,
+        verification_id: c.verification_id,
+        status: c.status,
+        total_amount: Number(c.total_amount),
+        amount_paid: Number(c.amount_paid || 0),
+        currency: c.currency,
+      }))
+    }
+
     const response: ViewInvoiceResponse = {
       success: true,
       invoice: {
@@ -296,7 +352,11 @@ Deno.serve(async (req) => {
         recipient_snapshot: invoice.recipient_snapshot as RecipientSnapshot | null,
         payment_method_snapshot: invoice.payment_method_snapshot as PaymentMethodSnapshot | null,
         items: sortedItems,
-        verification_id: invoice.verification_id
+        verification_id: invoice.verification_id,
+        kind: invoiceKind,
+        deposit_percent: (invoice as { deposit_percent?: number | null }).deposit_percent ?? null,
+        parent_deposit: parentDeposit,
+        child_finals: childFinals,
       },
       issuer_tier: issuerTier,
       is_flagged: isFlagged,

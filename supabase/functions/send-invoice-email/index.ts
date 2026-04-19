@@ -132,6 +132,14 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
 // PDF GENERATION — Template-specific builders using pdfmake
 // ============================================================
 
+interface ParentDepositInfo {
+  invoice_number: string
+  amount_paid: number
+  total_amount: number
+  currency: string
+  deposit_percent: number | null
+}
+
 interface PdfBuildContext {
   invoice: Record<string, unknown>
   items: InvoiceItem[]
@@ -162,6 +170,11 @@ interface PdfBuildContext {
   showTerms: boolean
   showNotes: boolean
   showQr: boolean
+  // Deposit / final invoice linkage
+  invoiceKind: string
+  depositPercent: number | null
+  parentDeposit: ParentDepositInfo | null
+  depositCreditAmount: number
 }
 
 const statusColors: Record<string, string> = {
@@ -238,6 +251,21 @@ function buildTotalsBody(ctx: PdfBuildContext) {
     { text: 'Grand Total', fontSize: 11, bold: true, margin: [3, 3, 3, 3] },
     { text: formatCurrencyPdf(ctx.invoice.total_amount as number, ctx.currency), fontSize: 11, bold: true, alignment: 'right', margin: [3, 3, 3, 3] }
   ])
+  const grandTotalIndex = totalsBody.length - 1
+
+  // Deposit credit (only for final invoices linked to a deposit)
+  if (ctx.invoiceKind === 'final' && ctx.parentDeposit && ctx.depositCreditAmount > 0) {
+    totalsBody.push([
+      { text: `Less: Deposit (${ctx.parentDeposit.invoice_number})`, fontSize: 9, color: '#7c3aed', margin: [3, 2, 3, 2] },
+      { text: `-${formatCurrencyPdf(ctx.depositCreditAmount, ctx.currency)}`, fontSize: 9, color: '#7c3aed', alignment: 'right', margin: [3, 2, 3, 2] }
+    ])
+    const netDue = Math.max(0, (ctx.invoice.total_amount as number) - ctx.depositCreditAmount - ((ctx.invoice.amount_paid as number) || 0))
+    totalsBody.push([
+      { text: 'Net Due After Deposit', fontSize: 10, bold: true, margin: [3, 3, 3, 3] },
+      { text: formatCurrencyPdf(netDue, ctx.currency), fontSize: 10, bold: true, alignment: 'right', margin: [3, 3, 3, 3] }
+    ])
+  }
+
   if ((ctx.invoice.amount_paid as number) > 0) {
     totalsBody.push([
       { text: 'Paid', fontSize: 9, color: '#059669', margin: [3, 2, 3, 2] },
@@ -250,8 +278,65 @@ function buildTotalsBody(ctx: PdfBuildContext) {
       { text: formatCurrencyPdf(ctx.balanceDue, ctx.currency), fontSize: 11, bold: true, alignment: 'right', fillColor: '#fef3c7', margin: [3, 3, 3, 3] }
     ])
   }
-  const grandTotalIndex = totalsBody.length - (ctx.balanceDue > 0 ? ((ctx.invoice.amount_paid as number) > 0 ? 3 : 2) : 1)
   return { totalsBody, grandTotalIndex }
+}
+
+// Shared: build a "kind" badge (Deposit · 30% / Final Invoice) — returns null if standard
+function buildKindBadge(ctx: PdfBuildContext): unknown | null {
+  if (ctx.invoiceKind === 'deposit') {
+    const label = ctx.depositPercent != null ? `DEPOSIT · ${ctx.depositPercent}%` : 'DEPOSIT'
+    return {
+      table: { widths: ['auto'], body: [[{ text: label, fontSize: 7, bold: true, color: '#ffffff', fillColor: '#2563eb', margin: [5, 1, 5, 1] }]] },
+      layout: 'noBorders'
+    }
+  }
+  if (ctx.invoiceKind === 'final') {
+    return {
+      table: { widths: ['auto'], body: [[{ text: 'FINAL INVOICE', fontSize: 7, bold: true, color: '#ffffff', fillColor: '#7c3aed', margin: [5, 1, 5, 1] }]] },
+      layout: 'noBorders'
+    }
+  }
+  return null
+}
+
+// Shared: deposit/final banner row above items table
+function buildKindBanner(ctx: PdfBuildContext): unknown | null {
+  if (ctx.invoiceKind === 'deposit') {
+    const pct = ctx.depositPercent != null ? `${ctx.depositPercent}% ` : ''
+    return {
+      table: {
+        widths: ['*'],
+        body: [[{
+          stack: [
+            { text: `Deposit Invoice${ctx.depositPercent != null ? ` · ${ctx.depositPercent}%` : ''}`, fontSize: 9, bold: true, color: '#1e40af' },
+            { text: `This invoice collects an ${pct}advance payment. The amount paid here will be credited against a future final invoice.`, fontSize: 8, color: '#1e3a8a', margin: [0, 2, 0, 0] }
+          ],
+          fillColor: '#dbeafe',
+          margin: [8, 6, 8, 6]
+        }]]
+      },
+      layout: { hLineWidth: () => 1, vLineWidth: () => 1, hLineColor: () => '#bfdbfe', vLineColor: () => '#bfdbfe', paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+      margin: [0, 0, 0, 10]
+    }
+  }
+  if (ctx.invoiceKind === 'final' && ctx.parentDeposit) {
+    return {
+      table: {
+        widths: ['*'],
+        body: [[{
+          stack: [
+            { text: 'Final Invoice', fontSize: 9, bold: true, color: '#5b21b6' },
+            { text: `Linked to deposit invoice ${ctx.parentDeposit.invoice_number}. The deposit amount of ${formatCurrencyPdf(ctx.depositCreditAmount, ctx.currency)} is credited against the total below.`, fontSize: 8, color: '#4c1d95', margin: [0, 2, 0, 0] }
+          ],
+          fillColor: '#ede9fe',
+          margin: [8, 6, 8, 6]
+        }]]
+      },
+      layout: { hLineWidth: () => 1, vLineWidth: () => 1, hLineColor: () => '#ddd6fe', vLineColor: () => '#ddd6fe', paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+      margin: [0, 0, 0, 10]
+    }
+  }
+  return null
 }
 
 // Shared: payment instructions content
@@ -323,7 +408,8 @@ function buildMinimalPdf(ctx: PdfBuildContext): unknown[] {
     columns: [
       { stack: [
         { text: 'INVOICE', fontSize: 16, bold: true, color: '#4b5563' },
-        { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#9ca3af', margin: [0, 1, 0, 0] }
+        { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#9ca3af', margin: [0, 1, 0, 0] },
+        ...((): unknown[] => { const b = buildKindBadge(ctx); return b ? [{ ...(b as Record<string, unknown>), margin: [0, 4, 0, 0] }] : [] })()
       ], width: '*' },
       { stack: [
         { text: `Issued: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#6b7280', alignment: 'right' },
@@ -352,6 +438,10 @@ function buildMinimalPdf(ctx: PdfBuildContext): unknown[] {
     ],
     margin: [0, 0, 0, 14]
   })
+
+  // Deposit/final banner
+  const minimalBanner = buildKindBanner(ctx)
+  if (minimalBanner) content.push(minimalBanner)
 
   // Items table - clean, no border wrapping
   const { headerRow, itemRows, tableWidths } = buildItemRows(ctx)
@@ -423,6 +513,7 @@ function buildStandardPdf(ctx: PdfBuildContext): unknown[] {
       { stack: [
         { text: 'INVOICE', fontSize: 18, bold: true, alignment: 'right' },
         { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#666666', alignment: 'right', margin: [0, 1, 0, 3] },
+        ...((): unknown[] => { const b = buildKindBadge(ctx); return b ? [{ ...(b as Record<string, unknown>), alignment: 'right', margin: [0, 0, 0, 3] }] : [] })(),
         {
           table: { widths: ['auto'], body: [[{ text: ctx.status.toUpperCase(), fontSize: 7, bold: true, color: statusColors[ctx.status] || '#1d4ed8', fillColor: statusBgColors[ctx.status] || '#dbeafe', margin: [5, 1, 5, 1] }]] },
           layout: 'noBorders', alignment: 'right', margin: [0, 0, 0, 3]
@@ -474,19 +565,12 @@ function buildStandardPdf(ctx: PdfBuildContext): unknown[] {
     margin: [0, 0, 0, 14]
   })
 
+  // Deposit/final banner
+  const stdBanner = buildKindBanner(ctx)
+  if (stdBanner) content.push(stdBanner)
+
   // Items table
   const { headerRow, itemRows, tableWidths } = buildItemRows(ctx)
-  content.push({
-    table: { headerRows: 1, widths: tableWidths, body: [headerRow, ...itemRows] },
-    layout: {
-      hLineWidth: (i: number) => i <= 1 ? 1 : 0.5,
-      vLineWidth: () => 0,
-      hLineColor: (i: number) => i <= 1 ? '#d1d5db' : '#f0f0f0',
-      fillColor: (r: number) => r === 0 ? '#f5f5f5' : null,
-      paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0,
-    },
-    margin: [0, 0, 0, 6]
-  })
 
   // Invoice Summary box
   const summaryItems = [
@@ -559,7 +643,17 @@ function buildModernPdf(ctx: PdfBuildContext): unknown[] {
               ...(ctx.showLogo && ctx.logoDataUri ? [{ image: ctx.logoDataUri, width: 50, fit: [50, 35], margin: [0, 0, 10, 0] }] : []),
               { stack: [
                 { text: 'INVOICE', fontSize: 20, bold: true, color: '#ffffff' },
-                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffff', margin: [0, 1, 0, 0] }
+                { text: ctx.invoice.invoice_number as string, fontSize: 10, color: '#ffffff', margin: [0, 1, 0, 0] },
+                ...((): unknown[] => {
+                  if (ctx.invoiceKind === 'deposit') {
+                    const label = ctx.depositPercent != null ? `DEPOSIT · ${ctx.depositPercent}%` : 'DEPOSIT'
+                    return [{ table: { widths: ['auto'], body: [[{ text: label, fontSize: 7, bold: true, color: '#1e40af', fillColor: '#ffffff', margin: [5, 1, 5, 1] }]] }, layout: 'noBorders', margin: [0, 4, 0, 0] }]
+                  }
+                  if (ctx.invoiceKind === 'final') {
+                    return [{ table: { widths: ['auto'], body: [[{ text: 'FINAL INVOICE', fontSize: 7, bold: true, color: '#5b21b6', fillColor: '#ffffff', margin: [5, 1, 5, 1] }]] }, layout: 'noBorders', margin: [0, 4, 0, 0] }]
+                  }
+                  return []
+                })()
               ], width: '*' },
               { stack: [
                 { text: `Issue: ${formatDate(ctx.invoice.issue_date as string)}`, fontSize: 9, color: '#ffffff', alignment: 'right' },
@@ -633,6 +727,10 @@ function buildModernPdf(ctx: PdfBuildContext): unknown[] {
     ],
     margin: [0, 0, 0, 14]
   })
+
+  // Deposit/final banner
+  const modernBanner = buildKindBanner(ctx)
+  if (modernBanner) content.push(modernBanner)
 
   // Items table in bordered container
   const { headerRow, itemRows, tableWidths } = buildItemRows(ctx)
@@ -743,7 +841,7 @@ function buildEnterprisePdf(ctx: PdfBuildContext): unknown[] {
   // 4-column metadata grid
   content.push({
     columns: [
-      { stack: [{ text: 'INVOICE NO', fontSize: 7, bold: true, color: '#999999' }, { text: ctx.invoice.invoice_number as string, fontSize: 9, bold: true }], width: '*' },
+      { stack: [{ text: 'INVOICE NO', fontSize: 7, bold: true, color: '#999999' }, { text: ctx.invoice.invoice_number as string, fontSize: 9, bold: true }, ...((): unknown[] => { const b = buildKindBadge(ctx); return b ? [{ ...(b as Record<string, unknown>), margin: [0, 3, 0, 0] }] : [] })()], width: '*' },
       { stack: [{ text: 'DATE', fontSize: 7, bold: true, color: '#999999' }, { text: formatDate(ctx.invoice.issue_date as string), fontSize: 9 }], width: '*' },
       { stack: [{ text: 'DUE DATE', fontSize: 7, bold: true, color: '#999999' }, { text: formatDate(ctx.invoice.due_date as string), fontSize: 9 }], width: '*' },
       {
@@ -781,6 +879,10 @@ function buildEnterprisePdf(ctx: PdfBuildContext): unknown[] {
     margin: [0, 0, 0, 12]
   })
   content.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 0.5, lineColor: `${brandColor}40` }], margin: [0, 0, 0, 12] })
+
+  // Deposit/final banner
+  const entBanner = buildKindBanner(ctx)
+  if (entBanner) content.push(entBanner)
 
   // Items in bordered table
   const { headerRow, itemRows, tableWidths } = buildItemRows(ctx)
@@ -840,7 +942,8 @@ async function generateInvoicePdfBase64(
   verificationUrl: string | null,
   showWatermark: boolean,
   paymentMethodSnapshot: Record<string, unknown> | null,
-  templateSnapshot: TemplateSnapshot | null = null
+  templateSnapshot: TemplateSnapshot | null = null,
+  parentDeposit: ParentDepositInfo | null = null
 ): Promise<string> {
   // Dynamic imports for pdfmake
   // deno-lint-ignore no-explicit-any
@@ -869,6 +972,10 @@ async function generateInvoicePdfBase64(
   const tplLayout = templateSnapshot?.layout || {}
   const tplStyles = templateSnapshot?.styles || {}
 
+  const invoiceKind = (invoice.kind as string) || 'standard'
+  const depositPercent = (invoice.deposit_percent as number | null) ?? null
+  const depositCreditAmount = parentDeposit ? Number(parentDeposit.amount_paid || 0) : 0
+
   const ctx: PdfBuildContext = {
     invoice, items, issuerSnapshot, recipientSnapshot, verificationUrl,
     showWatermark, paymentMethodSnapshot, templateSnapshot,
@@ -890,6 +997,10 @@ async function generateInvoicePdfBase64(
     showTerms: tplLayout.show_terms !== false,
     showNotes: tplLayout.show_notes !== false,
     showQr: tplLayout.show_verification_qr !== false,
+    invoiceKind,
+    depositPercent,
+    parentDeposit,
+    depositCreditAmount,
   }
 
   const tplHeaderStyle = tplLayout.header_style || 'standard'
@@ -964,16 +1075,17 @@ Deno.serve(async (req) => {
     })
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token)
-    
-    if (claimsError || !claimsData?.user) {
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token)
+
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error('Auth validation failed:', claimsError?.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid authentication token' }),
+        JSON.stringify({ success: false, error: 'Invalid authentication token. Please log out and log back in.' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const userId = claimsData.user.id
+    const userId = claimsData.claims.sub
 
     // Rate limit: max 10 emails/hour, 50 emails/day per user
     const hourlyAllowed = await checkRateLimit(serviceRoleKey, userId, 'send-invoice-email', 3600, 10)
@@ -1113,11 +1225,31 @@ Deno.serve(async (req) => {
           : invoice.payment_method_snapshot) as Record<string, unknown>
       : null;
 
+    // Fetch parent deposit invoice if this is a final invoice
+    let parentDeposit: ParentDepositInfo | null = null
+    if (invoice.kind === 'final' && invoice.parent_invoice_id) {
+      const { data: parent } = await supabase
+        .from('invoices')
+        .select('invoice_number, amount_paid, total_amount, currency, deposit_percent')
+        .eq('id', invoice.parent_invoice_id)
+        .maybeSingle()
+      if (parent) {
+        parentDeposit = {
+          invoice_number: parent.invoice_number,
+          amount_paid: Number(parent.amount_paid || 0),
+          total_amount: Number(parent.total_amount || 0),
+          currency: parent.currency,
+          deposit_percent: parent.deposit_percent ?? null,
+        }
+      }
+    }
+
     // Generate PDF using pdfmake with template-specific layout
     console.log('Generating PDF attachment using pdfmake...')
     const attachmentContent = await generateInvoicePdfBase64(
       invoice, items, issuerSnapshot, recipientSnapshot,
-      verificationUrl, showWatermark, paymentMethodSnapshot, templateSnapshot
+      verificationUrl, showWatermark, paymentMethodSnapshot, templateSnapshot,
+      parentDeposit
     )
     const attachmentName = `Invoice-${invoice.invoice_number}.pdf`
     console.log(`PDF attachment generated: ${attachmentName}`)

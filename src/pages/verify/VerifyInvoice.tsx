@@ -331,7 +331,17 @@ const VerifyInvoice = () => {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Invoice Number</p>
-                          <p className="font-semibold text-lg">{data.invoice.invoice_number}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-lg">{data.invoice.invoice_number}</p>
+                            {data.invoice.kind === 'deposit' && (
+                              <Badge variant="default">
+                                Deposit{data.invoice.deposit_percent != null ? ` · ${data.invoice.deposit_percent}%` : ''}
+                              </Badge>
+                            )}
+                            {data.invoice.kind === 'final' && (
+                              <Badge variant="default">Final Invoice</Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -450,6 +460,15 @@ const VerifyInvoice = () => {
                                 <span className="text-muted-foreground">Amount credited (paid on deposit)</span>
                                 <span className="tabular-nums font-medium">
                                   {formatCurrency(data.invoice.parent_deposit.amount_paid, data.invoice.parent_deposit.currency)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm pt-2 border-t">
+                                <span className="text-muted-foreground">Net due after deposit</span>
+                                <span className="tabular-nums font-semibold">
+                                  {formatCurrency(
+                                    Math.max(0, data.invoice.total_amount - (data.invoice.parent_deposit.amount_paid || 0)),
+                                    data.invoice.currency
+                                  )}
                                 </span>
                               </div>
                               {data.invoice.parent_deposit.deposit_percent != null && (

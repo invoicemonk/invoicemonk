@@ -75,6 +75,16 @@ interface PaymentMethodSnapshot {
   instructions: Record<string, string>;
 }
 
+interface RelatedInvoiceLink {
+  invoice_number: string;
+  verification_id: string | null;
+  status: string;
+  total_amount: number;
+  amount_paid: number;
+  currency: string;
+  deposit_percent?: number | null;
+}
+
 interface InvoiceViewResponse {
   success: boolean;
   invoice?: {
@@ -96,6 +106,10 @@ interface InvoiceViewResponse {
     payment_method_snapshot: PaymentMethodSnapshot | null;
     items: InvoiceItem[];
     verification_id: string;
+    kind?: string;
+    deposit_percent?: number | null;
+    parent_deposit?: RelatedInvoiceLink | null;
+    child_finals?: RelatedInvoiceLink[];
   };
   issuer_tier?: string;
   is_flagged?: boolean;
@@ -264,9 +278,17 @@ const InvoiceView = () => {
   };
 
   const invoice = data?.invoice;
+  const depositCredit =
+    invoice?.kind === "final" && invoice.parent_deposit
+      ? invoice.parent_deposit.amount_paid || 0
+      : 0;
   const balanceDue = invoice
     ? invoice.total_amount - (invoice.amount_paid || 0)
     : 0;
+  const netDueAfterDeposit =
+    invoice?.kind === "final" && depositCredit > 0
+      ? Math.max(0, invoice.total_amount - depositCredit - (invoice.amount_paid || 0))
+      : balanceDue;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-background flex flex-col">
@@ -438,13 +460,50 @@ const InvoiceView = () => {
                     <p className="text-xl font-semibold mt-1">
                       {invoice.invoice_number}
                     </p>
-                    <div className="mt-2">{getStatusBadge(invoice.status)}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 justify-end">
+                      {invoice.kind === "deposit" && (
+                        <Badge variant="default">
+                          Deposit{invoice.deposit_percent != null ? ` · ${invoice.deposit_percent}%` : ""}
+                        </Badge>
+                      )}
+                      {invoice.kind === "final" && (
+                        <Badge variant="default">
+                          Final Invoice
+                        </Badge>
+                      )}
+                      {getStatusBadge(invoice.status)}
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Invoice Details Grid */}
+            {/* Deposit / Final invoice banner */}
+            {(invoice.kind === "deposit" || invoice.kind === "final") && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-5 pb-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">
+                        {invoice.kind === "deposit"
+                          ? `Deposit Invoice${invoice.deposit_percent != null ? ` · ${invoice.deposit_percent}%` : ""}`
+                          : "Final Invoice"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {invoice.kind === "deposit"
+                          ? "This invoice collects an advance payment. The amount paid here will be credited against a future final invoice."
+                          : invoice.parent_deposit
+                          ? `Linked to deposit invoice ${invoice.parent_deposit.invoice_number}. The deposit amount of ${formatCurrency(depositCredit, invoice.currency)} is credited against the total below.`
+                          : "This invoice consumes a previously paid deposit."}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <div className="grid gap-6 md:grid-cols-2">
               {/* Bill To */}
               <Card>
@@ -606,6 +665,18 @@ const InvoiceView = () => {
                         {formatCurrency(invoice.total_amount, invoice.currency)}
                       </span>
                     </div>
+                    {invoice.kind === "final" && invoice.parent_deposit && depositCredit > 0 && (
+                      <>
+                        <div className="flex justify-between text-sm text-primary">
+                          <span>Less: Deposit ({invoice.parent_deposit.invoice_number})</span>
+                          <span>-{formatCurrency(depositCredit, invoice.currency)}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                          <span>Net Due After Deposit</span>
+                          <span>{formatCurrency(Math.max(0, invoice.total_amount - depositCredit), invoice.currency)}</span>
+                        </div>
+                      </>
+                    )}
                     {invoice.amount_paid > 0 && (
                       <>
                         <div className="flex justify-between text-sm text-accent-foreground">
@@ -621,7 +692,7 @@ const InvoiceView = () => {
                         <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
                           <span>Balance Due</span>
                           <span className="text-primary">
-                            {formatCurrency(balanceDue, invoice.currency)}
+                            {formatCurrency(invoice.kind === "final" && depositCredit > 0 ? netDueAfterDeposit : balanceDue, invoice.currency)}
                           </span>
                         </div>
                       </>
