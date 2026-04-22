@@ -632,6 +632,20 @@ serve(async (req) => {
             : session.subscription.id;
 
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+          // IDEMPOTENCY GUARD #1: ignore replayed/stale checkout events whose
+          // referenced Stripe subscription is no longer live (e.g. the customer
+          // was refunded and the sub was cancelled before the webhook arrived
+          // or was redelivered later).
+          if (subscription.status !== "active" && subscription.status !== "trialing") {
+            console.log(
+              `[idempotency] Skipping checkout.session.completed for ${subscriptionId}: ` +
+              `Stripe status is "${subscription.status}", not active/trialing. ` +
+              `Refusing to overwrite DB row with a dead subscription.`
+            );
+            break;
+          }
+
           const userId = session.metadata?.user_id || subscription.metadata?.user_id;
           const businessId = session.metadata?.business_id || subscription.metadata?.business_id;
           const tier = session.metadata?.tier || subscription.metadata?.tier || "professional";
@@ -672,9 +686,38 @@ serve(async (req) => {
           // Check if business has existing subscription
           const { data: existingSub } = await supabase
             .from("subscriptions")
-            .select("id")
+            .select("id, stripe_subscription_id")
             .eq("business_id", businessId)
             .maybeSingle();
+
+          // IDEMPOTENCY GUARD #2: if we're about to repoint to a *different*
+          // Stripe sub than the one we already track, verify the existing one
+          // is actually dead in Stripe before clobbering it. Otherwise a
+          // replayed checkout for an old sub could overwrite a live one.
+          if (
+            existingSub &&
+            existingSub.stripe_subscription_id &&
+            existingSub.stripe_subscription_id !== subscriptionId
+          ) {
+            try {
+              const existingStripe = await stripe.subscriptions.retrieve(existingSub.stripe_subscription_id);
+              if (existingStripe.status === "active" || existingStripe.status === "trialing") {
+                console.log(
+                  `[idempotency] Refusing to overwrite live sub ${existingSub.stripe_subscription_id} ` +
+                  `(Stripe status="${existingStripe.status}") with incoming ${subscriptionId}.`
+                );
+                break;
+              }
+              console.log(
+                `[idempotency] Existing tracked sub ${existingSub.stripe_subscription_id} is "${existingStripe.status}" in Stripe — safe to repoint to ${subscriptionId}.`
+              );
+            } catch (lookupErr) {
+              console.log(
+                `[idempotency] Existing sub ${existingSub.stripe_subscription_id} not retrievable from Stripe — proceeding with repoint.`,
+                (lookupErr as Error).message
+              );
+            }
+          }
 
           if (existingSub) {
             await supabase
@@ -1088,12 +1131,25 @@ async function doUpdateSubscriptionByBusiness(
 ) {
   const metadataTier = subscription.metadata?.tier || "professional";
 
-  // Check current DB tier to prevent downgrading manual upgrades
+  // Check current DB tier and tracked Stripe sub
   const { data: currentSub } = await supabase
     .from("subscriptions")
-    .select("tier")
+    .select("tier, stripe_subscription_id")
     .eq("business_id", businessId)
     .maybeSingle();
+
+  // IDEMPOTENCY GUARD: don't let a stale/redelivered customer.subscription.updated
+  // event for an old Stripe sub mutate a row that's tracking a different (live) sub.
+  if (
+    currentSub?.stripe_subscription_id &&
+    currentSub.stripe_subscription_id !== subscription.id
+  ) {
+    console.log(
+      `[idempotency] Ignoring customer.subscription.updated for ${subscription.id} ` +
+      `because business ${businessId} now tracks ${currentSub.stripe_subscription_id}.`
+    );
+    return;
+  }
 
   const dbTier = currentSub?.tier || "starter";
   const tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
@@ -1118,6 +1174,20 @@ async function doUpdateSubscriptionByBusiness(
     .from("subscriptions")
     .update(updateData2)
     .eq("business_id", businessId);
+
+  // Audit trail so future incidents are reconstructable
+  await supabase.rpc("log_audit_event", {
+    _event_type: "SUBSCRIPTION_CHANGED",
+    _entity_type: "subscription",
+    _business_id: businessId,
+    _metadata: {
+      action: "stripe_subscription_updated",
+      stripe_subscription_id: subscription.id,
+      stripe_status: subscription.status,
+      tier,
+      status,
+    },
+  });
 
   console.log("Updated subscription for business:", businessId, "tier:", tier, "status:", status);
 }

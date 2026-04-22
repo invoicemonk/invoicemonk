@@ -309,6 +309,13 @@ export interface AdminRevenueStats {
     professional: { count: number; monthlyPriceCents: number; mrrCents: number };
     business: { count: number; monthlyPriceCents: number; mrrCents: number };
   };
+  priceBuckets: Array<{
+    tier: string;
+    count: number;
+    sourceMonthlyMinor: number;
+    sourceCurrency: string;
+    mrrUsdCents: number;
+  }>;
   currency: string;
 }
 
@@ -319,69 +326,39 @@ export function useAdminRevenueStats(startDate: Date, endDate: Date) {
       const startIso = startDate.toISOString();
       const endIso = endDate.toISOString();
 
-      // 1. Default USD pricing → tier→monthly price (cents)
-      const { data: pricingRows } = await supabase
-        .from('pricing_regions')
-        .select('tier, monthly_price, currency')
-        .eq('is_default', true);
-
-      const priceMap: Record<string, number> = { professional: 0, business: 0 };
-      let currency = 'USD';
-      (pricingRows || []).forEach((p) => {
-        if (p.tier === 'professional' || p.tier === 'business') {
-          priceMap[p.tier] = p.monthly_price || 0;
-          currency = p.currency || currency;
-        }
+      // Call edge function that resolves each subscription's actual billed amount via Stripe
+      // (with pricing_regions fallback). This avoids the legacy-vs-current price hardcoding bug.
+      const { data, error } = await supabase.functions.invoke('admin-revenue-stats', {
+        body: { startIso, endIso },
       });
+      if (error) throw error;
 
-      // 2. Active subs overlapping [start, end]
-      const { data: activeSubs } = await supabase
-        .from('subscriptions')
-        .select('tier, status, current_period_start, current_period_end')
-        .eq('status', 'active')
-        .lte('current_period_start', endIso)
-        .or(`current_period_end.gte.${startIso},current_period_end.is.null`);
-
-      let proCount = 0;
-      let bizCount = 0;
-      (activeSubs || []).forEach((s) => {
-        if (s.tier === 'professional') proCount++;
-        else if (s.tier === 'business') bizCount++;
-      });
-
-      const proMrr = proCount * priceMap.professional;
-      const bizMrr = bizCount * priceMap.business;
-      const mrrCents = proMrr + bizMrr;
-
-      // 3. New subs created within window
-      const { count: newCount } = await supabase
-        .from('subscriptions')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', startIso)
-        .lte('created_at', endIso);
-
-      // 4. Churned subs cancelled within window
-      const { count: churnedCount } = await supabase
-        .from('subscriptions')
-        .select('id', { count: 'exact', head: true })
-        .gte('cancelled_at', startIso)
-        .lte('cancelled_at', endIso);
-
-      const newInPeriod = newCount || 0;
-      const churnedInPeriod = churnedCount || 0;
+      const proCount = data?.breakdown?.professional?.count ?? 0;
+      const bizCount = data?.breakdown?.business?.count ?? 0;
+      const proMrr = data?.breakdown?.professional?.mrrCents ?? 0;
+      const bizMrr = data?.breakdown?.business?.mrrCents ?? 0;
 
       return {
-        mrrCents,
-        arrCents: mrrCents * 12,
-        payingCount: proCount + bizCount,
-        newInPeriod,
-        churnedInPeriod,
-        netNew: newInPeriod - churnedInPeriod,
+        mrrCents: data?.mrrCents ?? 0,
+        arrCents: data?.arrCents ?? 0,
+        payingCount: data?.payingCount ?? 0,
+        newInPeriod: data?.newInPeriod ?? 0,
+        churnedInPeriod: data?.churnedInPeriod ?? 0,
+        netNew: data?.netNew ?? 0,
         breakdown: {
-          professional: { count: proCount, monthlyPriceCents: priceMap.professional, mrrCents: proMrr },
-          business: { count: bizCount, monthlyPriceCents: priceMap.business, mrrCents: bizMrr },
+          professional: {
+            count: proCount,
+            monthlyPriceCents: proCount > 0 ? Math.round(proMrr / proCount) : 0,
+            mrrCents: proMrr,
+          },
+          business: {
+            count: bizCount,
+            monthlyPriceCents: bizCount > 0 ? Math.round(bizMrr / bizCount) : 0,
+            mrrCents: bizMrr,
+          },
         },
-        currency,
+        priceBuckets: data?.priceBuckets ?? [],
+        currency: data?.currency ?? 'USD',
       };
     },
     staleTime: 60_000,

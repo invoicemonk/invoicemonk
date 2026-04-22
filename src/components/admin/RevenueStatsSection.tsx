@@ -176,33 +176,40 @@ export function RevenueStatsSection() {
         </div>
 
         <div className="rounded-lg border p-4">
-          <div className="text-sm font-medium mb-3">Tier Breakdown</div>
+          <div className="text-sm font-medium mb-3">Price Breakdown (actual billed amounts)</div>
           {isLoading || !data ? (
             <Skeleton className="h-6 w-full" />
           ) : data.payingCount === 0 ? (
             <p className="text-sm text-muted-foreground">No active paying subscriptions in this range.</p>
           ) : (
-            <div className="flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Badge variant="secondary">Professional</Badge>
-                <span className="text-muted-foreground">
-                  {data.breakdown.professional.count} ×{' '}
-                  {formatMoney(data.breakdown.professional.monthlyPriceCents, data.currency)} ={' '}
-                </span>
-                <span className="font-semibold">
-                  {formatMoney(data.breakdown.professional.mrrCents, data.currency)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Badge variant="default">Business</Badge>
-                <span className="text-muted-foreground">
-                  {data.breakdown.business.count} ×{' '}
-                  {formatMoney(data.breakdown.business.monthlyPriceCents, data.currency)} ={' '}
-                </span>
-                <span className="font-semibold">
-                  {formatMoney(data.breakdown.business.mrrCents, data.currency)}
-                </span>
-              </div>
+            <div className="space-y-2">
+              {(data.priceBuckets ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No price details available.</p>
+              ) : (
+                (data.priceBuckets ?? []).map((b, i) => {
+                  const minorDivisor =
+                    b.sourceCurrency === 'JPY' || b.sourceCurrency === 'KRW' ? 1 : 100;
+                  const sourceMajor = b.sourceMonthlyMinor / minorDivisor;
+                  return (
+                    <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
+                      <Badge variant={b.tier === 'business' ? 'default' : 'secondary'} className="capitalize">
+                        {b.tier}
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        {b.count} × {b.sourceCurrency}{' '}
+                        {sourceMajor.toLocaleString(undefined, { maximumFractionDigits: 2 })}/mo
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-semibold">
+                        {formatMoney(b.mrrUsdCents, 'USD')} MRR
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+              <p className="text-xs text-muted-foreground pt-2 border-t mt-2">
+                Amounts pulled live from Stripe per subscription (FX-normalized to USD). Legacy and current prices are shown separately.
+              </p>
             </div>
           )}
         </div>
