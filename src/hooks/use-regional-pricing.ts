@@ -45,7 +45,9 @@ export function useRegionalPricing() {
 
       return (pricing || []) as RegionalPrice[];
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const pricing = data || [];

@@ -1022,7 +1022,7 @@ serve(async (req) => {
 
             const { data: subRecord } = await supabase
               .from("subscriptions")
-              .select("id")
+              .select("id, status, cancelled_at")
               .eq("stripe_subscription_id", subId)
               .maybeSingle();
 
@@ -1039,6 +1039,39 @@ serve(async (req) => {
                 console.error("Error voiding commissions on refund:", voidErr);
               } else {
                 console.log(`Voided ${voidedComms?.length || 0} commissions for refunded charge`);
+              }
+
+              // Sync subscription status from Stripe — a refund can accompany a
+              // cancellation; if Stripe shows the sub is canceled, mirror it locally
+              // so revenue snapshots stop counting it. If Stripe still shows live,
+              // do NOT cancel locally (one-off invoice refund only).
+              try {
+                const liveSub = await stripe.subscriptions.retrieve(subId);
+                if (
+                  (liveSub.status === "canceled" || liveSub.status === "incomplete_expired") &&
+                  subRecord.status !== "cancelled"
+                ) {
+                  const cancelledAt = liveSub.canceled_at
+                    ? new Date(liveSub.canceled_at * 1000).toISOString()
+                    : new Date().toISOString();
+                  const { error: syncErr } = await supabase
+                    .from("subscriptions")
+                    .update({
+                      status: "cancelled",
+                      cancelled_at: cancelledAt,
+                    })
+                    .eq("id", subRecord.id);
+                  if (syncErr) {
+                    console.error("Error syncing cancelled status from Stripe:", syncErr);
+                  } else {
+                    console.log(`Synced subscription ${subRecord.id} to cancelled (Stripe status: ${liveSub.status})`);
+                  }
+                } else {
+                  console.log(`Refund processed but subscription still live in Stripe (status: ${liveSub.status}); not cancelling locally`);
+                }
+              } catch (syncErr) {
+                console.error("Error fetching live Stripe subscription for refund sync:", syncErr);
+                captureException(syncErr, { function_name: 'stripe-webhook' });
               }
 
               // Audit log

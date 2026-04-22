@@ -26,6 +26,8 @@ export function useAllTierLimits() {
       return data as TierLimit[];
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 

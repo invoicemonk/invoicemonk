@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Mail, CheckCircle, Loader2, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import logo from '@/assets/logo-red.png';
 import { addTags } from '@/lib/onesignal';
+import { trackFunnel, trackFunnelOnce } from '@/lib/funnel-tracking';
 
 const VerifyEmail = () => {
   const { user } = useAuth();
@@ -18,9 +19,16 @@ const VerifyEmail = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    trackFunnel('onboarding_email_verify_viewed');
+  }, []);
+
+  useEffect(() => {
     if (user?.email_confirmed_at) {
       setIsVerified(true);
       addTags({ email_confirmed: 'true' });
+      trackFunnelOnce('onboarding_email_verified', 'im_email_verified_fired', {
+        user_id: user.id,
+      });
       setTimeout(() => {
         navigate('/select-plan');
       }, 2000);

@@ -97,7 +97,7 @@ export function RevenueStatsSection() {
       title: 'Paying Subscribers',
       value: data ? data.payingCount.toLocaleString() : '—',
       icon: Users,
-      description: 'Active in selected range',
+      description: 'Snapshot at end of period',
       color: 'text-blue-600',
     },
     {
@@ -117,7 +117,7 @@ export function RevenueStatsSection() {
             <DollarSign className="h-5 w-5" />
             Revenue Metrics
           </CardTitle>
-          <CardDescription>MRR, ARR & subscriber movement (USD, normalized)</CardDescription>
+          <CardDescription>MRR/ARR/subscribers = snapshot at period end · New/Churned = movement during range (USD, normalized)</CardDescription>
         </div>
         <Popover>
           <PopoverTrigger asChild>

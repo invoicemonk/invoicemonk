@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -23,6 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { addTags } from '@/lib/onesignal';
+import { trackFunnel } from '@/lib/funnel-tracking';
 
 function getSmartPrefillAmount(currency: string): number {
   const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
@@ -52,6 +53,10 @@ export default function CountryConfirmation() {
   });
   const [entityType, setEntityType] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    trackFunnel('onboarding_country_viewed');
+  }, []);
 
   // Fetch user's first business directly (no BusinessProvider needed)
   const { data: businessData, isLoading } = useQuery({
@@ -129,6 +134,11 @@ export default function CountryConfirmation() {
       });
 
       addTags({ jurisdiction: selectedCountry, onboarding_complete: 'true' });
+      trackFunnel('onboarding_country_confirmed', {
+        country: selectedCountry,
+        entity_type: entityType,
+        currency,
+      });
       navigate(`/b/${businessId}/dashboard`, { replace: true });
     } catch (err: any) {
       toast({

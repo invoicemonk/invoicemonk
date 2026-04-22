@@ -13,10 +13,10 @@ const ZERO_DECIMAL = new Set([
 ]);
 const THREE_DECIMAL = new Set(["BHD","KWD","OMR","JOD"]);
 
-function toMinorUnits(amount: number, currency: string): number {
-  // Stripe unit_amount is already in minor units; this helper is unused for Stripe but kept for clarity.
-  return amount;
-}
+// Stripe statuses we treat as "live / counts toward revenue"
+const STRIPE_LIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+// Stripe statuses we treat as definitively dead (never count)
+const STRIPE_DEAD_STATUSES = new Set(["canceled", "unpaid", "incomplete_expired", "incomplete"]);
 
 // Fetch FX rate currency -> USD (cached in module scope per warm instance).
 const fxCache = new Map<string, number>();
@@ -35,7 +35,6 @@ async function fxToUsd(currency: string): Promise<number> {
   } catch (e) {
     console.warn(`FX lookup failed for ${cur}:`, e);
   }
-  // Fallback hardcoded approximate rates so we never over- or under-state egregiously.
   const fallback: Record<string, number> = { EUR: 1.08, GBP: 1.27, NGN: 0.00065, CAD: 0.73 };
   const r = fallback[cur] ?? 1;
   fxCache.set(cur, r);
@@ -93,21 +92,32 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const startIso: string = body.startIso;
-    const endIso: string = body.endIso;
-    if (!startIso || !endIso) {
+    const requestedEndIso: string = body.endIso;
+    if (!startIso || !requestedEndIso) {
       return new Response(JSON.stringify({ error: "startIso and endIso required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Active paying subs overlapping window
-    const { data: activeSubs, error: subsErr } = await admin
+    // Clamp end to "now" so future-dated presets (e.g. endOfMonth) don't include the future.
+    const nowIso = new Date().toISOString();
+    const effectiveEndIso = requestedEndIso > nowIso ? nowIso : requestedEndIso;
+
+    // Treat the snapshot as "current" if effective end is within ~5 minutes of now.
+    const isCurrentSnapshot =
+      Math.abs(new Date(effectiveEndIso).getTime() - Date.now()) < 5 * 60 * 1000;
+
+    // Snapshot-as-of-date: subscriptions that existed and were not yet cancelled
+    // by `effectiveEndIso`. We include statuses that historically counted as paying
+    // (active / past_due / trialing / cancelled — the latter only if cancelled_at
+    // is AFTER effectiveEndIso, meaning at snapshot time it was still live).
+    const { data: snapshotSubs, error: subsErr } = await admin
       .from("subscriptions")
-      .select("id, tier, status, billing_currency, pricing_region, stripe_subscription_id, current_period_start, current_period_end")
-      .eq("status", "active")
+      .select("id, tier, status, billing_currency, pricing_region, stripe_subscription_id, created_at, cancelled_at")
       .neq("tier", "starter")
-      .lte("current_period_start", endIso)
-      .or(`current_period_end.gte.${startIso},current_period_end.is.null`);
+      .lte("created_at", effectiveEndIso)
+      .in("status", ["active", "past_due", "trialing", "cancelled"])
+      .or(`cancelled_at.is.null,cancelled_at.gt.${effectiveEndIso}`);
 
     if (subsErr) throw subsErr;
 
@@ -128,12 +138,13 @@ Deno.serve(async (req) => {
       sourceMonthlyMinor: number;
       source: "stripe" | "pricing_regions" | "unresolved";
       stripe_price_id?: string | null;
+      stripe_status?: string | null;
     };
 
     const resolved: SubResolved[] = [];
 
     // Helper: query Stripe subscription
-    async function stripeFetch(sub: any): Promise<{ unit: number; currency: string; interval: string; priceId: string } | null> {
+    async function stripeFetch(sub: any): Promise<{ unit: number; currency: string; interval: string; priceId: string; status: string } | null> {
       if (!stripeSecretKey || !sub.stripe_subscription_id) return null;
       try {
         const r = await fetch(
@@ -153,6 +164,7 @@ Deno.serve(async (req) => {
           currency: (price.currency || "usd").toUpperCase(),
           interval: price.recurring?.interval || "month",
           priceId: price.id,
+          status: j?.status || "unknown",
         };
       } catch (e) {
         console.warn("Stripe error:", e);
@@ -160,8 +172,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    for (const sub of activeSubs || []) {
+    let excludedAsStaleCount = 0;
+
+    for (const sub of snapshotSubs || []) {
       const stripeData = await stripeFetch(sub);
+
+      // For CURRENT snapshots only, use Stripe as the authority for live state.
+      // If Stripe says the sub is dead (canceled/unpaid/etc.), exclude it even if
+      // the local DB still has it as 'active' (handles refund/cancellation lag).
+      // For HISTORICAL snapshots, do NOT use today's Stripe status to rewrite
+      // the past — rely on DB lifecycle (created_at / cancelled_at) instead.
+      if (isCurrentSnapshot && stripeData) {
+        if (STRIPE_DEAD_STATUSES.has(stripeData.status)) {
+          excludedAsStaleCount += 1;
+          continue;
+        }
+        if (!STRIPE_LIVE_STATUSES.has(stripeData.status)) {
+          // Unknown/odd status — skip from current revenue to be safe.
+          excludedAsStaleCount += 1;
+          continue;
+        }
+      }
+
       let monthlyMinor = 0;
       let sourceCurrency = (sub.billing_currency || "USD").toUpperCase();
       let source: SubResolved["source"] = "unresolved";
@@ -176,7 +208,6 @@ Deno.serve(async (req) => {
         else monthlyMinor = stripeData.unit;
         source = "stripe";
       } else {
-        // Fallback: pricing_regions
         const key = `${sub.pricing_region || "US"}|${sub.tier}`;
         const fallback = priceLookup.get(key) || priceLookup.get(`US|${sub.tier}`);
         if (fallback) {
@@ -197,6 +228,7 @@ Deno.serve(async (req) => {
         sourceMonthlyMinor: monthlyMinor,
         source,
         stripe_price_id: priceId,
+        stripe_status: stripeData?.status ?? null,
       });
     }
 
@@ -206,7 +238,6 @@ Deno.serve(async (req) => {
       professional: { count: 0, mrrCents: 0 },
       business: { count: 0, mrrCents: 0 },
     };
-    // Group by (tier, sourceMonthlyMinor, sourceCurrency) for breakdown insight
     const priceBuckets = new Map<string, { tier: string; count: number; sourceMonthlyMinor: number; sourceCurrency: string; mrrUsdCents: number }>();
 
     for (const r of resolved) {
@@ -231,18 +262,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // New / churned counts
+    // Movement metrics: range-based counts using effective end.
     const { count: newCount } = await admin
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
       .gte("created_at", startIso)
-      .lte("created_at", endIso);
+      .lte("created_at", effectiveEndIso);
 
     const { count: churnedCount } = await admin
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
       .gte("cancelled_at", startIso)
-      .lte("cancelled_at", endIso);
+      .lte("cancelled_at", effectiveEndIso);
 
     const newInPeriod = newCount || 0;
     const churnedInPeriod = churnedCount || 0;
@@ -261,6 +292,9 @@ Deno.serve(async (req) => {
         },
         priceBuckets: Array.from(priceBuckets.values()).sort((a, b) => b.mrrUsdCents - a.mrrUsdCents),
         currency: "USD",
+        snapshotAt: effectiveEndIso,
+        isCurrentSnapshot,
+        excludedAsStaleCount,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

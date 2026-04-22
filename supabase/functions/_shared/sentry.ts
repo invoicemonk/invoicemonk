@@ -1,4 +1,5 @@
 import * as Sentry from 'https://deno.land/x/sentry/index.mjs'
+import { capturePosthogException } from './posthog.ts'
 
 let initialized = false
 
@@ -19,6 +20,10 @@ export function initSentry() {
 }
 
 export function captureException(error: unknown, context?: Record<string, unknown>) {
+  // Forward to PostHog regardless of Sentry init state.
+  // Fire-and-forget; never await so request handlers stay fast.
+  capturePosthogException(error, context).catch(() => {})
+
   if (!initialized) return
   Sentry.withScope((scope: any) => {
     if (context) {

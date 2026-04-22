@@ -5,6 +5,7 @@ import posthog from 'posthog-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIdleTimeout } from '@/hooks/use-idle-timeout';
 import { addTags, loginUser, logoutUser } from '@/lib/onesignal';
+import { trackFunnelOnce } from '@/lib/funnel-tracking';
 
 interface Profile {
   id: string;
@@ -81,6 +82,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (event === 'SIGNED_IN') {
             loginUser(session.user.id);
             addTags({ last_login: String(Date.now()) });
+            // Funnel: first time we see a verified email for this user
+            if (session.user.email_confirmed_at) {
+              trackFunnelOnce('onboarding_email_verified', 'im_email_verified_fired', {
+                user_id: session.user.id,
+              });
+            }
           }
 
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {

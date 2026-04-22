@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
@@ -26,6 +27,22 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
 import { addTags } from '@/lib/onesignal';
+import { trackFunnel } from '@/lib/funnel-tracking';
+type TierKey = 'starter' | 'professional' | 'business';
+
+// Hardcoded fallback pricing (USD, in cents) — used if network slow.
+// Authoritative pricing is always re-validated server-side at checkout.
+const FALLBACK_PRICING: Record<TierKey, { monthly: number; yearly: number }> = {
+  starter: { monthly: 0, yearly: 0 },
+  professional: { monthly: 1900, yearly: 19000 },
+  business: { monthly: 4900, yearly: 49000 },
+};
+
+const FALLBACK_FEATURES: Record<TierKey, string[]> = {
+  starter: ['5 invoices/month', '5 receipts/month', '1 currency account', 'Single user only'],
+  professional: ['Unlimited invoices', 'Unlimited receipts', 'Up to 3 team members', 'Accounting module', 'Expense tracking', 'Credit notes', 'Data exports'],
+  business: ['Unlimited everything', 'Unlimited team members', 'Full audit trail', 'In-app support', 'Custom branding', 'Credit notes', 'Data exports'],
+};
 
 const BIZ_FEATURES = [
   'Everything in SME',
@@ -36,8 +53,6 @@ const BIZ_FEATURES = [
   'Unlimited everything',
   'Priority support',
 ];
-
-type TierKey = 'starter' | 'professional' | 'business';
 
 const TIER_DISPLAY: Record<TierKey | 'biz', { name: string; description: string }> = {
   starter: { name: 'Starter', description: 'For individuals getting started' },
@@ -52,16 +67,37 @@ const planIcons = {
   business: Building2,
 };
 
+function fallbackFormatPrice(cents: number): string {
+  return `$${Math.round(cents / 100)}`;
+}
+
 export default function PlanSelection() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  // Show fallback pricing if real data hasn't arrived in 1.5s — keeps perceived load fast
+  const [showFallback, setShowFallback] = useState(false);
   
   const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { subscription } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
+
+  // Page view tracking
+  useEffect(() => {
+    trackFunnel('onboarding_plan_viewed');
+  }, []);
+
+  // Trigger fallback rendering if data is slow
+  useEffect(() => {
+    if (!pricingLoading && !tierFeaturesLoading) return;
+    const timer = setTimeout(() => setShowFallback(true), 1500);
+    return () => clearTimeout(timer);
+  }, [pricingLoading, tierFeaturesLoading]);
+
+  const dataReady = !pricingLoading && !tierFeaturesLoading;
+  const useFallback = !dataReady && showFallback;
 
   const markPlanSelected = async () => {
     if (user?.id) {
@@ -72,6 +108,11 @@ export default function PlanSelection() {
   const queryClient = useQueryClient();
 
   const handleSelectPlan = async (planTier: TierKey) => {
+    trackFunnel('onboarding_plan_selected', {
+      plan: planTier,
+      billing: isYearly ? 'yearly' : 'monthly',
+    });
+
     if (planTier === 'starter') {
       addTags({ plan_type: 'free' });
       await markPlanSelected();
@@ -91,13 +132,8 @@ export default function PlanSelection() {
 
   const tiers: TierKey[] = ['starter', 'professional', 'business'];
 
-  if (pricingLoading || tierFeaturesLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Skeleton-only state: data still loading AND fallback hasn't kicked in yet (<1.5s)
+  const showSkeleton = !dataReady && !useFallback;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-12 px-4">
@@ -153,13 +189,31 @@ export default function PlanSelection() {
               ? tier === subscription.tier
               : false;
             const isLoadingThis = loadingTier === tier;
-            const features = buildFeatureList(tier);
-            
-            const price = pricing 
-              ? (isYearly && pricing.yearly_price 
-                  ? pricing.yearly_price / 12
-                  : pricing.monthly_price)
-              : 0;
+            const realFeatures = buildFeatureList(tier);
+            const features = realFeatures.length > 0 ? realFeatures : FALLBACK_FEATURES[tier];
+
+            // Resolve display price: real → fallback (if timed out) → 0
+            let displayPriceCents = 0;
+            let yearlyPriceCents: number | null = null;
+            if (pricing) {
+              displayPriceCents = isYearly && pricing.yearly_price
+                ? pricing.yearly_price / 12
+                : pricing.monthly_price;
+              yearlyPriceCents = pricing.yearly_price;
+            } else if (useFallback) {
+              const fb = FALLBACK_PRICING[tier];
+              displayPriceCents = isYearly ? fb.yearly / 12 : fb.monthly;
+              yearlyPriceCents = fb.yearly || null;
+            }
+
+            const renderPrice = pricing
+              ? formatPrice(displayPriceCents)
+              : fallbackFormatPrice(displayPriceCents);
+            const renderYearly = pricing && yearlyPriceCents
+              ? formatPrice(yearlyPriceCents)
+              : yearlyPriceCents != null
+                ? fallbackFormatPrice(yearlyPriceCents)
+                : null;
 
             return (
               <motion.div
@@ -188,26 +242,41 @@ export default function PlanSelection() {
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
                     <div className="mb-4">
-                      <span className="text-4xl font-bold">{formatPrice(price)}</span>
-                      <span className="text-muted-foreground">/month</span>
-                      {isYearly && tier !== 'starter' && pricing?.yearly_price && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Billed {formatPrice(pricing.yearly_price)} yearly
-                        </p>
+                      {showSkeleton ? (
+                        <Skeleton className="h-10 w-24" />
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold">{renderPrice}</span>
+                          <span className="text-muted-foreground">/month</span>
+                          {isYearly && tier !== 'starter' && yearlyPriceCents && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Billed {renderYearly} yearly
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                     
                     <Separator className="mb-4" />
                     
                     <ul className="space-y-3 flex-1">
-                      {features.map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                          {feature}
-                        </li>
-                      ))}
+                      {showSkeleton ? (
+                        <>
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-5/6" />
+                          <Skeleton className="h-4 w-4/6" />
+                          <Skeleton className="h-4 w-5/6" />
+                        </>
+                      ) : (
+                        features.map((feature, featureIndex) => (
+                          <li key={featureIndex} className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                            {feature}
+                          </li>
+                        ))
+                      )}
                     </ul>
-                    
+
                     <div className="mt-6">
                       {isCurrent ? (
                         <Button className="w-full" variant="secondary" disabled>

@@ -14,6 +14,8 @@ import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { supabase } from '@/integrations/supabase/client';
+import { trackFunnel, prefetchOnboardingData } from '@/lib/funnel-tracking';
+import { useQueryClient } from '@tanstack/react-query';
 
 const TURNSTILE_SITE_KEY = '0x4AAAAAAAkZ2xm_NhJMLnfb'; // Cloudflare Turnstile site key
 
@@ -47,6 +49,7 @@ const Signup = () => {
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   // Load Turnstile script
   useEffect(() => {
@@ -93,6 +96,7 @@ const Signup = () => {
     } else {
       // Track signup page view
       gaEvents.signupStarted();
+      trackFunnel('onboarding_signup_viewed');
     }
   }, [user, navigate]);
 
@@ -112,6 +116,7 @@ const Signup = () => {
     }
 
     setIsLoading(true);
+    trackFunnel('onboarding_signup_submitted');
 
     // Verify Turnstile token server-side
     try {
@@ -157,6 +162,7 @@ const Signup = () => {
         errorMessage = msg;
       }
       
+      trackFunnel('onboarding_signup_failed', { reason: msg.slice(0, 200) });
       toast({
         title: errorTitle,
         description: errorMessage,
@@ -165,6 +171,9 @@ const Signup = () => {
     } else {
       // Track successful signup
       gaEvents.signupCompleted();
+      trackFunnel('onboarding_signup_completed');
+      // Warm caches for the next step (/select-plan)
+      prefetchOnboardingData(queryClient);
       toast({
         title: 'Account created!',
         description: "Please check your email to verify your account. If you don't see it, check your spam folder and mark it as 'Not Spam'.",

@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import { PostHogProvider } from "@posthog/react";
+import posthog from "posthog-js";
 import App from "./App.tsx";
 import "./index.css";
 import { initOneSignal } from "./lib/onesignal";
@@ -24,10 +25,24 @@ const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || "https://us.i.po
 
 const posthogOptions = {
   api_host: posthogHost,
+  capture_exceptions: true,
 };
 
 createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={<p>Something went wrong</p>}>
+  <Sentry.ErrorBoundary
+    fallback={<p>Something went wrong</p>}
+    onError={(error, componentStack, eventId) => {
+      try {
+        posthog.captureException(error instanceof Error ? error : new Error(String(error)), {
+          componentStack,
+          sentry_event_id: eventId,
+          source: "react_error_boundary",
+        });
+      } catch {
+        // no-op: never let error reporting throw
+      }
+    }}
+  >
     <PostHogProvider
       apiKey={posthogKey}
       options={posthogOptions}

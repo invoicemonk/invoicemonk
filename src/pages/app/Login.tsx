@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { gaEvents } from '@/hooks/use-google-analytics';
+import { trackFunnel } from '@/lib/funnel-tracking';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address').max(100),
@@ -47,6 +48,10 @@ const Login = () => {
       });
     }
   }, [idleLogout]);
+
+  useEffect(() => {
+    trackFunnel('onboarding_login_viewed');
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -126,6 +131,9 @@ const Login = () => {
         setEmailNotVerified(true);
         setUnverifiedEmail(data.email);
       }
+      trackFunnel('onboarding_login_failed', {
+        reason: isUnverified ? 'email_not_confirmed' : (error.message || 'unknown').slice(0, 200),
+      });
       toast({
         title: 'Login failed',
         description: isUnverified
@@ -139,6 +147,7 @@ const Login = () => {
       setFailedAttempts(0);
       // Track successful login
       gaEvents.loginSuccess();
+      trackFunnel('onboarding_login_succeeded');
       
       // Check if the user's email is verified before proceeding
       const { data: { user: freshUser } } = await supabase.auth.getUser();

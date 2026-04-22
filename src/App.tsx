@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,7 +40,7 @@ import Analytics from "./pages/app/Analytics";
 import AuditLogs from "./pages/app/AuditLogs";
 import BusinessProfile from "./pages/app/BusinessProfile";
 import Billing from "./pages/app/Billing";
-import PlanSelection from "./pages/app/PlanSelection";
+const PlanSelection = lazy(() => import("./pages/app/PlanSelection"));
 import CheckoutSuccess from "./pages/app/CheckoutSuccess";
 import CheckoutCancel from "./pages/app/CheckoutCancel";
 import Settings from "./pages/app/Settings";
@@ -132,7 +133,14 @@ import { APIDocumentation } from "./pages/docs";
 import HeroPreview from "./pages/demo/HeroPreview";
 
 // Onboarding pages
-import CountryConfirmation from "./pages/app/CountryConfirmation";
+const CountryConfirmation = lazy(() => import("./pages/app/CountryConfirmation"));
+
+// Lightweight fallback for lazy-loaded onboarding routes
+const LazyFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 const queryClient = new QueryClient();
 
 // Root redirect component
@@ -187,12 +195,12 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* Plan selection and checkout routes */}
-          <Route path="/select-plan" element={<ProtectedRoute><PlanSelection /></ProtectedRoute>} />
+          <Route path="/select-plan" element={<ProtectedRoute><Suspense fallback={<LazyFallback />}><PlanSelection /></Suspense></ProtectedRoute>} />
           <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
           <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancel /></ProtectedRoute>} />
           
           {/* Onboarding routes */}
-          <Route path="/onboarding/country" element={<ProtectedRoute><CountryConfirmation /></ProtectedRoute>} />
+          <Route path="/onboarding/country" element={<ProtectedRoute><Suspense fallback={<LazyFallback />}><CountryConfirmation /></Suspense></ProtectedRoute>} />
           
           {/* Legacy route redirects */}
           <Route path="/auth" element={<Login />} />

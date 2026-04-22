@@ -5,6 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
 import { captureError } from '@/lib/sentry';
 import { addTags } from '@/lib/onesignal';
+import { trackFunnelOnce } from '@/lib/funnel-tracking';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Invoice = Tables<'invoices'> & {
@@ -192,6 +193,12 @@ export function useCreateInvoice() {
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+
+      // Funnel: first invoice created (once per device)
+      trackFunnelOnce('onboarding_first_invoice_created', 'im_first_invoice_fired', {
+        user_id: user?.id,
+        business_id: data.business_id,
+      });
 
       // Tag OneSignal with invoice count (fire-and-forget)
       try {

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { trackFunnel, trackFunnelOnce } from '@/lib/funnel-tracking';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { 
@@ -196,6 +197,23 @@ export default function Dashboard() {
 
   // First visit: no invoices loaded yet AND checklist not dismissed
   const isFirstVisit = !invoicesLoading && (!recentInvoices || recentInvoices.length === 0) && !checklistDismissed;
+
+  // Funnel: dashboard reached (once per session)
+  useEffect(() => {
+    if (typeof sessionStorage === 'undefined') return;
+    if (sessionStorage.getItem('im_dashboard_session') === '1') return;
+    sessionStorage.setItem('im_dashboard_session', '1');
+    trackFunnel('onboarding_dashboard_reached', { user_id: user?.id });
+  }, [user?.id]);
+
+  // Funnel: activated (first time user has any issued invoice)
+  useEffect(() => {
+    if (invoicesLoading || !recentInvoices) return;
+    const hasIssued = recentInvoices.some((inv: any) => inv.status && inv.status !== 'draft');
+    if (hasIssued) {
+      trackFunnelOnce('onboarding_activated', 'im_activated_fired', { user_id: user?.id });
+    }
+  }, [recentInvoices, invoicesLoading, user?.id]);
 
   const statsCards = [
     {
