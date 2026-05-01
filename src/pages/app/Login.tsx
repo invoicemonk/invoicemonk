@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { trackFunnel } from '@/lib/funnel-tracking';
 
@@ -176,6 +177,17 @@ const Login = () => {
 
       {/* Form */}
       <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-xl">
+        <GoogleAuthButton label="Continue with Google" />
+
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+          </div>
+        </div>
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
