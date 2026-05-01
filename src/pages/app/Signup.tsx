@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Shield, FileCheck } from 'lucide-react';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { supabase } from '@/integrations/supabase/client';
 import { trackFunnel, prefetchOnboardingData } from '@/lib/funnel-tracking';
@@ -235,6 +236,17 @@ const Signup = () => {
 
       {/* Form */}
       <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-xl">
+        <GoogleAuthButton label="Sign up with Google" />
+
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">Or sign up with email</span>
+          </div>
+        </div>
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full name</Label>
