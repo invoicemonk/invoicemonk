@@ -65,7 +65,8 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
   const [showNewBusinessDialog, setShowNewBusinessDialog] = useState(false);
   const [newBusinessName, setNewBusinessName] = useState('');
   const [newBusinessType, setNewBusinessType] = useState('freelancer');
-  const [newBusinessCountry, setNewBusinessCountry] = useState('NG');
+  const [newBusinessCountry, setNewBusinessCountry] = useState('');
+  const [countryPopoverOpen, setCountryPopoverOpen] = useState(false);
   const createBusiness = useCreateBusiness();
 
   // Fetch businesses directly when outside BusinessProvider
