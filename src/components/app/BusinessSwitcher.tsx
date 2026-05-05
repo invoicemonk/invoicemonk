@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { useNavigate } from 'react-router-dom';
 import { ChevronsUpDown, Plus, Building2, User, Check, Loader2 } from 'lucide-react';
+import { COUNTRIES } from '@/lib/countries';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,7 +65,8 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
   const [showNewBusinessDialog, setShowNewBusinessDialog] = useState(false);
   const [newBusinessName, setNewBusinessName] = useState('');
   const [newBusinessType, setNewBusinessType] = useState('freelancer');
-  const [newBusinessCountry, setNewBusinessCountry] = useState('NG');
+  const [newBusinessCountry, setNewBusinessCountry] = useState('');
+  const [countryPopoverOpen, setCountryPopoverOpen] = useState(false);
   const createBusiness = useCreateBusiness();
 
   // Fetch businesses directly when outside BusinessProvider
@@ -324,19 +328,49 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="country">Country</Label>
-              <Select value={newBusinessCountry} onValueChange={setNewBusinessCountry}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NG">Nigeria</SelectItem>
-                  <SelectItem value="GH">Ghana</SelectItem>
-                  <SelectItem value="KE">Kenya</SelectItem>
-                  <SelectItem value="ZA">South Africa</SelectItem>
-                  <SelectItem value="US">United States</SelectItem>
-                  <SelectItem value="GB">United Kingdom</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover open={countryPopoverOpen} onOpenChange={setCountryPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="country"
+                    variant="outline"
+                    role="combobox"
+                    className="justify-between font-normal"
+                  >
+                    {newBusinessCountry
+                      ? COUNTRIES.find((c) => c.code === newBusinessCountry)?.name
+                      : 'Select country'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search country..." />
+                    <CommandList>
+                      <CommandEmpty>No country found.</CommandEmpty>
+                      <CommandGroup>
+                        {COUNTRIES.map((c) => (
+                          <CommandItem
+                            key={c.code}
+                            value={c.name}
+                            onSelect={() => {
+                              setNewBusinessCountry(c.code);
+                              setCountryPopoverOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                newBusinessCountry === c.code ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            {c.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <DialogFooter>
@@ -345,7 +379,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
             </Button>
             <Button 
               onClick={handleCreateBusiness}
-              disabled={!newBusinessName.trim() || createBusiness.isPending}
+              disabled={!newBusinessName.trim() || !newBusinessCountry || createBusiness.isPending}
             >
               {createBusiness.isPending ? (
                 <>
