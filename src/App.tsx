@@ -10,6 +10,7 @@ import { TierGatedRoute } from "@/components/app/TierGatedRoute";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
+import { useTawkTriggers } from "@/hooks/use-tawk-triggers";
 import NotFound from "./pages/NotFound";
 
 // App pages (authentication)
@@ -167,6 +168,12 @@ function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Runs Tawk.to engagement triggers (pricing dwell, milestones, etc.) for logged-in users
+function TawkTriggersProvider({ children }: { children: React.ReactNode }) {
+  useTawkTriggers();
+  return <>{children}</>;
+}
+
 // Identifies logged-in users to the Tawk.to widget
 function TawkIdentityProvider({ children }: { children: React.ReactNode }) {
   useTawkIdentity();
@@ -183,6 +190,7 @@ const App = () => (
         <TawkTo />
         <BrowserRouter>
           <AnalyticsProvider>
+          <TawkTriggersProvider>
           <Routes>
           {/* Root redirect - authenticated users go to dashboard, others to login */}
           <Route path="/" element={<RootRedirect />} />
