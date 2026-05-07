@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { UpgradeModal } from './UpgradeModal';
+import { PaymentIssueBanner } from '@/components/billing/PaymentIssueBanner';
 
 
 function BusinessLayoutContent() {
