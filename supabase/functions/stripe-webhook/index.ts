@@ -1208,23 +1208,46 @@ async function doUpdateSubscriptionByBusiness(
   }
 
   const dbTier = currentSub?.tier || "starter";
-  const tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  const stripeStatus = subscription.status;
 
-  if (tier !== metadataTier) {
-    console.log("Tier-downgrade protection: keeping DB tier", dbTier, "instead of metadata tier", metadataTier);
+  // Map Stripe status -> our local status, and decide whether to keep tier
+  // or revert to starter. We treat past_due as a grace period (keep tier).
+  // unpaid / incomplete / incomplete_expired / canceled all mean the customer
+  // is not paying — revert tier to starter so paid features are revoked.
+  let status: string;
+  let tier: string;
+  if (stripeStatus === "active") {
+    status = "active";
+    tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  } else if (stripeStatus === "trialing") {
+    status = "trialing";
+    tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  } else if (stripeStatus === "past_due") {
+    status = "past_due";
+    tier = dbTier; // keep tier during retry grace period
+  } else {
+    // unpaid | incomplete | incomplete_expired | canceled | paused
+    status = stripeStatus === "canceled" ? "cancelled" : "past_due";
+    tier = "starter";
+    console.log(
+      `[entitlement] Stripe status="${stripeStatus}" for sub ${subscription.id} — reverting business ${businessId} to starter.`
+    );
   }
 
-  const status = subscription.status === "active" ? "active" 
-    : subscription.status === "past_due" ? "past_due"
-    : subscription.status === "canceled" ? "cancelled"
-    : subscription.status === "trialing" ? "trialing"
-    : "active";
+  if (tier !== metadataTier) {
+    console.log("Tier-protection applied: keeping/forcing tier", tier, "(metadata wanted", metadataTier + ")");
+  }
 
   const updateData2: Record<string, any> = { tier, status, updated_at: new Date().toISOString() };
   const ps2 = safeISODate(subscription.current_period_start);
   const pe2 = safeISODate(subscription.current_period_end);
   if (ps2) updateData2.current_period_start = ps2;
   if (pe2) updateData2.current_period_end = pe2;
+  if (status === "cancelled") {
+    updateData2.cancelled_at = subscription.canceled_at
+      ? new Date(subscription.canceled_at * 1000).toISOString()
+      : new Date().toISOString();
+  }
 
   await supabase
     .from("subscriptions")
