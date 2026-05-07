@@ -790,6 +790,29 @@ serve(async (req) => {
             _business_id: businessId,
             _metadata: { tier, action: "upgraded", stripe_subscription_id: subscriptionId },
           });
+
+          // Post-payment: cancel any *other* live subs on the same customer
+          // that have a conflicting currency. Doing this here (after payment
+          // is confirmed) avoids stranding the customer if checkout had failed.
+          try {
+            const customerSubs = await stripe.subscriptions.list({
+              customer: session.customer as string,
+              status: "active",
+              limit: 10,
+            });
+            const newCurrency = (subscription.currency || "").toLowerCase();
+            for (const other of customerSubs.data) {
+              if (other.id === subscriptionId) continue;
+              const otherCurrency = (other.currency || "").toLowerCase();
+              if (otherCurrency && newCurrency && otherCurrency !== newCurrency) {
+                console.log(`[post-payment] Cancelling conflicting-currency sub ${other.id} (${otherCurrency}) on customer ${session.customer}`);
+                await stripe.subscriptions.cancel(other.id, { prorate: false });
+              }
+            }
+          } catch (cleanupErr) {
+            console.error("Post-payment currency cleanup error:", cleanupErr);
+            captureException(cleanupErr, { function_name: 'stripe-webhook' });
+          }
         }
         break;
       }
