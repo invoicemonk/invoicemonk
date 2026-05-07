@@ -70,7 +70,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
   const createClient = useCreateClient();
   const { data: existingClients = [] } = useClients(currentBusiness?.id);
 
-  const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || 'NG');
+  const [clientCountry, setClientCountry] = useState(currentBusiness?.jurisdiction || '');
   const jurisdictionConfig = getJurisdictionConfig(clientCountry);
 
   const [newClient, setNewClient] = useState({ ...EMPTY_CLIENT });
@@ -80,7 +80,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
-      setClientCountry(currentBusiness?.jurisdiction || 'NG');
+      setClientCountry(currentBusiness?.jurisdiction || '');
       setNewClient({ ...EMPTY_CLIENT });
       setShowAddress(false);
       setTouched({});

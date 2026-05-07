@@ -198,7 +198,7 @@ export default function AdminCountryModules() {
               <div className="space-y-2">
                 <Label>Schema Name *</Label>
                 <Input 
-                  placeholder="e.g., Nigeria VAT 2025" 
+                  placeholder="e.g., VAT 2025" 
                   value={newSchema.name}
                   onChange={(e) => setNewSchema({ ...newSchema, name: e.target.value })}
                 />

@@ -852,7 +852,7 @@ export default function BusinessProfile() {
                   id="phone"
                   type="tel"
                   className="pl-9"
-                  placeholder="+234 800 000 0000"
+                  placeholder="Phone number"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   maxLength={INPUT_LIMITS.PHONE}
@@ -881,7 +881,7 @@ export default function BusinessProfile() {
                 </Label>
                 <Input
                   id="city"
-                  placeholder="Lagos"
+                  placeholder="City"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   maxLength={INPUT_LIMITS.ADDRESS_LINE}
@@ -891,7 +891,7 @@ export default function BusinessProfile() {
                 <Label htmlFor="state">State/Province</Label>
                 <Input
                   id="state"
-                  placeholder="Lagos State"
+                  placeholder="State / Province"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                   maxLength={INPUT_LIMITS.ADDRESS_LINE}
@@ -903,7 +903,7 @@ export default function BusinessProfile() {
                 <Label htmlFor="postalCode">Postal Code</Label>
                 <Input
                   id="postalCode"
-                  placeholder="100001"
+                  placeholder="Postal Code"
                   value={formData.postalCode}
                   onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
                   maxLength={INPUT_LIMITS.POSTAL_CODE}

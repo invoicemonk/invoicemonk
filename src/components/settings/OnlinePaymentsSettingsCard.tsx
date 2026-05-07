@@ -307,7 +307,7 @@ export function OnlinePaymentsSettingsCard({ business }: OnlinePaymentsSettingsC
                       <Label htmlFor="accountNumber" className="text-xs">Account Number</Label>
                       <Input
                         id="accountNumber"
-                        placeholder="0123456789"
+                        placeholder="Account number"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         maxLength={10}
