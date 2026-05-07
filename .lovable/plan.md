@@ -1,83 +1,69 @@
-# Tawk.to Engagement Triggers for Logged-In Users
+## What went wrong
 
-## Overview
+I traced the May 5 incident through `stripe-webhook`, `create-checkout-session`, and `use-subscription`. There are three real bugs that, together, explain how a user with a failed payment ended up on Pro:
 
-Add four behavioral triggers that programmatically open the Tawk.to widget and send a message from "Bami" to logged-in users at key moments. All triggers respect a session-wide "only one fires per session" lock and persist per-user state in `localStorage`.
+1. **Tier access is decided purely by `tier`, ignoring `status`.**  
+   In `src/hooks/use-subscription.ts`, `isPaid = tier !== 'starter'` and `canAccess` / `hasTier` never look at `subscriptions.status`. So a row with `tier='professional'` and `status='past_due'`, `'incomplete'`, or `'unpaid'` still unlocks Pro everywhere. RLS and DB-side `check_tier_limit` likely behave the same.
 
-## Architecture
+2. **`checkout.session.completed` activates on Stripe sub status alone, not on actual payment.**  
+   In `stripe-webhook` we only check `subscription.status === 'active' | 'trialing'` and then write `status:'active'`, `tier:'professional'`. We never inspect `subscription.latest_invoice.payment_intent.status`. With Stripe Checkout in subscription mode, a sub can briefly read as `active` or `trialing` before the charge is confirmed (free trials, async payment methods, SCA after-redirect). We trust it and upgrade the row.
 
-```text
-AuthProvider
-  └── TawkIdentityProvider          (existing — identifies user to Tawk)
-        └── TawkTriggersProvider    (NEW — wraps <Routes>, watches user + route)
-              ├─ Pricing dwell timer       (route: /select-plan, 20s)
-              ├─ Stuck-on-invoice timer    (routes: invoices/new, invoices/:id/edit, 3min)
-              ├─ Return-visit timer        (any route, 15s, only if last_visit ≥ 10d ago)
-              └─ Invoice milestone watcher (queries invoice count, fires at 5)
-```
+3. **`invoice.payment_failed` sets status to `past_due` but does not downgrade the tier**, and no other event ever does. Combined with bug #1, the user keeps Pro features forever after a failed payment. There is also no handler for `invoice.payment_action_required` or for the `incomplete_expired` transition that Stripe emits ~23h after an unpaid initial invoice.
 
-A shared helper `fireTawkMessage(userId, triggerKey, message, event?)` handles:
-1. Session-lock check (`sessionStorage['tawk_trigger_fired']`)
-2. Per-user lifetime/cooldown check (`localStorage['tawk_trigger_<key>_<userId>']`)
-3. Waiting for `Tawk_API` readiness (reuse `waitForTawk` pattern from `use-tawk-identity.ts`)
-4. `Tawk_API.maximize()` → `Tawk_API.sendMessage(message)` → optional `Tawk_API.addEvent(event.name, event.props)`
-5. Marking both session lock and per-user state
+There is also a smaller correctness gap: `create-checkout-session` cancels conflicting-currency subs *before* the new payment is confirmed, so a failed new payment can leave a customer with no live sub at all.
+
+## Plan
+
+### 1. Make payment status authoritative on the server
+
+Edit `supabase/functions/stripe-webhook/index.ts`:
+
+- In `checkout.session.completed` (subscription branch), after retrieving the subscription, also verify the latest invoice's payment intent succeeded:
+  - Retrieve `subscription.latest_invoice` with `expand: ['payment_intent']`.
+  - Treat the upgrade as confirmed only if `subscription.status` is `active` or `trialing` **and** (`latest_invoice.status === 'paid'` OR `latest_invoice.payment_intent.status === 'succeeded'` OR `subscription.status === 'trialing'` with no amount due).
+  - Otherwise: write the row with the requested tier but `status='incomplete'` (no upgrade email, no audit log saying "upgraded"), and return 200 so Stripe doesn't retry.
+
+- In `customer.subscription.updated`, propagate Stripe statuses into a clear policy and downgrade tier when the sub is not in good standing:
+  - `active` / `trialing` → keep tier, `status='active'` (or `'trialing'`).
+  - `past_due` → keep `tier`, `status='past_due'` (allow grace).
+  - `unpaid` / `incomplete` / `incomplete_expired` / `canceled` → set `tier='starter'`, `status='cancelled'` (or `'past_due'` for `unpaid` if we want one more grace cycle — pick one and document).
+
+- Add a handler for `invoice.payment_action_required` that mirrors `invoice.payment_failed` (status → `past_due`, admin notified, no tier change yet).
+
+- In `invoice.payment_failed`, after marking `past_due`, schedule no tier change yet but record an audit event so support can trace it. The actual downgrade is driven by Stripe's own `customer.subscription.updated` to `unpaid` / `canceled` when retries are exhausted, which the handler above will catch.
+
+### 2. Make payment status authoritative on the client and in DB checks
+
+Edit `src/hooks/use-subscription.ts` and `src/contexts/SubscriptionContext.tsx`:
+
+- Treat the subscription as "entitled to paid features" only if `tier !== 'starter'` **and** `status` is one of `'active' | 'trialing' | 'past_due'` (past_due kept inside Stripe's standard ~3-day retry grace).
+- Replace `isPaid`, `canAccess`, `hasTier` to use this combined predicate.
+- Expose a new flag like `isInGracePeriod` (status === `'past_due'`) so the UI can show a banner.
+
+If the DB function `check_tier_limit` (called from `useBusiness().checkTierLimit`) only looks at `tier`, update it via a migration so it returns `allowed:false` when `status NOT IN ('active','trialing','past_due')`. This is what `TierGatedRoute` relies on, so without it, the client guard alone would be bypassable.
+
+### 3. Add a “payment failed” banner
+
+A small `PaymentIssueBanner` shown in `BusinessLayout` when `status === 'past_due'` with a link to the Stripe customer portal (`manage-subscription { action: 'portal' }`). This converts the silent state into something the user can fix.
+
+### 4. Don't kill the old sub before the new one is paid
+
+In `supabase/functions/create-checkout-session/index.ts`, stop calling `stripe.subscriptions.cancel(...)` on conflicting-currency subs at checkout-creation time. Move that cleanup into `stripe-webhook` so it only runs after `checkout.session.completed` has confirmed the new sub is paid. That way a failed checkout leaves the customer on their previous plan instead of stranded on starter.
+
+### 5. Backfill the affected user
+
+After the code is in place, run a one-shot SQL migration that, for each `subscriptions` row with `tier != 'starter'` and `stripe_subscription_id IS NOT NULL`, fetches the live Stripe status via `sync-subscriptions` (already exists) and corrects `tier`/`status`. The May 5 user will be auto-corrected the next time `sync-subscriptions` runs because Stripe will report the sub as `incomplete_expired` / `canceled`. We can also call `sync-subscriptions` manually right after deploy.
 
 ## Files
 
-### New
-- **`src/hooks/use-tawk-triggers.ts`** — single hook orchestrating all four triggers. Reads `useAuth()`, `useLocation()`, and the user's invoice count via TanStack Query (reuse existing `useInvoices` aggregate or a lightweight `select count` query against `invoices` filtered by businesses the user owns).
-- **`src/lib/tawk-triggers.ts`** — pure helpers: `waitForTawk`, `fireTawkMessage`, storage-key builders, session lock.
+- `supabase/functions/stripe-webhook/index.ts` — payment-confirmed gating, status-driven downgrade, new event handlers.
+- `supabase/functions/create-checkout-session/index.ts` — remove premature cancel of conflicting subs.
+- `src/hooks/use-subscription.ts`, `src/contexts/SubscriptionContext.tsx` — status-aware entitlement.
+- `src/components/app/BusinessLayout.tsx` (+ new `src/components/billing/PaymentIssueBanner.tsx`) — past-due banner.
+- New migration to update `check_tier_limit` to require an entitled status.
+- Trigger one `sync-subscriptions` run post-deploy.
 
-### Modified
-- **`src/App.tsx`** — add `<TawkTriggersProvider>` inside `<BrowserRouter>` (must be inside Router so `useLocation` works), wrapping `<AnalyticsProvider>`. Hook only activates when `user` is present.
+## Out of scope
 
-## Trigger Details
-
-| # | Key | Route(s) | Delay | Cooldown | Message |
-|---|---|---|---|---|---|
-| 1 | `pricing_dwell` | `/select-plan` | 20s | once / session | "Hey — noticed you're checking out the Pro plan…" |
-| 2 | `invoice_milestone_5` | any | on count=5 | once / lifetime | "You've sent 5 invoices on Invoicemonk — nice!…" + `addEvent('invoice_milestone', {count:5})` |
-| 3 | `return_visit` | any | 15s | once / 30 days, requires last_visit ≥ 10d | "Welcome back! It's been a little while…" |
-| 4 | `stuck_invoice` | `/b/:businessId/invoices/new` or `…/edit` | 3 min | once / session | "Taking a while to set this up?…" |
-
-### Last-visit tracking (trigger 3)
-
-Store `localStorage['tawk_last_visit_<userId>']` = ISO timestamp.
-- On hook mount with a user: read previous value, then write `now`.
-- If previous value exists AND `now - prev ≥ 10 days` AND `localStorage['tawk_return_visit_cooldown_<userId>']` is empty or older than 30d → start 15s timer.
-- On fire: set cooldown stamp.
-
-### Invoice count (trigger 2)
-
-Use a single Supabase query at hook mount + on invoice-create invalidations:
-```ts
-supabase.from('invoices').select('id', { count: 'exact', head: true })
-  .in('business_id', userBusinessIds)
-```
-Or, simpler: subscribe to the existing `useInvoices` query keys via `queryClient.getQueryCache()` and recompute total. To keep it isolated, the hook will run its own `useQuery(['tawk-invoice-count', user.id])` that joins through `business_members` → `invoices`. Fires once when count first observed at ≥5 AND lifetime flag absent.
-
-### Session lock semantics
-
-`sessionStorage['tawk_trigger_fired'] = '<triggerKey>'` set on first fire. Other triggers check this and skip. Cleared automatically when the tab closes. The "once per session" rule applies to triggers 1, 3, 4. Trigger 2 (milestone) is also session-blocked by other triggers but additionally has a lifetime flag.
-
-### Tawk readiness & error handling
-
-All firing wrapped in try/catch; if `Tawk_API.sendMessage` is unavailable (older widget version), fall back to `Tawk_API.maximize()` only. Never throw to React tree.
-
-## Excluded routes
-
-Do NOT run any timer on:
-- `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password`
-- Public verify/invoice-view pages
-- Admin routes (`/admin/*`) — admin users should not get sales prompts
-
-Hook returns early if path matches the exclude list or `user` is null.
-
-## Technical Notes
-
-- All timers cleared in effect cleanup (route change, unmount, sign-out).
-- `waitForTawk` reused from `src/hooks/use-tawk-identity.ts` — extract to `src/lib/tawk-triggers.ts` and import from both to avoid duplication.
-- `Tawk_API` window typing already declared in `use-tawk-identity.ts`; extend it there to add `maximize`, `sendMessage`, `addEvent` (some already present).
-- No DB changes required.
-- No new dependencies.
+- Switching to `payment_behavior: 'default_incomplete'` on the Stripe side. It would be cleaner long-term but requires reworking the success page; the gating fix above is sufficient and far less risky.
+- Webhook idempotency rework (the existing guards #1 and #2 are fine for this incident).
