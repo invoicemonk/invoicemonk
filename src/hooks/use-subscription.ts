@@ -122,7 +122,18 @@ export function useSubscription() {
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  const tier: SubscriptionTier = subscriptionQuery.data?.tier || 'starter';
+  const rawTier: SubscriptionTier = subscriptionQuery.data?.tier || 'starter';
+  const status = subscriptionQuery.data?.status;
+
+  // ENTITLEMENT GATE: a paid tier only counts if the subscription is in good
+  // standing. past_due is allowed (Stripe retry grace ~3 days). incomplete /
+  // unpaid / cancelled all collapse the user back to starter for feature
+  // access purposes, even if the row still says professional/business.
+  const isEntitledStatus =
+    !status || status === 'active' || status === 'trialing' || status === 'past_due';
+  const tier: SubscriptionTier = isEntitledStatus ? rawTier : 'starter';
+  const isInGracePeriod = status === 'past_due';
+
   const limits = limitsQuery.data || [];
 
   // Check if a feature is available for the current tier
@@ -197,6 +208,7 @@ export function useSubscription() {
     hasTier,
     getLimit,
     checkTierLimit,
+    isInGracePeriod,
     // Quick access helpers
     isStarter: tier === 'starter',
     isStarterPaid: tier === 'starter_paid',

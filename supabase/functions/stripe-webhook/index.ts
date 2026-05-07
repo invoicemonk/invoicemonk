@@ -631,7 +631,9 @@ serve(async (req) => {
             ? session.subscription 
             : session.subscription.id;
 
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ["latest_invoice.payment_intent"],
+          });
 
           // IDEMPOTENCY GUARD #1: ignore replayed/stale checkout events whose
           // referenced Stripe subscription is no longer live (e.g. the customer
@@ -642,6 +644,27 @@ serve(async (req) => {
               `[idempotency] Skipping checkout.session.completed for ${subscriptionId}: ` +
               `Stripe status is "${subscription.status}", not active/trialing. ` +
               `Refusing to overwrite DB row with a dead subscription.`
+            );
+            break;
+          }
+
+          // PAYMENT GUARD: even when Stripe reports the subscription as "active",
+          // the initial invoice may not have been paid (async/3DS/retry). Only
+          // grant the upgrade after we've confirmed actual payment.
+          // Trialing subs with no amount due are exempt.
+          const latestInvoice: any = (subscription as any).latest_invoice;
+          const invoiceStatus: string | undefined = latestInvoice?.status;
+          const piStatus: string | undefined = latestInvoice?.payment_intent?.status;
+          const amountDue: number = latestInvoice?.amount_due ?? 0;
+          const paymentConfirmed =
+            subscription.status === "trialing" && amountDue === 0
+              ? true
+              : invoiceStatus === "paid" || piStatus === "succeeded";
+
+          if (!paymentConfirmed) {
+            console.warn(
+              `[payment-guard] Refusing to upgrade ${subscriptionId}: invoice.status=${invoiceStatus}, ` +
+              `payment_intent.status=${piStatus}, amount_due=${amountDue}. Stripe will re-emit when paid.`
             );
             break;
           }
@@ -767,6 +790,29 @@ serve(async (req) => {
             _business_id: businessId,
             _metadata: { tier, action: "upgraded", stripe_subscription_id: subscriptionId },
           });
+
+          // Post-payment: cancel any *other* live subs on the same customer
+          // that have a conflicting currency. Doing this here (after payment
+          // is confirmed) avoids stranding the customer if checkout had failed.
+          try {
+            const customerSubs = await stripe.subscriptions.list({
+              customer: session.customer as string,
+              status: "active",
+              limit: 10,
+            });
+            const newCurrency = (subscription.currency || "").toLowerCase();
+            for (const other of customerSubs.data) {
+              if (other.id === subscriptionId) continue;
+              const otherCurrency = (other.currency || "").toLowerCase();
+              if (otherCurrency && newCurrency && otherCurrency !== newCurrency) {
+                console.log(`[post-payment] Cancelling conflicting-currency sub ${other.id} (${otherCurrency}) on customer ${session.customer}`);
+                await stripe.subscriptions.cancel(other.id, { prorate: false });
+              }
+            }
+          } catch (cleanupErr) {
+            console.error("Post-payment currency cleanup error:", cleanupErr);
+            captureException(cleanupErr, { function_name: 'stripe-webhook' });
+          }
         }
         break;
       }
@@ -856,6 +902,7 @@ serve(async (req) => {
         break;
       }
 
+      case "invoice.payment_action_required":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         console.log("Payment failed for invoice:", invoice.id);
@@ -1185,23 +1232,46 @@ async function doUpdateSubscriptionByBusiness(
   }
 
   const dbTier = currentSub?.tier || "starter";
-  const tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  const stripeStatus = subscription.status;
 
-  if (tier !== metadataTier) {
-    console.log("Tier-downgrade protection: keeping DB tier", dbTier, "instead of metadata tier", metadataTier);
+  // Map Stripe status -> our local status, and decide whether to keep tier
+  // or revert to starter. We treat past_due as a grace period (keep tier).
+  // unpaid / incomplete / incomplete_expired / canceled all mean the customer
+  // is not paying — revert tier to starter so paid features are revoked.
+  let status: string;
+  let tier: string;
+  if (stripeStatus === "active") {
+    status = "active";
+    tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  } else if (stripeStatus === "trialing") {
+    status = "trialing";
+    tier = (TIER_ORDER[dbTier] ?? 0) > (TIER_ORDER[metadataTier] ?? 0) ? dbTier : metadataTier;
+  } else if (stripeStatus === "past_due") {
+    status = "past_due";
+    tier = dbTier; // keep tier during retry grace period
+  } else {
+    // unpaid | incomplete | incomplete_expired | canceled | paused
+    status = stripeStatus === "canceled" ? "cancelled" : "past_due";
+    tier = "starter";
+    console.log(
+      `[entitlement] Stripe status="${stripeStatus}" for sub ${subscription.id} — reverting business ${businessId} to starter.`
+    );
   }
 
-  const status = subscription.status === "active" ? "active" 
-    : subscription.status === "past_due" ? "past_due"
-    : subscription.status === "canceled" ? "cancelled"
-    : subscription.status === "trialing" ? "trialing"
-    : "active";
+  if (tier !== metadataTier) {
+    console.log("Tier-protection applied: keeping/forcing tier", tier, "(metadata wanted", metadataTier + ")");
+  }
 
   const updateData2: Record<string, any> = { tier, status, updated_at: new Date().toISOString() };
   const ps2 = safeISODate(subscription.current_period_start);
   const pe2 = safeISODate(subscription.current_period_end);
   if (ps2) updateData2.current_period_start = ps2;
   if (pe2) updateData2.current_period_end = pe2;
+  if (status === "cancelled") {
+    updateData2.cancelled_at = subscription.canceled_at
+      ? new Date(subscription.canceled_at * 1000).toISOString()
+      : new Date().toISOString();
+  }
 
   await supabase
     .from("subscriptions")

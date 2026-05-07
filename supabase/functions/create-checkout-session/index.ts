@@ -215,26 +215,10 @@ serve(async (req) => {
 
     const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
-    // Cancel any existing subscriptions with conflicting currency
-    try {
-      const existingStripeSubs = await stripe.subscriptions.list({
-        customer: customerId,
-        status: 'active',
-        limit: 10,
-      });
-
-      const checkoutCurrency = finalPricing.currency.toLowerCase();
-      for (const sub of existingStripeSubs.data) {
-        const subCurrency = sub.currency?.toLowerCase();
-        if (subCurrency && subCurrency !== checkoutCurrency) {
-          console.log(`Cancelling conflicting subscription ${sub.id} (currency: ${subCurrency}) to allow ${checkoutCurrency} checkout`);
-          await stripe.subscriptions.cancel(sub.id, { prorate: false });
-        }
-      }
-    } catch (cancelErr) {
-      console.error("Error cancelling conflicting subscriptions:", cancelErr);
-      captureException(cancelErr, { function_name: 'create-checkout-session' })
-    }
+    // NOTE: Conflicting-currency cancellation is intentionally NOT done here.
+    // Cancelling existing subs before the new payment is confirmed leaves the
+    // customer with no live sub if checkout fails. The cleanup is now done
+    // in the stripe-webhook on checkout.session.completed (post-payment).
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
