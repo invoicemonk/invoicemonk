@@ -17,6 +17,7 @@ interface SubscriptionContextType {
   isBusiness: boolean;
   isFree: boolean;
   isPaid: boolean;
+  isInGracePeriod: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
