@@ -631,7 +631,9 @@ serve(async (req) => {
             ? session.subscription 
             : session.subscription.id;
 
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ["latest_invoice.payment_intent"],
+          });
 
           // IDEMPOTENCY GUARD #1: ignore replayed/stale checkout events whose
           // referenced Stripe subscription is no longer live (e.g. the customer
@@ -642,6 +644,27 @@ serve(async (req) => {
               `[idempotency] Skipping checkout.session.completed for ${subscriptionId}: ` +
               `Stripe status is "${subscription.status}", not active/trialing. ` +
               `Refusing to overwrite DB row with a dead subscription.`
+            );
+            break;
+          }
+
+          // PAYMENT GUARD: even when Stripe reports the subscription as "active",
+          // the initial invoice may not have been paid (async/3DS/retry). Only
+          // grant the upgrade after we've confirmed actual payment.
+          // Trialing subs with no amount due are exempt.
+          const latestInvoice: any = (subscription as any).latest_invoice;
+          const invoiceStatus: string | undefined = latestInvoice?.status;
+          const piStatus: string | undefined = latestInvoice?.payment_intent?.status;
+          const amountDue: number = latestInvoice?.amount_due ?? 0;
+          const paymentConfirmed =
+            subscription.status === "trialing" && amountDue === 0
+              ? true
+              : invoiceStatus === "paid" || piStatus === "succeeded";
+
+          if (!paymentConfirmed) {
+            console.warn(
+              `[payment-guard] Refusing to upgrade ${subscriptionId}: invoice.status=${invoiceStatus}, ` +
+              `payment_intent.status=${piStatus}, amount_due=${amountDue}. Stripe will re-emit when paid.`
             );
             break;
           }
