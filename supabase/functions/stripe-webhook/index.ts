@@ -879,6 +879,7 @@ serve(async (req) => {
         break;
       }
 
+      case "invoice.payment_action_required":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         console.log("Payment failed for invoice:", invoice.id);
