@@ -54,6 +54,7 @@ function BusinessLayoutContent() {
             <BusinessSidebar />
             <SidebarInset className="flex flex-col flex-1">
               <DashboardHeader />
+              <PaymentIssueBanner />
               <main className="flex-1 p-6 overflow-auto">
                 <Outlet />
               </main>
