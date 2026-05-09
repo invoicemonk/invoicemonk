@@ -370,6 +370,22 @@ const App = () => (
           
           {/* Referral tracking redirect */}
           <Route path="/r/:code" element={<ReferralRedirect />} />
+
+          {/* Marketing screenshot routes — public, no auth */}
+          <Route path="/marketing-shots/invoicing-eu-vat" element={<InvoicingEuVat />} />
+          <Route path="/marketing-shots/invoicing-africa" element={<InvoicingAfrica />} />
+          <Route path="/marketing-shots/invoicing-global" element={<InvoicingGlobal />} />
+          <Route path="/marketing-shots/estimates-templates" element={<EstimatesTemplates />} />
+          <Route path="/marketing-shots/estimates-client-portal" element={<EstimatesClientPortal />} />
+          <Route path="/marketing-shots/estimates-tracking" element={<EstimatesTracking />} />
+          <Route path="/marketing-shots/estimates-conversion" element={<EstimatesConversion />} />
+          <Route path="/marketing-shots/clients-profiles" element={<ClientsProfiles />} />
+          <Route path="/marketing-shots/clients-communication" element={<ClientsCommunication />} />
+          <Route path="/marketing-shots/clients-segmentation" element={<ClientsSegmentation />} />
+          <Route path="/marketing-shots/clients-alternating" element={<ClientsAlternating />} />
+          <Route path="/marketing-shots/receipts-scanning" element={<ReceiptsScanning />} />
+          <Route path="/marketing-shots/receipts-storage" element={<ReceiptsStorage />} />
+          <Route path="/marketing-shots/receipts-search" element={<ReceiptsSearch />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
