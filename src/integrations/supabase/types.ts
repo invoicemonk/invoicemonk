@@ -3144,6 +3144,16 @@ export type Database = {
         }
         Returns: Json
       }
+      get_business_sensitive_fields: {
+        Args: { _business_id: string }
+        Returns: {
+          business_id: string
+          cac_number: string
+          government_id_type: string
+          government_id_value: string
+          tax_id: string
+        }[]
+      }
       get_cashflow_summary: {
         Args: {
           _business_id: string
