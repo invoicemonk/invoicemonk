@@ -136,6 +136,14 @@ import HeroPreview from "./pages/demo/HeroPreview";
 // Onboarding pages
 const CountryConfirmation = lazy(() => import("./pages/app/CountryConfirmation"));
 
+// Marketing screenshot routes (public, used to capture product images)
+import {
+  InvoicingEuVat, InvoicingAfrica, InvoicingGlobal,
+  EstimatesTemplates, EstimatesClientPortal, EstimatesTracking, EstimatesConversion,
+  ClientsProfiles, ClientsCommunication, ClientsSegmentation, ClientsAlternating,
+  ReceiptsScanning, ReceiptsStorage, ReceiptsSearch,
+} from "./pages/marketing-shots";
+
 // Lightweight fallback for lazy-loaded onboarding routes
 const LazyFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
