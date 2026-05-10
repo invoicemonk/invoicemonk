@@ -142,6 +142,9 @@ import {
   EstimatesTemplates, EstimatesClientPortal, EstimatesTracking, EstimatesConversion,
   ClientsProfiles, ClientsCommunication, ClientsSegmentation, ClientsAlternating,
   ReceiptsScanning, ReceiptsStorage, ReceiptsSearch,
+  ExpensesReceiptScanning, ExpensesCategories, ExpensesTaxTracking, ExpensesAutomation,
+  AccountingChartOfAccounts, AccountingFinancialReports, AccountingMultiEntity, AccountingAutomation,
+  FeatureRelief, FeatureProfessional, FeatureCompliance,
 } from "./pages/marketing-shots";
 
 // Lightweight fallback for lazy-loaded onboarding routes
@@ -386,6 +389,17 @@ const App = () => (
           <Route path="/marketing-shots/receipts-scanning" element={<ReceiptsScanning />} />
           <Route path="/marketing-shots/receipts-storage" element={<ReceiptsStorage />} />
           <Route path="/marketing-shots/receipts-search" element={<ReceiptsSearch />} />
+          <Route path="/marketing-shots/expenses-receipt-scanning" element={<ExpensesReceiptScanning />} />
+          <Route path="/marketing-shots/expenses-categories" element={<ExpensesCategories />} />
+          <Route path="/marketing-shots/expenses-tax-tracking" element={<ExpensesTaxTracking />} />
+          <Route path="/marketing-shots/expenses-automation" element={<ExpensesAutomation />} />
+          <Route path="/marketing-shots/accounting-chart-of-accounts" element={<AccountingChartOfAccounts />} />
+          <Route path="/marketing-shots/accounting-financial-reports" element={<AccountingFinancialReports />} />
+          <Route path="/marketing-shots/accounting-multi-entity" element={<AccountingMultiEntity />} />
+          <Route path="/marketing-shots/accounting-automation" element={<AccountingAutomation />} />
+          <Route path="/marketing-shots/feature-relief" element={<FeatureRelief />} />
+          <Route path="/marketing-shots/feature-professional" element={<FeatureProfessional />} />
+          <Route path="/marketing-shots/feature-compliance" element={<FeatureCompliance />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
