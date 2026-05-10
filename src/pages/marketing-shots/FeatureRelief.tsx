@@ -2,7 +2,8 @@ import { MarketingShotFrame } from './MarketingShotFrame';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Shield, FileText, Mail, Eye, Download, Bell, CheckCircle2 } from 'lucide-react';
-import { auditTrail, muellerInvoice } from './seed';
+import { muellerInvoice } from './seed';
+import { auditTrail } from './seed2';
 
 const iconFor = (a: string) => {
   if (a.startsWith('Created')) return FileText;
