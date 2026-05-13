@@ -37,16 +37,17 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const graceCutoff = new Date();
-    graceCutoff.setDate(graceCutoff.getDate() - 3);
-
+    // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise
+    // a sub whose payment was cancelled mid-period (period_end still in the
+    // future, or NULL) is never caught and MRR stays inflated.
+    const MAX_ROWS = 500;
     const { data: staleSubscriptions, error: fetchError } = await supabase
       .from("subscriptions")
-      .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, current_period_end")
-      .eq("status", "active")
-      .not("current_period_end", "is", null)
-      .lt("current_period_end", graceCutoff.toISOString())
-      .neq("tier", "starter");
+      .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, status, current_period_end, updated_at")
+      .in("status", ["active", "past_due"])
+      .neq("tier", "starter")
+      .order("updated_at", { ascending: true })
+      .limit(MAX_ROWS);
 
     if (fetchError) {
       console.error("Error fetching stale subscriptions:", fetchError);
