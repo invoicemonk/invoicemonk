@@ -228,9 +228,27 @@ Deno.serve(async (req) => {
             });
             console.log(`Renewed sub ${sub.id}, new period end: ${newPeriodEnd}`);
           }
+        } else if (stripeSub.status === "past_due") {
+          // Keep tier during Stripe's retry grace window; just mirror status.
+          if (sub.status !== "past_due") {
+            await supabase
+              .from("subscriptions")
+              .update({ status: "past_due", updated_at: new Date().toISOString() })
+              .eq("id", sub.id);
+            synced++;
+            console.log(`Marked sub ${sub.id} past_due (kept tier ${sub.tier})`);
+          }
         } else {
-          // Stripe says the tracked sub is dead. Try to repoint to a live
-          // sibling sub on the same customer before downgrading.
+          // canceled | incomplete | incomplete_expired | unpaid | paused
+          // For 'incomplete', give Stripe 24h to settle the first payment
+          // before downgrading (covers SCA / async confirmations).
+          if (stripeSub.status === "incomplete") {
+            const createdMs = (stripeSub.created ?? 0) * 1000;
+            if (createdMs && Date.now() - createdMs < 24 * 60 * 60 * 1000) {
+              continue;
+            }
+          }
+
           if (await tryRepointFromCustomer(sub)) {
             repointed++;
             synced++;
@@ -241,7 +259,9 @@ Deno.serve(async (req) => {
             .from("subscriptions")
             .update({
               tier: "starter",
-              status: stripeSub.status === "past_due" ? "past_due" : "cancelled",
+              status: "cancelled",
+              cancelled_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
             })
             .eq("id", sub.id);
 
@@ -250,10 +270,20 @@ Deno.serve(async (req) => {
           } else {
             downgraded++;
             synced++;
+
+            // Void any pending/locked commissions tied to this subscription.
+            const { data: voidedComms } = await supabase
+              .from("commissions")
+              .update({ status: "voided" as const })
+              .eq("subscription_id", sub.id)
+              .in("status", ["pending", "locked"])
+              .select("id");
+
             await logAudit(sub.business_id, "downgraded", {
               reason: `stripe_status_${stripeSub.status}`,
               stripe_subscription_id: sub.stripe_subscription_id,
               previous_tier: sub.tier,
+              voided_commissions: voidedComms?.length ?? 0,
             });
             console.log(`Downgraded sub ${sub.id} (Stripe status: ${stripeSub.status}, no sibling)`);
           }
