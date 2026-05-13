@@ -332,6 +332,17 @@ Deno.serve(async (req) => {
 
     console.log("Sync complete:", JSON.stringify(result));
 
+    await supabase.from("sync_subscription_runs").insert({
+      triggered_by: triggeredBy,
+      triggered_by_user: triggeredByUser,
+      synced,
+      downgraded,
+      renewed,
+      repointed,
+      errors: errors.length > 0 ? errors : null,
+      duration_ms: Date.now() - startedAt,
+    });
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
