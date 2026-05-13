@@ -2644,6 +2644,45 @@ export type Database = {
           },
         ]
       }
+      sync_subscription_runs: {
+        Row: {
+          downgraded: number
+          duration_ms: number | null
+          errors: Json | null
+          id: string
+          ran_at: string
+          renewed: number
+          repointed: number
+          synced: number
+          triggered_by: string
+          triggered_by_user: string | null
+        }
+        Insert: {
+          downgraded?: number
+          duration_ms?: number | null
+          errors?: Json | null
+          id?: string
+          ran_at?: string
+          renewed?: number
+          repointed?: number
+          synced?: number
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Update: {
+          downgraded?: number
+          duration_ms?: number | null
+          errors?: Json | null
+          id?: string
+          ran_at?: string
+          renewed?: number
+          repointed?: number
+          synced?: number
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Relationships: []
+      }
       tax_schemas: {
         Row: {
           created_at: string | null
