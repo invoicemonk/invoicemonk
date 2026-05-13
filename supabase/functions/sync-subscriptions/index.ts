@@ -87,9 +87,14 @@ Deno.serve(async (req) => {
     }
 
     if (!staleSubscriptions || staleSubscriptions.length === 0) {
-      console.log("No stale subscriptions found");
+      console.log("No subscriptions to reconcile");
+      await supabase.from("sync_subscription_runs").insert({
+        triggered_by: triggeredBy,
+        triggered_by_user: triggeredByUser,
+        duration_ms: Date.now() - startedAt,
+      });
       return new Response(
-        JSON.stringify({ synced: 0, message: "No stale subscriptions" }),
+        JSON.stringify({ synced: 0, downgraded: 0, renewed: 0, repointed: 0, message: "No subscriptions to reconcile" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
