@@ -37,6 +37,35 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // If invoked with a user JWT (admin "Reconcile now" button), require
+    // platform_admin. Cron invokes this with apikey only (no Bearer), which
+    // remains allowed.
+    const authHeader = req.headers.get("Authorization");
+    let triggeredBy: "cron" | "admin" = "cron";
+    let triggeredByUser: string | null = null;
+    const startedAt = Date.now();
+    if (authHeader?.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: isAdmin } = await supabase.rpc("has_role", {
+        _user_id: user.id, _role: "platform_admin",
+      });
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      triggeredBy = "admin";
+      triggeredByUser = user.id;
+    }
+
     // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise
     // a sub whose payment was cancelled mid-period (period_end still in the
     // future, or NULL) is never caught and MRR stays inflated.
@@ -58,9 +87,14 @@ Deno.serve(async (req) => {
     }
 
     if (!staleSubscriptions || staleSubscriptions.length === 0) {
-      console.log("No stale subscriptions found");
+      console.log("No subscriptions to reconcile");
+      await supabase.from("sync_subscription_runs").insert({
+        triggered_by: triggeredBy,
+        triggered_by_user: triggeredByUser,
+        duration_ms: Date.now() - startedAt,
+      });
       return new Response(
-        JSON.stringify({ synced: 0, message: "No stale subscriptions" }),
+        JSON.stringify({ synced: 0, downgraded: 0, renewed: 0, repointed: 0, message: "No subscriptions to reconcile" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -302,6 +336,17 @@ Deno.serve(async (req) => {
     };
 
     console.log("Sync complete:", JSON.stringify(result));
+
+    await supabase.from("sync_subscription_runs").insert({
+      triggered_by: triggeredBy,
+      triggered_by_user: triggeredByUser,
+      synced,
+      downgraded,
+      renewed,
+      repointed,
+      errors: errors.length > 0 ? errors : null,
+      duration_ms: Date.now() - startedAt,
+    });
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

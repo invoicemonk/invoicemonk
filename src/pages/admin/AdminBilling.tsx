@@ -1,24 +1,76 @@
 import { motion } from 'framer-motion';
-import { 
-  CreditCard, 
+import {
+  CreditCard,
   AlertCircle,
   TrendingUp,
   Users,
   DollarSign,
-  Clock
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+
+interface SyncRun {
+  id: string;
+  ran_at: string;
+  triggered_by: string;
+  synced: number;
+  downgraded: number;
+  renewed: number;
+  repointed: number;
+  errors: string[] | null;
+  duration_ms: number | null;
+}
 
 export default function AdminBilling() {
   const { data: stats, isLoading } = useAdminStats();
-  
-  // Enable realtime updates for subscription changes
+  const queryClient = useQueryClient();
+
   useRealtimeAdminStats();
+
+  const { data: lastRun } = useQuery({
+    queryKey: ['sync-subscription-runs', 'last'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('sync_subscription_runs')
+        .select('*')
+        .order('ran_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as SyncRun | null;
+    },
+    refetchInterval: 15_000,
+  });
+
+  const reconcile = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-subscriptions');
+      if (error) throw error;
+      return data as { synced: number; downgraded: number; renewed: number; repointed: number; errors?: string[] };
+    },
+    onSuccess: (data) => {
+      toast.success(
+        `Reconcile complete — ${data.synced} synced, ${data.downgraded} downgraded, ${data.renewed} renewed, ${data.repointed} repointed`
+      );
+      queryClient.invalidateQueries({ queryKey: ['sync-subscription-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-revenue-stats'] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Reconcile failed');
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -45,6 +97,58 @@ export default function AdminBilling() {
           </div>
         </div>
       </motion.div>
+
+      {/* Reconcile subscriptions */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Reconcile subscriptions
+            </CardTitle>
+            <CardDescription>
+              Force-checks every paid subscription against Stripe and downgrades any whose
+              payment was cancelled or never settled. Runs automatically once a day.
+            </CardDescription>
+          </div>
+          <Button onClick={() => reconcile.mutate()} disabled={reconcile.isPending}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${reconcile.isPending ? 'animate-spin' : ''}`} />
+            {reconcile.isPending ? 'Reconciling…' : 'Reconcile now'}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {lastRun ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">Last run</span>
+                <span className="font-medium">{formatDistanceToNow(new Date(lastRun.ran_at), { addSuffix: true })}</span>
+                <Badge variant="outline" className="capitalize">{lastRun.triggered_by}</Badge>
+                {lastRun.duration_ms != null && (
+                  <span className="text-muted-foreground">· {(lastRun.duration_ms / 1000).toFixed(1)}s</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{lastRun.synced} synced</Badge>
+                <Badge variant="secondary">{lastRun.downgraded} downgraded</Badge>
+                <Badge variant="secondary">{lastRun.renewed} renewed</Badge>
+                <Badge variant="secondary">{lastRun.repointed} repointed</Badge>
+                {lastRun.errors && lastRun.errors.length > 0 && (
+                  <Badge variant="destructive">{lastRun.errors.length} errors</Badge>
+                )}
+              </div>
+              {lastRun.errors && lastRun.errors.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-xs text-destructive space-y-1">
+                  {lastRun.errors.slice(0, 5).map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No runs recorded yet.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Revenue Metrics (MRR/ARR with date filter) */}
       <RevenueStatsSection />
