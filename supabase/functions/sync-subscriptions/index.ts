@@ -37,6 +37,30 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // If invoked with a user JWT (admin "Reconcile now" button), require
+    // platform_admin. Cron invokes this with apikey only (no Bearer), which
+    // remains allowed.
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: isAdmin } = await supabase.rpc("has_role", {
+        _user_id: user.id, _role: "platform_admin",
+      });
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise
     // a sub whose payment was cancelled mid-period (period_end still in the
     // future, or NULL) is never caught and MRR stays inflated.
