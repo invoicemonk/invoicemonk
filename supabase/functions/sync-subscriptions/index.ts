@@ -41,6 +41,9 @@ Deno.serve(async (req) => {
     // platform_admin. Cron invokes this with apikey only (no Bearer), which
     // remains allowed.
     const authHeader = req.headers.get("Authorization");
+    let triggeredBy: "cron" | "admin" = "cron";
+    let triggeredByUser: string | null = null;
+    const startedAt = Date.now();
     if (authHeader?.startsWith("Bearer ")) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
         global: { headers: { Authorization: authHeader } },
@@ -59,6 +62,8 @@ Deno.serve(async (req) => {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      triggeredBy = "admin";
+      triggeredByUser = user.id;
     }
 
     // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise
