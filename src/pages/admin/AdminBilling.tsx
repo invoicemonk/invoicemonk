@@ -1,24 +1,76 @@
 import { motion } from 'framer-motion';
-import { 
-  CreditCard, 
+import {
+  CreditCard,
   AlertCircle,
   TrendingUp,
   Users,
   DollarSign,
-  Clock
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+
+interface SyncRun {
+  id: string;
+  ran_at: string;
+  triggered_by: string;
+  synced: number;
+  downgraded: number;
+  renewed: number;
+  repointed: number;
+  errors: string[] | null;
+  duration_ms: number | null;
+}
 
 export default function AdminBilling() {
   const { data: stats, isLoading } = useAdminStats();
-  
-  // Enable realtime updates for subscription changes
+  const queryClient = useQueryClient();
+
   useRealtimeAdminStats();
+
+  const { data: lastRun } = useQuery({
+    queryKey: ['sync-subscription-runs', 'last'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('sync_subscription_runs')
+        .select('*')
+        .order('ran_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as SyncRun | null;
+    },
+    refetchInterval: 15_000,
+  });
+
+  const reconcile = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-subscriptions');
+      if (error) throw error;
+      return data as { synced: number; downgraded: number; renewed: number; repointed: number; errors?: string[] };
+    },
+    onSuccess: (data) => {
+      toast.success(
+        `Reconcile complete — ${data.synced} synced, ${data.downgraded} downgraded, ${data.renewed} renewed, ${data.repointed} repointed`
+      );
+      queryClient.invalidateQueries({ queryKey: ['sync-subscription-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-revenue-stats'] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Reconcile failed');
+    },
+  });
 
   return (
     <div className="space-y-6">
