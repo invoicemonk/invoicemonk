@@ -858,12 +858,37 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         console.log("Subscription deleted:", subscription.id);
 
-        // Find the subscription record before updating
-        const { data: cancelledSub } = await supabase
+        // Find the subscription record before updating. Prefer match by
+        // stripe_subscription_id, but fall back to stripe_customer_id so a
+        // delete event for a sub we never recorded (e.g. the upgrade row was
+        // overwritten by a later checkout) still downgrades the right row.
+        let { data: cancelledSub } = await supabase
           .from("subscriptions")
           .select("id, business_id")
           .eq("stripe_subscription_id", subscription.id)
           .maybeSingle();
+
+        let matchedBy: "subscription_id" | "customer_id" = "subscription_id";
+
+        if (!cancelledSub && typeof subscription.customer === "string") {
+          const { data: byCustomer } = await supabase
+            .from("subscriptions")
+            .select("id, business_id")
+            .eq("stripe_customer_id", subscription.customer)
+            .neq("tier", "starter")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (byCustomer) {
+            cancelledSub = byCustomer;
+            matchedBy = "customer_id";
+          }
+        }
+
+        if (!cancelledSub) {
+          console.log("No local subscription row matched delete event:", subscription.id);
+          break;
+        }
 
         const { error } = await supabase
           .from("subscriptions")
@@ -874,12 +899,12 @@ serve(async (req) => {
             stripe_subscription_id: null,
             updated_at: new Date().toISOString(),
           })
-          .eq("stripe_subscription_id", subscription.id);
+          .eq("id", cancelledSub.id);
 
         if (error) {
           console.error("Error updating cancelled subscription:", error);
         } else {
-          console.log("Subscription cancelled, reverted to starter");
+          console.log(`Subscription cancelled (matched by ${matchedBy}), reverted to starter`);
         }
 
         // Void any pending/locked commissions tied to this subscription
