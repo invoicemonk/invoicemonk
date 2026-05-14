@@ -228,11 +228,14 @@ export function useCreateBusiness() {
 
       if (!user) throw new Error('Not authenticated');
 
+      // Split sensitive fields out — they live in business_sensitive_data, not businesses
+      const { tax_id, ...businessCore } = business;
+
       // Create the business
       const { data: newBusiness, error: businessError } = await supabase
         .from('businesses')
         .insert({
-          ...business,
+          ...businessCore,
           created_by: user.id,
           is_default: business.is_default ?? false,
         })
@@ -240,6 +243,19 @@ export function useCreateBusiness() {
         .single();
 
       if (businessError) throw businessError;
+
+      // Persist sensitive fields if any were provided
+      if (tax_id) {
+        const { error: sensitiveError } = await supabase
+          .from('business_sensitive_data')
+          .upsert(
+            { business_id: newBusiness.id, tax_id: tax_id || null },
+            { onConflict: 'business_id' }
+          );
+        if (sensitiveError) {
+          console.error('Failed to save business sensitive data:', sensitiveError);
+        }
+      }
 
       // Note: The database trigger `add_business_creator_as_owner` automatically
       // adds the creator as an owner in business_members, so we don't need to do it here.
