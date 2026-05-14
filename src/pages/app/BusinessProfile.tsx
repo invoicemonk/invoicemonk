@@ -192,8 +192,6 @@ export default function BusinessProfile() {
       name: formData.name,
       legal_name: formData.entityType === 'individual' ? null : (formData.legalName || null),
       jurisdiction: formData.jurisdiction,
-      tax_id: formData.governmentIdValue || formData.taxId || null,
-      cac_number: (jurisdictionConfig.showCac && formData.entityType !== 'individual') ? (formData.cacNumber || null) : null,
       contact_email: formData.email || null,
       contact_phone: formData.phone || null,
       address: Object.values(addressData).some(Boolean) ? addressData : null,
@@ -201,13 +199,19 @@ export default function BusinessProfile() {
       invoice_number_digits: formData.invoiceNumberDigits || 4,
       default_currency: formData.defaultCurrency || null,
       is_vat_registered: jurisdictionConfig.showVat ? formData.isVatRegistered : false,
-      vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered 
-        ? formData.vatRegistrationNumber || null 
-        : null,
       business_type: formData.businessType || null,
       allowed_currencies: formData.allowedCurrencies || [],
       brand_color: formData.brandColor || null,
       entity_type: formData.entityType,
+    };
+
+    // Sensitive identifiers — persisted to business_sensitive_data (owner/admin/platform_admin only)
+    const sensitiveData = {
+      tax_id: formData.governmentIdValue || formData.taxId || null,
+      cac_number: (jurisdictionConfig.showCac && formData.entityType !== 'individual') ? (formData.cacNumber || null) : null,
+      vat_registration_number: jurisdictionConfig.showVat && formData.isVatRegistered
+        ? formData.vatRegistrationNumber || null
+        : null,
       government_id_type: formData.governmentIdType || null,
       government_id_value: formData.governmentIdValue || null,
     };
@@ -215,10 +219,26 @@ export default function BusinessProfile() {
     if (business) {
       await updateBusiness.mutateAsync({
         businessId: business.id,
-        updates: businessData as any, // Cast needed until types regenerate
+        updates: businessData as any,
       });
+
+      const { error: sensitiveErr } = await supabase
+        .from('business_sensitive_data')
+        .upsert({ business_id: business.id, ...sensitiveData }, { onConflict: 'business_id' });
+      if (sensitiveErr) {
+        toast({
+          title: 'Sensitive fields not saved',
+          description: sensitiveErr.message,
+          variant: 'destructive',
+        });
+      }
     } else {
-      await createBusiness.mutateAsync(businessData as any);
+      const created = await createBusiness.mutateAsync({ ...businessData, tax_id: sensitiveData.tax_id } as any);
+      if (created?.id) {
+        await supabase
+          .from('business_sensitive_data')
+          .upsert({ business_id: created.id, ...sensitiveData }, { onConflict: 'business_id' });
+      }
     }
   };
 
