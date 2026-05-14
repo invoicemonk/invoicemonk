@@ -11,29 +11,20 @@ serve(async (req) => {
   }
 
   try {
-    // Authenticate: require service role key as Bearer token
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    // Authenticate: require dedicated CRON_SECRET header (never the service role key)
+    const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+    const incomingSecret = req.headers.get("x-cron-secret") ?? "";
+    if (!cronSecret || incomingSecret !== cronSecret) {
+      console.error("Lock commissions called with invalid or missing CRON_SECRET");
       return new Response(
-        JSON.stringify({ error: "Unauthorized: Bearer token required" }),
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (token !== serviceRoleKey) {
-      console.error("Lock commissions called with invalid credentials");
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: Invalid credentials" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      serviceRoleKey
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     // Lock commissions that have been pending for more than 30 days
