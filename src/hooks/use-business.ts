@@ -314,16 +314,23 @@ export function useUpdateBusiness() {
         .eq('id', businessId)
         .single();
 
-      // Auto-upgrade to self_declared if government_id or tax_id or cac_number is being set
+      // Defensively strip sensitive fields — they live in business_sensitive_data,
+      // not on businesses. BusinessProfile already routes them separately.
+      const SENSITIVE_KEYS = [
+        'tax_id', 'government_id_type', 'government_id_value',
+        'vat_registration_number', 'cac_number',
+        'stripe_connect_account_id', 'paystack_subaccount_code', 'flag_reason',
+      ] as const;
+      const updatesAny = updates as any;
+      for (const k of SENSITIVE_KEYS) delete updatesAny[k];
+
+      // Auto-upgrade to self_declared if legal_name/jurisdiction is being set
       // and business is currently unverified (skip for individuals — they need doc verification)
       const currentVerification = (currentBusiness as any)?.verification_status || 'unverified';
       const currentEntityType = (currentBusiness as any)?.entity_type || 'business';
-      const updatesAny = updates as any;
       if (currentVerification === 'unverified' && currentEntityType !== 'individual') {
-        const hasTaxId = updatesAny.tax_id && updatesAny.tax_id.trim();
-        const hasCac = updatesAny.cac_number && updatesAny.cac_number.trim();
-        const hasGovId = updatesAny.government_id_value && updatesAny.government_id_value.trim();
-        if (hasTaxId || hasCac || hasGovId) {
+        const hasLegalName = updatesAny.legal_name && updatesAny.legal_name.trim();
+        if (hasLegalName) {
           updatesAny.verification_status = 'self_declared';
           updatesAny.verification_source = 'none';
         }
@@ -340,8 +347,7 @@ export function useUpdateBusiness() {
 
       // Warn user if their verification was downgraded by the DB trigger
       if (currentVerification === 'verified') {
-        const sensitiveDiff = 
-          (currentBusiness as any)?.tax_id !== updatesAny.tax_id ||
+        const sensitiveDiff =
           (currentBusiness as any)?.legal_name !== updatesAny.legal_name ||
           (currentBusiness as any)?.jurisdiction !== updatesAny.jurisdiction;
         if (sensitiveDiff && (updatedBusiness as any)?.verification_status === 'pending_review') {
