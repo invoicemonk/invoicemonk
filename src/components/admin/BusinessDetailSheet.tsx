@@ -72,12 +72,22 @@ export function BusinessDetailSheet({ business, open, onOpenChange }: BusinessDe
     try {
       const { error } = await supabase
         .from('businesses')
-        .update({ 
-          is_flagged: isFlagged, 
-          flag_reason: isFlagged ? flagReason || null : null 
-        })
+        .update({ is_flagged: isFlagged })
         .eq('id', business.id);
       if (error) throw error;
+
+      // Sensitive flag_reason lives in business_sensitive_data (owner/admin/platform_admin only)
+      const { error: sensitiveError } = await supabase
+        .from('business_sensitive_data')
+        .upsert(
+          {
+            business_id: business.id,
+            flag_reason: isFlagged ? (flagReason || null) : null,
+          },
+          { onConflict: 'business_id' }
+        );
+      if (sensitiveError) throw sensitiveError;
+
       toast.success(isFlagged ? 'Business flagged as fraudulent' : 'Fraud flag removed');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update flag');
