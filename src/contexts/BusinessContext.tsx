@@ -9,6 +9,16 @@ import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 type Business = Tables<'businesses'> & {
   registration_status?: string;
   is_default?: boolean;
+  // Sensitive fields — only populated for owners/admins/platform admins via the
+  // get_business_sensitive RPC. Stored in the separate business_sensitive_data table.
+  tax_id?: string | null;
+  government_id_type?: string | null;
+  government_id_value?: string | null;
+  vat_registration_number?: string | null;
+  cac_number?: string | null;
+  stripe_connect_account_id?: string | null;
+  paystack_subaccount_code?: string | null;
+  flag_reason?: string | null;
 };
 type BusinessMember = Tables<'business_members'>;
 type Subscription = Tables<'subscriptions'>;
