@@ -9,6 +9,16 @@ import { usePlatformAdmin } from '@/hooks/use-platform-admin';
 type Business = Tables<'businesses'> & {
   registration_status?: string;
   is_default?: boolean;
+  // Sensitive fields — only populated for owners/admins/platform admins via the
+  // get_business_sensitive RPC. Stored in the separate business_sensitive_data table.
+  tax_id?: string | null;
+  government_id_type?: string | null;
+  government_id_value?: string | null;
+  vat_registration_number?: string | null;
+  cac_number?: string | null;
+  stripe_connect_account_id?: string | null;
+  paystack_subaccount_code?: string | null;
+  flag_reason?: string | null;
 };
 type BusinessMember = Tables<'business_members'>;
 type Subscription = Tables<'subscriptions'>;
@@ -218,6 +228,29 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [businessId, businesses, loadingBusinesses, user, navigate]);
+
+  // Fetch sensitive fields (tax_id, vat_registration_number, etc.) for owners/admins/platform admins
+  // and merge them into currentBusiness so existing call sites keep working.
+  useQuery({
+    queryKey: ['business-sensitive', currentBusiness?.id],
+    queryFn: async () => {
+      if (!currentBusiness?.id) return null;
+      const { data, error: rpcError } = await supabase.rpc('get_business_sensitive', {
+        _business_id: currentBusiness.id,
+      });
+      if (rpcError) {
+        // User lacks permission (regular member) — return null silently
+        return null;
+      }
+      const sensitive = (Array.isArray(data) ? data[0] : data) as Record<string, string | null> | null;
+      if (sensitive && currentBusiness) {
+        setCurrentBusiness(prev => prev ? { ...prev, ...sensitive } : prev);
+      }
+      return sensitive;
+    },
+    enabled: !!currentBusiness?.id && (currentRole === 'owner' || currentRole === 'admin' || isPlatformAdmin),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const refreshBusiness = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
