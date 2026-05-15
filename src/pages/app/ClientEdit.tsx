@@ -177,11 +177,6 @@ export default function ClientEdit() {
     );
   }
 
-  if (hasIssuedInvoices) {
-    navigate(`/clients/${id}`);
-    return null;
-  }
-
   return (
     <BusinessAccessGuard businessId={client.business_id} resourceType="client">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -210,6 +205,15 @@ export default function ClientEdit() {
           </Button>
         </div>
       </div>
+
+      {hasIssuedInvoices && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This client has issued invoices. Updates here apply to <strong>new invoices only</strong> — already-issued invoices keep the details captured at issuance and cannot be modified (compliance requirement).
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Basic Information */}

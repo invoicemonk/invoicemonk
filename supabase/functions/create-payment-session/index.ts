@@ -87,17 +87,30 @@ Deno.serve(async (req) => {
     }
 
     // Check business is not flagged and has online payments enabled
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id, jurisdiction, is_flagged, name, online_payments_enabled, stripe_connect_account_id, stripe_connect_status, paystack_subaccount_code, paystack_subaccount_status, verification_status')
-      .eq('id', invoice.business_id)
-      .maybeSingle()
+    const [{ data: businessRow }, { data: sensitive }] = await Promise.all([
+      supabase
+        .from('businesses')
+        .select('id, jurisdiction, is_flagged, name, online_payments_enabled, stripe_connect_status, paystack_subaccount_status, verification_status')
+        .eq('id', invoice.business_id)
+        .maybeSingle(),
+      supabase
+        .from('business_sensitive_data')
+        .select('stripe_connect_account_id, paystack_subaccount_code')
+        .eq('business_id', invoice.business_id)
+        .maybeSingle(),
+    ])
 
-    if (!business) {
+    if (!businessRow) {
       return new Response(JSON.stringify({ error: 'Business not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    const business = {
+      ...businessRow,
+      stripe_connect_account_id: sensitive?.stripe_connect_account_id ?? null,
+      paystack_subaccount_code: sensitive?.paystack_subaccount_code ?? null,
     }
 
     if (business.is_flagged) {

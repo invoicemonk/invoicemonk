@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     // Get business details
     const { data: business } = await adminSupabase
       .from('businesses')
-      .select('id, name, paystack_subaccount_code')
+      .select('id, name')
       .eq('id', business_id)
       .maybeSingle()
 
@@ -147,14 +147,19 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update business
-    await adminSupabase
-      .from('businesses')
-      .update({
-        paystack_subaccount_code: createData.data.subaccount_code,
-        paystack_subaccount_status: 'active',
-      })
-      .eq('id', business_id)
+    // Update business + sensitive data
+    await Promise.all([
+      adminSupabase
+        .from('business_sensitive_data')
+        .upsert({
+          business_id,
+          paystack_subaccount_code: createData.data.subaccount_code,
+        }, { onConflict: 'business_id' }),
+      adminSupabase
+        .from('businesses')
+        .update({ paystack_subaccount_status: 'active' })
+        .eq('id', business_id),
+    ])
 
     // Audit log
     try {

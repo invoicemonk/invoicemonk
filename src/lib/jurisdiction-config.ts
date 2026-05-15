@@ -109,6 +109,31 @@ export interface JurisdictionConfig {
   // Government ID defaults per jurisdiction
   defaultIdType?: GovernmentIdType;
   supportedIdTypes?: GovernmentIdType[];
+  // Issuer-side compliance requirements (drives required `*` markers in BusinessProfile)
+  // When omitted, falls back to `clientTaxIdRequired` / `cacRequired` (strict-regime signal).
+  taxIdRequiredForIssuer?: boolean;
+  cacRequiredForIssuer?: boolean;
+}
+
+/**
+ * Whether the issuer's tax ID / Government ID is legally required to appear
+ * on invoices in this jurisdiction. Used to drive the `*` marker on the
+ * Business Profile form. Falls back to the strict-regime `clientTaxIdRequired`
+ * signal so jurisdictions that mandate B2B tax IDs also mandate them on the issuer side.
+ */
+export function isIssuerTaxIdRequired(jurisdiction?: string | null): boolean {
+  const cfg = getJurisdictionConfig(jurisdiction || '');
+  return cfg.taxIdRequiredForIssuer ?? cfg.clientTaxIdRequired ?? false;
+}
+
+/**
+ * Whether the issuer's commercial registration (CAC / Companies House / SIRET / etc.)
+ * is legally required for non-individual entities in this jurisdiction.
+ */
+export function isIssuerCacRequired(jurisdiction?: string | null): boolean {
+  const cfg = getJurisdictionConfig(jurisdiction || '');
+  if (!cfg.showCac) return false;
+  return cfg.cacRequiredForIssuer ?? cfg.cacRequired ?? false;
 }
 
 // Detailed configurations for Tier 1 markets (full compliance labels)

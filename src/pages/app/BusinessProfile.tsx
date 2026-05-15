@@ -53,7 +53,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useTeamAccess } from '@/hooks/use-tier-features';
 import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
 import { calculateProfileCompletion } from '@/lib/profile-completion';
-import { getJurisdictionConfig, getGroupedIdTypes, GOVERNMENT_ID_LABELS, type GovernmentIdType } from '@/lib/jurisdiction-config';
+import { getJurisdictionConfig, getGroupedIdTypes, GOVERNMENT_ID_LABELS, isIssuerTaxIdRequired, isIssuerCacRequired, type GovernmentIdType } from '@/lib/jurisdiction-config';
 import { validateGovernmentId } from '@/lib/government-id-validation';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -231,6 +231,8 @@ export default function BusinessProfile() {
           description: sensitiveErr.message,
           variant: 'destructive',
         });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['business-sensitive', business.id] });
       }
     } else {
       const created = await createBusiness.mutateAsync({ ...businessData, tax_id: sensitiveData.tax_id } as any);
@@ -238,6 +240,7 @@ export default function BusinessProfile() {
         await supabase
           .from('business_sensitive_data')
           .upsert({ business_id: created.id, ...sensitiveData }, { onConflict: 'business_id' });
+        queryClient.invalidateQueries({ queryKey: ['business-sensitive', created.id] });
       }
     }
   };
@@ -676,11 +679,9 @@ export default function BusinessProfile() {
 
             {/* Government ID — replaces Tax ID */}
             <div className="space-y-3">
-              <Label>
-                Government ID {formData.entityType === 'business' && <span className="text-destructive">*</span>}
-                {formData.entityType === 'individual' && <span className="text-xs text-muted-foreground ml-1">(Optional)</span>}
-              </Label>
               {(() => {
+                const jurisdictionRequiresTaxId = isIssuerTaxIdRequired(formData.jurisdiction);
+                const govIdRequired = jurisdictionRequiresTaxId || formData.entityType === 'business';
                 const grouped = getGroupedIdTypes(formData.jurisdiction);
                 const selectedType = formData.governmentIdType as GovernmentIdType | '';
                 const selectedLabel = selectedType ? GOVERNMENT_ID_LABELS[selectedType as GovernmentIdType] : undefined;
@@ -688,6 +689,11 @@ export default function BusinessProfile() {
                 const validation = validateGovernmentId(selectedType || undefined, formData.governmentIdValue, formData.jurisdiction);
                 return (
                   <>
+                    <Label>
+                      Government ID {govIdRequired
+                        ? <span className="text-destructive">*</span>
+                        : <span className="text-xs text-muted-foreground ml-1">(Optional)</span>}
+                    </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Select
                         value={formData.governmentIdType}
@@ -731,11 +737,13 @@ export default function BusinessProfile() {
                       <p className="text-xs text-destructive">{validation.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      {formData.entityType === 'individual'
-                        ? 'Your government-issued ID number. Varies by country.'
-                        : jurisdictionConfig.countryName
-                          ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
-                          : jurisdictionConfig.taxIdHint}
+                      {govIdRequired && jurisdictionConfig.countryName
+                        ? `Required by ${jurisdictionConfig.countryName} regulations to appear on every invoice you issue.`
+                        : formData.entityType === 'individual'
+                          ? 'Your government-issued ID number. Varies by country.'
+                          : jurisdictionConfig.countryName
+                            ? `This will appear on your invoices to meet ${jurisdictionConfig.countryName}'s documentation requirements.`
+                            : jurisdictionConfig.taxIdHint}
                     </p>
                   </>
                 );
@@ -744,23 +752,29 @@ export default function BusinessProfile() {
 
 
             {/* CAC/Registration Number - Only for non-individuals in jurisdictions that have it */}
-            {jurisdictionConfig.showCac && formData.entityType !== 'individual' && (
-              <div className="space-y-2">
-                <Label htmlFor="cacNumber">
-                  {jurisdictionConfig.cacLabel}
-                </Label>
-                <Input
-                  id="cacNumber"
-                  placeholder={jurisdictionConfig.cacPlaceholder}
-                  value={formData.cacNumber}
-                  onChange={(e) => setFormData({ ...formData, cacNumber: e.target.value })}
-                  maxLength={INPUT_LIMITS.REG_NUMBER}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {jurisdictionConfig.cacHint}
-                </p>
-              </div>
-            )}
+            {jurisdictionConfig.showCac && formData.entityType !== 'individual' && (() => {
+              const cacRequired = isIssuerCacRequired(formData.jurisdiction);
+              return (
+                <div className="space-y-2">
+                  <Label htmlFor="cacNumber">
+                    {jurisdictionConfig.cacLabel}{' '}
+                    {cacRequired
+                      ? <span className="text-destructive">*</span>
+                      : <span className="text-xs text-muted-foreground">(Optional)</span>}
+                  </Label>
+                  <Input
+                    id="cacNumber"
+                    placeholder={jurisdictionConfig.cacPlaceholder}
+                    value={formData.cacNumber}
+                    onChange={(e) => setFormData({ ...formData, cacNumber: e.target.value })}
+                    maxLength={INPUT_LIMITS.REG_NUMBER}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {jurisdictionConfig.cacHint}
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Business Type */}
             <div className="space-y-2">

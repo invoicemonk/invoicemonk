@@ -259,11 +259,18 @@ Deno.serve(async (req) => {
     }
 
     // Business profile completeness check
-    const { data: businessProfile } = await supabaseService
-      .from('businesses')
-      .select('name, legal_name, contact_email, jurisdiction, tax_id, address, entity_type')
-      .eq('id', invoiceData.business_id)
-      .maybeSingle()
+    const [{ data: businessProfile }, { data: businessSensitive }] = await Promise.all([
+      supabaseService
+        .from('businesses')
+        .select('name, legal_name, contact_email, jurisdiction, address, entity_type')
+        .eq('id', invoiceData.business_id)
+        .maybeSingle(),
+      supabaseService
+        .from('business_sensitive_data')
+        .select('tax_id, government_id_value')
+        .eq('business_id', invoiceData.business_id)
+        .maybeSingle(),
+    ])
 
     if (businessProfile) {
       const missingFields: string[] = []
@@ -276,7 +283,9 @@ Deno.serve(async (req) => {
 
       if (businessProfile.entity_type !== 'individual') {
         if (!businessProfile.legal_name?.trim()) missingFields.push('Legal Name')
-        if (!businessProfile.tax_id?.trim()) missingFields.push('Tax ID')
+        if (!businessSensitive?.tax_id?.trim() && !businessSensitive?.government_id_value?.trim()) {
+          missingFields.push('Tax ID or Government ID')
+        }
       }
 
       if (missingFields.length > 0) {

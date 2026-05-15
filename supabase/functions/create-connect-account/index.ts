@@ -73,17 +73,29 @@ Deno.serve(async (req) => {
     }
 
     // Check if business already has a Connect account
-    const { data: business } = await adminSupabase
-      .from('businesses')
-      .select('id, name, contact_email, stripe_connect_account_id, stripe_connect_status, verification_status')
-      .eq('id', business_id)
-      .maybeSingle()
+    const [{ data: businessRow }, { data: sensitive }] = await Promise.all([
+      adminSupabase
+        .from('businesses')
+        .select('id, name, contact_email, stripe_connect_status, verification_status')
+        .eq('id', business_id)
+        .maybeSingle(),
+      adminSupabase
+        .from('business_sensitive_data')
+        .select('stripe_connect_account_id')
+        .eq('business_id', business_id)
+        .maybeSingle(),
+    ])
 
-    if (!business) {
+    if (!businessRow) {
       return new Response(JSON.stringify({ error: 'Business not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    const business = {
+      ...businessRow,
+      stripe_connect_account_id: sensitive?.stripe_connect_account_id ?? null,
     }
 
     // Block unverified or rejected businesses from connecting
@@ -121,13 +133,18 @@ Deno.serve(async (req) => {
 
       accountId = account.id
 
-      await adminSupabase
-        .from('businesses')
-        .update({
-          stripe_connect_account_id: accountId,
-          stripe_connect_status: 'pending',
-        })
-        .eq('id', business_id)
+      await Promise.all([
+        adminSupabase
+          .from('business_sensitive_data')
+          .upsert({
+            business_id: business_id,
+            stripe_connect_account_id: accountId,
+          }, { onConflict: 'business_id' }),
+        adminSupabase
+          .from('businesses')
+          .update({ stripe_connect_status: 'pending' })
+          .eq('id', business_id),
+      ])
     }
 
     // Create an account link for onboarding

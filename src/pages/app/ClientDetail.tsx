@@ -111,17 +111,10 @@ export default function ClientDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          {hasIssuedInvoices ? (
-            <Button variant="outline" disabled>
-              <Lock className="h-4 w-4 mr-2" />
-              Edit Locked
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => navigate(`/clients/${id}/edit`)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Client
-            </Button>
-          )}
+          <Button variant="outline" onClick={() => navigate(`/clients/${id}/edit`)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Client
+          </Button>
           <Button onClick={() => navigate(`/invoices/new?client=${id}`)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Invoice
@@ -129,15 +122,14 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Edit Lock Notice */}
       {hasIssuedInvoices && (
-        <Card className="bg-amber-500/5 border-amber-500/20">
-          <CardContent className="flex items-center gap-4 py-4">
-            <Lock className="h-5 w-5 text-amber-500" />
+        <Card className="bg-muted/40 border-border">
+          <CardContent className="flex items-start gap-4 py-4">
+            <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
             <div>
-              <p className="font-medium text-amber-700 dark:text-amber-400">Client profile locked</p>
+              <p className="font-medium">Issued invoices are immutable</p>
               <p className="text-sm text-muted-foreground">
-                This client has issued invoices and cannot be edited for compliance reasons.
+                You can update this client's details (e.g. tax ID, address) for future invoices. Already-issued invoices keep the details captured at issuance and cannot be changed.
               </p>
             </div>
           </CardContent>

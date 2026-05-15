@@ -153,18 +153,25 @@ Deno.serve(async (req) => {
     let verificationSource: string | null = null
     let entityType: string | null = null
     if (invoice.business_id) {
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('is_flagged, flag_reason, verification_status, verification_source, entity_type')
-        .eq('id', invoice.business_id)
-        .maybeSingle()
+      const [{ data: business }, { data: sensitive }] = await Promise.all([
+        supabase
+          .from('businesses')
+          .select('is_flagged, verification_status, verification_source, entity_type')
+          .eq('id', invoice.business_id)
+          .maybeSingle(),
+        supabase
+          .from('business_sensitive_data')
+          .select('flag_reason')
+          .eq('business_id', invoice.business_id)
+          .maybeSingle(),
+      ])
       if (business) {
         isFlagged = business.is_flagged || false
-        flagReason = business.flag_reason || null
         verificationStatus = business.verification_status || null
         verificationSource = business.verification_source || null
         entityType = business.entity_type || null
       }
+      flagReason = sensitive?.flag_reason || null
     }
 
     // USE SNAPSHOT DATA ONLY - no live data queries, no subscription lookups

@@ -66,24 +66,38 @@ Deno.serve(async (req) => {
       updatePayload.verified_by = null // System-initiated via Stripe
     }
 
-    // Update by stripe_connect_account_id
-    const { error } = await supabase
-      .from('businesses')
-      .update(updatePayload)
-      .eq('stripe_connect_account_id', accountId)
+    // Resolve business_id from sensitive data when not present in metadata
+    let resolvedBusinessId: string | null = businessId || null
+    if (!resolvedBusinessId) {
+      const { data: sensitive } = await supabase
+        .from('business_sensitive_data')
+        .select('business_id')
+        .eq('stripe_connect_account_id', accountId)
+        .maybeSingle()
+      resolvedBusinessId = sensitive?.business_id || null
+    }
 
-    if (error) {
-      console.error('Failed to update connect status:', error)
+    if (!resolvedBusinessId) {
+      console.error('Could not resolve business_id for stripe account', accountId)
+    } else {
+      const { error } = await supabase
+        .from('businesses')
+        .update(updatePayload)
+        .eq('id', resolvedBusinessId)
+
+      if (error) {
+        console.error('Failed to update connect status:', error)
+      }
     }
 
     // Audit log
-    if (businessId) {
+    if (resolvedBusinessId) {
       try {
         await supabase.rpc('log_audit_event', {
           _event_type: status === 'active' ? 'BUSINESS_VERIFIED' : 'STRIPE_CONNECT_STATUS_UPDATED',
           _entity_type: 'business',
-          _entity_id: businessId,
-          _business_id: businessId,
+          _entity_id: resolvedBusinessId,
+          _business_id: resolvedBusinessId,
           _metadata: { stripe_account_id: accountId, status, verification_source: status === 'active' ? 'stripe_kyc' : undefined },
         })
       } catch (e) {

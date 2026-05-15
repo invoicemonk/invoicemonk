@@ -1,4 +1,4 @@
-import { getJurisdictionConfig } from './jurisdiction-config';
+import { getJurisdictionConfig, isIssuerTaxIdRequired, isIssuerCacRequired } from './jurisdiction-config';
 
 interface AddressData {
   street?: string;
@@ -53,8 +53,19 @@ const REQUIRED_FIELDS: ProfileField[] = [
     key: 'governmentId', 
     label: 'Government ID', 
     getValue: (d) => !!(d.governmentIdValue?.trim() || d.taxId?.trim()),
-    // Required for businesses; optional for individuals and nonprofits
-    condition: (d) => d.entityType === 'business' || (!d.entityType),
+    // Required for businesses (any jurisdiction) and for individuals/nonprofits in
+    // jurisdictions that mandate the issuer's tax ID on every invoice (e.g. NG, KE, FR…).
+    condition: (d) => 
+      d.entityType === 'business' 
+      || !d.entityType 
+      || isIssuerTaxIdRequired(d.jurisdiction),
+  },
+  {
+    key: 'cacNumber',
+    label: 'Commercial Registration',
+    getValue: (d) => !!d.cacNumber?.trim(),
+    // Required for non-individual entities in jurisdictions that mandate it (e.g. NG, FR, KE…).
+    condition: (d) => d.entityType !== 'individual' && isIssuerCacRequired(d.jurisdiction),
   },
   { key: 'email', label: 'Email', getValue: (d) => !!d.email?.trim() },
   { 

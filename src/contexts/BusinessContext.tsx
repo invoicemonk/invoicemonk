@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -115,7 +115,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   // Check if user is a platform admin (unlimited access)
   const { isPlatformAdmin } = usePlatformAdmin();
   
-  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
+  const [baseBusiness, setBaseBusiness] = useState<Business | null>(null);
   const [currentRole, setCurrentRole] = useState<BusinessRole | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,9 +145,9 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch subscription for current business
   const { data: subscription, isLoading: loadingSubscription } = useQuery({
-    queryKey: ['business-subscription', currentBusiness?.id],
+    queryKey: ['business-subscription', baseBusiness?.id],
     queryFn: async () => {
-      if (!currentBusiness?.id) return null;
+      if (!baseBusiness?.id) return null;
       
       // Calculate grace period date (3 days ago) for expiration check
       const gracePeriodDate = new Date();
@@ -156,7 +156,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       const { data, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('business_id', currentBusiness.id)
+        .eq('business_id', baseBusiness.id)
         .eq('status', 'active')
         .or(`current_period_end.is.null,current_period_end.gte.${gracePeriodDate.toISOString()}`)
         .order('created_at', { ascending: false })
@@ -170,7 +170,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
       return data as Subscription | null;
     },
-    enabled: !!currentBusiness?.id,
+    enabled: !!baseBusiness?.id,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -192,7 +192,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
       return data as TierLimit[];
     },
-    enabled: !!currentBusiness?.id,
+    enabled: !!baseBusiness?.id,
     staleTime: 10 * 60 * 1000,
   });
 
@@ -204,7 +204,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     if (businessId) {
       const membership = businesses.find(m => m.business_id === businessId);
       if (membership) {
-        setCurrentBusiness(membership.business);
+        setBaseBusiness(membership.business);
         setCurrentRole(membership.role as BusinessRole);
         setError(null);
       } else {
@@ -219,38 +219,43 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       // No businessId in URL - find default or first business
       const defaultBusiness = businesses.find(m => m.business.is_default) || businesses[0];
       if (defaultBusiness) {
-        setCurrentBusiness(defaultBusiness.business);
+        setBaseBusiness(defaultBusiness.business);
         setCurrentRole(defaultBusiness.role as BusinessRole);
         setError(null);
       } else {
-        setCurrentBusiness(null);
+        setBaseBusiness(null);
         setCurrentRole(null);
       }
     }
   }, [businessId, businesses, loadingBusinesses, user, navigate]);
 
-  // Fetch sensitive fields (tax_id, vat_registration_number, etc.) for owners/admins/platform admins
-  // and merge them into currentBusiness so existing call sites keep working.
-  useQuery({
-    queryKey: ['business-sensitive', currentBusiness?.id],
+  // Fetch sensitive fields (tax_id, vat_registration_number, etc.) for owners/admins/platform admins.
+  // Returned data is merged into the exposed `currentBusiness` via useMemo below — do NOT mutate
+  // state inside the queryFn, otherwise the merge is lost when baseBusiness is replaced after refetch.
+  const { data: sensitiveData } = useQuery({
+    queryKey: ['business-sensitive', baseBusiness?.id],
     queryFn: async () => {
-      if (!currentBusiness?.id) return null;
+      if (!baseBusiness?.id) return null;
       const { data, error: rpcError } = await supabase.rpc('get_business_sensitive', {
-        _business_id: currentBusiness.id,
+        _business_id: baseBusiness.id,
       });
       if (rpcError) {
         // User lacks permission (regular member) — return null silently
         return null;
       }
       const sensitive = (Array.isArray(data) ? data[0] : data) as Record<string, string | null> | null;
-      if (sensitive && currentBusiness) {
-        setCurrentBusiness(prev => prev ? { ...prev, ...sensitive } : prev);
-      }
       return sensitive;
     },
-    enabled: !!currentBusiness?.id && (currentRole === 'owner' || currentRole === 'admin' || isPlatformAdmin),
+    enabled: !!baseBusiness?.id && (currentRole === 'owner' || currentRole === 'admin' || isPlatformAdmin),
     staleTime: 5 * 60 * 1000,
   });
+
+  // Derive merged business from base + sensitive so the merge survives base refetches.
+  const currentBusiness = useMemo<Business | null>(() => {
+    if (!baseBusiness) return null;
+    if (!sensitiveData) return baseBusiness;
+    return { ...baseBusiness, ...sensitiveData };
+  }, [baseBusiness, sensitiveData]);
 
   const refreshBusiness = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
