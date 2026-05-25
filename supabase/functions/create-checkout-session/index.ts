@@ -220,9 +220,29 @@ serve(async (req) => {
     // customer with no live sub if checkout fails. The cleanup is now done
     // in the stripe-webhook on checkout.session.completed (post-payment).
 
+    // Defence-in-depth: stamp the paid intent server-side too, so a failed
+    // checkout can always be recovered even if the client missed the write.
+    try {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          intended_tier: tier,
+          intended_billing_period: billingPeriod,
+          intended_tier_set_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+    } catch (e) {
+      console.error("Failed to stamp paid intent:", e);
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
+      client_reference_id: user.id,
       line_items: [
         {
           price: priceId,
@@ -236,6 +256,7 @@ serve(async (req) => {
           user_id: user.id,
           business_id: targetBusinessId,
           tier,
+          billing_period: billingPeriod,
           pricing_region: finalPricing.country_code,
           billing_currency: finalPricing.currency,
         },
@@ -244,6 +265,7 @@ serve(async (req) => {
         user_id: user.id,
         business_id: targetBusinessId,
         tier,
+        billing_period: billingPeriod,
       },
     });
 

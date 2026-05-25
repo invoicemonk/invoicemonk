@@ -1,18 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
-  Check, 
-  Zap, 
-  Shield, 
-  Building2, 
-  Loader2,
-  ArrowRight,
-  Sparkles,
-  Mail
+  Check, Zap, Shield, Building2, Loader2, ArrowRight, Sparkles, Mail,
+  AlertTriangle, RotateCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +15,10 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -76,18 +74,49 @@ export default function PlanSelection() {
   const { user } = useAuth();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
-  // Show fallback pricing if real data hasn't arrived in 1.5s — keeps perceived load fast
   const [showFallback, setShowFallback] = useState(false);
-  
+  const [downgradeConfirmOpen, setDowngradeConfirmOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
   const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { subscription } = useSubscription();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
+  const queryClient = useQueryClient();
+
+  // Fetch the user's pending paid intent (if any) so we can show the resume banner
+  // and protect against accidental silent downgrades to Starter.
+  const { data: intent } = useQuery({
+    queryKey: ['paid-intent', user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('intended_tier, intended_billing_period, failed_checkout_attempts')
+        .eq('id', user!.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const pendingPaidTier = (intent?.intended_tier as 'professional' | 'business' | null) || null;
+  const pendingBilling = (intent?.intended_billing_period as 'monthly' | 'yearly' | null) || 'monthly';
+  const failedAttempts = intent?.failed_checkout_attempts ?? 0;
 
   // Page view tracking
   useEffect(() => {
     trackFunnel('onboarding_plan_viewed');
   }, []);
+
+  // Auto-resume: ?resume=1 from recovery email / cancel page → fire checkout immediately.
+  useEffect(() => {
+    if (searchParams.get('resume') === '1' && pendingPaidTier) {
+      trackFunnel('paid_intent_resumed', { tier: pendingPaidTier, source: 'auto' });
+      setLoadingTier(pendingPaidTier);
+      createCheckoutSession(pendingPaidTier, pendingBilling).finally(() => setLoadingTier(null));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPaidTier]);
 
   // Trigger fallback rendering if data is slow
   useEffect(() => {
@@ -105,7 +134,29 @@ export default function PlanSelection() {
     }
   };
 
-  const queryClient = useQueryClient();
+  const clearPaidIntent = async () => {
+    if (!user?.id) return;
+    await supabase
+      .from('profiles')
+      .update({
+        intended_tier: null,
+        intended_billing_period: null,
+        intended_tier_set_at: null,
+      })
+      .eq('id', user.id);
+    queryClient.invalidateQueries({ queryKey: ['paid-intent', user.id] });
+  };
+
+  const completeStarterSelection = async () => {
+    addTags({ plan_type: 'free' });
+    await markPlanSelected();
+    await clearPaidIntent();
+    supabase.functions.invoke('track-auth-event', {
+      body: { event_type: 'plan_selected' },
+    }).catch(() => {});
+    await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
+    navigate('/dashboard');
+  };
 
   const handleSelectPlan = async (planTier: TierKey) => {
     trackFunnel('onboarding_plan_selected', {
@@ -114,20 +165,48 @@ export default function PlanSelection() {
     });
 
     if (planTier === 'starter') {
-      addTags({ plan_type: 'free' });
-      await markPlanSelected();
-      supabase.functions.invoke('track-auth-event', {
-        body: { event_type: 'plan_selected' },
-      }).catch(() => {});
-      await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
-      navigate('/dashboard');
+      // If the user previously committed to a paid upgrade, don't silently
+      // downgrade them — make them confirm.
+      if (pendingPaidTier) {
+        setDowngradeConfirmOpen(true);
+        return;
+      }
+      await completeStarterSelection();
       return;
     }
 
     addTags({ plan_type: 'paid' });
+    // Persist intent BEFORE redirecting to Stripe so a failed checkout can be recovered.
+    if (user?.id) {
+      await supabase
+        .from('profiles')
+        .update({
+          intended_tier: planTier,
+          intended_billing_period: isYearly ? 'yearly' : 'monthly',
+          intended_tier_set_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+    }
     setLoadingTier(planTier);
     await createCheckoutSession(planTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly');
     setLoadingTier(null);
+  };
+
+  const handleResumeUpgrade = async () => {
+    if (!pendingPaidTier) return;
+    trackFunnel('paid_intent_resumed', { tier: pendingPaidTier, source: 'banner' });
+    setLoadingTier(pendingPaidTier);
+    await createCheckoutSession(pendingPaidTier, pendingBilling);
+    setLoadingTier(null);
+  };
+
+  const confirmDowngradeToStarter = async () => {
+    trackFunnel('paid_intent_downgraded', {
+      from_tier: pendingPaidTier || 'unknown',
+      attempts: failedAttempts,
+    });
+    setDowngradeConfirmOpen(false);
+    await completeStarterSelection();
   };
 
   const tiers: TierKey[] = ['starter', 'professional', 'business'];
@@ -156,6 +235,36 @@ export default function PlanSelection() {
             Start free and upgrade as your business grows. All plans include core invoicing features.
           </p>
         </motion.div>
+
+        {pendingPaidTier && failedAttempts > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 max-w-3xl mx-auto rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+          >
+            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium">
+                You started upgrading to {TIER_DISPLAY[pendingPaidTier].name} but the payment didn't go through.
+              </p>
+              <p className="text-muted-foreground">
+                Resume checkout with a different card, or pick another plan below.
+              </p>
+            </div>
+            <Button
+              onClick={handleResumeUpgrade}
+              disabled={loadingTier !== null}
+              className="shrink-0"
+            >
+              {loadingTier === pendingPaidTier ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RotateCw className="h-4 w-4 mr-2" />
+              )}
+              Resume upgrade
+            </Button>
+          </motion.div>
+        )}
 
         {/* Billing Toggle */}
         <motion.div 
@@ -355,6 +464,26 @@ export default function PlanSelection() {
           </motion.div>
         </div>
       </div>
+
+      <AlertDialog open={downgradeConfirmOpen} onOpenChange={setDowngradeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your {pendingPaidTier ? TIER_DISPLAY[pendingPaidTier].name : ''} upgrade?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You were upgrading to a paid plan. Switching to the free Starter plan
+              will cancel that upgrade and limit you to {' '}
+              {FALLBACK_FEATURES.starter[0]}. You can upgrade again later, but you'll
+              lose any in-progress payment session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep my upgrade</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDowngradeToStarter}>
+              Continue with Starter (free)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

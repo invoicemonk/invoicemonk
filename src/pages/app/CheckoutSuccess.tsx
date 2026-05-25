@@ -20,8 +20,14 @@ export default function CheckoutSuccess() {
   useEffect(() => {
     const init = async () => {
       if (user?.id) {
-        // Mark plan as selected after successful checkout
-        await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
+        // Mark plan as selected and clear any pending paid intent after successful checkout.
+        await supabase.from('profiles').update({
+          has_selected_plan: true,
+          intended_tier: null,
+          intended_billing_period: null,
+          intended_tier_set_at: null,
+          failed_checkout_attempts: 0,
+        }).eq('id', user.id);
         addTags({ stripe_checkout_completed: 'true' });
 
         // Trigger welcome email (non-blocking)

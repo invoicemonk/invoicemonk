@@ -782,6 +782,20 @@ serve(async (req) => {
           // Send upgrade confirmation email
           await sendUpgradeEmail(supabase, businessId, tier, periodEnd);
 
+          // Clear paid intent + reset failed checkout counter on success.
+          if (resolvedUserId) {
+            await supabase
+              .from("profiles")
+              .update({
+                intended_tier: null,
+                intended_billing_period: null,
+                intended_tier_set_at: null,
+                failed_checkout_attempts: 0,
+                has_selected_plan: true,
+              })
+              .eq("id", resolvedUserId);
+          }
+
           // Log audit event
           await supabase.rpc("log_audit_event", {
             _event_type: "SUBSCRIPTION_CHANGED",

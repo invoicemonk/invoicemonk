@@ -1886,9 +1886,14 @@ export type Database = {
           created_at: string | null
           email: string
           email_verified: boolean | null
+          failed_checkout_attempts: number
           full_name: string | null
           has_selected_plan: boolean
           id: string
+          intended_billing_period: string | null
+          intended_tier: string | null
+          intended_tier_set_at: string | null
+          last_failed_checkout_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1900,9 +1905,14 @@ export type Database = {
           created_at?: string | null
           email: string
           email_verified?: boolean | null
+          failed_checkout_attempts?: number
           full_name?: string | null
           has_selected_plan?: boolean
           id: string
+          intended_billing_period?: string | null
+          intended_tier?: string | null
+          intended_tier_set_at?: string | null
+          last_failed_checkout_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1914,9 +1924,14 @@ export type Database = {
           created_at?: string | null
           email?: string
           email_verified?: boolean | null
+          failed_checkout_attempts?: number
           full_name?: string | null
           has_selected_plan?: boolean
           id?: string
+          intended_billing_period?: string | null
+          intended_tier?: string | null
+          intended_tier_set_at?: string | null
+          last_failed_checkout_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -3120,6 +3135,7 @@ export type Database = {
           verification_submitted_at: string
         }[]
       }
+      admin_paid_intent_lost_count: { Args: { days?: number }; Returns: number }
       admin_set_verification: {
         Args: {
           _business_id: string

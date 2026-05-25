@@ -27,7 +27,12 @@ export type OnboardingEvent =
   | 'onboarding_country_confirmed'
   | 'onboarding_dashboard_reached'
   | 'onboarding_first_invoice_created'
-  | 'onboarding_activated';
+  | 'onboarding_activated'
+  | 'checkout_payment_failed'
+  | 'checkout_payment_retried'
+  | 'paid_intent_abandoned'
+  | 'paid_intent_downgraded'
+  | 'paid_intent_resumed';
 
 type EventProps = Record<string, string | number | boolean | null | undefined>;
 
