@@ -2784,6 +2784,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tax_report_mappings: {
+        Row: {
+          created_at: string
+          deductible_percent: number
+          expense_category: string
+          id: string
+          jurisdiction: string
+          notes: string | null
+          report_line_code: string
+          report_line_label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          deductible_percent?: number
+          expense_category: string
+          id?: string
+          jurisdiction: string
+          notes?: string | null
+          report_line_code: string
+          report_line_label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          deductible_percent?: number
+          expense_category?: string
+          id?: string
+          jurisdiction?: string
+          notes?: string | null
+          report_line_code?: string
+          report_line_label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       tax_schemas: {
         Row: {
           created_at: string | null

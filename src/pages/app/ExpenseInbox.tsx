@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Inbox, Loader2, Image as ImageIcon, Check, X, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,9 +153,19 @@ export default function ExpenseInbox() {
   };
 
   const handleBulkApprove = () => {
-    const toApprove = selectableItems.filter((i) => selectedIds.has(i.id));
-    if (toApprove.length === 0) return;
-    bulkApprove.mutate(toApprove, {
+    const selected = selectableItems.filter((i) => selectedIds.has(i.id));
+    if (selected.length === 0) return;
+    const risky = selected.filter(
+      (i) => i.handwriting_detected || (i.confidence !== null && i.confidence < 0.5),
+    );
+    const safe = selected.filter((i) => !risky.includes(i));
+    if (risky.length > 0) {
+      toast.warning(
+        `${risky.length} risky item${risky.length === 1 ? '' : 's'} skipped — review handwritten or low-confidence receipts individually.`,
+      );
+    }
+    if (safe.length === 0) return;
+    bulkApprove.mutate(safe, {
       onSettled: () => setSelectedIds(new Set()),
     });
   };

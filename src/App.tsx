@@ -61,6 +61,7 @@ import ExpenseInbox from "./pages/app/ExpenseInbox";
 import Receivables from "./pages/app/Receivables";
 import Import from "./pages/app/Import";
 import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
+import AccountingTaxReports from "./pages/app/accounting/AccountingTaxReports";
 
 // Receipts pages
 import Receipts from "./pages/app/Receipts";
@@ -266,6 +267,8 @@ const App = () => (
                 <AccountingProfitability />
               </TierGatedRoute>
             } />
+            <Route path="/b/:businessId/accounting/tax-reports" element={<AccountingTaxReports />} />
+            
             
             {/* Import / Migration wizard */}
             <Route path="/b/:businessId/import" element={<Import />} />

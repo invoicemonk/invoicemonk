@@ -46,6 +46,7 @@ export function InboxItemCard({ item, defaultCurrency, currencyAccountId, select
   const [currency, setCurrency] = useState(ext.currency ?? defaultCurrency ?? '');
   const [date, setDate] = useState(ext.date ?? new Date().toISOString().slice(0, 10));
   const [category, setCategory] = useState(ext.category ?? 'other');
+  const [reviewed, setReviewed] = useState(false);
 
   const { data: thumbUrl } = useInboxThumbnailUrl(item);
   const approve = useApproveInboxItem();
@@ -57,6 +58,8 @@ export function InboxItemCard({ item, defaultCurrency, currencyAccountId, select
   const isPending = item.status === 'pending';
   const isApproved = item.status === 'approved';
   const isRejected = item.status === 'rejected';
+
+  const isRisky = item.handwriting_detected || (item.confidence !== null && item.confidence < 0.5);
 
   const handleApprove = () => {
     const overrides: Partial<InboxExtraction> & { vendor_id?: string | null; create_vendor?: boolean } = {
@@ -123,10 +126,19 @@ export function InboxItemCard({ item, defaultCurrency, currencyAccountId, select
               </div>
             )}
 
-            {(item.handwriting_detected || (item.confidence !== null && item.confidence < 0.5)) && isPending && (
-              <div className="text-xs flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-amber-400">
-                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>Review carefully — extracted values may be inaccurate.</span>
+            {isRisky && isPending && (
+              <div className="text-sm flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-300">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div>
+                    Review carefully — extracted from a {item.handwriting_detected ? 'handwritten' : 'low-confidence'} receipt.
+                    Double-check vendor, date, and amount before approving.
+                  </div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <Checkbox checked={reviewed} onCheckedChange={(v) => setReviewed(!!v)} />
+                    I've reviewed this
+                  </label>
+                </div>
               </div>
             )}
             {currencyMismatch && isPending && (
@@ -226,7 +238,12 @@ export function InboxItemCard({ item, defaultCurrency, currencyAccountId, select
               <Button size="sm" variant="ghost" onClick={() => reject.mutate(item)} disabled={reject.isPending}>
                 <X className="h-4 w-4 mr-1" /> Reject
               </Button>
-              <Button size="sm" onClick={handleApprove} disabled={approve.isPending}>
+              <Button
+                size="sm"
+                onClick={handleApprove}
+                disabled={approve.isPending || (isRisky && !reviewed)}
+                title={isRisky && !reviewed ? 'Confirm "I\'ve reviewed this" first' : undefined}
+              >
                 {approve.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
                 Approve & create expense
               </Button>
