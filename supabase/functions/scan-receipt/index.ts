@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { storage_path, business_currency, business_jurisdiction } = await req.json();
+    const { storage_path, bucket, business_currency, business_jurisdiction } = await req.json();
 
     if (!storage_path) {
       return new Response(
@@ -27,20 +27,21 @@ serve(async (req) => {
       );
     }
 
+    const ALLOWED_BUCKETS = new Set(["expense-receipts", "expense-inbox"]);
+    const bucketName = bucket && ALLOWED_BUCKETS.has(bucket) ? bucket : "expense-receipts";
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Create service-role client to download from storage
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Download the receipt file
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-      .from("expense-receipts")
+      .from(bucketName)
       .download(storage_path);
 
     if (downloadError || !fileData) {
@@ -79,7 +80,7 @@ Guidelines:
 - Detect currency from symbols (₦=NGN, $=USD, £=GBP, €=EUR, etc.) or context
 - The business operates in ${business_jurisdiction || "unknown"} jurisdiction with primary currency ${business_currency || "USD"}
 - Categorize the expense into one of these categories: ${EXPENSE_CATEGORIES.join(", ")}
-- If you cannot determine a field with confidence, omit it
+- Set handwritten=true if the receipt is handwritten (ink/pen on paper, not printed). Be conservative on confidence for handwritten receipts.
 - Return a confidence score from 0 to 1 indicating overall extraction quality`;
 
     const userContent = [
@@ -132,6 +133,10 @@ Guidelines:
               confidence: {
                 type: "number",
                 description: "Confidence score from 0 to 1 for the overall extraction quality",
+              },
+              handwritten: {
+                type: "boolean",
+                description: "True if the receipt appears to be handwritten rather than printed",
               },
             },
             required: ["vendor_name", "total_amount", "confidence"],

@@ -807,6 +807,66 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_inbox_items: {
+        Row: {
+          approved_expense_id: string | null
+          business_id: string
+          confidence: number | null
+          created_at: string
+          extracted_data: Json | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          handwriting_detected: boolean
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scan_error: string | null
+          status: Database["public"]["Enums"]["expense_inbox_status"]
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_expense_id?: string | null
+          business_id: string
+          confidence?: number | null
+          created_at?: string
+          extracted_data?: Json | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          handwriting_detected?: boolean
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scan_error?: string | null
+          status?: Database["public"]["Enums"]["expense_inbox_status"]
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_expense_id?: string | null
+          business_id?: string
+          confidence?: number | null
+          created_at?: string
+          extracted_data?: Json | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          handwriting_detected?: boolean
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scan_error?: string | null
+          status?: Database["public"]["Enums"]["expense_inbox_status"]
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -3465,6 +3525,12 @@ export type Database = {
         | "BUSINESS_VERIFICATION_CHANGED"
       business_role: "owner" | "admin" | "member" | "auditor"
       commission_status: "pending" | "locked" | "paid" | "voided"
+      expense_inbox_status:
+        | "pending"
+        | "scanning"
+        | "failed"
+        | "approved"
+        | "rejected"
       invoice_kind: "standard" | "deposit" | "final"
       invoice_status:
         | "draft"
@@ -3673,6 +3739,13 @@ export const Constants = {
       ],
       business_role: ["owner", "admin", "member", "auditor"],
       commission_status: ["pending", "locked", "paid", "voided"],
+      expense_inbox_status: [
+        "pending",
+        "scanning",
+        "failed",
+        "approved",
+        "rejected",
+      ],
       invoice_kind: ["standard", "deposit", "final"],
       invoice_status: [
         "draft",

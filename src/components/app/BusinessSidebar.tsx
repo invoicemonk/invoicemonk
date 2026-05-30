@@ -19,6 +19,7 @@ import {
   Handshake,
   Package,
   Store,
+  Inbox,
   Upload
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +73,7 @@ export function BusinessSidebar() {
     { title: 'Products & Services', url: `${baseUrl}/products`, icon: Package },
     { title: 'Accounting', url: `${baseUrl}/accounting`, icon: Calculator },
     { title: 'Expenses', url: `${baseUrl}/expenses`, icon: Receipt },
+    { title: 'Expense Inbox', url: `${baseUrl}/expenses/inbox`, icon: Inbox },
     { title: 'Vendors', url: `${baseUrl}/vendors`, icon: Store },
     { title: 'Receivables', url: `${baseUrl}/receivables`, icon: Wallet },
     { title: 'Reports', url: `${baseUrl}/reports`, icon: BarChart3 },

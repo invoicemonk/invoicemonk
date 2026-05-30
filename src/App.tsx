@@ -57,6 +57,7 @@ import AccountingResult from "./pages/app/accounting/AccountingResult";
 // Expenses page (standalone entry point)
 import Expenses from "./pages/app/Expenses";
 import Vendors from "./pages/app/Vendors";
+import ExpenseInbox from "./pages/app/ExpenseInbox";
 import Receivables from "./pages/app/Receivables";
 import Import from "./pages/app/Import";
 import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
@@ -272,6 +273,8 @@ const App = () => (
             {/* Expenses standalone entry point */}
             <Route path="/b/:businessId/expenses" element={<Expenses />} />
             <Route path="/b/:businessId/vendors" element={<Vendors />} />
+            <Route path="/b/:businessId/expenses/inbox" element={<ExpenseInbox />} />
+            
             
             {/* Receivables Intelligence */}
             <Route path="/b/:businessId/receivables" element={
