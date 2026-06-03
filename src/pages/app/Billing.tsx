@@ -26,15 +26,15 @@ import { gaEvents } from '@/hooks/use-google-analytics';
 import { useTierFeatures } from '@/hooks/use-tier-features';
 
 const planIcons = {
-  starter: Zap,
   professional: Shield,
   business: Building2,
 };
 
-type TierKey = 'starter' | 'professional' | 'business';
+type TierKey = 'professional' | 'business';
 
-const TIER_DISPLAY: Record<TierKey | 'biz', { name: string; description: string }> = {
-  starter: { name: 'Starter', description: 'For individuals getting started' },
+const TIER_DISPLAY: Record<string, { name: string; description: string }> = {
+  starter: { name: 'Starter (legacy)', description: 'Free plan — being retired' },
+  starter_paid: { name: 'Starter (legacy)', description: 'Being retired' },
   professional: { name: 'Pro', description: 'For growing businesses' },
   business: { name: 'SME', description: 'For scaling companies' },
   biz: { name: 'Biz', description: 'Enterprise with e-invoicing & compliance' },
@@ -78,9 +78,8 @@ export default function Billing() {
   }, [tier]);
 
   const handleUpgrade = async (newTier: TierKey) => {
-    if (newTier === 'starter') return;
     setLoadingTier(newTier);
-    await createCheckoutSession(newTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly', currentBusiness?.id);
+    await createCheckoutSession(newTier, isYearly ? 'yearly' : 'monthly', currentBusiness?.id);
     setLoadingTier(null);
   };
 
@@ -88,20 +87,21 @@ export default function Billing() {
     await openCustomerPortal();
   };
 
-  const tiers: TierKey[] = ['starter', 'professional', 'business'];
-  
+  const tiers: TierKey[] = ['professional', 'business'];
+
   const hasPaidSubscription = subscription?.stripe_subscription_id != null;
 
+  const isLegacyFreeTier = tier === 'starter' || tier === 'starter_paid';
   const isLoadingData = pricingLoading || tierFeaturesLoading || businessLoading;
 
   const isUpgrade = (targetTier: TierKey): boolean => {
-    const tierOrder: Record<TierKey, number> = { starter: 0, professional: 1, business: 2 };
-    return tierOrder[targetTier] > tierOrder[tier as TierKey];
+    const tierOrder: Record<string, number> = { starter: 0, starter_paid: 0, professional: 1, business: 2 };
+    return tierOrder[targetTier] > (tierOrder[tier] ?? 0);
   };
 
   const isDowngrade = (targetTier: TierKey): boolean => {
-    const tierOrder: Record<TierKey, number> = { starter: 0, professional: 1, business: 2 };
-    return tierOrder[targetTier] < tierOrder[tier as TierKey];
+    const tierOrder: Record<string, number> = { starter: 0, starter_paid: 0, professional: 1, business: 2 };
+    return tierOrder[targetTier] < (tierOrder[tier] ?? 0);
   };
 
   return (
@@ -128,20 +128,22 @@ export default function Billing() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold">{TIER_DISPLAY[tier as TierKey]?.name ?? tier}</h3>
-                <Badge>Current</Badge>
+                <h3 className="text-xl font-bold">{TIER_DISPLAY[tier]?.name ?? tier}</h3>
+                <Badge variant={isLegacyFreeTier ? 'destructive' : 'default'}>
+                  {isLegacyFreeTier ? 'Being retired' : 'Current'}
+                </Badge>
               </div>
               <p className="text-muted-foreground">
-                {TIER_DISPLAY[tier as TierKey]?.description ?? ''}
+                {TIER_DISPLAY[tier]?.description ?? ''}
               </p>
-              {subscription?.current_period_end && tier !== 'starter' && (
+              {subscription?.current_period_end && !isLegacyFreeTier && (
                 <p className="text-sm text-muted-foreground mt-2">
                   Renews on {new Date(subscription.current_period_end).toLocaleDateString()}
                 </p>
               )}
             </div>
             <div className="text-right">
-              {pricingByTier[tier as TierKey] && (
+              {!isLegacyFreeTier && pricingByTier[tier as TierKey] && (
                 <div className="text-2xl font-bold">
                   {formatPrice(pricingByTier[tier as TierKey]!.monthly_price)}
                   <span className="text-sm font-normal text-muted-foreground">/month</span>
@@ -185,7 +187,7 @@ export default function Billing() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Available Plans</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tiers.map((planTier) => {
             const isCurrent = planTier === tier;
             const isUpgradeTier = isUpgrade(planTier);
@@ -203,7 +205,7 @@ export default function Billing() {
                   : pricing.monthly_price)
               : 0;
 
-            const showPriceSkeleton = isLoadingData && planTier !== 'starter' && !pricing;
+            const showPriceSkeleton = isLoadingData && !pricing;
 
             return (
               <Card 
@@ -233,7 +235,7 @@ export default function Billing() {
                       )}
                     </span>
                     <span className="text-muted-foreground">/month</span>
-                    {isYearly && planTier !== 'starter' && pricing?.yearly_price && (
+                    {isYearly && pricing?.yearly_price && (
                       <p className="text-sm text-muted-foreground mt-1">
                         Billed {formatPrice(pricing.yearly_price)} yearly
                       </p>
