@@ -4,7 +4,6 @@ import { DowngradeFeedbackDialog } from '@/components/billing/DowngradeFeedbackD
 import { 
   CreditCard, 
   Check,
-  Zap,
   Building2,
   Shield,
   ExternalLink,
