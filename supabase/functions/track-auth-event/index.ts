@@ -356,7 +356,7 @@ serve(async (req) => {
         syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
           FIRSTNAME: firstName,
           LASTNAME: lastName,
-          PLAN: subscription?.tier || "starter",
+          PLAN: subscription?.tier || "none",
           SIGNUP_DATE: profile.created_at
             ? new Date(profile.created_at).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
@@ -369,7 +369,7 @@ serve(async (req) => {
       if (event_type === "sign_in") {
         syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
           LAST_LOGIN: new Date().toISOString().split("T")[0],
-          PLAN: subscription?.tier || "starter",
+          PLAN: subscription?.tier || "none",
         }).catch((err) => console.error("Brevo sync bg error:", err));
       }
 
@@ -377,7 +377,7 @@ serve(async (req) => {
         syncBrevoContact(supabaseUrl, serviceRoleKey, profile.email, {
           FIRSTNAME: firstName,
           LASTNAME: lastName,
-          PLAN: subscription?.tier || "starter",
+          PLAN: subscription?.tier || "none",
           HAS_SELECTED_PLAN: true,
           COUNTRY: businessData?.jurisdiction || "",
           BUSINESS_NAME: businessData?.name || "",

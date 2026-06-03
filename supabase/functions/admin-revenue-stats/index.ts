@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     const { data: snapshotSubs, error: subsErr } = await admin
       .from("subscriptions")
       .select("id, tier, status, billing_currency, pricing_region, stripe_subscription_id, created_at, cancelled_at")
-      .neq("tier", "starter")
+      .not("tier", "in", "(starter,starter_paid)")
       .lte("created_at", effectiveEndIso)
       .in("status", ["active", "past_due", "trialing", "cancelled"])
       .or(`cancelled_at.is.null,cancelled_at.gt.${effectiveEndIso}`);
