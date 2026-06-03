@@ -4,8 +4,8 @@ import { motion } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  Check, Zap, Shield, Building2, Loader2, ArrowRight, Sparkles, Mail,
+import {
+  Check, Shield, Building2, Loader2, ArrowRight, Sparkles, Mail,
   AlertTriangle, RotateCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,10 +15,6 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -26,18 +22,17 @@ import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
 import { addTags } from '@/lib/onesignal';
 import { trackFunnel } from '@/lib/funnel-tracking';
-type TierKey = 'starter' | 'professional' | 'business';
+
+type TierKey = 'professional' | 'business';
 
 // Hardcoded fallback pricing (USD, in cents) — used if network slow.
 // Authoritative pricing is always re-validated server-side at checkout.
 const FALLBACK_PRICING: Record<TierKey, { monthly: number; yearly: number }> = {
-  starter: { monthly: 0, yearly: 0 },
   professional: { monthly: 1900, yearly: 19000 },
   business: { monthly: 4900, yearly: 49000 },
 };
 
 const FALLBACK_FEATURES: Record<TierKey, string[]> = {
-  starter: ['5 invoices/month', '5 receipts/month', '1 currency account', 'Single user only'],
   professional: ['Unlimited invoices', 'Unlimited receipts', 'Up to 3 team members', 'Accounting module', 'Expense tracking', 'Credit notes', 'Data exports'],
   business: ['Unlimited everything', 'Unlimited team members', 'Full audit trail', 'In-app support', 'Custom branding', 'Credit notes', 'Data exports'],
 };
@@ -53,14 +48,12 @@ const BIZ_FEATURES = [
 ];
 
 const TIER_DISPLAY: Record<TierKey | 'biz', { name: string; description: string }> = {
-  starter: { name: 'Starter', description: 'For individuals getting started' },
   professional: { name: 'Pro', description: 'For growing businesses' },
   business: { name: 'SME', description: 'For scaling companies' },
   biz: { name: 'Biz', description: 'Enterprise with e-invoicing & compliance' },
 };
 
-const planIcons = {
-  starter: Zap,
+const planIcons: Record<TierKey, typeof Shield> = {
   professional: Shield,
   business: Building2,
 };
@@ -75,7 +68,6 @@ export default function PlanSelection() {
   const [isYearly, setIsYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [showFallback, setShowFallback] = useState(false);
-  const [downgradeConfirmOpen, setDowngradeConfirmOpen] = useState(false);
   const [searchParams] = useSearchParams();
 
   const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
@@ -84,8 +76,7 @@ export default function PlanSelection() {
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
   const queryClient = useQueryClient();
 
-  // Fetch the user's pending paid intent (if any) so we can show the resume banner
-  // and protect against accidental silent downgrades to Starter.
+  // Fetch the user's pending paid intent (if any) so we can show the resume banner.
   const { data: intent } = useQuery({
     queryKey: ['paid-intent', user?.id],
     enabled: !!user?.id,
@@ -99,7 +90,7 @@ export default function PlanSelection() {
     },
   });
 
-  const pendingPaidTier = (intent?.intended_tier as 'professional' | 'business' | null) || null;
+  const pendingPaidTier = (intent?.intended_tier as TierKey | null) || null;
   const pendingBilling = (intent?.intended_billing_period as 'monthly' | 'yearly' | null) || 'monthly';
   const failedAttempts = intent?.failed_checkout_attempts ?? 0;
 
@@ -128,52 +119,11 @@ export default function PlanSelection() {
   const dataReady = !pricingLoading && !tierFeaturesLoading;
   const useFallback = !dataReady && showFallback;
 
-  const markPlanSelected = async () => {
-    if (user?.id) {
-      await supabase.from('profiles').update({ has_selected_plan: true }).eq('id', user.id);
-    }
-  };
-
-  const clearPaidIntent = async () => {
-    if (!user?.id) return;
-    await supabase
-      .from('profiles')
-      .update({
-        intended_tier: null,
-        intended_billing_period: null,
-        intended_tier_set_at: null,
-      })
-      .eq('id', user.id);
-    queryClient.invalidateQueries({ queryKey: ['paid-intent', user.id] });
-  };
-
-  const completeStarterSelection = async () => {
-    addTags({ plan_type: 'free' });
-    await markPlanSelected();
-    await clearPaidIntent();
-    supabase.functions.invoke('track-auth-event', {
-      body: { event_type: 'plan_selected' },
-    }).catch(() => {});
-    await queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
-    navigate('/dashboard');
-  };
-
   const handleSelectPlan = async (planTier: TierKey) => {
     trackFunnel('onboarding_plan_selected', {
       plan: planTier,
       billing: isYearly ? 'yearly' : 'monthly',
     });
-
-    if (planTier === 'starter') {
-      // If the user previously committed to a paid upgrade, don't silently
-      // downgrade them — make them confirm.
-      if (pendingPaidTier) {
-        setDowngradeConfirmOpen(true);
-        return;
-      }
-      await completeStarterSelection();
-      return;
-    }
 
     addTags({ plan_type: 'paid' });
     // Persist intent BEFORE redirecting to Stripe so a failed checkout can be recovered.
@@ -188,7 +138,7 @@ export default function PlanSelection() {
         .eq('id', user.id);
     }
     setLoadingTier(planTier);
-    await createCheckoutSession(planTier as 'professional' | 'business', isYearly ? 'yearly' : 'monthly');
+    await createCheckoutSession(planTier, isYearly ? 'yearly' : 'monthly');
     setLoadingTier(null);
   };
 
@@ -200,16 +150,7 @@ export default function PlanSelection() {
     setLoadingTier(null);
   };
 
-  const confirmDowngradeToStarter = async () => {
-    trackFunnel('paid_intent_downgraded', {
-      from_tier: pendingPaidTier || 'unknown',
-      attempts: failedAttempts,
-    });
-    setDowngradeConfirmOpen(false);
-    await completeStarterSelection();
-  };
-
-  const tiers: TierKey[] = ['starter', 'professional', 'business'];
+  const tiers: TierKey[] = ['professional', 'business'];
 
   // Skeleton-only state: data still loading AND fallback hasn't kicked in yet (<1.5s)
   const showSkeleton = !dataReady && !useFallback;
@@ -218,21 +159,21 @@ export default function PlanSelection() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <img 
-            src={logoImage} 
-            alt="Invoicemonk" 
+          <img
+            src={logoImage}
+            alt="Invoicemonk"
             className="h-12 mx-auto mb-6"
           />
           <h1 className="text-4xl font-bold tracking-tight mb-3">
             Choose Your Plan
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Start free and upgrade as your business grows. All plans include core invoicing features.
+            Pick a plan to start using InvoiceMonk. Cancel anytime.
           </p>
         </motion.div>
 
@@ -267,7 +208,7 @@ export default function PlanSelection() {
         )}
 
         {/* Billing Toggle */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
@@ -288,13 +229,13 @@ export default function PlanSelection() {
         </motion.div>
 
         {/* Plan Cards */}
-        <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-3">
           {tiers.map((tier, index) => {
             const pricing = pricingByTier[tier];
             const Icon = planIcons[tier];
             const display = TIER_DISPLAY[tier];
             const isRecommended = tier === 'professional';
-            const isCurrent = subscription && subscription.tier !== 'starter'
+            const isCurrent = subscription
               ? tier === subscription.tier
               : false;
             const isLoadingThis = loadingTier === tier;
@@ -331,7 +272,7 @@ export default function PlanSelection() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.1 }}
               >
-                <Card 
+                <Card
                   className={`relative h-full flex flex-col ${
                     isRecommended ? 'border-primary shadow-lg scale-105' : ''
                   } ${isCurrent ? 'bg-muted/30' : ''}`}
@@ -357,7 +298,7 @@ export default function PlanSelection() {
                         <>
                           <span className="text-4xl font-bold">{renderPrice}</span>
                           <span className="text-muted-foreground">/month</span>
-                          {isYearly && tier !== 'starter' && yearlyPriceCents && (
+                          {isYearly && yearlyPriceCents && (
                             <p className="text-sm text-muted-foreground mt-1">
                               Billed {renderYearly} yearly
                             </p>
@@ -365,9 +306,9 @@ export default function PlanSelection() {
                         </>
                       )}
                     </div>
-                    
+
                     <Separator className="mb-4" />
-                    
+
                     <ul className="space-y-3 flex-1">
                       {showSkeleton ? (
                         <>
@@ -392,19 +333,14 @@ export default function PlanSelection() {
                           Current Plan
                         </Button>
                       ) : (
-                        <Button 
-                          className="w-full" 
-                          variant={isRecommended ? 'default' : tier === 'starter' ? 'default' : 'outline'}
+                        <Button
+                          className="w-full"
+                          variant={isRecommended ? 'default' : 'outline'}
                           onClick={() => handleSelectPlan(tier)}
                           disabled={checkoutLoading || !!loadingTier}
                         >
                           {isLoadingThis ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : tier === 'starter' ? (
-                            <>
-                              Continue with Free plan
-                              <ArrowRight className="h-4 w-4 ml-2" />
-                            </>
                           ) : (
                             <>
                               Get Started
@@ -439,9 +375,9 @@ export default function PlanSelection() {
                   <span className="text-4xl font-bold">Custom</span>
                   <span className="text-muted-foreground ml-1">pricing</span>
                 </div>
-                
+
                 <Separator className="mb-4" />
-                
+
                 <ul className="space-y-3 flex-1">
                   {BIZ_FEATURES.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
@@ -450,7 +386,7 @@ export default function PlanSelection() {
                     </li>
                   ))}
                 </ul>
-                
+
                 <div className="mt-6">
                   <Button className="w-full" variant="outline" asChild>
                     <a href="mailto:sales@invoicemonk.com">
@@ -463,27 +399,11 @@ export default function PlanSelection() {
             </Card>
           </motion.div>
         </div>
-      </div>
 
-      <AlertDialog open={downgradeConfirmOpen} onOpenChange={setDowngradeConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel your {pendingPaidTier ? TIER_DISPLAY[pendingPaidTier].name : ''} upgrade?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You were upgrading to a paid plan. Switching to the free Starter plan
-              will cancel that upgrade and limit you to {' '}
-              {FALLBACK_FEATURES.starter[0]}. You can upgrade again later, but you'll
-              lose any in-progress payment session.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep my upgrade</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDowngradeToStarter}>
-              Continue with Starter (free)
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+          Need to come back later? You can sign out and finish picking a plan when you're ready.
+        </p>
+      </div>
     </div>
   );
 }

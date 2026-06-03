@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { UpgradeModal } from './UpgradeModal';
 import { PaymentIssueBanner } from '@/components/billing/PaymentIssueBanner';
+import { StarterSunsetBanner } from '@/components/billing/StarterSunsetBanner';
 
 
 function BusinessLayoutContent() {
@@ -54,6 +55,7 @@ function BusinessLayoutContent() {
             <BusinessSidebar />
             <SidebarInset className="flex flex-col flex-1">
               <DashboardHeader />
+              <StarterSunsetBanner />
               <PaymentIssueBanner />
               <main className="flex-1 p-6 overflow-auto">
                 <Outlet />

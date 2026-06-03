@@ -2588,6 +2588,7 @@ export type Database = {
           current_period_start: string | null
           id: string
           pricing_region: string | null
+          starter_grace_expires_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -2604,6 +2605,7 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
+          starter_grace_expires_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -2620,6 +2622,7 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
+          starter_grace_expires_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null

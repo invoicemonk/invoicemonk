@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { TierGatedRoute } from "@/components/app/TierGatedRoute";
+import { StarterGraceGuard } from "@/components/app/StarterGraceGuard";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
@@ -233,9 +234,23 @@ const App = () => (
           <Route element={<ProtectedRoute><BusinessLayout /></ProtectedRoute>}>
             <Route path="/b/:businessId/dashboard" element={<Dashboard />} />
             <Route path="/b/:businessId/invoices" element={<Invoices />} />
-            <Route path="/b/:businessId/invoices/new" element={<InvoiceNew />} />
+            <Route path="/b/:businessId/invoices/new" element={
+              <StarterGraceGuard
+                feature="Create invoice"
+                description="Creating new invoices requires a paid plan."
+              >
+                <InvoiceNew />
+              </StarterGraceGuard>
+            } />
             <Route path="/b/:businessId/invoices/:id" element={<InvoiceDetail />} />
-            <Route path="/b/:businessId/invoices/:id/edit" element={<InvoiceEdit />} />
+            <Route path="/b/:businessId/invoices/:id/edit" element={
+              <StarterGraceGuard
+                feature="Edit invoice"
+                description="Editing invoices requires a paid plan."
+              >
+                <InvoiceEdit />
+              </StarterGraceGuard>
+            } />
             <Route path="/b/:businessId/credit-notes" element={<CreditNotesRedirect />} />
             <Route path="/b/:businessId/credit-notes/:id" element={<CreditNoteDetail />} />
             <Route path="/b/:businessId/clients" element={<Clients />} />

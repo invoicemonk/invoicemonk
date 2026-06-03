@@ -70,11 +70,13 @@ Deno.serve(async (req) => {
     // a sub whose payment was cancelled mid-period (period_end still in the
     // future, or NULL) is never caught and MRR stays inflated.
     const MAX_ROWS = 500;
+    // Starter / starter_paid are retired free tiers — they have no Stripe
+    // subscription to reconcile against, so skip them entirely.
     const { data: staleSubscriptions, error: fetchError } = await supabase
       .from("subscriptions")
       .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, status, current_period_end, updated_at")
       .in("status", ["active", "past_due"])
-      .neq("tier", "starter")
+      .not("tier", "in", "(starter,starter_paid)")
       .order("updated_at", { ascending: true })
       .limit(MAX_ROWS);
 
@@ -187,9 +189,11 @@ Deno.serve(async (req) => {
             synced++;
             continue;
           }
+          // Starter is retired — just mark the row cancelled and keep the
+          // historical tier so reporting/audit stays accurate.
           const { error: updateError } = await supabase
             .from("subscriptions")
-            .update({ tier: "starter", status: "cancelled" })
+            .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq("id", sub.id);
           if (updateError) {
             errors.push(`Failed to downgrade ${sub.id}: ${updateError.message}`);
@@ -219,7 +223,7 @@ Deno.serve(async (req) => {
             }
             const { error: updateError } = await supabase
               .from("subscriptions")
-              .update({ tier: "starter", status: "cancelled" })
+              .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
               .eq("id", sub.id);
             if (updateError) {
               errors.push(`Failed to downgrade ${sub.id}: ${updateError.message}`);
@@ -292,7 +296,6 @@ Deno.serve(async (req) => {
           const { error: updateError } = await supabase
             .from("subscriptions")
             .update({
-              tier: "starter",
               status: "cancelled",
               cancelled_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),

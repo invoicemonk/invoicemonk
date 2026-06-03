@@ -25,7 +25,7 @@ interface SubscriptionDialogProps {
 }
 
 const TIERS: { value: SubscriptionTier; label: string; description: string }[] = [
-  { value: 'starter', label: 'Starter', description: 'Basic features, limited invoices' },
+  // Starter and starter_paid are retired — admins can no longer assign them.
   { value: 'professional', label: 'Professional', description: 'More invoices, custom branding' },
   { value: 'business', label: 'Business', description: 'Unlimited invoices, priority support' },
 ];
