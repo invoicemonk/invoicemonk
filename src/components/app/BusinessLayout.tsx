@@ -47,6 +47,11 @@ function BusinessLayoutContent() {
     );
   }
 
+  // Gate the business workspace behind a completed onboarding.
+  if ((currentBusiness as any).onboarding_step !== 'completed') {
+    return <Navigate to={`/onboarding/${currentBusiness.id}`} replace />;
+  }
+
   return (
     <SubscriptionProvider>
       <CurrencyAccountProvider>

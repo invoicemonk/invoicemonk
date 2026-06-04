@@ -1,71 +1,94 @@
 ## Goal
 
-Stop allocating system resources to users on the free Starter / starter_paid plans. Professional becomes the entry paid tier. Existing free-tier users get a 14-day grace period, then are locked to read-only until they upgrade.
+Replace the single-step country picker with a guided multi-step onboarding wizard that collects every field needed for a business to be (a) compliance-complete and (b) able to issue legally valid invoices. By the time the user reaches the dashboard, the only remaining actions are "add a client" and "create an invoice".
 
-## Scope
+## What "compliant + invoice-ready" requires today
 
-Pricing UI, plan-selection flow, signup default, billing/admin tooling, and an existing-user migration path. No new Stripe products needed — Professional and Business already exist.
+Sourced from `profile-completion.ts`, `business-profile-guard.ts`, `jurisdiction-config.ts`, and the `BusinessProfile` page. Requirements branch on **entity type** (individual / business / nonprofit) and **jurisdiction**.
 
----
+### 1. Always required (every entity, every jurisdiction)
 
-## 1. Pricing & plan-selection UI (frontend)
+- **Business / trading name** (`businesses.name`)
+- **Country of operation** (`jurisdiction`) — drives every rule below
+- **Default currency** (`default_currency`) — locks after first issued invoice
+- **Contact email** (`contact_email`) — appears as issuer contact on invoices
+- **Address country** (`address.country`)
+- **Entity type** — individual / business / nonprofit
 
-- `src/pages/app/PlanSelection.tsx`
-  - Drop `starter` and `starter_paid` from `tiers`, `FALLBACK_FEATURES`, `TIER_META`, and icons.
-  - Remove `completeStarterSelection`, `confirmDowngradeToStarter`, the "Continue with Starter (free)" dialog, and any "free" copy.
-  - Make Professional the default-selected/recommended tier. If a user lands here with no subscription, they must pick Pro or Business to continue — no skip-to-free path.
-- `src/pages/app/Billing.tsx`
-  - Remove the Starter card from the comparison grid; only show Professional and Business.
-  - Hide the "current plan: Starter" badge variant; replace with the grace-period banner (see §4) when the active row is still `starter`/`starter_paid`.
-- `src/components/app/UpgradePrompt.tsx` and any "upgrade to Pro" copy — confirm recommended tier is Professional (no "stay on free" CTA).
-- `src/components/admin/SubscriptionDialog.tsx`
-  - Drop the `starter` option from the tier picker so admins can no longer assign someone to Starter manually. Keep `starter_paid` hidden as well.
-  - Note: this is the only place admins set tiers; existing rows in DB still display correctly.
+### 2. Required for businesses & nonprofits (not individuals)
 
-## 2. Signup default (no more auto-Starter row)
+- **Legal / registered name** (`legal_name`) — must match official registration
+- **City** (`address.city`)
+- **Commercial registration number** (`cac_number`) — only in jurisdictions where `isIssuerCacRequired` is true (e.g. NG, FR, KE)
 
-Today a Postgres trigger inserts `('starter', 'active')` into `subscriptions` on new auth user (`20260131050339_…sql`). Change the behavior:
+### 3. Required for individuals
 
-- Migration: rewrite the `handle_new_user` (or equivalent) trigger so it no longer creates a default subscription row. New users have **no subscription** until they complete Stripe checkout.
-- Frontend signup flow: after email confirmation / first login, route to `/select-plan` and block all `/b/...` routes via `ProtectedRoute` until a paid subscription exists. Reuse the existing `TierGatedRoute` / `useSubscription` (treat "no subscription" the same as Starter for gating, but the only escape is paying).
-- `useSubscription` keeps returning `tier: 'starter'` as a virtual default for gating math, but the DB row is gone.
+- **Government ID upload** (`document_verification_status` ≠ `not_uploaded`) — proves identity in place of a registration cert
 
-## 3. Grace period + restriction for existing free users
+### 4. Conditionally required by jurisdiction
 
-- Migration: add `starter_grace_expires_at timestamptz` to `subscriptions` (nullable). Backfill: set to `now() + interval '14 days'` for every active row where `tier IN ('starter','starter_paid')`.
-- New hook `useStarterGrace()` reads the current subscription; returns `{ inGrace, expiresAt, expired }` when the row tier is starter/starter_paid.
-- `src/components/billing/PaymentIssueBanner.tsx` (or a new `StarterSunsetBanner`): persistent banner on every page for in-grace users — "Free plans end on {date}. Upgrade to keep creating invoices." with an Upgrade button to `/select-plan`.
-- After expiry (`expired === true`), gate every creation surface to read-only:
-  - Wrap `InvoiceNew`, `InvoiceEdit`, expense creation, receipt creation, client/vendor create dialogs, and the "Send" action with a check that opens the upgrade modal instead of submitting.
-  - Sidebar "+ New" buttons become disabled with tooltip.
-  - Read/export of existing data remains allowed so they can leave with their records.
-- Optional one-time email via the existing lifecycle-campaigns infra (`process-lifecycle-campaigns`) announcing the sunset — keep it minimal: trigger on grace-set and on expiry.
+- **Tax ID / Government ID** (`tax_id` or `government_id_value`) — mandatory for all non-individuals, and for individuals in jurisdictions where `isIssuerTaxIdRequired` is true (NG FIRS, KE KRA, FR SIREN, EU VAT countries, etc.)
+- **VAT registration number** (`vat_registration_number`) — only when the jurisdiction has VAT (`showVat`) and the user marks themselves VAT-registered
+- **Invoice number digit width** (`invoice_number_digits`) — auto-seeded from `jurisdictionConfig.invoiceNumberDigits`, no user input needed
 
-## 4. Backend sync & reporting cleanup
+### 5. Strongly recommended for invoice quality (not blocking, but should be collected once to avoid the settings page later)
 
-- `supabase/functions/sync-subscriptions/index.ts`
-  - When a Stripe sub is cancelled/expired, instead of downgrading the local row to `starter`, mark the local row `status='cancelled'` and leave `tier` as-is (or set to `null`). Removes false MRR signals and stops re-creating Starter entitlements.
-  - Skip the `.neq("tier", "starter")` shortcut — it's no longer meaningful.
-- `supabase/functions/admin-revenue-stats/index.ts` — exclude starter/starter_paid from the active-tier breakdown (they're no longer a product).
-- `supabase/functions/track-auth-event/index.ts` — drop the `"starter"` fallback in Brevo PLAN attribute; send `"none"` instead so segmentation reflects unconverted signups.
-- `tier_limits` / `pricing_regions` rows for `starter` and `starter_paid` stay in the DB (referenced by historical analytics) but are hidden from all UI surfaces.
+- **Street address, state/region, postal code** — appear on every invoice
+- **Business phone** — appears on invoices
+- **Invoice prefix** (default `INV`)
+- **Logo** + **brand color** — branded invoices
+- **Default payment method** (bank transfer / mobile money / online payments toggle) — without this the first invoice has no "how to pay" block
 
-## 5. We are NOT doing (out of scope)
+## Proposed onboarding flow
 
-- Removing the `starter` value from the `subscription_tier` enum (would break historical rows and many SQL functions). It stays as a legacy value, just unreachable from product surfaces.
-- Refunds / proration for users who recently paid `starter_paid` — there are very few; handle case-by-case if anyone complains.
+Route the user from email-verified signup straight into `/onboarding`, a stepper that cannot be skipped. Each step writes to the existing `businesses` / `business_sensitive_data` / `currency_accounts` / `payment_methods` tables.
 
----
+```text
+Signup → Verify email → Select plan (paid)
+   → Step 1  Location & entity
+   → Step 2  Identity (legal name + tax/gov ID + CAC, conditional)
+   → Step 3  Address & contact
+   → Step 4  Tax setup (VAT toggle + VAT number when applicable)
+   → Step 5  Invoice branding (prefix, logo, color)   
+   → Step 6  Get paid (payment method or enable online payments)
+   → Dashboard
+```
 
-## Technical notes (for the engineer)
+### Step-by-step content
 
-- The `subscription_tier` enum currently has `starter | starter_paid | professional | business`. We keep it intact; the cleanup is at the UI + signup + sync layer.
-- `has_role`-style RLS and `check_tier_limit` already collapse "no entitlement" to starter behavior, so a missing subscription row will naturally fall through to the gating logic — confirm with a quick test before shipping.
-- After §3 lands, run a one-off SQL update to set `starter_grace_expires_at` on all existing `tier IN ('starter','starter_paid') AND status='active'` rows.
+1. **Location & entity** — country, entity type, currency (auto-derived but editable). Reuses today's `CountryConfirmation` preview card.
+2. **Identity** — fields appear conditionally:
+  - businesses/nonprofits: legal name, tax ID, CAC (if jurisdiction needs it)
+  - individuals in tax-ID jurisdictions: government ID number + ID document upload
+3. **Address & contact** — street, city, state, postal code, phone, contact email (prefilled from auth).
+4. **Tax setup** — only shown when `jurisdictionConfig.showVat`. Toggle "Are you VAT registered?" → reveal VAT number input. Show the jurisdiction's VAT label (TVA, VAT, GST, etc.).
+5. **Branding** — invoice prefix (default INV), logo upload, brand color picker. Marked optional with a "Skip for now" link.
+6. **Get paid** — one of: add a manual payment method (bank/mobile money fields based on country) **or** enable online payments (Stripe Connect / Paystack handoff). Without this step the first invoice has no payable instruction.
 
-## Rollout order
+### Behaviour rules
 
-1. Migration: trigger change + `starter_grace_expires_at` column + backfill.
-2. Edge function updates (sync-subscriptions, admin-revenue-stats, track-auth-event).
-3. Frontend: PlanSelection / Billing / SubscriptionDialog cleanup, grace banner, read-only gates.
-4. Verify: signup flow forces Pro/Business; existing test starter account sees banner; after manually expiring the grace date, creates are blocked.
+- Stepper persists progress per business (new column `onboarding_step` on `businesses`, nullable; `completed` when done).
+- A guard redirects any `/b/:id/*` route to `/onboarding/:step` until `onboarding_step = completed` OR the user explicitly chose "Skip" on optional steps 5/6.
+- Steps 5 and 6 can be deferred — a soft banner reminds the user on the dashboard until done.
+- Existing businesses with incomplete profiles get the same wizard the next time they log in (one-time backfill prompt), so we retire the heavy `BusinessProfile` settings page as the primary completion surface.
+- `BusinessProfile` settings page stays for edits, but the giant "complete your profile" banners and `QuickSetupChecklist` are replaced by the wizard.
+
+### Files in scope (for the implementation phase)
+
+- New: `src/pages/app/onboarding/OnboardingWizard.tsx` + one file per step under `src/components/onboarding/`.
+- New hook: `useOnboardingProgress` reading/writing `businesses.onboarding_step`.
+- Migration: add `onboarding_step text` to `businesses`, backfill existing rows to `completed` only when `profile-completion` says so, otherwise `null`.
+- Update `App.tsx` routes (replace single `/onboarding/country` with `/onboarding/:step`) and add a guard in `BusinessLayout`/`BusinessAccessGuard`.
+- Retire: `CountryConfirmation.tsx`, `QuickSetupChecklist`, `CompleteProfileBanner` (folded into wizard).
+
+## Out of scope
+
+- Verification (Stripe Connect KYC, document review) stays where it is — the wizard only collects what's required for invoice compliance, not regulator verification.
+- Team invites, recurring expenses, products/services — these remain post-onboarding.
+- No changes to existing invoice/compliance logic; we just front-load the data collection.
+
+## Open questions before I build
+
+1. For step 6 (Get paid), should we **require** at least one payment method/online payments enabled, or allow skipping? We must require at least one payment method.
+2. For existing users with incomplete profiles, do we force them through the wizard on next login, or only nudge with a banner? Yes
+3. Should logo + brand color be part of the required flow or fully optional? Let's make logo required.

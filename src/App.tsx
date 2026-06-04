@@ -138,6 +138,7 @@ import HeroPreview from "./pages/demo/HeroPreview";
 
 // Onboarding pages
 const CountryConfirmation = lazy(() => import("./pages/app/CountryConfirmation"));
+const OnboardingWizard = lazy(() => import("./pages/app/OnboardingWizard"));
 
 // Marketing screenshot routes (public, used to capture product images)
 import {
@@ -223,6 +224,8 @@ const App = () => (
           
           {/* Onboarding routes */}
           <Route path="/onboarding/country" element={<ProtectedRoute><Suspense fallback={<LazyFallback />}><CountryConfirmation /></Suspense></ProtectedRoute>} />
+          <Route path="/onboarding" element={<ProtectedRoute><Suspense fallback={<LazyFallback />}><OnboardingWizard /></Suspense></ProtectedRoute>} />
+          <Route path="/onboarding/:businessId" element={<ProtectedRoute><Suspense fallback={<LazyFallback />}><OnboardingWizard /></Suspense></ProtectedRoute>} />
           
           {/* Legacy route redirects */}
           <Route path="/auth" element={<Login />} />
