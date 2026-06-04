@@ -31,7 +31,7 @@ export function BusinessRedirect() {
         .from('business_members')
         .select(`
           business_id,
-          business:businesses!inner(id, is_default, jurisdiction)
+          business:businesses!inner(id, is_default, jurisdiction, onboarding_step)
         `)
         .eq('user_id', user.id)
         .eq('businesses.is_default', true)
@@ -40,13 +40,14 @@ export function BusinessRedirect() {
 
       let businessId = defaultMembership?.business_id ?? null;
       let jurisdiction = (defaultMembership?.business as any)?.jurisdiction ?? null;
+      let onboardingStep = (defaultMembership?.business as any)?.onboarding_step ?? null;
 
       if (!businessId) {
         const { data: firstMembership } = await supabase
           .from('business_members')
           .select(`
             business_id,
-            business:businesses!inner(id, jurisdiction)
+            business:businesses!inner(id, jurisdiction, onboarding_step)
           `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: true })
@@ -55,23 +56,14 @@ export function BusinessRedirect() {
 
         businessId = firstMembership?.business_id ?? null;
         jurisdiction = (firstMembership?.business as any)?.jurisdiction ?? null;
-      }
-
-      // Check if business has any invoices (to skip onboarding for returning users)
-      let hasInvoices = false;
-      if (businessId) {
-        const { count } = await supabase
-          .from('invoices')
-          .select('id', { count: 'exact', head: true })
-          .eq('business_id', businessId);
-        hasInvoices = (count ?? 0) > 0;
+        onboardingStep = (firstMembership?.business as any)?.onboarding_step ?? null;
       }
 
       return {
         hasSelectedPlan: profile?.has_selected_plan ?? false,
         businessId,
         jurisdiction,
-        hasInvoices,
+        onboardingStep,
       };
     },
     enabled: !!user,
@@ -86,9 +78,9 @@ export function BusinessRedirect() {
     }
 
     if (data.businessId) {
-      // Redirect to country onboarding if jurisdiction is null/empty and no invoices yet
-      if (!data.jurisdiction && !data.hasInvoices) {
-        navigate('/onboarding/country', { replace: true });
+      // Send to onboarding wizard until the user completes it
+      if (data.onboardingStep !== 'completed') {
+        navigate(`/onboarding/${data.businessId}`, { replace: true });
         return;
       }
       navigate(`/b/${data.businessId}/dashboard`, { replace: true });
