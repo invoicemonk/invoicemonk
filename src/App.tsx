@@ -138,6 +138,7 @@ import HeroPreview from "./pages/demo/HeroPreview";
 
 // Onboarding pages
 const CountryConfirmation = lazy(() => import("./pages/app/CountryConfirmation"));
+const OnboardingWizard = lazy(() => import("./pages/app/OnboardingWizard"));
 
 // Marketing screenshot routes (public, used to capture product images)
 import {
