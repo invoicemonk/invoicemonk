@@ -263,6 +263,7 @@ export type Database = {
           name: string
           next_invoice_number: number | null
           next_receipt_number: number
+          onboarding_step: string | null
           online_payments_enabled: boolean
           paystack_subaccount_status: string
           registration_status: string | null
@@ -306,6 +307,7 @@ export type Database = {
           name: string
           next_invoice_number?: number | null
           next_receipt_number?: number
+          onboarding_step?: string | null
           online_payments_enabled?: boolean
           paystack_subaccount_status?: string
           registration_status?: string | null
@@ -349,6 +351,7 @@ export type Database = {
           name?: string
           next_invoice_number?: number | null
           next_receipt_number?: number
+          onboarding_step?: string | null
           online_payments_enabled?: boolean
           paystack_subaccount_status?: string
           registration_status?: string | null
