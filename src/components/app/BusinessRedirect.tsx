@@ -35,7 +35,7 @@ export function BusinessRedirect() {
         .eq('user_id', user.id);
       const businessIds = (memberships ?? []).map(m => m.business_id);
 
-      const liveStatuses = ['active', 'trialing', 'past_due'];
+      const liveStatuses = ['active', 'trialing', 'past_due'] as const;
 
       const { data: userSubs } = await supabase
         .from('subscriptions')
