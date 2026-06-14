@@ -7,8 +7,11 @@ import { Loader2 } from 'lucide-react';
 
 /**
  * Redirects the user to their default/first business dashboard.
- * Used when accessing /dashboard without a business context.
- * Also gates access: if the user hasn't selected a plan yet, redirects to /select-plan.
+ * Gates:
+ *  - must have selected a plan (profiles.has_selected_plan)
+ *  - AND must have an active/trialing/past_due subscription (defence-in-depth
+ *    against the legacy bug where /checkout/success flipped has_selected_plan
+ *    without verifying payment).
  */
 export function BusinessRedirect() {
   const { user, loading: authLoading } = useAuth();
@@ -19,15 +22,40 @@ export function BusinessRedirect() {
     queryFn: async () => {
       if (!user) return null;
 
-      // Check if user has selected a plan
       const { data: profile } = await supabase
         .from('profiles')
         .select('has_selected_plan')
         .eq('id', user.id)
         .maybeSingle();
 
-      // First try to find the user's default business
-      const { data: defaultMembership, error: defaultError } = await supabase
+      // Find a live subscription on the user OR any of their businesses.
+      const { data: memberships } = await supabase
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', user.id);
+      const businessIds = (memberships ?? []).map(m => m.business_id);
+
+      const liveStatuses = ['active', 'trialing', 'past_due'];
+
+      const { data: userSubs } = await supabase
+        .from('subscriptions')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('status', liveStatuses)
+        .limit(1);
+
+      let hasLiveSubscription = (userSubs?.length ?? 0) > 0;
+      if (!hasLiveSubscription && businessIds.length > 0) {
+        const { data: bizSubs } = await supabase
+          .from('subscriptions')
+          .select('id')
+          .in('business_id', businessIds)
+          .in('status', liveStatuses)
+          .limit(1);
+        hasLiveSubscription = (bizSubs?.length ?? 0) > 0;
+      }
+
+      const { data: defaultMembership } = await supabase
         .from('business_members')
         .select(`
           business_id,
@@ -39,7 +67,6 @@ export function BusinessRedirect() {
         .maybeSingle();
 
       let businessId = defaultMembership?.business_id ?? null;
-      let jurisdiction = (defaultMembership?.business as any)?.jurisdiction ?? null;
       let onboardingStep = (defaultMembership?.business as any)?.onboarding_step ?? null;
 
       if (!businessId) {
@@ -53,16 +80,14 @@ export function BusinessRedirect() {
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle();
-
         businessId = firstMembership?.business_id ?? null;
-        jurisdiction = (firstMembership?.business as any)?.jurisdiction ?? null;
         onboardingStep = (firstMembership?.business as any)?.onboarding_step ?? null;
       }
 
       return {
         hasSelectedPlan: profile?.has_selected_plan ?? false,
+        hasLiveSubscription,
         businessId,
-        jurisdiction,
         onboardingStep,
       };
     },
@@ -72,13 +97,13 @@ export function BusinessRedirect() {
   useEffect(() => {
     if (authLoading || isLoading || !data) return;
 
-    if (!data.hasSelectedPlan) {
+    // Require BOTH the flag and an actual live subscription.
+    if (!data.hasSelectedPlan || !data.hasLiveSubscription) {
       navigate('/select-plan', { replace: true });
       return;
     }
 
     if (data.businessId) {
-      // Send to onboarding wizard until the user completes it
       if (data.onboardingStep !== 'completed') {
         navigate(`/onboarding/${data.businessId}`, { replace: true });
         return;
