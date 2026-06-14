@@ -341,15 +341,22 @@ export default function OnboardingWizard() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['user-business'] });
-      queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
-      queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-business'] });
-
       if (isLast) {
+        // Must await refetch — BusinessLayout reads user-businesses cache and
+        // will bounce back to /onboarding if it still sees the pre-completion value.
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['user-businesses'] }),
+          queryClient.refetchQueries({ queryKey: ['business-redirect'] }),
+        ]);
+        queryClient.invalidateQueries({ queryKey: ['user-business'] });
+        queryClient.invalidateQueries({ queryKey: ['onboarding-business'] });
         toast({ title: 'You are all set', description: 'Welcome to your dashboard.' });
         navigate(`/b/${businessId}/dashboard`, { replace: true });
       } else {
+        queryClient.invalidateQueries({ queryKey: ['user-business'] });
+        queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
+        queryClient.invalidateQueries({ queryKey: ['business-redirect'] });
+        queryClient.invalidateQueries({ queryKey: ['onboarding-business'] });
         setStep(step + 1);
       }
     } catch (e: any) {
