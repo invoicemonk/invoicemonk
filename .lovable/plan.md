@@ -1,94 +1,60 @@
-## Goal
+## Root cause
 
-Replace the single-step country picker with a guided multi-step onboarding wizard that collects every field needed for a business to be (a) compliance-complete and (b) able to issue legally valid invoices. By the time the user reaches the dashboard, the only remaining actions are "add a client" and "create an invoice".
+`src/pages/app/CheckoutSuccess.tsx` (lines 22–30) unconditionally writes `has_selected_plan = true` on the profile as soon as the page mounts. There is **no check that the Stripe session was actually paid** — it just trusts that the user landed on `/checkout/success`.
 
-## What "compliant + invoice-ready" requires today
+That means a user can reach the paid state without paying by:
 
-Sourced from `profile-completion.ts`, `business-profile-guard.ts`, `jurisdiction-config.ts`, and the `BusinessProfile` page. Requirements branch on **entity type** (individual / business / nonprofit) and **jurisdiction**.
+- Opening the Stripe Checkout page, closing it, then manually navigating to `/checkout/success` (the URL is predictable and protected only by auth).
+- Hitting back/forward to a previously visited `/checkout/success?session_id=…` after abandoning payment.
+- Any redirect that lands on `/checkout/success` for an unpaid/expired session.
 
-### 1. Always required (every entity, every jurisdiction)
+The Stripe customer row exists because `create-checkout-session` creates the customer **before** the user pays (lines ~150–165 of the edge function). That explains why `dariensm15@gmail.com` shows up in Stripe with no payment, yet still passed the `BusinessRedirect` gate (`has_selected_plan` flag) and reached onboarding.
 
-- **Business / trading name** (`businesses.name`)
-- **Country of operation** (`jurisdiction`) — drives every rule below
-- **Default currency** (`default_currency`) — locks after first issued invoice
-- **Contact email** (`contact_email`) — appears as issuer contact on invoices
-- **Address country** (`address.country`)
-- **Entity type** — individual / business / nonprofit
+The webhook (`stripe-webhook` checkout.session.completed handler) already sets `has_selected_plan = true` correctly **after** payment is confirmed. The client-side flip is redundant and unsafe.
 
-### 2. Required for businesses & nonprofits (not individuals)
+## Fix
 
-- **Legal / registered name** (`legal_name`) — must match official registration
-- **City** (`address.city`)
-- **Commercial registration number** (`cac_number`) — only in jurisdictions where `isIssuerCacRequired` is true (e.g. NG, FR, KE)
+### 1. Verify the session server-side before trusting success
 
-### 3. Required for individuals
+New edge function `verify-checkout-session` (verify_jwt = false, in-code auth):
 
-- **Government ID upload** (`document_verification_status` ≠ `not_uploaded`) — proves identity in place of a registration cert
+- Input: `{ session_id }`
+- Auth: validate caller's JWT, get `user.id`.
+- Fetch `stripe.checkout.sessions.retrieve(session_id)`.
+- Confirm `session.client_reference_id === user.id` AND (`payment_status === 'paid'` OR `status === 'complete'`).
+- Only then update `profiles.has_selected_plan = true` and clear `intended_tier*` using the service-role client.
+- Return `{ paid: boolean, tier, businessId }`.
 
-### 4. Conditionally required by jurisdiction
+### 2. Harden `CheckoutSuccess.tsx`
 
-- **Tax ID / Government ID** (`tax_id` or `government_id_value`) — mandatory for all non-individuals, and for individuals in jurisdictions where `isIssuerTaxIdRequired` is true (NG FIRS, KE KRA, FR SIREN, EU VAT countries, etc.)
-- **VAT registration number** (`vat_registration_number`) — only when the jurisdiction has VAT (`showVat`) and the user marks themselves VAT-registered
-- **Invoice number digit width** (`invoice_number_digits`) — auto-seeded from `jurisdictionConfig.invoiceNumberDigits`, no user input needed
+- Remove the unconditional `update({ has_selected_plan: true, ... })`.
+- Call `verify-checkout-session` with the `session_id` from the URL.
+- If `paid === false` (or no `session_id`): show a "Payment not confirmed" state with a button back to `/select-plan`, do **not** flip the flag, do **not** auto-redirect to `/dashboard`.
+- Keep the polling/invalidations for the case where the webhook is still catching up.
 
-### 5. Strongly recommended for invoice quality (not blocking, but should be collected once to avoid the settings page later)
+### 3. Defense in depth in `BusinessRedirect.tsx`
 
-- **Street address, state/region, postal code** — appear on every invoice
-- **Business phone** — appears on invoices
-- **Invoice prefix** (default `INV`)
-- **Logo** + **brand color** — branded invoices
-- **Default payment method** (bank transfer / mobile money / online payments toggle) — without this the first invoice has no "how to pay" block
+Currently the gate is just `profile.has_selected_plan`. Add a second check: look up an active subscription for the user (matching the existing `useSubscription` query — either a user-level sub or via `business_members → subscriptions` with `status in ('active','trialing','past_due')`). If `has_selected_plan` is true but **no** active subscription exists, redirect to `/select-plan` instead of letting them through. This catches any future bypass and the existing leaked accounts.
 
-## Proposed onboarding flow
+Apply the same active-subscription check at the entry of `OnboardingWizard` so a user who somehow keeps the flag still can't progress through onboarding without paying.
 
-Route the user from email-verified signup straight into `/onboarding`, a stepper that cannot be skipped. Each step writes to the existing `businesses` / `business_sensitive_data` / `currency_accounts` / `payment_methods` tables.
+### 4. Backfill / cleanup for the leaked user(s)
 
-```text
-Signup → Verify email → Select plan (paid)
-   → Step 1  Location & entity
-   → Step 2  Identity (legal name + tax/gov ID + CAC, conditional)
-   → Step 3  Address & contact
-   → Step 4  Tax setup (VAT toggle + VAT number when applicable)
-   → Step 5  Invoice branding (prefix, logo, color)   
-   → Step 6  Get paid (payment method or enable online payments)
-   → Dashboard
-```
+One-off migration (or admin script) that resets `has_selected_plan = false` and clears `intended_tier*` for any profile whose user has **no** active/trialing/past_due subscription row. This will push `dariensm15@gmail.com` (and anyone else who slipped through the same hole) back to `/select-plan` on their next visit.
 
-### Step-by-step content
+## Files touched
 
-1. **Location & entity** — country, entity type, currency (auto-derived but editable). Reuses today's `CountryConfirmation` preview card.
-2. **Identity** — fields appear conditionally:
-  - businesses/nonprofits: legal name, tax ID, CAC (if jurisdiction needs it)
-  - individuals in tax-ID jurisdictions: government ID number + ID document upload
-3. **Address & contact** — street, city, state, postal code, phone, contact email (prefilled from auth).
-4. **Tax setup** — only shown when `jurisdictionConfig.showVat`. Toggle "Are you VAT registered?" → reveal VAT number input. Show the jurisdiction's VAT label (TVA, VAT, GST, etc.).
-5. **Branding** — invoice prefix (default INV), logo upload, brand color picker. Marked optional with a "Skip for now" link.
-6. **Get paid** — one of: add a manual payment method (bank/mobile money fields based on country) **or** enable online payments (Stripe Connect / Paystack handoff). Without this step the first invoice has no payable instruction.
-
-### Behaviour rules
-
-- Stepper persists progress per business (new column `onboarding_step` on `businesses`, nullable; `completed` when done).
-- A guard redirects any `/b/:id/*` route to `/onboarding/:step` until `onboarding_step = completed` OR the user explicitly chose "Skip" on optional steps 5/6.
-- Steps 5 and 6 can be deferred — a soft banner reminds the user on the dashboard until done.
-- Existing businesses with incomplete profiles get the same wizard the next time they log in (one-time backfill prompt), so we retire the heavy `BusinessProfile` settings page as the primary completion surface.
-- `BusinessProfile` settings page stays for edits, but the giant "complete your profile" banners and `QuickSetupChecklist` are replaced by the wizard.
-
-### Files in scope (for the implementation phase)
-
-- New: `src/pages/app/onboarding/OnboardingWizard.tsx` + one file per step under `src/components/onboarding/`.
-- New hook: `useOnboardingProgress` reading/writing `businesses.onboarding_step`.
-- Migration: add `onboarding_step text` to `businesses`, backfill existing rows to `completed` only when `profile-completion` says so, otherwise `null`.
-- Update `App.tsx` routes (replace single `/onboarding/country` with `/onboarding/:step`) and add a guard in `BusinessLayout`/`BusinessAccessGuard`.
-- Retire: `CountryConfirmation.tsx`, `QuickSetupChecklist`, `CompleteProfileBanner` (folded into wizard).
+- New: `supabase/functions/verify-checkout-session/index.ts`
+- Edit: `src/pages/app/CheckoutSuccess.tsx` (remove trust-the-client flip, call verifier, render unpaid state)
+- Edit: `src/components/app/BusinessRedirect.tsx` (require active subscription, not just flag)
+- Edit: `src/pages/app/OnboardingWizard.tsx` (same active-sub gate)
+- New migration: backfill cleanup of `has_selected_plan` for users with no live subscription.
 
 ## Out of scope
 
-- Verification (Stripe Connect KYC, document review) stays where it is — the wizard only collects what's required for invoice compliance, not regulator verification.
-- Team invites, recurring expenses, products/services — these remain post-onboarding.
-- No changes to existing invoice/compliance logic; we just front-load the data collection.
+No changes to pricing, plan list, checkout creation, or webhook handler — webhook already does the right thing.
 
-## Open questions before I build
+## Questions before I build
 
-1. For step 6 (Get paid), should we **require** at least one payment method/online payments enabled, or allow skipping? We must require at least one payment method.
-2. For existing users with incomplete profiles, do we force them through the wizard on next login, or only nudge with a banner? Yes
-3. Should logo + brand color be part of the required flow or fully optional? Let's make logo required.
+1. For the backfill, should I **reset `has_selected_plan` for every user with no active sub** (catches all past leaks), or **only** `dariensm15@gmail.com` (surgical)? catch all past leaks
+2. If a user lands on `/checkout/success` with an unpaid/expired session, should the page (a) show "Payment not completed, try again" with a button to retry, or (b) silently redirect back to `/select-plan`? Show "Payment not completed, try again" with a button to retry
