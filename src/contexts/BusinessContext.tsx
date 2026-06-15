@@ -141,7 +141,10 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       })) as BusinessMembership[];
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
+
 
   // Fetch subscription for current business
   const { data: subscription, isLoading: loadingSubscription } = useQuery({
