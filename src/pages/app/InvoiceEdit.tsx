@@ -409,43 +409,53 @@ export default function InvoiceEdit() {
     // First save, then issue
     const validItems = items.filter(item => item.description && item.unitPrice > 0);
 
-    await updateInvoice.mutateAsync({
-      invoiceId: id,
-      updates: {
-        client_id: selectedClientId,
-        currency: currency,
-        issue_date: issueDate,
-        due_date: dueDate || null,
-        notes: notes ? stripUrls(notes) : null,
-        terms: terms ? stripUrls(terms) : null,
-        summary: summary ? stripUrls(summary) : null,
-        subtotal: calculateSubtotal(),
-        tax_amount: calculateTax(),
-        total_amount: calculateTotal(),
-        template_id: selectedTemplateId || null,
-        exchange_rate_to_primary: null,
-        exchange_rate_snapshot: null,
-        payment_method_id: selectedPaymentMethodId || null,
-        is_reverse_charge: isReverseCharge,
-        kind: invoiceKind,
-        parent_invoice_id: parentInvoiceId,
-        deposit_percent: depositPercent,
-      },
-      items: validItems.map(item => ({
-        description: combineLineItemDescription(item.description, item.longDescription || ''),
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
-        tax_label: item.taxLabel || null,
-        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
-        amount: item.quantity * item.unitPrice,
-        product_service_id: item.productServiceId || null,
-      })),
-    });
+    try {
+      await updateInvoice.mutateAsync({
+        invoiceId: id,
+        updates: {
+          client_id: selectedClientId,
+          currency: currency,
+          issue_date: issueDate,
+          due_date: dueDate || null,
+          notes: notes ? stripUrls(notes) : null,
+          terms: terms ? stripUrls(terms) : null,
+          summary: summary ? stripUrls(summary) : null,
+          subtotal: calculateSubtotal(),
+          tax_amount: calculateTax(),
+          total_amount: calculateTotal(),
+          template_id: selectedTemplateId || null,
+          exchange_rate_to_primary: null,
+          exchange_rate_snapshot: null,
+          payment_method_id: selectedPaymentMethodId || null,
+          is_reverse_charge: isReverseCharge,
+          kind: invoiceKind,
+          parent_invoice_id: parentInvoiceId,
+          deposit_percent: depositPercent,
+        },
+        items: validItems.map(item => ({
+          description: combineLineItemDescription(item.description, item.longDescription || ''),
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          tax_rate: item.taxRate,
+          tax_label: item.taxLabel || null,
+          tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
+          amount: item.quantity * item.unitPrice,
+          product_service_id: item.productServiceId || null,
+        })),
+      });
 
-    await issueInvoice.mutateAsync(id);
-    navigate(`/b/${currentBusiness?.id}/invoices/${id}`);
+      await issueInvoice.mutateAsync(id);
+      navigate(`/b/${currentBusiness?.id}/invoices/${id}`);
+    } catch (err) {
+      console.error('Issue invoice failed:', err);
+      toast({
+        title: 'Could not issue invoice',
+        description: err instanceof Error ? err.message : 'Something went wrong. Your form is still here — please try again.',
+        variant: 'destructive',
+      });
+    }
   };
+
 
   const isLoading = updateInvoice.isPending || issueInvoice.isPending;
 
