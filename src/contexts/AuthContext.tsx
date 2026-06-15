@@ -63,20 +63,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let lastUserId: string | null = null;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        const nextUserId = session?.user?.id ?? null;
+        const userChanged = nextUserId !== lastUserId;
+        lastUserId = nextUserId;
+
         setSession(session);
-        setUser(session?.user ?? null);
-        
+        // Only swap the user object when identity actually changes, so consumers
+        // don't re-render (and queries don't re-fire) on every TOKEN_REFRESHED.
+        if (userChanged) {
+          setUser(session?.user ?? null);
+        }
+
         if (session?.user) {
-          Sentry.setUser({ id: session.user.id, email: session.user.email });
-          posthog.identify(session.user.id, { email: session.user.email });
-          // Use setTimeout to avoid potential race conditions with Supabase
-          setTimeout(async () => {
-            const profileData = await fetchProfile(session.user.id);
-            setProfile(profileData);
-          }, 0);
+          if (userChanged) {
+            Sentry.setUser({ id: session.user.id, email: session.user.email });
+            posthog.identify(session.user.id, { email: session.user.email });
+            // Use setTimeout to avoid potential race conditions with Supabase
+            setTimeout(async () => {
+              const profileData = await fetchProfile(session.user.id);
+              setProfile(profileData);
+            }, 0);
+          }
 
           // Fire-and-forget login tracking — update last_login_at
           if (event === 'SIGNED_IN') {
@@ -90,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (event === 'SIGNED_IN') {
             Promise.resolve(
               supabase
                 .from('user_activity_state')
@@ -105,18 +117,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (event === 'SIGNED_IN' && localStorage.getItem('pending_referral_code')) {
             triggerReferralAttribution();
           }
-        } else {
+        } else if (userChanged) {
           Sentry.setUser(null);
           posthog.reset();
           setProfile(null);
         }
-        
+
         setLoading(false);
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      lastUserId = session?.user?.id ?? null;
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -130,6 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
 
   const triggerReferralAttribution = useCallback(async () => {
     try {
