@@ -25,9 +25,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       return data;
     },
     enabled: !!user?.id,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes — avoid refetching mid-form
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
+
 
   if (loading || (user && statusLoading)) {
     return (
