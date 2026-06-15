@@ -199,17 +199,32 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Set current business based on URL or default
+  // Set current business based on URL or default.
+  // Only call setBaseBusiness when the underlying business id actually changes —
+  // otherwise refetches produce a new object reference and unnecessarily cascade
+  // re-renders / context-consumer effects (which previously redirected users mid-form).
   useEffect(() => {
     if (loadingBusinesses || !user) return;
+
+    const apply = (membership: BusinessMembership | undefined) => {
+      if (!membership) {
+        if (baseBusiness !== null) setBaseBusiness(null);
+        if (currentRole !== null) setCurrentRole(null);
+        return;
+      }
+      if (baseBusiness?.id !== membership.business.id) {
+        setBaseBusiness(membership.business);
+      }
+      const nextRole = membership.role as BusinessRole;
+      if (currentRole !== nextRole) setCurrentRole(nextRole);
+      setError(null);
+    };
 
     // If we have a businessId in URL, find that business
     if (businessId) {
       const membership = businesses.find(m => m.business_id === businessId);
       if (membership) {
-        setBaseBusiness(membership.business);
-        setCurrentRole(membership.role as BusinessRole);
-        setError(null);
+        apply(membership);
       } else {
         setError('Business not found or you do not have access');
         // Redirect to default business
@@ -221,16 +236,10 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     } else {
       // No businessId in URL - find default or first business
       const defaultBusiness = businesses.find(m => m.business.is_default) || businesses[0];
-      if (defaultBusiness) {
-        setBaseBusiness(defaultBusiness.business);
-        setCurrentRole(defaultBusiness.role as BusinessRole);
-        setError(null);
-      } else {
-        setBaseBusiness(null);
-        setCurrentRole(null);
-      }
+      apply(defaultBusiness);
     }
-  }, [businessId, businesses, loadingBusinesses, user, navigate]);
+  }, [businessId, businesses, loadingBusinesses, user, navigate, baseBusiness, currentRole]);
+
 
   // Fetch sensitive fields (tax_id, vat_registration_number, etc.) for owners/admins/platform admins.
   // Returned data is merged into the exposed `currentBusiness` via useMemo below — do NOT mutate
