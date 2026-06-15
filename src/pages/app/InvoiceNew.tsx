@@ -458,46 +458,56 @@ export default function InvoiceNew() {
       return;
     }
 
-    const invoice = await createInvoice.mutateAsync({
-      invoice: {
-        business_id: currentBusiness.id,
-        client_id: selectedClientId,
-        currency: effectiveCurrency,
-        currency_account_id: currentCurrencyAccount?.id || null,
-        issue_date: issueDate,
-        due_date: dueDate || null,
-        notes: notes ? stripUrls(notes) : null,
-        terms: terms ? stripUrls(terms) : null,
-        summary: summary ? stripUrls(summary) : null,
-        subtotal: calculateSubtotal(),
-        tax_amount: calculateTax(),
-        total_amount: calculateTotal(),
-        // Legacy FX fields - null for new records created through currency accounts
-        exchange_rate_to_primary: null,
-        exchange_rate_snapshot: null,
-        payment_method_id: selectedPaymentMethodId || null,
-        kind: invoiceKind,
-        parent_invoice_id: parentInvoiceId,
-        deposit_percent: depositPercent,
-      },
-      items: validItems.map(item => ({
-        description: combineLineItemDescription(item.description, item.longDescription || ''),
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
-        tax_label: item.taxLabel || null,
-        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
-        amount: item.quantity * item.unitPrice,
-        product_service_id: item.productServiceId || null,
-      })),
-    });
+    try {
+      const invoice = await createInvoice.mutateAsync({
+        invoice: {
+          business_id: currentBusiness.id,
+          client_id: selectedClientId,
+          currency: effectiveCurrency,
+          currency_account_id: currentCurrencyAccount?.id || null,
+          issue_date: issueDate,
+          due_date: dueDate || null,
+          notes: notes ? stripUrls(notes) : null,
+          terms: terms ? stripUrls(terms) : null,
+          summary: summary ? stripUrls(summary) : null,
+          subtotal: calculateSubtotal(),
+          tax_amount: calculateTax(),
+          total_amount: calculateTotal(),
+          // Legacy FX fields - null for new records created through currency accounts
+          exchange_rate_to_primary: null,
+          exchange_rate_snapshot: null,
+          payment_method_id: selectedPaymentMethodId || null,
+          kind: invoiceKind,
+          parent_invoice_id: parentInvoiceId,
+          deposit_percent: depositPercent,
+        },
+        items: validItems.map(item => ({
+          description: combineLineItemDescription(item.description, item.longDescription || ''),
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          tax_rate: item.taxRate,
+          tax_label: item.taxLabel || null,
+          tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
+          amount: item.quantity * item.unitPrice,
+          product_service_id: item.productServiceId || null,
+        })),
+      });
 
-    if (invoice) {
-      // Track invoice created as draft
-      gaEvents.invoiceCreated(invoice.id);
+      if (invoice) {
+        // Track invoice created as draft
+        gaEvents.invoiceCreated(invoice.id);
+      }
+      navigate('/invoices');
+    } catch (err) {
+      console.error('Save draft failed:', err);
+      toast({
+        title: 'Could not save draft',
+        description: err instanceof Error ? err.message : 'Something went wrong. Your form is still here — please try again.',
+        variant: 'destructive',
+      });
     }
-    navigate('/invoices');
   };
+
 
   const profileMissingFields = getBusinessProfileMissingFields(currentBusiness);
   const isProfileIncomplete = profileMissingFields.length > 0;
