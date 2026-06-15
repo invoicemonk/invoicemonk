@@ -571,49 +571,59 @@ export default function InvoiceNew() {
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
     // First create the invoice with template
-    const invoice = await createInvoice.mutateAsync({
-      invoice: {
-        business_id: currentBusiness.id,
-        client_id: selectedClientId,
-        currency: effectiveCurrency,
-        currency_account_id: currentCurrencyAccount?.id || null,
-        issue_date: issueDate,
-        due_date: dueDate || null,
-        notes: notes ? stripUrls(notes) : null,
-        terms: terms ? stripUrls(terms) : null,
-        summary: summary ? stripUrls(summary) : null,
-        subtotal: calculateSubtotal(),
-        tax_amount: calculateTax(),
-        total_amount: calculateTotal(),
-        template_id: selectedTemplateId || null,
-        // Legacy FX fields - null for new records created through currency accounts
-        exchange_rate_to_primary: null,
-        exchange_rate_snapshot: null,
-        payment_method_id: selectedPaymentMethodId || null,
-        kind: invoiceKind,
-        parent_invoice_id: parentInvoiceId,
-        deposit_percent: depositPercent,
-      },
-      items: validItems.map(item => ({
-        description: combineLineItemDescription(item.description, item.longDescription || ''),
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
-        tax_label: item.taxLabel || null,
-        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
-        amount: item.quantity * item.unitPrice,
-        product_service_id: item.productServiceId || null,
-      })),
-    });
+    try {
+      const invoice = await createInvoice.mutateAsync({
+        invoice: {
+          business_id: currentBusiness.id,
+          client_id: selectedClientId,
+          currency: effectiveCurrency,
+          currency_account_id: currentCurrencyAccount?.id || null,
+          issue_date: issueDate,
+          due_date: dueDate || null,
+          notes: notes ? stripUrls(notes) : null,
+          terms: terms ? stripUrls(terms) : null,
+          summary: summary ? stripUrls(summary) : null,
+          subtotal: calculateSubtotal(),
+          tax_amount: calculateTax(),
+          total_amount: calculateTotal(),
+          template_id: selectedTemplateId || null,
+          // Legacy FX fields - null for new records created through currency accounts
+          exchange_rate_to_primary: null,
+          exchange_rate_snapshot: null,
+          payment_method_id: selectedPaymentMethodId || null,
+          kind: invoiceKind,
+          parent_invoice_id: parentInvoiceId,
+          deposit_percent: depositPercent,
+        },
+        items: validItems.map(item => ({
+          description: combineLineItemDescription(item.description, item.longDescription || ''),
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          tax_rate: item.taxRate,
+          tax_label: item.taxLabel || null,
+          tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
+          amount: item.quantity * item.unitPrice,
+          product_service_id: item.productServiceId || null,
+        })),
+      });
 
-    if (invoice) {
-      // Track invoice issued event
-      gaEvents.invoiceIssued(invoice.id, calculateTotal());
-      // Then issue it
-      await issueInvoice.mutateAsync(invoice.id);
-      navigate(`/b/${currentBusiness.id}/invoices/${invoice.id}`);
+      if (invoice) {
+        // Track invoice issued event
+        gaEvents.invoiceIssued(invoice.id, calculateTotal());
+        // Then issue it
+        await issueInvoice.mutateAsync(invoice.id);
+        navigate(`/b/${currentBusiness.id}/invoices/${invoice.id}`);
+      }
+    } catch (err) {
+      console.error('Issue invoice failed:', err);
+      toast({
+        title: 'Could not issue invoice',
+        description: err instanceof Error ? err.message : 'Something went wrong. Your form is still here — please try again.',
+        variant: 'destructive',
+      });
     }
   };
+
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
 
