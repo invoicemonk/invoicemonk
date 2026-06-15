@@ -48,9 +48,14 @@ function BusinessLayoutContent() {
   }
 
   // Gate the business workspace behind a completed onboarding.
-  if ((currentBusiness as any).onboarding_step !== 'completed') {
+  // Only redirect when we have a definite step value that is not 'completed'.
+  // Treat null/undefined as "still loading" to avoid bouncing the user out of
+  // long-running forms (e.g. invoice creation) when a query briefly refetches.
+  const onboardingStep = (currentBusiness as any).onboarding_step;
+  if (onboardingStep != null && onboardingStep !== 'completed') {
     return <Navigate to={`/onboarding/${currentBusiness.id}`} replace />;
   }
+
 
   return (
     <SubscriptionProvider>

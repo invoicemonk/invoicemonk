@@ -24,10 +24,13 @@ export function useStarterGrace() {
         .select('starter_grace_expires_at')
         .eq('id', subscription?.id ?? '')
         .maybeSingle();
-      return (data as any)?.starter_grace_expires_at as string | null | undefined;
+      // Never return undefined — React Query treats that as an error and logs a warning.
+      return ((data as any)?.starter_grace_expires_at as string | null | undefined) ?? null;
     },
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
+
 
   return useMemo(() => {
     if (!isLegacyFreeTier) {
