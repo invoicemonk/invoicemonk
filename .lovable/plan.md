@@ -1,74 +1,69 @@
-## What the user reported
+## What's happening
 
-1. While filling out **Create Invoice**, the page appears to refresh roughly every 60 seconds, wiping the form.
-2. After finally filling it in and clicking **Issue Invoice**, the page goes blank (white/black screen).
+Every page inside `/b/:businessId/*` is wrapped in `BusinessLayout` → `BusinessLayoutContent`. That component currently does:
 
-Both are urgent UX bugs. Below is what I found while reading the code and how I propose to fix them.
-
----
-
-## Issue 1 — Form is wiped roughly every minute
-
-### Likely root causes (multiple compounding)
-
-1. **`handleIssue` / `handleSaveDraft` have no `try/catch`.** If any awaited call rejects, the unhandled error bubbles to the root Sentry `ErrorBoundary` in `src/main.tsx`, which renders `<p>Something went wrong</p>` — i.e. a near-blank page (Issue 2). When the user clicks a button mid-form, this can also unmount `InvoiceNew` and lose state.
-2. **`BusinessLayout` hard-redirects on every render** when `currentBusiness.onboarding_step !== 'completed'`. `BusinessProvider`'s `setBaseBusiness(...)` runs every time the `businesses` query refetches (React Query defaults to `refetchOnWindowFocus: true` and no shared `staleTime`), producing a new `baseBusiness` object reference. If `onboarding_step` is briefly stale/undefined the user is yanked to `/onboarding/:businessId`, losing the form.
-3. **`AuthContext.onAuthStateChange` calls `setUser/setSession` on every event (including `TOKEN_REFRESHED`)** and re-runs profile fetch. Combined with the React StrictMode double-mount we can see in the console (`OneSignal Init failed` and the auth-lock warning `Lock "lock:sb-…-auth-token" was not released within 5000ms`), this causes extra renders. The repeated lock warning is the smoking gun that the auth client is being re-initialized.
-4. **`use-starter-grace` returns `undefined`** when the row is missing — React Query then logs `Query data cannot be undefined` (visible in the console logs at 21:30/21:31/21:33). On a refetch this can momentarily flip dependents' state.
-
-### Proposed fixes
-
-- **Wrap submit handlers in `try/catch`** in `src/pages/app/InvoiceNew.tsx` (`handleSaveDraft`, `handleIssue`) and surface a toast on failure instead of letting the error reach the global ErrorBoundary. Same audit for `InvoiceEdit.tsx`.
-- **Stabilise `BusinessLayout`'s onboarding gate** so it only redirects after `loading` is `false` AND `currentBusiness` has actually loaded with a definite `onboarding_step`. Treat `null/undefined` as "still loading", not "incomplete".
-- **Stop redirecting on transient refetches in `BusinessProvider`**: only call `setBaseBusiness` when the underlying business id changes (compare by id, not by reference). Also add `staleTime: 5 * 60 * 1000` and `refetchOnWindowFocus: false` to `['user-businesses']`, `['business-redirect']`, `['account-status']`, and `['starter-grace']` so they don't refetch mid-form.
-- **Make `use-starter-grace` return `null` instead of `undefined`** so React Query stops warning and re-rendering.
-- **Make `AuthContext.onAuthStateChange` no-op on `TOKEN_REFRESHED`** when `session.user.id` is unchanged (skip the profile re-fetch and the activity upsert; keep updating `setSession` only). This removes the cascade of renders every time Supabase refreshes the token.
-- **Confirm the duplicate-mount source**: read `src/main.tsx` to check `StrictMode` and ensure we don't have a second Supabase client. If StrictMode is on in prod-like preview, leave it but make `AuthProvider`'s effect idempotent.
-
-### How I'll verify
-
-- Open the preview, log in, navigate to `/b/:id/invoices/new`, start typing, leave the tab for 2 minutes, switch back, and confirm the form state is intact.
-- Watch the browser console for the `Lock … was not released` warning — it should disappear or appear only once.
-- Watch React Query devtools (if not present I'll add a temporary `console.log` in BusinessProvider) to confirm `setBaseBusiness` no longer fires on every refetch.
-
----
-
-## Issue 2 — Blank/white screen after "Issue invoice"
-
-### Root cause
-
-In `src/pages/app/InvoiceNew.tsx#handleIssue` (lines 505-606), `createInvoice.mutateAsync(...)` and `issueInvoice.mutateAsync(invoice.id)` are awaited with no `try/catch`. Any rejection (RLS denial, validation error, network blip, Stripe Connect 503, the existing `business-profile-guard` throwing, etc.) becomes an unhandled error inside a React event handler, which is caught by the root `Sentry.ErrorBoundary` in `src/main.tsx`. That boundary renders `<p>Something went wrong</p>` on a blank page — exactly the "page went black/white" symptom.
-
-### Proposed fix
-
-- Wrap both mutations in `try/catch`, show a `toast({ variant: 'destructive' })` with the error message, and stay on the form so the user doesn't lose their input.
-- Apply the same pattern to `handleSaveDraft` and to `InvoiceEdit.tsx`'s save/issue handlers.
-- Add an inline error fallback for the `InvoiceNew` route (a smaller Sentry boundary) so even if something else throws, the user lands on a "Something went wrong, your draft is safe" panel with a "Retry" button instead of a global blank page.
-- After fixing, look at recent Supabase Edge Function logs / Postgres errors for that user's invoice attempts to confirm what the original mutation error actually was, so we can address the underlying validation issue (likely `business_profile_guard` or RLS).
-
-### How I'll verify
-
-- Reproduce by submitting an intentionally invalid invoice (e.g. unsaved client) and confirm a toast appears instead of a blank screen.
-- Log in with the affected account, attempt to issue an invoice, and capture the real error from the toast/logs.
-
----
-
-## Files I expect to touch
-
-```text
-src/pages/app/InvoiceNew.tsx        # try/catch + inline error boundary
-src/pages/app/InvoiceEdit.tsx       # same pattern
-src/components/app/BusinessLayout.tsx   # safer onboarding gate
-src/contexts/BusinessContext.tsx    # id-based setBaseBusiness, query defaults
-src/contexts/AuthContext.tsx        # ignore no-op TOKEN_REFRESHED
-src/components/ProtectedRoute.tsx   # raise staleTime, disable focus refetch
-src/hooks/use-starter-grace.ts      # return null, not undefined
+```
+if (loading) return <Loader …/>           // full-screen spinner
+if (error || !currentBusiness) return …   // Access Denied
+return <Outlet />                         // the actual page
 ```
 
-No database migrations, no design changes.
+`loading` is `loadingBusinesses || loadingSubscription` from `BusinessContext`. Both are React-Query `isLoading` flags, which **flip back to `true` whenever the query key changes** (a brand-new query has no cached data yet).
 
-## Out of scope
+Two things keep changing those keys / blanking the data in the background, every few seconds:
 
-- The OneSignal "Can only be used on app.invoicemonk.com" warning (preview-only, harmless).
-- The Tawk.to title-flicker every second — separate issue, only cosmetic.
-- Rebuilding the onboarding flow further (separate thread).
+1. **`BusinessProvider`'s effect** (`src/contexts/BusinessContext.tsx` lines 206–241). The effect depends on the `businesses` array reference. Every time Supabase fires a `TOKEN_REFRESHED` / `SIGNED_IN` event (visible in the console logs as the recurring OneSignal "Init failed / Login failed / Tags added" trio), `AuthContext` calls `setSession(...)`, the user-businesses query is treated as stale by some consumer, and the effect re-runs. If the find for the URL `businessId` ever resolves to `undefined` for one render (e.g. the array is briefly empty during a background refetch), it falls into the `else` branch and calls `setBaseBusiness(null)` + `setError('Business not found…')`. That:
+   - Flips `loading` (the `business-subscription` query restarts with a `null` key, then a new id), and
+   - Renders the "Access Denied" screen for a frame.
+   Both unmount `<Outlet />`, wiping form state and giving the visual "page just refreshed" effect.
+
+2. **`BusinessLayoutContent` uses `loading` as a hard gate**. Even without bug #1, any future query-key change in `BusinessContext` (currency switch, subscription refetch, role change) momentarily flips `loading` back to `true` and tears down the whole page tree.
+
+This matches the user's report: "in-app remount only, every account, every page."
+
+The recurring `SIGNED_IN` events (~every 10–50 s in the logs) are the trigger; the layout's unmount-on-loading is the amplifier.
+
+## Fix
+
+### 1. `src/components/app/BusinessLayout.tsx`
+Only block on the loader when we have **no business yet**. Once `currentBusiness` is non-null, keep the `<Outlet />` mounted across subsequent refetches:
+
+```text
+- if (loading) return <Loader/>;
+- if (error || !currentBusiness) return <AccessDenied/>;
++ if (!currentBusiness && loading) return <Loader/>;
++ if (!currentBusiness) return <AccessDenied/>;
+```
+
+Same idea for the onboarding gate: only redirect when we have a definite `onboarding_step !== 'completed'` (already done) — keep it.
+
+### 2. `src/contexts/BusinessContext.tsx`
+Make the membership-resolution effect **sticky** so a transient empty/stale `businesses` array can't wipe `baseBusiness`:
+
+- Skip the effect entirely while `loadingBusinesses` is true **or** `businesses.length === 0` and we already have a `baseBusiness`. Only clear `baseBusiness` when we positively know the user has zero memberships (`!loadingBusinesses && businesses.length === 0`).
+- In the `businessId` branch, if `businesses.find(...)` is undefined but `loadingBusinesses` is still pending in the background (or businesses is empty), do **not** set the error or navigate — keep the current business.
+- Remove `baseBusiness` and `currentRole` from the effect's dependency array (they're only read inside the id-guard; including them just re-runs the effect for no reason).
+- Add `refetchOnWindowFocus: false` to the `business-subscription`, `business-sensitive`, and `tier-limits` queries (parity with `user-businesses`).
+- Derive `loading` so it only reports the **initial** load: `loading = (loadingBusinesses && !baseBusiness) || (loadingSubscription && !subscription && !!baseBusiness?.id)`.
+
+### 3. `src/contexts/AuthContext.tsx`
+Avoid creating a fresh `session` reference on every `TOKEN_REFRESHED` when the access token hasn't actually changed:
+
+- Track `lastAccessToken` alongside `lastUserId`.
+- Only call `setSession(session)` when `session?.access_token !== lastAccessToken`.
+- Only fire `loginUser` / `addTags` / activity upserts when `event === 'SIGNED_IN' && userChanged` — currently they fire on every `SIGNED_IN` repeat, which is what causes the recurring OneSignal log noise.
+
+### 4. (Defensive) `src/hooks/use-platform-admin.ts`
+Add `refetchOnWindowFocus: false` so the admin check doesn't oscillate either.
+
+## What this does not change
+
+- Routing, auth gating, subscription/tier logic, RLS — all untouched.
+- The OneSignal "Can only be used on https://app.invoicemonk.com" warning stays (it's a domain restriction on preview, not a bug).
+- No design / UI changes.
+
+## Verification
+
+1. Open the preview, navigate to `/b/:id/clients` (and `/invoices/new`). Watch for 60 s — the page should no longer flash to "Loading business…" / "Access Denied" and the invoice form should retain its values.
+2. Console should no longer show repeating `[OneSignal] Login failed / Tags added` every ~30 s after the first one.
+3. Token-refresh cycle (~55 min later, or by manually invalidating the JWT) should not remount the page tree.

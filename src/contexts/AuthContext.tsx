@@ -64,17 +64,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let lastUserId: string | null = null;
+    let lastAccessToken: string | null = null;
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         const nextUserId = session?.user?.id ?? null;
+        const nextAccessToken = session?.access_token ?? null;
         const userChanged = nextUserId !== lastUserId;
+        const tokenChanged = nextAccessToken !== lastAccessToken;
         lastUserId = nextUserId;
+        lastAccessToken = nextAccessToken;
 
-        setSession(session);
-        // Only swap the user object when identity actually changes, so consumers
-        // don't re-render (and queries don't re-fire) on every TOKEN_REFRESHED.
+        // Only swap the session/user object when something actually changed,
+        // so consumers don't re-render (and queries don't re-fire) on every
+        // TOKEN_REFRESHED echo with the same token.
+        if (tokenChanged) {
+          setSession(session);
+        }
         if (userChanged) {
           setUser(session?.user ?? null);
         }
@@ -90,8 +97,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }, 0);
           }
 
-          // Fire-and-forget login tracking — update last_login_at
-          if (event === 'SIGNED_IN') {
+          // Fire login-side effects only when the user identity actually
+          // changes — Supabase can echo SIGNED_IN on token refresh, and we
+          // don't want OneSignal / activity upserts firing every ~50s.
+          if (event === 'SIGNED_IN' && userChanged) {
             loginUser(session.user.id);
             addTags({ last_login: String(Date.now()) });
             // Funnel: first time we see a verified email for this user
@@ -100,9 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 user_id: session.user.id,
               });
             }
-          }
 
-          if (event === 'SIGNED_IN') {
             Promise.resolve(
               supabase
                 .from('user_activity_state')
@@ -111,11 +118,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   { onConflict: 'user_id' }
                 )
             ).catch(() => {});
-          }
 
-          // Trigger referral attribution on first sign-in (after email confirmation)
-          if (event === 'SIGNED_IN' && localStorage.getItem('pending_referral_code')) {
-            triggerReferralAttribution();
+            // Trigger referral attribution on first sign-in (after email confirmation)
+            if (localStorage.getItem('pending_referral_code')) {
+              triggerReferralAttribution();
+            }
           }
         } else if (userChanged) {
           Sentry.setUser(null);
@@ -130,6 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // THEN check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       lastUserId = session?.user?.id ?? null;
+      lastAccessToken = session?.access_token ?? null;
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -143,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
 
 
   const triggerReferralAttribution = useCallback(async () => {

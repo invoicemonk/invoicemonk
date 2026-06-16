@@ -175,6 +175,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     },
     enabled: !!baseBusiness?.id,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const tier: SubscriptionTier = (subscription?.tier as SubscriptionTier) || 'starter';
@@ -197,21 +198,21 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     },
     enabled: !!baseBusiness?.id,
     staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
+
   // Set current business based on URL or default.
-  // Only call setBaseBusiness when the underlying business id actually changes —
-  // otherwise refetches produce a new object reference and unnecessarily cascade
-  // re-renders / context-consumer effects (which previously redirected users mid-form).
+  // Sticky resolution: never wipe `baseBusiness` on a transient empty/stale
+  // `businesses` array (e.g. background refetch). Only clear when we
+  // positively know the user has zero memberships.
   useEffect(() => {
-    if (loadingBusinesses || !user) return;
+    if (!user) return;
+    // Still doing the initial businesses fetch — do nothing.
+    if (loadingBusinesses && businesses.length === 0) return;
 
     const apply = (membership: BusinessMembership | undefined) => {
-      if (!membership) {
-        if (baseBusiness !== null) setBaseBusiness(null);
-        if (currentRole !== null) setCurrentRole(null);
-        return;
-      }
+      if (!membership) return;
       if (baseBusiness?.id !== membership.business.id) {
         setBaseBusiness(membership.business);
       }
@@ -225,20 +226,33 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       const membership = businesses.find(m => m.business_id === businessId);
       if (membership) {
         apply(membership);
-      } else {
-        setError('Business not found or you do not have access');
-        // Redirect to default business
-        const defaultBusiness = businesses.find(m => m.business.is_default) || businesses[0];
-        if (defaultBusiness) {
-          navigate(`/b/${defaultBusiness.business_id}/dashboard`, { replace: true });
-        }
+        return;
+      }
+      // Membership lookup failed. If we're still loading or the array is
+      // empty during a background refetch, keep the current state instead of
+      // bouncing the user out of the page mid-action.
+      if (loadingBusinesses || businesses.length === 0) return;
+      // Definitively not a member of this URL business.
+      setError('Business not found or you do not have access');
+      const defaultBusiness = businesses.find(m => m.business.is_default) || businesses[0];
+      if (defaultBusiness && defaultBusiness.business_id !== businessId) {
+        navigate(`/b/${defaultBusiness.business_id}/dashboard`, { replace: true });
       }
     } else {
       // No businessId in URL - find default or first business
       const defaultBusiness = businesses.find(m => m.business.is_default) || businesses[0];
-      apply(defaultBusiness);
+      if (defaultBusiness) {
+        apply(defaultBusiness);
+      } else if (!loadingBusinesses) {
+        // Confirmed: user has zero memberships.
+        if (baseBusiness !== null) setBaseBusiness(null);
+        if (currentRole !== null) setCurrentRole(null);
+      }
     }
-  }, [businessId, businesses, loadingBusinesses, user, navigate, baseBusiness, currentRole]);
+    // baseBusiness / currentRole intentionally omitted — they're only read
+    // inside id-guards; including them just re-runs the effect for no reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, businesses, loadingBusinesses, user, navigate]);
 
 
   // Fetch sensitive fields (tax_id, vat_registration_number, etc.) for owners/admins/platform admins.
@@ -260,7 +274,9 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     },
     enabled: !!baseBusiness?.id && (currentRole === 'owner' || currentRole === 'admin' || isPlatformAdmin),
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
+
 
   // Derive merged business from base + sensitive so the merge survives base refetches.
   const currentBusiness = useMemo<Business | null>(() => {
@@ -363,7 +379,13 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     return result;
   };
 
-  const loading = loadingBusinesses || loadingSubscription;
+  // Report loading only for the INITIAL load. Once we have a `baseBusiness`,
+  // background refetches must not toggle `loading` back to true — otherwise
+  // BusinessLayout unmounts the page tree and wipes form state.
+  const loading =
+    (loadingBusinesses && !baseBusiness) ||
+    (loadingSubscription && !!baseBusiness?.id && subscription === undefined);
+
 
   return (
     <BusinessContext.Provider
