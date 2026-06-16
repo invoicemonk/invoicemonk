@@ -17,7 +17,7 @@ import { StarterSunsetBanner } from '@/components/billing/StarterSunsetBanner';
 function BusinessLayoutContent() {
   const { loading, error, currentBusiness } = useBusiness();
 
-  if (loading) {
+  if (!currentBusiness && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -28,7 +28,7 @@ function BusinessLayoutContent() {
     );
   }
 
-  if (error || !currentBusiness) {
+  if (!currentBusiness) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Alert variant="destructive" className="max-w-md">
@@ -46,6 +46,7 @@ function BusinessLayoutContent() {
       </div>
     );
   }
+
 
   // Gate the business workspace behind a completed onboarding.
   // Only redirect when we have a definite step value that is not 'completed'.

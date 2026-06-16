@@ -32,7 +32,9 @@ export function usePlatformAdmin() {
     enabled: !!user?.id,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
   });
+
 
   return {
     isPlatformAdmin: data ?? false,
