@@ -1,26 +1,60 @@
-Plan: Add missing Stripe Connect webhook event handlers to `stripe-connect-webhook` edge function.
+## Root cause
 
-The `stripe-connect-webhook` currently only handles `account.updated`. The remaining events discussed (`capability.updated`, `person.updated`) need to be added so the Stripe Dashboard webhook subscription can be completed with all recommended events.
+The dashboard's Compliance card shows **TIN "Not set"** even though the value is saved in `business_sensitive_data` (verified in DB: `tax_id = '1031640657'`).
 
-Changes
--------
+The Compliance card reads `currentBusiness.tax_id`, which `BusinessContext` fills by calling the `get_business_sensitive` RPC and merging the result into the business object. That RPC call is currently returning `403 permission denied` for the `authenticated` role, so the merge silently falls back to `null` and the card reports TIN as missing. Saving in Settings works (the row is written), but the next dashboard render can't read it back — that's why the value "disappears" after saving.
 
-1. **Refactor `stripe-connect-webhook/index.ts`**
-   - Extract a shared `resolveBusinessId(supabase, accountId)` helper that looks up `business_id` from `account.metadata.business_id` first, then falls back to `business_sensitive_data.stripe_connect_account_id`.
-   - Re-use the helper in `account.updated` and the new handlers so the resolution logic is not duplicated.
+Network log confirms sibling RPCs on the same dashboard also fail with the same error:
 
-2. **Add `capability.updated` handler**
-   - When the `transfers` or `card_payments` capability changes to `inactive` or `pending`, mark the business `stripe_connect_status` as `restricted`.
-   - When both capabilities are `active` and `charges_enabled` / `payouts_enabled` are true, mark as `active`.
-   - Audit-log the event as `STRIPE_CONNECT_CAPABILITY_UPDATED`.
+```
+POST /rpc/get_dashboard_stats  → 42501 permission denied for function get_dashboard_stats
+POST /rpc/get_due_date_stats   → 42501 permission denied for function get_due_date_stats
+```
 
-3. **Add `person.updated` handler**
-   - When `verification.status` on a person changes to `unverified` or `pending`, flag the business as `restricted`.
-   - When the person becomes `verified` and the account is otherwise active, keep or restore `active` status.
-   - Audit-log the event as `STRIPE_CONNECT_PERSON_UPDATED`.
+Direct privilege check:
 
-4. **No database migrations required** — the existing `businesses` and `business_sensitive_data` tables already have the required columns.
+```
+get_business_sensitive  authenticated=false  service_role=true
+get_dashboard_stats     authenticated=false  service_role=true
+get_due_date_stats      authenticated=false  service_role=true
+```
 
-5. **No secret changes required** — the existing `STRIPE_CONNECT_WEBHOOK_SECRET` and `STRIPE_SECRET_KEY` are already configured.
+A recent `CREATE OR REPLACE FUNCTION` migration dropped the `EXECUTE` grant to `authenticated` on these `SECURITY DEFINER` RPCs. Postgres does not preserve grants when a function's signature is replaced without re-granting.
 
-After deployment, the user will be able to safely add `capability.updated` and `person.updated` to the Stripe Connect webhook events list in the Stripe Dashboard without receiving 400 errors.
+## Fix
+
+Single SQL migration that re-grants `EXECUTE` to `authenticated` on the client-facing RPCs currently missing it. No table/RLS/data changes, no code changes, no secret changes.
+
+**Definitely required (directly reproduces the bug or shows up as 403 in the current session):**
+
+- `get_business_sensitive`
+- `get_business_sensitive_fields`
+- `get_dashboard_stats`
+- `get_due_date_stats`
+
+**Also re-grant proactively** — same regression pattern, all called from the frontend, will 403 the same way if not already broken:
+
+- Stats/analytics: `get_accounting_stats`, `get_cashflow_summary`, `get_expenses_by_category`, `get_profitability_stats`, `get_receivables_intelligence`, `get_revenue_trend`
+- Tier/limits: `has_tier`, `check_tier_limit`, `check_tier_limit_business`, `check_currency_account_limit`, `check_payment_method_limit`, `check_receipt_limit`, `check_team_member_limit`
+- Actions the app calls: `issue_invoice`, `log_audit_event`, `create_notification`, `create_regulatory_submission`, `update_submission_status`, `lock_business_currency`, `close_account`, `check_disposable_email`, `check_rate_limit`
+- Admin-panel RPCs called from the client: `admin_get_business_documents`, `admin_get_verification_queue`, `admin_paid_intent_lost_count`, `admin_set_verification`, `ban_user`, `unban_user`, `get_platform_admin_emails`
+
+Each function keeps its existing `SECURITY DEFINER` + internal auth checks (e.g. `has_role`, `has_business_role`), so re-granting `EXECUTE` to `authenticated` does not widen access — it just lets the API layer reach the function so the internal checks can run.
+
+Migration shape:
+
+```sql
+GRANT EXECUTE ON FUNCTION public.get_business_sensitive(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_dashboard_stats(uuid, uuid, timestamptz, timestamptz) TO authenticated;
+-- …one line per function above, using the exact signature from pg_proc
+```
+
+## Verification
+
+After the migration:
+
+1. Re-query `has_function_privilege('authenticated', 'public.get_business_sensitive(uuid)', 'EXECUTE')` — expect `true` for all listed functions.
+2. Reload the dashboard: the Compliance card should show TIN as **`1031640657` — Configured** (green), and the score should jump from 75% → 90%+.
+3. Network tab: previously-403 requests to `get_dashboard_stats` / `get_due_date_stats` / `get_business_sensitive` should return `200`.
+
+No frontend files change.
