@@ -99,10 +99,8 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+
+
 
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from(bucketName)
