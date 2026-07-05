@@ -108,7 +108,24 @@ serve(async (req) => {
 
     // Determine the business to bill (use provided businessId or user's default)
     let targetBusinessId = businessId;
-    if (!targetBusinessId) {
+    if (targetBusinessId) {
+      // SECURITY: Verify caller is a member of the provided business_id.
+      // Without this check, any user could attach a subscription to another
+      // business's record and later control it via their own Stripe account.
+      const { data: membership, error: membershipError } = await supabaseClient
+        .from("business_members")
+        .select("business_id")
+        .eq("user_id", user.id)
+        .eq("business_id", targetBusinessId)
+        .maybeSingle();
+
+      if (membershipError || !membership) {
+        return new Response(
+          JSON.stringify({ error: "You are not a member of the specified business." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
+        );
+      }
+    } else {
       const { data: businessMemberData } = await supabaseClient
         .from("business_members")
         .select("business_id, businesses(is_default)")
@@ -128,6 +145,7 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
+
 
     // Check if business has existing subscription with stripe customer
     const { data: existingSubscription } = await supabaseClient

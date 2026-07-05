@@ -243,28 +243,22 @@ serve(async (req) => {
       });
     }
 
-    // Decode JWT directly to extract user_id
+    // SECURITY: verify the JWT signature via Supabase instead of decoding it
+    // manually. Manual base64 decode trusts any self-signed token and lets an
+    // attacker impersonate any user_id.
     const token = authHeader.replace("Bearer ", "");
-    const parts = token.split(".");
-    if (parts.length !== 3 || !parts[1]) {
+    const supabaseUrlForAuth = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const authClient = createClient(supabaseUrlForAuth, anonKey);
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !userData?.user?.id) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = userData.user.id;
 
-    let userId: string;
-    try {
-      const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-      const payload = JSON.parse(atob(payloadB64));
-      userId = payload.sub;
-      if (!userId) throw new Error("Missing sub");
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid token payload" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     // Parse body
     const { event_type } = await req.json();
