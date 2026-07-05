@@ -38,8 +38,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // If invoked with a user JWT (admin "Reconcile now" button), require
-    // platform_admin. Cron invokes this with apikey only (no Bearer), which
-    // remains allowed.
+    // platform_admin. Otherwise (cron path) require the shared CRON_SECRET
+    // header — without this, any caller with the public anon apikey could
+    // trigger full Stripe reconciliation.
     const authHeader = req.headers.get("Authorization");
     let triggeredBy: "cron" | "admin" = "cron";
     let triggeredByUser: string | null = null;
@@ -64,7 +65,16 @@ Deno.serve(async (req) => {
       }
       triggeredBy = "admin";
       triggeredByUser = user.id;
+    } else {
+      const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+      const incomingSecret = req.headers.get("x-cron-secret") ?? "";
+      if (!cronSecret || incomingSecret !== cronSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
+
 
     // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise
     // a sub whose payment was cancelled mid-period (period_end still in the
