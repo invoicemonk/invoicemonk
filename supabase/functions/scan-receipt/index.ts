@@ -18,9 +18,33 @@ serve(async (req) => {
   }
 
   try {
+    // Require authenticated caller
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await authClient.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const userId = userData.user.id;
+
     const { storage_path, bucket, business_currency, business_jurisdiction } = await req.json();
 
-    if (!storage_path) {
+    if (!storage_path || typeof storage_path !== 'string') {
       return new Response(
         JSON.stringify({ error: "storage_path is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -30,15 +54,53 @@ serve(async (req) => {
     const ALLOWED_BUCKETS = new Set(["expense-receipts", "expense-inbox"]);
     const bucketName = bucket && ALLOWED_BUCKETS.has(bucket) ? bucket : "expense-receipts";
 
+    // Path convention:
+    //   expense-receipts/{user_id}/...
+    //   expense-inbox/{business_id}/...
+    const firstSegment = storage_path.split('/')[0] ?? '';
+    if (!firstSegment) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid storage_path' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    if (bucketName === 'expense-receipts') {
+      if (firstSegment !== userId) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
+      // expense-inbox — verify user belongs to the business folder
+      const { data: membership, error: mErr } = await supabaseAdmin
+        .from('business_members')
+        .select('id')
+        .eq('business_id', firstSegment)
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (mErr || !membership) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+
+
 
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from(bucketName)
