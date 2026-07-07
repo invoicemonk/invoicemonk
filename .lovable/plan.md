@@ -1,60 +1,91 @@
-## Root cause
+## Goal
+Fix the Billing Management section on `/b/:businessId/billing` so it actually lists past payments (pulled from Stripe) instead of showing "No payment history". For the affected user, the duplicate charge will appear as **two invoice rows** — one dated in July, one in August — matching how they're happy to spread the charges.
 
-The dashboard's Compliance card shows **TIN "Not set"** even though the value is saved in `business_sensitive_data` (verified in DB: `tax_id = '1031640657'`).
+## 1. New edge function: `list-stripe-payments`
+Location: `supabase/functions/list-stripe-payments/index.ts`
 
-The Compliance card reads `currentBusiness.tax_id`, which `BusinessContext` fills by calling the `get_business_sensitive` RPC and merging the result into the business object. That RPC call is currently returning `403 permission denied` for the `authenticated` role, so the merge silently falls back to `null` and the card reports TIN as missing. Saving in Settings works (the row is written), but the next dashboard render can't read it back — that's why the value "disappears" after saving.
+- Verifies the caller via `supabase.auth.getUser(token)` (JWT verified in code, `verify_jwt = false` per project pattern).
+- Resolves every Stripe customer tied to this user:
+  - primary lookup by email via `stripe.customers.list({ email })`
+  - plus any `stripe_customer_id`s from the `subscriptions` table for the user and for businesses they're a member of (covers users whose Stripe email differs from their auth email — matches the answered scope: "All of the user's subscriptions").
+- For each customer, calls `stripe.invoices.list({ customer, limit: 100, expand: ['data.charge'] })`.
+- Normalizes each invoice into:
+  ```ts
+  {
+    id, number, created_at, period_start, period_end,
+    amount, currency, status,               // paid | open | uncollectible | void
+    description,                            // line item / plan nickname
+    hosted_invoice_url, invoice_pdf,
+    receipt_url                             // from expanded charge
+  }
+  ```
+- Sorted newest first.
+- Errors return `{ error }` with 500 so the UI can show a graceful fallback.
 
-Network log confirms sibling RPCs on the same dashboard also fail with the same error:
+Secrets: uses existing `STRIPE_SECRET_KEY`. None to add.
 
+## 2. Record the duplicate charge as two invoices (one-off backfill)
+The user's second charge already exists in Stripe as an ordinary invoice — we just need it to *appear* as two rows spanning July and August so the history matches the agreed outcome.
+
+Approach: create **two out-of-band Stripe invoices** on that customer, each for half the disputed amount, one dated in July and one in August, both marked paid out-of-band. The real (duplicate) Stripe charge is then voided from the customer's ledger so totals stay correct.
+
+- Done via the `stripe--stripe_api_write` tool (no code change needed), not in application code:
+  1. `PostInvoices` × 2 with `collection_method=send_invoice`, `auto_advance=false`, `description="Subscription — July 2026"` / `"Subscription — August 2026"`.
+  2. `PostInvoiceitems` for the correct half-amount on each.
+  3. `PostInvoicesFinalize` then `PostInvoicesPay` with `paid_out_of_band=true`.
+  4. Void the original duplicate invoice with `PostInvoicesVoid` so the customer isn't shown as charged twice for the same period.
+- Requires the user to confirm:
+  - the affected **user email / business** and
+  - the **Stripe invoice ID** of the duplicate charge
+  before I run these Stripe writes (they mutate live billing data).
+
+After this backfill, `list-stripe-payments` will naturally return the two July/August rows because it reads Stripe directly.
+
+## 3. Frontend hook: `useBillingPayments`
+Location: `src/hooks/use-billing-payments.ts`
+
+- `useQuery(['billing-payments', userId])` → `supabase.functions.invoke('list-stripe-payments')`
+- 60s stale time, refetch on window focus.
+
+## 4. Rework the "Billing Management" card in `src/pages/app/Billing.tsx`
+Replace the current empty state + lone "Open Customer Portal" button (lines 332–367) with:
+
+```text
+┌─ Billing Management ─────────────────── [Open Customer Portal ↗] ─┐
+│ Manage your payment methods and view invoices                     │
+│                                                                   │
+│  Date         Description              Amount     Status          │
+│  ─────────────────────────────────────────────────────────── ⋯    │
+│  Aug 2 2026   Subscription — August    $14.50     Paid   PDF View │
+│  Jul 2 2026   Subscription — July      $14.50     Paid   PDF View │
+│  Jul 2 2026   Pro (monthly)            $29.00     Paid   PDF View │
+│  Jun 2 2026   Pro (monthly)            $29.00     Paid   PDF View │
+│  ...                                                              │
+└───────────────────────────────────────────────────────────────────┘
 ```
-POST /rpc/get_dashboard_stats  → 42501 permission denied for function get_dashboard_stats
-POST /rpc/get_due_date_stats   → 42501 permission denied for function get_due_date_stats
-```
 
-Direct privilege check:
+- Table via shadcn `Table` primitives.
+- Amount formatted with `Intl.NumberFormat` per row's currency.
+- Status → colored `Badge` (`paid` default, `void`/`refunded` secondary, `open`/`uncollectible` destructive).
+- Rightmost column: icon buttons opening `hosted_invoice_url` and `invoice_pdf` in a new tab.
+- Loading: 5 `Skeleton` rows.
+- Error: inline muted line "Couldn't load payment history — open the Customer Portal for the full record."
+- Non-paid users (no `hasPaidSubscription`): keep today's "Upgrade to a paid plan" empty state, no fetch.
+- The existing "Manage Subscription" button in the Current Plan card stays untouched.
 
-```
-get_business_sensitive  authenticated=false  service_role=true
-get_dashboard_stats     authenticated=false  service_role=true
-get_due_date_stats      authenticated=false  service_role=true
-```
+## Files
+- **New:** `supabase/functions/list-stripe-payments/index.ts`
+- **New:** `src/hooks/use-billing-payments.ts`
+- **Edit:** `src/pages/app/Billing.tsx` (Billing Management card body only)
+- **No new DB tables or migrations.**
 
-A recent `CREATE OR REPLACE FUNCTION` migration dropped the `EXECUTE` grant to `authenticated` on these `SECURITY DEFINER` RPCs. Postgres does not preserve grants when a function's signature is replaced without re-granting.
+## Out of scope
+- No webhook or DB mirroring of Stripe invoices.
+- No refunds — the money stays with us; the fix is purely how it's presented (two months of billing).
+- No changes to checkout, subscription reconciliation, or the Customer Portal flow.
 
-## Fix
+## What I need from you before running the Stripe backfill
+- The affected user's email (or business).
+- The Stripe **invoice ID** (or payment intent) of the duplicate charge.
 
-Single SQL migration that re-grants `EXECUTE` to `authenticated` on the client-facing RPCs currently missing it. No table/RLS/data changes, no code changes, no secret changes.
-
-**Definitely required (directly reproduces the bug or shows up as 403 in the current session):**
-
-- `get_business_sensitive`
-- `get_business_sensitive_fields`
-- `get_dashboard_stats`
-- `get_due_date_stats`
-
-**Also re-grant proactively** — same regression pattern, all called from the frontend, will 403 the same way if not already broken:
-
-- Stats/analytics: `get_accounting_stats`, `get_cashflow_summary`, `get_expenses_by_category`, `get_profitability_stats`, `get_receivables_intelligence`, `get_revenue_trend`
-- Tier/limits: `has_tier`, `check_tier_limit`, `check_tier_limit_business`, `check_currency_account_limit`, `check_payment_method_limit`, `check_receipt_limit`, `check_team_member_limit`
-- Actions the app calls: `issue_invoice`, `log_audit_event`, `create_notification`, `create_regulatory_submission`, `update_submission_status`, `lock_business_currency`, `close_account`, `check_disposable_email`, `check_rate_limit`
-- Admin-panel RPCs called from the client: `admin_get_business_documents`, `admin_get_verification_queue`, `admin_paid_intent_lost_count`, `admin_set_verification`, `ban_user`, `unban_user`, `get_platform_admin_emails`
-
-Each function keeps its existing `SECURITY DEFINER` + internal auth checks (e.g. `has_role`, `has_business_role`), so re-granting `EXECUTE` to `authenticated` does not widen access — it just lets the API layer reach the function so the internal checks can run.
-
-Migration shape:
-
-```sql
-GRANT EXECUTE ON FUNCTION public.get_business_sensitive(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_dashboard_stats(uuid, uuid, timestamptz, timestamptz) TO authenticated;
--- …one line per function above, using the exact signature from pg_proc
-```
-
-## Verification
-
-After the migration:
-
-1. Re-query `has_function_privilege('authenticated', 'public.get_business_sensitive(uuid)', 'EXECUTE')` — expect `true` for all listed functions.
-2. Reload the dashboard: the Compliance card should show TIN as **`1031640657` — Configured** (green), and the score should jump from 75% → 90%+.
-3. Network tab: previously-403 requests to `get_dashboard_stats` / `get_due_date_stats` / `get_business_sensitive` should return `200`.
-
-No frontend files change.
+I'll build the code changes above regardless; the two-invoice split via Stripe is a separate confirmation because it writes to live Stripe data.
