@@ -359,29 +359,29 @@ export default function Billing() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Billing Management</CardTitle>
-          <CardDescription>Manage your payment methods and view invoices</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>Billing Management</CardTitle>
+            <CardDescription>Manage your payment methods and view invoices</CardDescription>
+          </div>
+          {hasPaidSubscription && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManageSubscription}
+              disabled={checkoutLoading}
+            >
+              {checkoutLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <ExternalLink className="h-4 w-4 mr-2" />
+              )}
+              Open Customer Portal
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {hasPaidSubscription ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <p className="text-sm text-muted-foreground mb-4">
-                View your payment history, update payment methods, and download invoices from the Stripe Customer Portal.
-              </p>
-              <Button 
-                onClick={handleManageSubscription}
-                disabled={checkoutLoading}
-              >
-                {checkoutLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                )}
-                Open Customer Portal
-              </Button>
-            </div>
-          ) : (
+          {!hasPaidSubscription ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="p-4 rounded-full bg-muted mb-4">
                 <CreditCard className="h-8 w-8 text-muted-foreground" />
@@ -391,9 +391,101 @@ export default function Billing() {
                 Upgrade to a paid plan to access billing management features.
               </p>
             </div>
+          ) : paymentsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : paymentsError ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Couldn't load payment history — open the Customer Portal for the full record.
+            </p>
+          ) : !payments || payments.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No payments recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Invoice</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((p: BillingPayment) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {new Date(p.created_at).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {p.description}
+                        {p.number && (
+                          <span className="text-muted-foreground text-xs ml-2">#{p.number}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">
+                        {formatAmount(p.amount, p.currency)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusVariant(p.status)} className="capitalize">
+                          {p.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {p.hosted_invoice_url && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              asChild
+                              title="View invoice"
+                            >
+                              <a
+                                href={p.hosted_invoice_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                          {p.invoice_pdf && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              asChild
+                              title="Download PDF"
+                            >
+                              <a
+                                href={p.invoice_pdf}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
+
 
       {feedbackTiers && (
         <DowngradeFeedbackDialog
