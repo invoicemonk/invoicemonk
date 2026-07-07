@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { DowngradeFeedbackDialog } from '@/components/billing/DowngradeFeedbackDialog';
-import { 
-  CreditCard, 
+import {
+  CreditCard,
   Check,
   Building2,
   Shield,
   ExternalLink,
   Loader2,
   Sparkles,
-  Mail
+  Mail,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,11 +20,36 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { gaEvents } from '@/hooks/use-google-analytics';
 import { useTierFeatures } from '@/hooks/use-tier-features';
+import { useBillingPayments, type BillingPayment } from '@/hooks/use-billing-payments';
+
+function formatAmount(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
+function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (status) {
+    case 'paid':
+      return 'default';
+    case 'void':
+    case 'refunded':
+      return 'secondary';
+    case 'open':
+    case 'uncollectible':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+}
 
 const planIcons = {
   professional: Shield,
