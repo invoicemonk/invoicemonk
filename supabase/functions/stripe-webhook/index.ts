@@ -986,12 +986,27 @@ serve(async (req) => {
             ? invoice.subscription
             : invoice.subscription.id;
 
+          // Persist advanced billing period on every successful renewal so the
+          // local row doesn't rot when customer.subscription.updated is delayed
+          // or dropped (which hides the subscription from the app UI).
+          const patch: Record<string, unknown> = {
+            status: "active",
+            updated_at: new Date().toISOString(),
+          };
+          try {
+            const liveSub = await stripe.subscriptions.retrieve(subscriptionId);
+            const ps = safeISODate(liveSub.current_period_start);
+            const pe = safeISODate(liveSub.current_period_end);
+            if (ps) patch.current_period_start = ps;
+            if (pe) patch.current_period_end = pe;
+          } catch (retrieveErr) {
+            console.error("Failed to retrieve subscription for period sync:", (retrieveErr as Error).message);
+            captureException(retrieveErr, { function_name: 'stripe-webhook', stage: 'invoice.paid.retrieve' });
+          }
+
           await supabase
             .from("subscriptions")
-            .update({
-              status: "active",
-              updated_at: new Date().toISOString(),
-            })
+            .update(patch)
             .eq("stripe_subscription_id", subscriptionId);
 
           // --- REFERRAL COMMISSION LOGIC ---

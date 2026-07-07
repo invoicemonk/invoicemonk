@@ -49,10 +49,11 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      // Calculate grace period date (3 days ago) for expiration check
-      const gracePeriodDate = new Date();
-      gracePeriodDate.setDate(gracePeriodDate.getDate() - 3);
-      const graceISO = gracePeriodDate.toISOString();
+      // NOTE: we intentionally do NOT filter by current_period_end here. If a
+      // Stripe webhook (invoice.paid / customer.subscription.updated) is late,
+      // the local row's period can lag behind reality, and filtering by it
+      // would silently drop a legitimately-paying customer back to "starter".
+      // The entitlement gate below (isEntitledStatus) is what enforces access.
 
       // First try user-level subscription
       const { data: userSub, error: userError } = await supabase
@@ -60,7 +61,6 @@ export function useSubscription() {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .or(`current_period_end.is.null,current_period_end.gte.${graceISO}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -85,7 +85,6 @@ export function useSubscription() {
         .select('*')
         .in('business_id', businessIds)
         .eq('status', 'active')
-        .or(`current_period_end.is.null,current_period_end.gte.${graceISO}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
