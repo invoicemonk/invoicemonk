@@ -86,6 +86,8 @@ export default function Billing() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackTiers, setFeedbackTiers] = useState<{ previous: string; next: string } | null>(null);
   const previousTierRef = useRef<string | null>(null);
+  const hasPaidSubscriptionEarly = subscription?.stripe_subscription_id != null;
+  const { data: payments, isLoading: paymentsLoading, isError: paymentsError } = useBillingPayments(hasPaidSubscriptionEarly);
 
   useEffect(() => {
     gaEvents.subscriptionViewed(tier);
