@@ -2,6 +2,7 @@ import { Outlet, useParams, Navigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { BusinessSidebar } from './BusinessSidebar';
 import { DashboardHeader } from './DashboardHeader';
+import { ImpersonationBanner } from './ImpersonationBanner';
 import { BusinessProvider, useBusiness } from '@/contexts/BusinessContext';
 import { CurrencyAccountProvider } from '@/contexts/CurrencyAccountContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
@@ -65,6 +66,7 @@ function BusinessLayoutContent() {
           <div className="min-h-screen flex w-full bg-background">
             <BusinessSidebar />
             <SidebarInset className="flex flex-col flex-1">
+              <ImpersonationBanner />
               <DashboardHeader />
               <StarterSunsetBanner />
               <PaymentIssueBanner />

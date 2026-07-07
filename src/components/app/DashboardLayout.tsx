@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
+import { ImpersonationBanner } from './ImpersonationBanner';
 
 export function DashboardLayout() {
   return (
@@ -9,6 +10,7 @@ export function DashboardLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
         <SidebarInset className="flex flex-col flex-1">
+          <ImpersonationBanner />
           <DashboardHeader />
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />

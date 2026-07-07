@@ -7,11 +7,14 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert, Globe, Monitor, Building2 } from 'lucide-react';
+import { Mail, Calendar, Shield, CheckCircle, XCircle, Ban, UserCheck, ShieldAlert, Globe, Monitor, Building2, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { useBanUser, useUnbanUser } from '@/hooks/use-admin';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
+import { ImpersonateConfirmDialog } from './ImpersonateConfirmDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,8 +49,11 @@ interface UserDetailSheetProps {
 export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetProps) {
   const banUser = useBanUser();
   const unbanUser = useUnbanUser();
+  const navigate = useNavigate();
+  const { start: startImpersonation } = useImpersonation();
   const [banDialogOpen, setBanDialogOpen] = useState(false);
   const [banReason, setBanReason] = useState('');
+  const [impersonateDialogOpen, setImpersonateDialogOpen] = useState(false);
 
   if (!user) return null;
 
@@ -187,9 +193,18 @@ export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetPro
               </>
             )}
 
-            {/* Ban/Unban Action */}
+            {/* Actions */}
             <div className="space-y-2">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Actions</h4>
+              <Button
+                variant="outline"
+                className="w-full border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                onClick={() => setImpersonateDialogOpen(true)}
+                disabled={isSuspended}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Impersonate (read-only)
+              </Button>
               {isSuspended ? (
                 <Button
                   variant="outline"
@@ -297,7 +312,32 @@ export function UserDetailSheet({ user, open, onOpenChange }: UserDetailSheetPro
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImpersonateConfirmDialog
+        open={impersonateDialogOpen}
+        onOpenChange={setImpersonateDialogOpen}
+        targetLabel={user.full_name || user.email}
+        onConfirm={async () => {
+          startImpersonation({
+            userId: user.id,
+            email: user.email,
+            fullName: user.full_name,
+          });
+          // Best-effort audit log
+          supabase.from('audit_logs').insert({
+            user_id: undefined as any, // set server-side by RLS trigger where applicable
+            action: 'impersonate.start',
+            resource_type: 'user',
+            resource_id: user.id,
+            metadata: { impersonated_email: user.email },
+          } as any).then(() => {}, () => {});
+          setImpersonateDialogOpen(false);
+          onOpenChange(false);
+          navigate('/dashboard');
+        }}
+      />
     </>
+
   );
 }
 

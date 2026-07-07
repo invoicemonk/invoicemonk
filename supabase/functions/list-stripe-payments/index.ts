@@ -56,27 +56,63 @@ serve(async (req) => {
     }
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-    // Collect Stripe customer IDs for this user
     const admin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
+    // Optional impersonation: platform_admin may request another user's payments.
+    let targetUserId = user.id;
+    let targetEmail = user.email ?? null;
+    try {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        const requested = typeof body?.target_user_id === "string" ? body.target_user_id : null;
+        if (requested && requested !== user.id) {
+          const { data: isAdmin } = await admin.rpc("has_role", {
+            _user_id: user.id,
+            _role: "platform_admin",
+          });
+          if (!isAdmin) {
+            return new Response(JSON.stringify({ error: "Forbidden" }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 403,
+            });
+          }
+          targetUserId = requested;
+          const { data: targetProfile } = await admin
+            .from("profiles")
+            .select("email")
+            .eq("id", requested)
+            .maybeSingle();
+          targetEmail = targetProfile?.email ?? null;
+          // Audit log
+          await admin.from("audit_logs").insert({
+            user_id: user.id,
+            action: "impersonate.read.billing_payments",
+            resource_type: "user",
+            resource_id: requested,
+            metadata: { impersonated_user_id: requested },
+          }).then(() => {}, () => {});
+        }
+      }
+    } catch (_) { /* ignore body parse errors */ }
+
     const customerIds = new Set<string>();
 
-    // 1. From subscriptions owned by user
+    // 1. From subscriptions owned by target user
     const { data: userSubs } = await admin
       .from("subscriptions")
       .select("stripe_customer_id")
-      .eq("user_id", user.id);
+      .eq("user_id", targetUserId);
     userSubs?.forEach((s: any) => s.stripe_customer_id && customerIds.add(s.stripe_customer_id));
 
-    // 2. From subscriptions of businesses the user is a member of
+    // 2. From subscriptions of businesses the target user is a member of
     const { data: memberships } = await admin
       .from("business_members")
       .select("business_id")
-      .eq("user_id", user.id);
+      .eq("user_id", targetUserId);
     const businessIds = (memberships ?? []).map((m: any) => m.business_id).filter(Boolean);
     if (businessIds.length > 0) {
       const { data: bizSubs } = await admin
@@ -86,10 +122,10 @@ serve(async (req) => {
       bizSubs?.forEach((s: any) => s.stripe_customer_id && customerIds.add(s.stripe_customer_id));
     }
 
-    // 3. Fallback: Stripe customers matching auth email
-    if (user.email) {
+    // 3. Fallback: Stripe customers matching target email
+    if (targetEmail) {
       try {
-        const found = await stripe.customers.list({ email: user.email, limit: 5 });
+        const found = await stripe.customers.list({ email: targetEmail, limit: 5 });
         found.data.forEach((c) => customerIds.add(c.id));
       } catch (e) {
         console.warn("Stripe customer email lookup failed:", (e as Error).message);

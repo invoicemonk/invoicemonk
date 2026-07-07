@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { Tables } from '@/integrations/supabase/types';
 import { usePlatformAdmin } from '@/hooks/use-platform-admin';
+import { useImpersonationOptional } from './ImpersonationContext';
 
 type Business = Tables<'businesses'> & {
   registration_status?: string;
@@ -114,24 +115,26 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   
   // Check if user is a platform admin (unlimited access)
   const { isPlatformAdmin } = usePlatformAdmin();
-  
+  const { target: impersonationTarget, isImpersonating } = useImpersonationOptional();
+  const effectiveUserId = impersonationTarget?.userId || user?.id;
+
   const [baseBusiness, setBaseBusiness] = useState<Business | null>(null);
   const [currentRole, setCurrentRole] = useState<BusinessRole | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all businesses the user belongs to
+  // Fetch all businesses the effective user (self or impersonation target) belongs to.
   const { data: businesses = [], isLoading: loadingBusinesses } = useQuery({
-    queryKey: ['user-businesses', user?.id],
+    queryKey: ['user-businesses', effectiveUserId, isImpersonating ? 'imp' : 'self'],
     queryFn: async () => {
-      if (!user) return [];
-      
+      if (!effectiveUserId) return [];
+
       const { data, error: fetchError } = await supabase
         .from('business_members')
         .select(`
           *,
           business:businesses(*)
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (fetchError) throw fetchError;
 
@@ -140,7 +143,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         business: item.business as unknown as Business,
       })) as BusinessMembership[];
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -303,10 +306,12 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const isMember = currentRole === 'member' || isAdmin;
   const isAuditor = currentRole === 'auditor';
 
-  const canManageTeam = isOwner || isAdmin;
-  const canCreateInvoices = isMember && !isAuditor;
+  // While impersonating, force every mutation permission to false so the UI
+  // hides create/edit/delete controls regardless of the target user's role.
+  const canManageTeam = !isImpersonating && (isOwner || isAdmin);
+  const canCreateInvoices = !isImpersonating && (isMember && !isAuditor);
   const canViewReports = true; // All roles can view reports
-  const canEditSettings = isOwner || isAdmin;
+  const canEditSettings = !isImpersonating && (isOwner || isAdmin);
 
   // Subscription helpers - Platform admins bypass all limits
   const canAccess = (feature: string): boolean => {

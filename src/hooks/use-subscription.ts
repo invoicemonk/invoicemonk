@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useImpersonationOptional } from '@/contexts/ImpersonationContext';
 
 export type SubscriptionTier = 'starter' | 'starter_paid' | 'professional' | 'business';
 
@@ -43,23 +44,19 @@ const TIER_ORDER: Record<SubscriptionTier, number> = {
 
 export function useSubscription() {
   const { user } = useAuth();
+  const { target } = useImpersonationOptional();
+  const effectiveUserId = target?.userId || user?.id;
 
   const subscriptionQuery = useQuery({
-    queryKey: ['subscription', user?.id],
+    queryKey: ['subscription', effectiveUserId, target ? 'imp' : 'self'],
     queryFn: async () => {
-      if (!user?.id) return null;
-
-      // NOTE: we intentionally do NOT filter by current_period_end here. If a
-      // Stripe webhook (invoice.paid / customer.subscription.updated) is late,
-      // the local row's period can lag behind reality, and filtering by it
-      // would silently drop a legitimately-paying customer back to "starter".
-      // The entitlement gate below (isEntitledStatus) is what enforces access.
+      if (!effectiveUserId) return null;
 
       // First try user-level subscription
       const { data: userSub, error: userError } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -75,7 +72,7 @@ export function useSubscription() {
       const { data: memberships } = await supabase
         .from('business_members')
         .select('business_id')
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (!memberships || memberships.length === 0) return null;
 
@@ -96,9 +93,10 @@ export function useSubscription() {
 
       return bizSub as Subscription | null;
     },
-    enabled: !!user?.id,
+    enabled: !!effectiveUserId,
     staleTime: 5 * 60 * 1000,
   });
+
 
   const limitsQuery = useQuery({
     queryKey: ['tier-limits', subscriptionQuery.data?.tier || 'starter'],

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { TierGatedRoute } from "@/components/app/TierGatedRoute";
 import { StarterGraceGuard } from "@/components/app/StarterGraceGuard";
@@ -198,6 +199,7 @@ function TawkIdentityProvider({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <ImpersonationProvider>
       <TawkIdentityProvider>
       <TooltipProvider>
         <Toaster />
@@ -433,6 +435,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
       </TawkIdentityProvider>
+      </ImpersonationProvider>
   </AuthProvider>
 </QueryClientProvider>
 );

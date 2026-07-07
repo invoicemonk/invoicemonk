@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useImpersonationOptional } from '@/contexts/ImpersonationContext';
 
 export interface BillingPayment {
   id: string;
@@ -19,14 +20,18 @@ export interface BillingPayment {
 
 export function useBillingPayments(enabled = true) {
   const { user } = useAuth();
+  const { target } = useImpersonationOptional();
+  const effectiveUserId = target?.userId || user?.id;
   return useQuery({
-    queryKey: ['billing-payments', user?.id],
+    queryKey: ['billing-payments', effectiveUserId, target ? 'imp' : 'self'],
     queryFn: async (): Promise<BillingPayment[]> => {
-      const { data, error } = await supabase.functions.invoke('list-stripe-payments');
+      const { data, error } = await supabase.functions.invoke('list-stripe-payments', {
+        body: target ? { target_user_id: target.userId } : {},
+      });
       if (error) throw error;
       return (data?.payments ?? []) as BillingPayment[];
     },
-    enabled: enabled && !!user?.id,
+    enabled: enabled && !!effectiveUserId,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   });
