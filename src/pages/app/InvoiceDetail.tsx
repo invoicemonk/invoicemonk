@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Lock, Download, Send, FileText, History, CheckCircle2,
-  Ban, DollarSign, Loader2, Clock, AlertCircle, AlertTriangle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink, Plus
+  Ban, DollarSign, Loader2, Clock, AlertCircle, AlertTriangle, Building2, User, Shield, Eye, FileX, Upload, Paperclip, Bell, ExternalLink, Plus, Copy
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -278,6 +278,12 @@ export default function InvoiceDetail() {
           <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
             <Eye className="h-4 w-4 mr-2" />
             Preview
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={`/b/${currentBusiness?.id}/invoices/new?duplicateFrom=${invoice.id}`}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate
+            </Link>
           </Button>
           {invoice.status === 'draft' && (
             <>

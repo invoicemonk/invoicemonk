@@ -20,7 +20,8 @@ import {
   Download,
   ChevronDown,
   FileX,
-  ArrowRight
+  ArrowRight,
+  Copy
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -689,6 +690,12 @@ export default function Invoices() {
                               <Link to={`/b/${currentBusiness?.id}/invoices/${invoice.id}`}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link to={`/b/${currentBusiness?.id}/invoices/new?duplicateFrom=${invoice.id}`}>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Duplicate
                               </Link>
                             </DropdownMenuItem>
                             {invoice.status === 'issued' && (

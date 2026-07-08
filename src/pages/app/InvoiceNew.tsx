@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { INPUT_LIMITS, combineLineItemDescription } from '@/lib/input-limits';
+import { INPUT_LIMITS, combineLineItemDescription, splitLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { 
   Plus, 
   Trash2, 
@@ -18,7 +18,8 @@ import {
   Sparkles,
   Eye,
   Info,
-  Building2
+  Building2,
+  Copy
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,7 +55,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { useClients, useCreateClient } from '@/hooks/use-clients';
-import { useCreateInvoice, useIssueInvoice } from '@/hooks/use-invoices';
+import { useCreateInvoice, useIssueInvoice, useInvoice } from '@/hooks/use-invoices';
 import { useInvoiceTemplates, TemplateWithAccess } from '@/hooks/use-invoice-templates';
 import { useBusinessCurrency, getPermittedCurrencies } from '@/hooks/use-business-currency';
 import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
@@ -101,6 +102,10 @@ interface InvoiceItem {
 
 export default function InvoiceNew() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const duplicateFromId = searchParams.get('duplicateFrom') || undefined;
+  const { data: sourceInvoice, isLoading: isLoadingSource } = useInvoice(duplicateFromId);
+  const [duplicationApplied, setDuplicationApplied] = useState(false);
   const { user } = useAuth();
   const isEmailVerified = user?.email_confirmed_at;
 
@@ -232,6 +237,80 @@ export default function InvoiceNew() {
       setSelectedPaymentMethodId('');
     }
   }, [paymentMethods]);
+
+  // Duplication: prefill form from a source invoice when ?duplicateFrom=<id> is present
+  useEffect(() => {
+    if (!duplicateFromId || duplicationApplied || isLoadingSource) return;
+    if (!sourceInvoice || !currentBusiness?.id) return;
+
+    // Guard: source must belong to current business
+    if (sourceInvoice.business_id !== currentBusiness.id) {
+      toast({
+        title: 'Invoice not found',
+        description: 'That invoice does not belong to this business.',
+        variant: 'destructive',
+      });
+      searchParams.delete('duplicateFrom');
+      setSearchParams(searchParams, { replace: true });
+      setDuplicationApplied(true);
+      return;
+    }
+
+    setSelectedClientId(sourceInvoice.client_id || '');
+    setNotes(sourceInvoice.notes || '');
+    setTerms(sourceInvoice.terms || '');
+    setSummary(sourceInvoice.summary || '');
+    setSelectedPaymentMethodId(sourceInvoice.payment_method_id || '');
+    setIssueDate(new Date().toISOString().split('T')[0]);
+    setDueDate('');
+    // Deposit / final chains require explicit reselection to preserve parent/child integrity
+    setInvoiceKind('standard');
+    setDepositPercent(null);
+    setParentInvoiceId(null);
+    if (sourceInvoice.kind && sourceInvoice.kind !== 'standard') {
+      toast({
+        title: 'Invoice kind reset',
+        description: 'Deposit/final links were cleared — reselect a parent invoice if needed.',
+      });
+    }
+
+    // Currency: fall back to business default if no longer permitted
+    const permitted = getPermittedCurrencies(businessCurrency).map(c => c.value);
+    if (sourceInvoice.currency && (permitted.length === 0 || permitted.includes(sourceInvoice.currency))) {
+      setCurrency(sourceInvoice.currency);
+    } else if (businessCurrency?.default_currency) {
+      setCurrency(businessCurrency.default_currency);
+      toast({
+        title: 'Currency changed',
+        description: `${sourceInvoice.currency} is no longer permitted — switched to ${businessCurrency.default_currency}.`,
+      });
+    }
+
+    // Line items
+    const srcItems = (sourceInvoice.invoice_items || []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    if (srcItems.length > 0) {
+      setItems(srcItems.map((it, idx) => {
+        const { heading, description } = splitLineItemDescription(it.description);
+        return {
+          id: `${Date.now()}-${idx}`,
+          productServiceId: it.product_service_id || null,
+          description: heading,
+          longDescription: description,
+          quantity: Number(it.quantity),
+          unitPrice: Number(it.unit_price),
+          taxRate: Number(it.tax_rate) || 0,
+          taxLabel: it.tax_label || undefined,
+          isVatExempt: Number(it.tax_rate) === 0 && defaultVatRate > 0,
+        };
+      }));
+      // Prevent first-invoice sample override
+      setPrefillApplied(true);
+    }
+
+    setDuplicationApplied(true);
+  }, [duplicateFromId, duplicationApplied, isLoadingSource, sourceInvoice, currentBusiness?.id, businessCurrency, defaultVatRate, searchParams, setSearchParams]);
+
+
 
   // Get selected client for preview
   const selectedClient = clients?.find(c => c.id === selectedClientId);
@@ -647,6 +726,26 @@ export default function InvoiceNew() {
           </p>
         </div>
       </div>
+
+      {/* Duplication banner */}
+      {duplicationApplied && sourceInvoice && sourceInvoice.business_id === currentBusiness?.id && (
+        <Alert className="border-primary/20 bg-primary/5">
+          <Copy className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>
+              Duplicated from{' '}
+              <Link
+                to={`/b/${currentBusiness?.id}/invoices/${sourceInvoice.id}`}
+                className="font-medium underline"
+              >
+                {sourceInvoice.invoice_number}
+              </Link>
+              {' '}— review and save. A new invoice number will be assigned.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
 
       {/* First invoice helper banner */}
       {isFirstInvoice && currentBusiness?.jurisdiction && (
