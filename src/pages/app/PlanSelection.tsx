@@ -400,10 +400,37 @@ export default function PlanSelection() {
           </motion.div>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
-          Need to come back later? You can sign out and finish picking a plan when you're ready.
+        {/* Trust signals */}
+        <div className="mt-10 max-w-4xl mx-auto space-y-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Cancel anytime</span>
+            <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> 14-day money-back guarantee</span>
+            <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Secure payments by Stripe</span>
+            <span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Your data is yours — export anytime</span>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { quote: 'Switched from spreadsheets in an afternoon. My accountant finally stopped complaining.', name: 'Amaka O.', role: 'Freelance designer' },
+              { quote: 'The compliance side is what sold me — VAT is handled properly, unlike the tools I tried before.', name: 'Julien M.', role: 'SME owner, Paris' },
+              { quote: 'Cheapest way to send professional invoices that clients actually pay on time.', name: 'Priya S.', role: 'Consultant' },
+            ].map((t, i) => (
+              <Card key={i} className="bg-muted/30 border-muted">
+                <CardContent className="pt-6">
+                  <p className="text-sm italic text-foreground/90">"{t.quote}"</p>
+                  <p className="mt-3 text-xs font-medium">{t.name}</p>
+                  <p className="text-xs text-muted-foreground">{t.role}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-10 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+          Not ready to upgrade? You can keep using the free plan — the "Back to dashboard" link above returns you to your workspace.
         </p>
       </div>
     </div>
   );
 }
+
