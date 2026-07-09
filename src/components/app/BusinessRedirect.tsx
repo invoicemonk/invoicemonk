@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { trackFunnelOnce } from '@/lib/funnel-tracking';
 
 /**
  * Redirects the user to their default/first business dashboard.
