@@ -4,14 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { trackFunnelOnce } from '@/lib/funnel-tracking';
 
 /**
  * Redirects the user to their default/first business dashboard.
- * Gates:
- *  - must have selected a plan (profiles.has_selected_plan)
- *  - AND must have an active/trialing/past_due subscription (defence-in-depth
- *    against the legacy bug where /checkout/success flipped has_selected_plan
- *    without verifying payment).
+ *
+ * Gate: `profiles.has_selected_plan` must be true. New signups default to
+ * `true` (free tier is a valid selected plan), so the paywall only fires
+ * for pre-existing accounts flagged `false` from the legacy paid-only flow.
+ * We no longer require a live Stripe subscription here — free users are
+ * first-class.
  */
 export function BusinessRedirect() {
   const { user, loading: authLoading } = useAuth();
@@ -27,33 +29,6 @@ export function BusinessRedirect() {
         .select('has_selected_plan')
         .eq('id', user.id)
         .maybeSingle();
-
-      // Find a live subscription on the user OR any of their businesses.
-      const { data: memberships } = await supabase
-        .from('business_members')
-        .select('business_id')
-        .eq('user_id', user.id);
-      const businessIds = (memberships ?? []).map(m => m.business_id);
-
-      const liveStatuses = ['active', 'trialing', 'past_due'] as const;
-
-      const { data: userSubs } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('user_id', user.id)
-        .in('status', liveStatuses)
-        .limit(1);
-
-      let hasLiveSubscription = (userSubs?.length ?? 0) > 0;
-      if (!hasLiveSubscription && businessIds.length > 0) {
-        const { data: bizSubs } = await supabase
-          .from('subscriptions')
-          .select('id')
-          .in('business_id', businessIds)
-          .in('status', liveStatuses)
-          .limit(1);
-        hasLiveSubscription = (bizSubs?.length ?? 0) > 0;
-      }
 
       const { data: defaultMembership } = await supabase
         .from('business_members')
@@ -85,8 +60,7 @@ export function BusinessRedirect() {
       }
 
       return {
-        hasSelectedPlan: profile?.has_selected_plan ?? false,
-        hasLiveSubscription,
+        hasSelectedPlan: profile?.has_selected_plan ?? true,
         businessId,
         onboardingStep,
       };
@@ -97,20 +71,26 @@ export function BusinessRedirect() {
   useEffect(() => {
     if (authLoading || isLoading || !data) return;
 
-    // Require BOTH the flag and an actual live subscription.
-    if (!data.hasSelectedPlan || !data.hasLiveSubscription) {
+    // Only legacy accounts explicitly flagged `has_selected_plan = false`
+    // still get pushed to the pricing page.
+    if (!data.hasSelectedPlan) {
       navigate('/select-plan', { replace: true });
       return;
     }
 
     if (data.businessId) {
+      trackFunnelOnce('onboarding_free_plan_entered', `im_free_plan_entered_${user?.id ?? 'anon'}`, {
+        user_id: user?.id,
+        business_id: data.businessId,
+      });
       if (data.onboardingStep !== 'completed') {
         navigate(`/onboarding/${data.businessId}`, { replace: true });
         return;
       }
       navigate(`/b/${data.businessId}/dashboard`, { replace: true });
     } else {
-      navigate('/select-plan', { replace: true });
+      // No business yet — start them in onboarding on the free tier.
+      navigate('/onboarding', { replace: true });
     }
   }, [data, authLoading, isLoading, navigate]);
 

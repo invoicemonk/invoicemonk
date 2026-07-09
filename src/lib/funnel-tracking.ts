@@ -28,11 +28,14 @@ export type OnboardingEvent =
   | 'onboarding_dashboard_reached'
   | 'onboarding_first_invoice_created'
   | 'onboarding_activated'
+  | 'onboarding_free_plan_entered'
   | 'checkout_payment_failed'
   | 'checkout_payment_retried'
   | 'paid_intent_abandoned'
   | 'paid_intent_downgraded'
-  | 'paid_intent_resumed';
+  | 'paid_intent_resumed'
+  | 'upgrade_prompt_shown'
+  | 'upgrade_prompt_clicked';
 
 type EventProps = Record<string, string | number | boolean | null | undefined>;
 

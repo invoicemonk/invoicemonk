@@ -44,32 +44,9 @@ export default function OnboardingWizard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Gate: must have a live subscription. Catches the legacy bug where
-  // /checkout/success flipped has_selected_plan without verifying payment.
-  const { data: subscriptionGate, isLoading: loadingGate } = useQuery({
-    queryKey: ['onboarding-sub-gate', user?.id],
-    queryFn: async () => {
-      if (!user) return { ok: false };
-      const live = ['active', 'trialing', 'past_due'] as const;
-      const { data: userSubs } = await supabase
-        .from('subscriptions').select('id').eq('user_id', user.id).in('status', live).limit(1);
-      if ((userSubs?.length ?? 0) > 0) return { ok: true };
-      const { data: memberships } = await supabase
-        .from('business_members').select('business_id').eq('user_id', user.id);
-      const ids = (memberships ?? []).map(m => m.business_id);
-      if (ids.length === 0) return { ok: false };
-      const { data: bizSubs } = await supabase
-        .from('subscriptions').select('id').in('business_id', ids).in('status', live).limit(1);
-      return { ok: (bizSubs?.length ?? 0) > 0 };
-    },
-    enabled: !!user,
-  });
-
-  useEffect(() => {
-    if (!loadingGate && subscriptionGate && !subscriptionGate.ok) {
-      navigate('/select-plan', { replace: true });
-    }
-  }, [loadingGate, subscriptionGate, navigate]);
+  // Free tier is a valid starting plan — no subscription gate here.
+  // Upgrade prompts fire contextually when a user hits a paid-feature limit.
+  const loadingGate = false;
 
   // Load business (param or default first business)
   const { data: business, isLoading: loadingBusiness } = useQuery({
@@ -89,7 +66,7 @@ export default function OnboardingWizard() {
         .maybeSingle();
       return (m?.business as any) ?? null;
     },
-    enabled: !!user && subscriptionGate?.ok === true,
+    enabled: !!user,
   });
 
   const businessId = business?.id;
