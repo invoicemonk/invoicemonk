@@ -79,6 +79,10 @@ export function BusinessRedirect() {
     }
 
     if (data.businessId) {
+      trackFunnelOnce('onboarding_free_plan_entered', `im_free_plan_entered_${user?.id ?? 'anon'}`, {
+        user_id: user?.id,
+        business_id: data.businessId,
+      });
       if (data.onboardingStep !== 'completed') {
         navigate(`/onboarding/${data.businessId}`, { replace: true });
         return;
