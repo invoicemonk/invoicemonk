@@ -66,7 +66,7 @@ export default function OnboardingWizard() {
         .maybeSingle();
       return (m?.business as any) ?? null;
     },
-    enabled: !!user && subscriptionGate?.ok === true,
+    enabled: !!user,
   });
 
   const businessId = business?.id;
