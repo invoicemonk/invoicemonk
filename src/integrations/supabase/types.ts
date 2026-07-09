@@ -714,6 +714,48 @@ export type Database = {
         }
         Relationships: []
       }
+      conversion_events: {
+        Row: {
+          created_at: string
+          cta_variant: string | null
+          event_type: string
+          extra: Json | null
+          id: string
+          magnet: string | null
+          page_url: string | null
+          pillar_id: string | null
+          placement: string | null
+          session_id: string | null
+          slug: string | null
+        }
+        Insert: {
+          created_at?: string
+          cta_variant?: string | null
+          event_type: string
+          extra?: Json | null
+          id?: string
+          magnet?: string | null
+          page_url?: string | null
+          pillar_id?: string | null
+          placement?: string | null
+          session_id?: string | null
+          slug?: string | null
+        }
+        Update: {
+          created_at?: string
+          cta_variant?: string | null
+          event_type?: string
+          extra?: Json | null
+          id?: string
+          magnet?: string | null
+          page_url?: string | null
+          pillar_id?: string | null
+          placement?: string | null
+          session_id?: string | null
+          slug?: string | null
+        }
+        Relationships: []
+      }
       credit_notes: {
         Row: {
           amount: number
