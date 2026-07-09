@@ -96,7 +96,7 @@ const VerifyEmail = () => {
                 </div>
                 <h1 className="text-2xl font-bold text-foreground">Email verified!</h1>
                 <p className="text-muted-foreground">
-                  Your email has been verified. Redirecting you to select a plan...
+                  Your email has been verified. Taking you to your dashboard...
                 </p>
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
               </motion.div>
