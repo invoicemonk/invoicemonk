@@ -170,11 +170,17 @@ export default function PlanSelection() {
             className="h-12 mx-auto mb-6"
           />
           <h1 className="text-4xl font-bold tracking-tight mb-3">
-            Choose Your Plan
+            Upgrade your plan
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Pick a plan to start using InvoiceMonk. Cancel anytime.
+            You're on the Free plan — upgrade only when you hit a limit or need more features. Cancel anytime.
           </p>
+          <div className="mt-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+              ← Back to dashboard (stay on Free)
+            </Button>
+          </div>
+
         </motion.div>
 
         {pendingPaidTier && failedAttempts > 0 && (
