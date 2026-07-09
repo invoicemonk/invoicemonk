@@ -30,7 +30,7 @@ const VerifyEmail = () => {
         user_id: user.id,
       });
       setTimeout(() => {
-        navigate('/select-plan');
+        navigate('/dashboard');
       }, 2000);
     }
   }, [user, navigate]);
