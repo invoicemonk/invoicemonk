@@ -261,8 +261,9 @@ export default function OnboardingWizard() {
         }
         return null;
       case 4:
-        if (!business?.logo_url) return 'Please upload a logo before continuing.';
+        // Logo is optional — users can add or replace it later from Business Profile.
         return null;
+
       case 5: {
         const fields = form.paymentProviderType === 'bank_transfer'
           ? getBankTransferFields(form.currency)
