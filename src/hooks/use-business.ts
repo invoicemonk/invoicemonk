@@ -25,9 +25,10 @@ export function useUploadBusinessLogo() {
         throw new Error('File too large. Maximum size is 500KB.');
       }
 
-      // Create file path: userId/businessId/logo.extension
+      // Create file path: businessId/logo.extension (business-scoped for RLS)
       const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/${businessId}/logo.${fileExt}`;
+      const filePath = `${businessId}/logo.${fileExt}`;
+
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
