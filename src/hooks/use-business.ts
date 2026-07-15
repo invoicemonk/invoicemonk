@@ -66,7 +66,8 @@ export function useUploadBusinessLogo() {
       captureError(error, { hook: 'useUploadBusinessLogo' });
       toast({
         title: 'Error uploading logo',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
+
         variant: 'destructive',
       });
     },
