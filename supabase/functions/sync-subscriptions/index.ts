@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     const { data: staleSubscriptions, error: fetchError } = await supabase
       .from("subscriptions")
       .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, status, current_period_end, updated_at")
-      .in("status", ["active", "past_due"])
+      .in("status", ["active", "trialing", "past_due"])
       .not("tier", "in", "(starter,starter_paid)")
       .order("updated_at", { ascending: true })
       .limit(MAX_ROWS);
@@ -277,6 +277,15 @@ Deno.serve(async (req) => {
             console.log(`Renewed sub ${sub.id}, new period end: ${newPeriodEnd}`);
           }
         } else if (stripeSub.status === "past_due") {
+          // GUARD: before mirroring past_due, look for an active sibling on
+          // the same customer. If one exists, our row is tracking a stale sub
+          // (typical after a broken upgrade) — repoint instead of marking
+          // the customer past_due. This is exactly Rico's July 2026 case.
+          if (await tryRepointFromCustomer(sub)) {
+            repointed++;
+            synced++;
+            continue;
+          }
           // Keep tier during Stripe's retry grace window; just mirror status.
           if (sub.status !== "past_due") {
             await supabase

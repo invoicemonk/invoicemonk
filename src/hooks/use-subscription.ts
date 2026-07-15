@@ -57,7 +57,7 @@ export function useSubscription() {
         .from('subscriptions')
         .select('*')
         .eq('user_id', effectiveUserId)
-        .eq('status', 'active')
+        .in('status', ['active', 'trialing', 'past_due'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -81,7 +81,7 @@ export function useSubscription() {
         .from('subscriptions')
         .select('*')
         .in('business_id', businessIds)
-        .eq('status', 'active')
+        .in('status', ['active', 'trialing', 'past_due'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

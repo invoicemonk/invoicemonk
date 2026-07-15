@@ -16,6 +16,7 @@ import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
+import { SubscriptionRepairPanel } from '@/components/admin/SubscriptionRepairPanel';
 import { Link } from 'react-router-dom';
 import {
   BarChart,
@@ -241,6 +242,8 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <SubscriptionRepairPanel />
     </div>
   );
 }

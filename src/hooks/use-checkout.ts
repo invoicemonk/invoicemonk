@@ -21,14 +21,30 @@ export function useCheckout(options: UseCheckoutOptions = {}) {
   ) => {
     setIsLoading(true);
 
+    // Stable idempotency key per attempt. Regenerated only per call site, so a
+    // double click on the same button within the same async boundary reuses it.
+    const idempotency_key =
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { tier, billingPeriod, businessId },
+        body: { tier, billingPeriod, businessId, idempotency_key },
       });
 
       if (error) {
         const serverMsg = typeof data === 'object' && data?.error ? data.error : (error.message || 'Failed to create checkout session');
         throw new Error(serverMsg);
+      }
+
+      if (data?.changed_in_place) {
+        toast.success(data.message || `Switched to ${tier} plan`);
+        options.onSuccess?.();
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+        }
+        return;
       }
 
       if (data?.url) {

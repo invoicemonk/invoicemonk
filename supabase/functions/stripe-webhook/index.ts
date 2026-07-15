@@ -669,6 +669,66 @@ serve(async (req) => {
             break;
           }
 
+          // DUPLICATE-SUB GUARD: if this customer already has another live
+          // subscription on the same price (typical double-click or webhook
+          // race), cancel the newly-created one and skip DB updates. The
+          // customer keeps the existing sub and won't be charged twice going
+          // forward. The already-paid initial invoice becomes credit that
+          // support can apply via trial_end / balance transaction.
+          try {
+            const incomingPriceId = subscription.items?.data?.[0]?.price?.id;
+            const siblings = await stripe.subscriptions.list({
+              customer: session.customer as string,
+              status: "all",
+              limit: 20,
+            });
+            const livePeer = siblings.data.find((s) =>
+              s.id !== subscription.id &&
+              (s.status === "active" || s.status === "trialing") &&
+              s.items?.data?.[0]?.price?.id === incomingPriceId
+            );
+            if (livePeer) {
+              console.warn(
+                `[duplicate-guard] Customer ${session.customer} already has live sub ${livePeer.id} ` +
+                `on price ${incomingPriceId}. Cancelling newly-created duplicate ${subscription.id}.`
+              );
+              try {
+                await stripe.subscriptions.update(subscription.id, {
+                  metadata: {
+                    cancellation_reason: `duplicate_of_${livePeer.id}`,
+                    handled_by: "stripe-webhook_duplicate_guard",
+                  },
+                });
+                await stripe.subscriptions.cancel(subscription.id, {
+                  invoice_now: false,
+                  prorate: false,
+                });
+              } catch (cancelErr) {
+                console.error("[duplicate-guard] cancel failed:", (cancelErr as Error).message);
+                captureException(cancelErr, { function_name: 'stripe-webhook' });
+              }
+              try {
+                await supabase.rpc("log_audit_event", {
+                  _event_type: "SUBSCRIPTION_CHANGED",
+                  _entity_type: "subscription",
+                  _metadata: {
+                    source: "stripe-webhook",
+                    action: "duplicate_subscription_cancelled",
+                    kept: livePeer.id,
+                    cancelled: subscription.id,
+                    customer: session.customer,
+                    price: incomingPriceId,
+                  },
+                });
+              } catch (_) { /* ignore */ }
+              break;
+            }
+          } catch (guardErr) {
+            console.error("[duplicate-guard] lookup failed:", (guardErr as Error).message);
+            // Fail-open — better to process than to lose a legit upgrade.
+          }
+
+
           const userId = session.metadata?.user_id || subscription.metadata?.user_id;
           const businessId = session.metadata?.business_id || subscription.metadata?.business_id;
           const tier = session.metadata?.tier || subscription.metadata?.tier || "professional";

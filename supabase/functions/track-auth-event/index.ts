@@ -336,7 +336,7 @@ serve(async (req) => {
           .from("subscriptions")
           .select("tier")
           .eq("business_id", membership.business_id)
-          .eq("status", "active")
+          .in("status", ["active", "trialing", "past_due"])
           .maybeSingle()
       : { data: null };
 

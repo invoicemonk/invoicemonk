@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
     const { data: expiringSubscriptions, error: subError } = await supabase
       .from('subscriptions')
       .select('id, user_id, tier, current_period_end')
-      .eq('status', 'active')
+      .in('status', ['active', 'trialing'])
       .neq('tier', 'starter')
       .gte('current_period_end', oneDayFromNow)
       .lte('current_period_end', threeDaysFromNow)

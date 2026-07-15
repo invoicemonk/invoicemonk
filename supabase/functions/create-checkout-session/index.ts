@@ -45,7 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const { tier, billingPeriod = "monthly", businessId } = await req.json();
+    const { tier, billingPeriod = "monthly", businessId, idempotency_key: clientIdempotencyKey } = await req.json();
 
     // Validate tier
     const tierError = validateEnum(tier, 'tier', VALID_TIERS);
@@ -233,10 +233,70 @@ serve(async (req) => {
 
     const appUrl = Deno.env.get("APP_URL") || "https://app.invoicemonk.com";
 
-    // NOTE: Conflicting-currency cancellation is intentionally NOT done here.
-    // Cancelling existing subs before the new payment is confirmed leaves the
-    // customer with no live sub if checkout fails. The cleanup is now done
-    // in the stripe-webhook on checkout.session.completed (post-payment).
+    // UPGRADE-IN-PLACE: if this customer already has a live paid subscription
+    // (active/past_due/trialing) that is NOT already on the target price,
+    // update it in place instead of creating a second subscription via
+    // Checkout. This is the Stripe-recommended pattern for plan changes and
+    // eliminates the class of duplicate-subscription bugs where an upgrade
+    // silently leaves the old sub live alongside the new one.
+    try {
+      const existing = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 20,
+      });
+      const livePaid = existing.data.find(
+        (s) => s.status === "active" || s.status === "trialing" || s.status === "past_due",
+      );
+      if (livePaid) {
+        const currentItem = livePaid.items?.data?.[0];
+        if (currentItem && currentItem.price?.id !== priceId) {
+          const updated = await stripe.subscriptions.update(
+            livePaid.id,
+            {
+              items: [{ id: currentItem.id, price: priceId }],
+              proration_behavior: "always_invoice",
+              metadata: {
+                ...(livePaid.metadata || {}),
+                user_id: user.id,
+                business_id: targetBusinessId,
+                tier,
+                billing_period: billingPeriod,
+                pricing_region: finalPricing.country_code,
+                billing_currency: finalPricing.currency,
+                last_plan_change_at: new Date().toISOString(),
+              },
+            },
+            { idempotencyKey: `plan-change:${livePaid.id}:${priceId}` },
+          );
+          console.log(`[upgrade-in-place] sub ${livePaid.id} -> price ${priceId}`);
+          return new Response(
+            JSON.stringify({
+              changed_in_place: true,
+              subscription_id: updated.id,
+              tier,
+              redirect_url: `${appUrl}/billing?upgraded=1`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+          );
+        }
+        if (currentItem?.price?.id === priceId) {
+          return new Response(
+            JSON.stringify({
+              changed_in_place: true,
+              subscription_id: livePaid.id,
+              tier,
+              redirect_url: `${appUrl}/billing`,
+              message: "Already on this plan",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+          );
+        }
+      }
+    } catch (e) {
+      console.error("[upgrade-in-place] lookup/update failed, falling through to Checkout:", (e as Error).message);
+      // Fall through to normal Checkout so we never block a legit new purchase.
+    }
 
     // Defence-in-depth: stamp the paid intent server-side too, so a failed
     // checkout can always be recovered even if the client missed the write.
@@ -256,6 +316,17 @@ serve(async (req) => {
     } catch (e) {
       console.error("Failed to stamp paid intent:", e);
     }
+
+    // IDEMPOTENCY: a stable key over (user, tier, billing_period, minute)
+    // suppresses rapid double-submits (double click, retry after network hiccup)
+    // by making Stripe return the same session for repeated calls in the same
+    // minute. Client-supplied idempotency_key wins if provided.
+    const bodyForKey = { user: user.id, tier, billing_period: billingPeriod, business: targetBusinessId };
+    const minuteBucket = Math.floor(Date.now() / 60000);
+    const idempotencyKey =
+      (typeof clientIdempotencyKey === "string" && clientIdempotencyKey.length > 0)
+        ? `checkout-client:${clientIdempotencyKey}`
+        : `checkout:${bodyForKey.user}:${bodyForKey.business}:${tier}:${billingPeriod}:${minuteBucket}`;
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -285,7 +356,7 @@ serve(async (req) => {
         tier,
         billing_period: billingPeriod,
       },
-    });
+    }, { idempotencyKey });
 
     console.log("Checkout session created:", session.id);
 
