@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { captureError } from '@/lib/sentry';
+import { sanitizeErrorMessage } from '@/lib/error-utils';
+
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Business = Tables<'businesses'>;
