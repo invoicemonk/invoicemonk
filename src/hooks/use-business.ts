@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { captureError } from '@/lib/sentry';
+import { sanitizeErrorMessage } from '@/lib/error-utils';
+
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Business = Tables<'businesses'>;
@@ -25,9 +27,10 @@ export function useUploadBusinessLogo() {
         throw new Error('File too large. Maximum size is 500KB.');
       }
 
-      // Create file path: userId/businessId/logo.extension
+      // Create file path: businessId/logo.extension (business-scoped for RLS)
       const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/${businessId}/logo.${fileExt}`;
+      const filePath = `${businessId}/logo.${fileExt}`;
+
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -63,7 +66,8 @@ export function useUploadBusinessLogo() {
       captureError(error, { hook: 'useUploadBusinessLogo' });
       toast({
         title: 'Error uploading logo',
-        description: error.message,
+        description: sanitizeErrorMessage(error),
+
         variant: 'destructive',
       });
     },

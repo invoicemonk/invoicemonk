@@ -261,8 +261,9 @@ export default function OnboardingWizard() {
         }
         return null;
       case 4:
-        if (!business?.logo_url) return 'Please upload a logo before continuing.';
+        // Logo is optional — users can add or replace it later from Business Profile.
         return null;
+
       case 5: {
         const fields = form.paymentProviderType === 'bank_transfer'
           ? getBankTransferFields(form.currency)
@@ -629,7 +630,7 @@ function StepBranding({ form, setForm, logoUrl, onLogoFile, uploading }: any) {
         <StepHeader icon={ImageIcon} title="Branding" subtitle="Make every invoice look like yours." />
 
         <div className="space-y-3">
-          <Label>Business logo <span className="text-destructive">*</span></Label>
+          <Label>Business logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
           <div className="flex items-center gap-4">
             <div className="h-20 w-20 rounded-md border bg-muted/40 flex items-center justify-center overflow-hidden">
               {logoUrl
