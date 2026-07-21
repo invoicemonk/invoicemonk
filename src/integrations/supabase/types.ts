@@ -1050,6 +1050,8 @@ export type Database = {
           actor_role: string | null
           business_id: string | null
           export_type: string
+          file_path: string | null
+          file_url: string | null
           format: string
           id: string
           integrity_hash: string
@@ -1065,6 +1067,8 @@ export type Database = {
           actor_role?: string | null
           business_id?: string | null
           export_type: string
+          file_path?: string | null
+          file_url?: string | null
           format: string
           id?: string
           integrity_hash: string
@@ -1080,6 +1084,8 @@ export type Database = {
           actor_role?: string | null
           business_id?: string | null
           export_type?: string
+          file_path?: string | null
+          file_url?: string | null
           format?: string
           id?: string
           integrity_hash?: string
@@ -2755,8 +2761,11 @@ export type Database = {
           current_period_start: string | null
           id: string
           pricing_region: string | null
+          revenuecat_app_user_id: string | null
+          revenuecat_product_id: string | null
           starter_grace_expires_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
+          store: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           tier: Database["public"]["Enums"]["subscription_tier"]
@@ -2772,8 +2781,11 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
+          revenuecat_app_user_id?: string | null
+          revenuecat_product_id?: string | null
           starter_grace_expires_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
+          store?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           tier?: Database["public"]["Enums"]["subscription_tier"]
@@ -2789,8 +2801,11 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           pricing_region?: string | null
+          revenuecat_app_user_id?: string | null
+          revenuecat_product_id?: string | null
           starter_grace_expires_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
+          store?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           tier?: Database["public"]["Enums"]["subscription_tier"]
