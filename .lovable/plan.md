@@ -1,58 +1,98 @@
-## What actually happened (updated after checking Stripe)
+# Align Invoicemonk backend to the live mobile app contract
 
-Rico's Stripe customer `cus_U8TCXJm3KyLHQH` currently has **three live subscriptions**, which is the root of the mess:
+Goal: reconcile the shared Supabase backend to the literal contracts the already-shipped mobile app uses. Mobile calls cannot change, so backend must match names, request bodies, and response keys exactly.
+
+## Current state (verified this turn)
+
+- **Edge functions present**: `scan-document`, `send-invoice-email`, `send-receipt-email`, `generate-receipt-pdf`, `generate-report`, `generate-tax-report`, `export-records`, `verify-invoice`, `verify-receipt`, `view-invoice`, Stripe/Paystack, cron functions with `x-cron-secret`, `list-stripe-payments`.
+- **Missing functions the app calls**: `generate-export`, `export-user-data`, `revenuecat-webhook`. (`email-report` already exists but its request body differs from the app's contract.)
+- **Buckets**: `receipt-scans`, `verification-documents`, `payment-proofs`, `expense-receipts`, `expense-inbox`, `invoice-pdfs`, `receipt-pdfs`, `accounting-reports` all private. Only SELECT policies exist on `verification-documents` and `payment-proofs` for business members — INSERT/UPDATE/DELETE for owners are missing.
+- `**tier_limits**` seeded for `starter`, `starter_paid`, `professional`, `business`.
+- `**subscriptions**` has `user_id, business_id, tier, status, current_period_*, stripe_customer_id, stripe_subscription_id, pricing_region, billing_currency, starter_grace_expires_at`. No RevenueCat columns yet.
+- `**export_manifests**` columns: `id, export_type, actor_id, actor_email, actor_role, business_id, scope, record_count, integrity_hash, format, timestamp_utc, source_ip, user_agent` — no `file_url` yet (the app expects a retrievable URL).
+- `**scan-document**` already returns `{ job_id, status, extracted, confidence }`; the extracted schema uses `line_items[].amount` and includes a top-level `confidence` from the model — but no `field_confidence`, and prompt currently asks for `unit_price` (harmless — `amount` is present).
+
+## Contract diffs the app breaks on (must shim)
 
 
-| Stripe sub                     | Price  | Status       | Notes                                                                   |
-| ------------------------------ | ------ | ------------ | ----------------------------------------------------------------------- |
-| `sub_1TAUQyFQfE4jyFlFqddXkC6k` | $5/mo  | **past_due** | The original starter plan. Never cancelled when Rico upgraded.          |
-| `sub_1TqZCqFQfE4jyFlFVXDZj2Q8` | $15/mo | active       | Legit upgrade — invoice 0006 ($15, paid, 2026-07-05 12:18)              |
-| `sub_1TqZFlFQfE4jyFlFCbCm2Rzb` | $15/mo | active       | **Duplicate** — invoice 0007 ($15, paid, 2026-07-05 12:21, 3 min later) |
+| Function               | Current                                                                          | App expects                                                                                                              | Fix                                                                                                                                                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email-report`         | body: `{ report_title, report_data, recipient_email, format, year }`             | `{ business_id, currency_account_id, period, start_date, end_date, format, recipient_email }`                            | Rewrite handler: accept the new body, call the same code path as `generate-report`/`export-records` to produce data, then email it. Keep backward-compat by also accepting the old body when `report_title` is present.                                  |
+| `generate-export`      | does not exist                                                                   | `{ business_id, currency_account_id, period, start_date, end_date, format }` → `{ file_url, manifest_id, record_count }` | New function. Delegates to the same export logic as `export-records`, uploads the generated CSV/JSON to a new private `exports` bucket at `${businessId}/${manifestId}.${ext}`, returns a signed URL (24h) and writes a manifest row.                    |
+| `export-user-data`     | does not exist                                                                   | `{}` (JWT identifies user) → `{ file_url }`                                                                              | New function. Aggregates the caller's businesses, invoices, expenses, clients, vendors, receipts, notifications into one JSON bundle; uploads to `exports` bucket at `user/${userId}/gdpr-${ts}.json`; returns a signed URL and emails a copy via Brevo. |
+| `scan-document`        | `{ job_id, status, extracted, confidence }` with `extracted.line_items[].amount` | Same, plus `field_confidence: Record<string, number>`                                                                    | Ask the model to also emit `field_confidence`; if missing, synthesize `{}`. Keep response shape otherwise identical.                                                                                                                                     |
+| `generate-report`      | Returns per-report-type payload                                                  | Must also expose top-level `{ income, expenses, invoice_count, expense_count }` for the dashboard summary report         | Add `report_type: 'summary'` branch (or default when omitted) that returns those four keys directly on the response body. Leave existing report types unchanged.                                                                                         |
+| `generate-tax-report`  | Returns HTML/CSV                                                                 | Must expose `{ missing_tax_rate_count, missing_receipt_count, total_expense_count }` in JSON                             | Add a `format: 'json'` branch returning those three counts alongside existing HTML/CSV output. Default remains `print`.                                                                                                                                  |
+| `generate-receipt-pdf` | Returns `{ success, pdf }`                                                       | `{ base64 }` or `{ pdf }`                                                                                                | Response already has `pdf`; also mirror as `base64` for the mobile shape. Additive, no breaking change.                                                                                                                                                  |
+| `send-invoice-email`   | body allows extras                                                               | Must accept minimum `{ invoice_id, recipient_email, custom_message? }`                                                   | Verify current handler treats extra fields as optional — no code change if `additional_recipients` etc. are optional (they are).                                                                                                                         |
+| `send-receipt-email`   | body: `{ receipt_id, recipient_email, custom_message?, app_url? }`               | `{ receipt_id, recipient_email }`                                                                                        | Already compatible. No change.                                                                                                                                                                                                                           |
 
 
-Our `public.subscriptions` row for Rico still points at the old $5 sub (`sub_1TAUQyFQfE4jyFlFqddXkC6k`), so the app has been tracking the wrong subscription this whole time. When that $5 sub tried to renew this month (invoice 0008, $5, still open), the card wasn't charged the expected way and Stripe flipped it to `past_due`; our webhook mirrored that, and Rico sees "downgraded / payment issue" in the app.
+## Subscriptions write model (RevenueCat webhook)
 
-Meanwhile, Stripe has been quietly holding **two active $15 subs** on the same customer — Rico paid $15 twice on July 5. Per Rico, the intent was: keep the $15 plan, apply the second $15 to a future month so he shouldn't be charged again until after August. His payment history he wants credited is March $5, April $5, May $5, June $15, August $15.
+The mobile app reads `subscriptions` by `business_id`. Rules the webhook must follow:
 
-## Fix — Part A: Restore Rico's account (Stripe + DB)
+- **Owner-only.** Resolve `app_user_id` → `auth.uid()` → the single business where the user is an **owner** (`business_members.role = 'owner'`). RevenueCat purchases are individual App Store/Play accounts, so we bind to the user's owned business.
+- **Multi-owner tiebreak.** If the user owns more than one business, apply to the **oldest owned business** (`min(business_members.created_at)`). Log a `SUBSCRIPTION_AMBIGUOUS` audit_logs entry with all owner business_ids so support can reassign manually if needed.
+- **No owned business.** Reject the webhook with a 202 + audit log entry `SUBSCRIPTION_UNASSIGNED` (RevenueCat should not retry indefinitely). This covers members-only accounts that shouldn't be billing owners anyway.
+- Upsert on `(user_id, business_id)`; every row written has a non-null `business_id`.
 
-Nothing below runs until you approve; every write touches live money.
+### Ask: is the "oldest owned business" tiebreak acceptable? 
 
-1. **Void invoice `in_1Tsia4FQfE4jyFlFQByDQfo9**` (the open $5 renewal on the old sub). No card charge attempted.
-2. **Cancel `sub_1TAUQyFQfE4jyFlFqddXkC6k**` (the $5 sub) with `invoice_now=false`, `prorate=false`, metadata `{ cancellation_reason: "duplicate_of_15_plan", handled_by: "support_manual_fix" }`. This is the "deactivate the old $5 subscription" step you called out.
-3. **Cancel `sub_1TqZFlFQfE4jyFlFCbCm2Rzb**` (the duplicate $15 sub) with `invoice_now=false`, `prorate=false`, metadata `{ cancellation_reason: "duplicate_charge_of_sub_1TqZCqFQfE4jyFlFVXDZj2Q8", handled_by: "support_manual_fix" }`. We do **not** refund invoice 0007 — per Rico's request, keep the money on account as pre-paid coverage.
-4. **Move the surviving $15 sub `sub_1TqZCqFQfE4jyFlFVXDZj2Q8` forward so the next charge lands after August**, using Stripe's `trial_end` field on the subscription (`POST /v1/subscriptions/sub_1TqZCqFQfE4jyFlFVXDZj2Q8` with `trial_end = <unix ts for 2026-09-01 00:00 UTC>`, `proration_behavior = "none"`). Stripe won't invoice again until that trial_end. This is the accepted Stripe pattern for "give this customer N months of paid time without charging". Metadata: `{ reason: "credit_for_duplicate_15_charge_2026_07_05", covers: "July+August_2026" }`.
-  - Alternative if `trial_end` fights the current period: post the $15 as a **negative customer balance transaction** (`customers.createBalanceTransaction`, amount `-1500`, currency `usd`, description referencing invoice 0007). Stripe will auto-consume it on the next renewal. Same net effect; pick whichever Stripe accepts cleanly. I'll try `trial_end` first.
-5. **Repair our DB row** in `public.subscriptions` for id `b2430849-0fa3-48f0-9d90-3282eb988109`:
-  - `stripe_subscription_id = 'sub_1TqZCqFQfE4jyFlFVXDZj2Q8'`
-  - `status = 'active'`
-  - `tier = 'professional'` (unchanged)
-  - `current_period_end = <trial_end from step 4>`
-  - `updated_at = now()`
-  - Write an `audit_logs` row `event_type='SUBSCRIPTION_CHANGED', metadata={ action: 'manual_repair', reason: 'Old $5 sub cancelled; duplicate $15 sub cancelled; surviving $15 sub extended to cover July+August per customer request', old_stripe_subscription_id: 'sub_1TAUQyFQfE4jyFlFqddXkC6k', new_stripe_subscription_id: 'sub_1TqZCqFQfE4jyFlFVXDZj2Q8' }`. Same shape as the 2026-04-22 repair already in his audit trail.
-6. **Send Rico a short confirmation email** from support summarising: old $5 plan cancelled, one duplicate $15 charge kept as credit, next charge on/after 2026-09-01.
+If the app expects a different rule (e.g. the "active" business the user last opened), tell me now — this is the only ambiguous piece. **Yes, use the "oldest owned business" tiebreak. It's correct.**
 
-We will not touch the March/April/May $5 invoices — they're already paid and consumed.
+## Changes
 
-## Fix — Part B: Stop this class of bug from recurring
+### 1. Storage RLS (migration)
 
-Two distinct code bugs made this possible; both need fixing so we don't do this to another customer.
+Add business-membership INSERT/UPDATE/DELETE policies on `storage.objects` for `verification-documents`, `payment-proofs`, `expense-receipts`, `expense-inbox`, `receipt-scans` where missing. Path convention `${businessId}/…`. Create new private `exports` bucket with member-scoped SELECT policy.
 
-1. **Upgrades never cancelled the previous sub.** In `supabase/functions/create-checkout-session/index.ts` (and/or `manage-subscription/index.ts`), the upgrade flow creates a brand-new Stripe subscription instead of updating the existing one, and never cancels the old one. Fix: before creating a new sub for a customer, look up their existing active/past_due subs (`stripe.subscriptions.list({ customer, status: 'all' })`); if one exists, either (a) `subscriptions.update` in place with the new price and `proration_behavior='always_invoice'` — the correct pattern for plan changes — or (b) after the new sub is confirmed paid in `stripe-webhook`, cancel the old one with `prorate=true`. I'll go with (a) since it's the Stripe-recommended path and avoids the duplicate-charge window entirely.
-2. **Checkout has no idempotency, so a double click / retry creates a second sub.** Invoices 0006 and 0007 are 3 minutes apart with identical amount — that's a duplicate submit, not two intentional purchases. Fix in `create-checkout-session`: generate a stable idempotency key on the client (UUID stored on the button before the invoke fires) and pass it through as the `Idempotency-Key` header on the Stripe call. Same insert-first + no-op-on-23505 pattern noted earlier.
-3. `**stripe-webhook` should reject a `checkout.session.completed` for a customer who already has an active paid sub on the same price**, and instead cancel the newly-created duplicate and refund/credit. Belt-and-braces so a webhook race can't recreate the same bug.
-4. `**sync-subscriptions` guard**: before downgrading a `past_due` or `unpaid` sub, check whether the same customer has another active sub on a paid tier; if yes, repoint our row instead of cancelling. Extend the existing `tryRepointFromCustomer` helper in `supabase/functions/sync-subscriptions/index.ts` to also accept `active` siblings when the current row is `past_due`, not just when it's already `cancelled`. Had this guard existed, Rico's DB row would have auto-migrated to `sub_1TqZCqFQfE4jyFlFVXDZj2Q8` the first time the cron ran after July 5.
-5. **Backfill scan (read-only):** query for any other customer with two paid invoices of the same amount within 10 minutes over the last 90 days, and for any customer with more than one active Stripe subscription. Surface results to support — do not auto-fix.
+### 2. `revenuecat-webhook` (new function)
 
-## Technical notes
+- `verify_jwt = false`; validates `Authorization: Bearer $REVENUECAT_WEBHOOK_SECRET`.
+- Handles `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, `EXPIRATION`, `PRODUCT_CHANGE`, `BILLING_ISSUE`, `UNCANCELLATION`.
+- Resolves owner business (rule above), maps `product_id` → tier, upserts `subscriptions` with `user_id`, `business_id`, `tier`, `status`, `current_period_start/end`, `store`, `revenuecat_app_user_id`, `revenuecat_product_id`.
+- Add columns to `subscriptions`: `revenuecat_app_user_id text`, `revenuecat_product_id text`, `store text`.
+- Write `SUBSCRIPTION_UPDATED` audit log.
 
-- Relevant edge functions: `supabase/functions/create-checkout-session/index.ts`, `supabase/functions/manage-subscription/index.ts`, `supabase/functions/stripe-webhook/index.ts`, `supabase/functions/sync-subscriptions/index.ts`.
-- DB row to repair: `public.subscriptions.id = 'b2430849-0fa3-48f0-9d90-3282eb988109'`. Service-role write from an edge function; no RLS / migration change required.
-- No schema migration needed for Part A or Part B.
-- I will *not* run any Stripe writes or DB updates until you approve. Confirming this plan is the go-ahead for Part A.
+### 3. Missing function wrappers
 
-## Questions before I execute
+- `generate-export/index.ts`: JWT auth → membership check → run `export-records` logic → upload to `exports` bucket → insert `export_manifests` row → return `{ file_url (signed 24h), manifest_id, record_count, integrity_hash }`. Add `file_url text` column to `export_manifests`.
+- `export-user-data/index.ts`: JWT auth → build user bundle → upload to `exports/user/${userId}/…` → email link via Brevo → return `{ file_url }`.
+- Extract shared export logic from `export-records/index.ts` into `_shared/export-core.ts` so `generate-export` and `export-user-data` reuse it.
 
-1. Confirm the intended final state: one $15 subscription active, first charge no earlier than **2026-09-01**. If you want the next charge on a specific day in September (e.g. anniversary day 5), tell me and I'll set `trial_end` to that exact date. September.
-2. OK to keep the duplicate $15 as pre-paid credit (via `trial_end`) rather than refunding it to Rico's card? Pre-paid
-3. Ship Part B (upgrade-in-place + idempotency + webhook guard + sync-subscriptions guard) in the same change, or split into a follow-up? In the same change.
+### 4. Shims to existing functions
+
+- `email-report`: replace request handling to accept the app's contract; internally reuse `generate-report` / `export-records` logic. Keep old body shape supported for the web `EmailReportDialog` (detect by presence of `report_title`).
+- `scan-document`: append `"field_confidence": { <field>: 0-100 }` to both prompts; default to `{}` when the model omits it. Response gains `field_confidence`.
+- `generate-report`: add `summary` branch returning `{ income, expenses, invoice_count, expense_count }` at top-level (backwards compatible — existing branches untouched).
+- `generate-tax-report`: when `format === 'json'`, return `{ missing_tax_rate_count, missing_receipt_count, total_expense_count, currency, jurisdiction }` and skip HTML/CSV rendering.
+- `generate-receipt-pdf`: mirror `pdf` field as `base64` in the response (both keys present).
+
+### 5. `tier_limits` reconciliation
+
+Idempotent upsert to guarantee every key in the mobile brief exists for all four tiers.
+
+### 6. Secrets
+
+Request `REVENUECAT_WEBHOOK_SECRET` via `add_secret` after functions ship. `BREVO_API_KEY` already present.
+
+### 7. Docs
+
+Update `docs/mobile/BACKEND_CONTRACT.md` with the three new functions, the storage-path convention, and the subscriptions business-resolution rule.
+
+## Acceptance tests (Deno tests + curl-edge probes)
+
+1. **Storage**: authenticated business member can PUT `${businessId}/x.jpg` in `verification-documents` and `payment-proofs`; non-member gets 403.
+2. **Subscriptions**: RevenueCat sandbox INITIAL_PURCHASE flips `subscriptions.tier` for the buyer's owned business within one delivery; row has non-null `business_id`; second delivery is idempotent.
+3. **Scan hero flow**: POST a real receipt image path to `scan-document`; response `.extracted.vendor`, `.extracted.date`, `.extracted.total` are non-null and `.field_confidence` is an object.
+4. **Invoice email hero flow**: POST `send-invoice-email` for an issued invoice → response `success: true`; Brevo API returns 2xx; presentation-link points at the Brevo transactional log.
+5. **Export flow**: POST `generate-export` → response `file_url` downloads a non-empty CSV whose row count matches `record_count`; `export_manifests` row inserted.
+6. **GDPR export**: POST `export-user-data` → response `file_url` returns a JSON bundle containing the caller's businesses and invoices; email delivered.
+7. **Report shims**: `generate-report` with `{ report_type: 'summary' }` returns the four keys; `generate-tax-report` with `format: 'json'` returns the three counts.
+
+## Out of scope (P2 follow-up)
+
+- Confirming vocabularies for `notifications.type`, `account_status`, `verification_status`, `support_tickets.status`, `*_hash` fields, and the sign convention for `credit_notes.amount`.
+- No web UI changes.
+- No changes to Stripe/Paystack behaviour.
