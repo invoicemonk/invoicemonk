@@ -77,13 +77,33 @@ Deno.serve(async (req) => {
   if (!userRow?.user) return json(404, { error: 'User not found' });
   const userId = userRow.user.id;
 
-  const { data: memberships } = await admin
+  // Strict owner-scoping: only businesses the buyer OWNS may be upgraded by
+  // their in-app purchase. Staff/members must never flip a tier on a business
+  // they don't own. Tiebreak: oldest owned business by created_at.
+  const { data: ownedMemberships } = await admin
     .from('business_members')
     .select('business_id, created_at')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(1);
-  const businessId = memberships?.[0]?.business_id ?? null;
+    .eq('role', 'owner')
+    .order('created_at', { ascending: true });
+
+  const ownedCount = ownedMemberships?.length ?? 0;
+  const businessId = ownedCount > 0 ? ownedMemberships![0].business_id : null;
+
+  if (ownedCount === 0) {
+    // No owned business — do not attach the subscription to a membership-only
+    // business. Log and return 202 so RevenueCat doesn't retry forever.
+    console.warn(
+      `revenuecat-webhook SUBSCRIPTION_UNASSIGNED user=${userId} type=${type} product=${productId} — no owned business`
+    );
+    return json(202, { ok: true, unassigned: true, reason: 'no_owned_business' });
+  }
+
+  if (ownedCount > 1) {
+    console.warn(
+      `revenuecat-webhook SUBSCRIPTION_AMBIGUOUS user=${userId} owned=${ownedCount} chosen=${businessId} — using oldest owned business`
+    );
+  }
 
   const tier = tierFromProduct(productId);
   const currentPeriodEnd = expirationMs ? new Date(expirationMs).toISOString() : null;
