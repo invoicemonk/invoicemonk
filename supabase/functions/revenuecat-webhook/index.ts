@@ -80,7 +80,12 @@ Deno.serve(async (req) => {
   // app_user_id from RN is the Supabase auth user id. Resolve to their oldest
   // owned business — mobile assumption in BACKEND_CONTRACT.md.
   const { data: userRow } = await admin.auth.admin.getUserById(appUserId).catch(() => ({ data: null }));
-  if (!userRow?.user) return json(404, { error: 'User not found' });
+  if (!userRow?.user) {
+    console.warn(
+      `revenuecat-webhook SUBSCRIPTION_UNASSIGNED app_user_id=${appUserId} type=${type} — user not found (likely synthetic test event)`
+    );
+    return json(202, { ok: true, unassigned: true, reason: 'user_not_found' });
+  }
   const userId = userRow.user.id;
 
   // Strict owner-scoping: only businesses the buyer OWNS may be upgraded by
