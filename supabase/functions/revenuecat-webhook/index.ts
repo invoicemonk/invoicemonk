@@ -44,8 +44,14 @@ Deno.serve(async (req) => {
 
   // Shared-secret auth (RevenueCat "Authorization header")
   const auth = req.headers.get('Authorization') ?? '';
-  const provided = auth.replace(/^Bearer\s+/i, '');
+  const provided = auth.replace(/^Bearer\s+/i, '').trim();
   if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET) {
+    console.warn('revenuecat-webhook AUTH_FAIL', {
+      hasSecret: !!WEBHOOK_SECRET,
+      hasHeader: !!auth,
+      providedLen: provided.length,
+      expectedLen: WEBHOOK_SECRET.length,
+    });
     return json(401, { error: 'Invalid webhook secret' });
   }
 
