@@ -50,10 +50,17 @@ respond with ONLY valid JSON, no prose, matching this schema:
   "category": string | null,
   "line_items": [{ "description": string, "quantity": number, "unit_price": number, "amount": number }],
   "payment_method": string | null,
-  "confidence": number (0-100, your overall confidence)
+  "confidence": number (0-100, your overall confidence),
+  "field_confidence": {
+    "vendor": number, "date": number, "currency": number,
+    "subtotal": number, "tax": number, "total": number
+  }
 }
 
-If a field is unreadable use null. Numbers must be plain (no currency symbols).`;
+If a field is unreadable use null. Numbers must be plain (no currency symbols).
+"field_confidence" values are 0-100 and describe how sure you are of each
+specific field. Always include a field_confidence entry for every field you
+returned.`;
 
 const INVOICE_PROMPT = `You are an expert invoice scanner. Extract these
 fields from the attached invoice image and respond with ONLY valid JSON:
@@ -69,8 +76,16 @@ fields from the attached invoice image and respond with ONLY valid JSON:
   "total": number,
   "bill_to": { "name": string | null, "email": string | null, "address": string | null },
   "line_items": [{ "description": string, "quantity": number, "unit_price": number, "amount": number }],
-  "confidence": number (0-100)
-}`;
+  "confidence": number (0-100),
+  "field_confidence": {
+    "vendor": number, "invoice_number": number, "issue_date": number,
+    "due_date": number, "currency": number,
+    "subtotal": number, "tax": number, "total": number
+  }
+}
+
+"field_confidence" values are 0-100 per-field confidences. Always include an
+entry for every field you returned.`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {

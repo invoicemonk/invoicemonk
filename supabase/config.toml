@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.scan-document]
 verify_jwt = false
+
+[functions.revenuecat-webhook]
+verify_jwt = false
