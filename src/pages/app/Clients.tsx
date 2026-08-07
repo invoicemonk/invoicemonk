@@ -208,7 +208,7 @@ export default function Clients() {
           <CsvImportDialog importType="clients" />
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button data-tour="client-new">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Client
               </Button>

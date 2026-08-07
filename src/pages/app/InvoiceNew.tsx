@@ -847,7 +847,7 @@ export default function InvoiceNew() {
         {/* Main Form */}
         <div className="lg:col-span-2 space-y-6">
           {/* Client Selection */}
-          <Card>
+          <Card data-tour="invoice-form-client">
             <CardHeader>
               <CardTitle>Client Details</CardTitle>
               <CardDescription>Select or create a client for this invoice</CardDescription>
@@ -926,7 +926,7 @@ export default function InvoiceNew() {
           {/* Invoice Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Invoice Details</CardTitle>
+              <CardTitle data-tour="invoice-form-dates">Invoice Details</CardTitle>
               <CardDescription>Set invoice dates and terms</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1092,7 +1092,7 @@ export default function InvoiceNew() {
           {/* Line Items */}
           <Card>
             <CardHeader>
-              <CardTitle>Line Items</CardTitle>
+              <CardTitle data-tour="invoice-form-items">Line Items</CardTitle>
               <CardDescription>Add products or services to the invoice</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1290,7 +1290,7 @@ export default function InvoiceNew() {
 
         {/* Summary Sidebar */}
         <div className="space-y-6">
-          <Card className="sticky top-6">
+          <Card className="sticky top-6" data-tour="invoice-form-totals">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
@@ -1366,6 +1366,7 @@ export default function InvoiceNew() {
                 <Button 
                   variant="outline" 
                   className="w-full"
+                  data-tour="invoice-form-actions"
                   onClick={handleSaveDraft}
                   disabled={isLoading}
                 >

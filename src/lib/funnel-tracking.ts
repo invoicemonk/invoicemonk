@@ -35,7 +35,10 @@ export type OnboardingEvent =
   | 'paid_intent_downgraded'
   | 'paid_intent_resumed'
   | 'upgrade_prompt_shown'
-  | 'upgrade_prompt_clicked';
+  | 'upgrade_prompt_clicked'
+  | 'tour_started'
+  | 'tour_completed'
+  | 'tour_skipped';
 
 type EventProps = Record<string, string | number | boolean | null | undefined>;
 

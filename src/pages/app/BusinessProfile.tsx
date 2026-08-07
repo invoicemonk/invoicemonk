@@ -391,7 +391,7 @@ export default function BusinessProfile() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
+          <Tabs data-tour="settings-profile" value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
             <TabsList>
               <TabsTrigger value="profile" className="gap-1.5">
                 <SettingsIcon className="h-4 w-4" />

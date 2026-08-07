@@ -20,10 +20,12 @@ import {
   Package,
   Store,
   Inbox,
-  Upload
+  Upload,
+  Compass
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { markTawkUserOpened } from '@/lib/tawk-triggers';
+import { useTour } from '@/contexts/TourContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +64,10 @@ export function BusinessSidebar() {
   const isCollapsed = state === 'collapsed';
   
   const { isPartner } = usePartnerRole();
+  const { startTourForCurrentPage } = useTour();
+
+  const tourKey = (title: string) =>
+    `nav-${title.toLowerCase().replace(/&/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
   const baseUrl = `/b/${businessId}`;
 
@@ -121,8 +127,12 @@ export function BusinessSidebar() {
           />
         </Link>
         <div className="mt-3 space-y-2">
-          <BusinessSwitcher collapsed={isCollapsed} />
-          <CurrencyAccountSwitcher collapsed={isCollapsed} />
+          <div data-tour="business-switcher">
+            <BusinessSwitcher collapsed={isCollapsed} />
+          </div>
+          <div data-tour="currency-switcher">
+            <CurrencyAccountSwitcher collapsed={isCollapsed} />
+          </div>
         </div>
         {!isCollapsed && currentBusiness && (
           <div className="mt-2 flex items-center gap-2">
@@ -153,6 +163,7 @@ export function BusinessSidebar() {
                     asChild
                     isActive={isActive(item.url)}
                     tooltip={item.title}
+                    data-tour={tourKey(item.title)}
                   >
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4 shrink-0" />
@@ -177,6 +188,7 @@ export function BusinessSidebar() {
                     asChild
                     isActive={isActive(item.url)}
                     tooltip={item.title}
+                    data-tour={tourKey(item.title)}
                   >
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4 shrink-0" />
@@ -185,6 +197,16 @@ export function BusinessSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Product tour"
+                  onClick={startTourForCurrentPage}
+                  data-tour="product-tour"
+                >
+                  <Compass className="h-4 w-4 shrink-0" />
+                  <span className="group-data-[collapsible=icon]:hidden">Product tour</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Contact Support"

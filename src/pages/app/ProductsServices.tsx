@@ -106,7 +106,7 @@ export default function ProductsServices() {
             </p>
           </div>
         </div>
-        <Button onClick={handleAdd} disabled={!currentCurrencyAccount}>
+        <Button onClick={handleAdd} disabled={!currentCurrencyAccount} data-tour="product-new">
           <Plus className="h-4 w-4 mr-2" />
           Add {activeCurrency} Product or Service
         </Button>

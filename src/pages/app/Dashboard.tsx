@@ -269,7 +269,7 @@ export default function Dashboard() {
           {!isFirstVisit && (
             <>
               <Select value={dateRangePreset} onValueChange={(v) => setDateRangePreset(v as DateRangePreset)}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[140px]" data-tour="dashboard-range">
                   <CalendarIcon className="h-4 w-4 mr-2" />
                   <SelectValue />
                 </SelectTrigger>
@@ -415,7 +415,7 @@ export default function Dashboard() {
           </motion.div>
 
            {/* Stats Grid */}
-          <motion.div variants={item} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <motion.div variants={item} data-tour="dashboard-stats" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {statsCards.map((stat) => (
               <Card key={stat.title} className="relative overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -549,7 +549,7 @@ export default function Dashboard() {
           )}
 
           {/* Recent Invoices */}
-          <motion.div variants={item}>
+          <motion.div variants={item} data-tour="dashboard-recent">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>

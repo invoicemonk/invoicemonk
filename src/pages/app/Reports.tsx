@@ -119,7 +119,7 @@ export default function Reports() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={activeView} onValueChange={v => setActiveView(v as 'reports' | 'analytics')}>
+          <Tabs data-tour="reports-tabs" value={activeView} onValueChange={v => setActiveView(v as 'reports' | 'analytics')}>
             <TabsList>
               <TabsTrigger value="reports" className="gap-1.5">
                 <BarChart3 className="h-4 w-4" />

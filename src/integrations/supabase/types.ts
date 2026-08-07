@@ -3245,6 +3245,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_tour_progress: {
+        Row: {
+          created_at: string
+          id: string
+          last_step: number
+          status: string
+          tour_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_step?: number
+          status?: string
+          tour_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_step?: number
+          status?: string
+          tour_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       vendors: {
         Row: {
           address: Json | null

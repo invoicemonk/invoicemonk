@@ -355,7 +355,7 @@ export default function Invoices() {
           </p>
         </div>
         {topTab === 'invoices' && (
-          <Button asChild>
+          <Button asChild data-tour="invoice-new">
             <Link to={`/b/${currentBusiness?.id}/invoices/new`}>
               <Plus className="h-4 w-4 mr-2" />
               New Invoice
@@ -366,6 +366,7 @@ export default function Invoices() {
 
       {/* Top-level tabs: Invoices / Credit Notes */}
       <Tabs
+        data-tour="invoice-filters"
         value={topTab}
         onValueChange={(val) => {
           if (val === 'credit-notes') {

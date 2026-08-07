@@ -14,6 +14,8 @@ import { UpgradeModal } from './UpgradeModal';
 import { PaymentIssueBanner } from '@/components/billing/PaymentIssueBanner';
 import { StarterSunsetBanner } from '@/components/billing/StarterSunsetBanner';
 import { CurrencyResolver } from './CurrencyResolver';
+import { TourProvider } from '@/contexts/TourContext';
+import { WelcomeTourAutoStart } from '@/components/tours/WelcomeTourAutoStart';
 
 
 function BusinessLayoutContent() {
@@ -77,6 +79,8 @@ function BusinessLayoutContent() {
   return (
     <SubscriptionProvider>
       <CurrencyAccountProvider>
+        <TourProvider>
+        <WelcomeTourAutoStart />
         <SidebarProvider>
           <div className="min-h-screen flex w-full bg-background">
             <BusinessSidebar />
@@ -91,6 +95,7 @@ function BusinessLayoutContent() {
             </SidebarInset>
           </div>
         </SidebarProvider>
+        </TourProvider>
         <UpgradeModal />
       </CurrencyAccountProvider>
     </SubscriptionProvider>

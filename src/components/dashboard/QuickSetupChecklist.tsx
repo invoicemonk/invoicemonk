@@ -64,7 +64,7 @@ export function QuickSetupChecklist() {
   const milestoneMessage = getMilestoneMessage(completedCount, items.length);
 
   return (
-    <Card>
+    <Card data-tour="quick-setup">
       <CardHeader className="pb-3 flex flex-row items-start justify-between">
         <div className="space-y-1">
           <CardTitle className="flex items-center gap-2 text-lg">

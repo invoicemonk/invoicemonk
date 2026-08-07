@@ -10,6 +10,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
+import { TourLauncherMenu } from '@/components/tours/TourLauncherMenu';
 
 const routeTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -54,7 +55,10 @@ export function DashboardHeader() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <NotificationDropdown />
+      <TourLauncherMenu />
+      <div data-tour="notifications">
+        <NotificationDropdown />
+      </div>
     </header>
   );
 }
