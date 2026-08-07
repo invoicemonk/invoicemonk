@@ -21,21 +21,25 @@ There *is* a working Delete Business flow (Danger Zone with type-the-name confir
 ## The fix
 
 ### Create dialog
-- Add a **Currency** field. When a country is picked, auto-fill the currency from that country (and let the user override it). Fall back to USD if the country's currency isn't one we support.
+
+- Add a **Currency** field. When a country is picked, auto-fill the currency from that country (and let the user override it). Do not fall back to USD if the country's currency isn't one we support; instead, the user should get an error and should not be able to create the new business until the currency we support is selected.
 - Send the currency and the business type through on create, so the new business gets a real currency and its first currency account is created automatically.
 - Stop the silent dead-click: show inline "required" hints on the name and country fields, and keep the button enabled so the click produces a visible validation message instead of nothing.
 - Surface create failures as an error inside the dialog (currently the dialog just sits there).
 - Reset all dialog fields on close/success so a second attempt doesn't inherit stale values.
 
 ### Country selection reliability
+
 Replace the nested searchable-popover country picker in this dialog with the same pattern used elsewhere in the app for in-dialog selects, so a selected country reliably registers.
 
 ### Delete
+
 - Add a **Delete** action to each non-primary business row in the business switcher, opening the existing confirmation dialog.
 - Add a short line in the Danger Zone explaining when deletion is blocked (invoices, credit notes or receipts exist), so the error isn't a surprise.
 - Keep the existing rule that the primary business can never be deleted.
 
 ### Repair the businesses already created without a currency
+
 A one-off data fix for the businesses currently saved with an empty currency: set their currency from their country, and create their missing default currency account. This only touches businesses with no currency and no currency accounts.
 
 ## Technical notes
