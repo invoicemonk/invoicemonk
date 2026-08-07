@@ -268,7 +268,7 @@ export default function Team() {
         {canManageTeam && (
           <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button data-tour="team-invite">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Invite Member
               </Button>
@@ -348,7 +348,7 @@ export default function Team() {
       </Card>
 
       {/* Team Members List */}
-      <Card>
+      <Card data-tour="team-list">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -426,7 +426,7 @@ export default function Team() {
                         </div>
                       ) : null}
                       
-                      <Badge variant={getRoleBadgeVariant(member.role)} className="capitalize">
+                      <Badge data-tour="team-roles" variant={getRoleBadgeVariant(member.role)} className="capitalize">
                         {member.role}
                       </Badge>
                       

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,8 +52,19 @@ export function AddVendorDialog() {
     setOpen(false);
   };
 
+  const isDirty =
+    !createVendor.isPending &&
+    [name, email, phone, taxId, notes].some(v => v.trim() !== '');
+
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange: (next) => { setOpen(next); if (!next) reset(); },
+    onDiscard: reset,
+  });
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
+
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -125,7 +138,7 @@ export function AddVendorDialog() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim() || createVendor.isPending}>
@@ -135,6 +148,12 @@ export function AddVendorDialog() {
           </DialogFooter>
         </form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="vendor"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
   );
 }

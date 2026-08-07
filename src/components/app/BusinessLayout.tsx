@@ -16,6 +16,8 @@ import { StarterSunsetBanner } from '@/components/billing/StarterSunsetBanner';
 import { CurrencyResolver } from './CurrencyResolver';
 import { TourProvider } from '@/contexts/TourContext';
 import { WelcomeTourAutoStart } from '@/components/tours/WelcomeTourAutoStart';
+import { PageTourHint } from '@/components/tours/PageTourHint';
+
 
 
 function BusinessLayoutContent() {
@@ -89,9 +91,11 @@ function BusinessLayoutContent() {
               <DashboardHeader />
               <StarterSunsetBanner />
               <PaymentIssueBanner />
-              <main className="flex-1 p-6 overflow-auto">
+              <main className="flex-1 p-6 overflow-auto space-y-4">
+                <PageTourHint />
                 <Outlet />
               </main>
+
             </SidebarInset>
           </div>
         </SidebarProvider>

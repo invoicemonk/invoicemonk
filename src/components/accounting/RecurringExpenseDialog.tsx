@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Plus, RefreshCw } from 'lucide-react';
@@ -64,7 +66,7 @@ export function RecurringExpenseDialog() {
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -105,8 +107,14 @@ export function RecurringExpenseDialog() {
     setOpen(false);
   };
 
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange: (next) => { setOpen(next); },
+    onDiscard: () => { reset(); },
+  });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -216,7 +224,7 @@ export function RecurringExpenseDialog() {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={createRecurring.isPending || !currentCurrencyAccount}>
@@ -226,6 +234,12 @@ export function RecurringExpenseDialog() {
           </DialogFooter>
         </form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="recurring expense"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
   );
 }

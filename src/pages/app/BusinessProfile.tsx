@@ -393,21 +393,21 @@ export default function BusinessProfile() {
         <div className="flex items-center gap-2">
           <Tabs data-tour="settings-profile" value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
             <TabsList>
-              <TabsTrigger value="profile" className="gap-1.5">
+              <TabsTrigger value="profile" data-tour="settings-tab-profile" className="gap-1.5">
                 <SettingsIcon className="h-4 w-4" />
                 Profile
               </TabsTrigger>
               {showTeamTab && (
-                <TabsTrigger value="team" className="gap-1.5">
+                <TabsTrigger value="team" data-tour="settings-tab-team" className="gap-1.5">
                   <UserPlus className="h-4 w-4" />
                   Team
                 </TabsTrigger>
               )}
-              <TabsTrigger value="billing" className="gap-1.5">
+              <TabsTrigger value="billing" data-tour="settings-tab-billing" className="gap-1.5">
                 <CreditCard className="h-4 w-4" />
                 Billing
               </TabsTrigger>
-              <TabsTrigger value="audit-logs" className="gap-1.5">
+              <TabsTrigger value="audit-logs" data-tour="settings-tab-audit" className="gap-1.5">
                 <History className="h-4 w-4" />
                 Audit Logs
               </TabsTrigger>
@@ -430,7 +430,7 @@ export default function BusinessProfile() {
         </Suspense>
       ) : (
       <>
-      <Button onClick={handleSave} disabled={isLoading} className="w-fit">
+      <Button data-tour="settings-save" onClick={handleSave} disabled={isLoading} className="w-fit">
         {isLoading ? (
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
         ) : (
@@ -452,7 +452,7 @@ export default function BusinessProfile() {
 
       {/* Compliance Notice - only show when profile is incomplete */}
       {!profileCompletion.isComplete && (
-        <Card className="bg-amber-500/5 border-amber-500/20">
+        <Card data-tour="settings-completion" className="bg-amber-500/5 border-amber-500/20">
           <CardContent className="flex flex-col gap-4 py-4">
             <div className="flex items-start gap-4">
               <Shield className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
@@ -623,7 +623,7 @@ export default function BusinessProfile() {
         </Card>
 
         {/* Business Identity */}
-        <Card>
+        <Card data-tour="settings-identity">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
@@ -882,7 +882,7 @@ export default function BusinessProfile() {
         </Card>
 
         {/* Contact Information */}
-        <Card>
+        <Card data-tour="settings-address">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -998,7 +998,7 @@ export default function BusinessProfile() {
         </Card>
 
         {/* Invoice Settings */}
-        <Card className="lg:col-span-2">
+        <Card data-tour="settings-invoicing" className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -1184,7 +1184,9 @@ export default function BusinessProfile() {
 
       {/* Business Verification Documents */}
       {business && (
-        <VerificationDocumentsSection business={business} />
+        <div data-tour="settings-verification">
+          <VerificationDocumentsSection business={business} />
+        </div>
       )}
 
       {/* Online Payments */}
@@ -1194,16 +1196,18 @@ export default function BusinessProfile() {
 
       {/* Manual Payment Instructions */}
       {business && (
-        <PaymentMethodsSection
-          businessId={business.id}
-          canManage={true}
-          canDelete={true}
-        />
+        <div data-tour="settings-payments">
+          <PaymentMethodsSection
+            businessId={business.id}
+            canManage={true}
+            canDelete={true}
+          />
+        </div>
       )}
 
       {/* Danger Zone — only for non-default businesses */}
       {business && !business.is_default && (
-        <Card className="border-destructive/30">
+        <Card data-tour="settings-danger" className="border-destructive/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />

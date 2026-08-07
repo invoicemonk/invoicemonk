@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { UnsavedChangesGuard } from '@/components/common/UnsavedChangesGuard';
 import { INPUT_LIMITS, combineLineItemDescription, splitLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
@@ -706,15 +707,34 @@ export default function InvoiceNew() {
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
 
+  // Baseline for unsaved-changes detection (accounts for auto-prefilled sample data)
+  const baselineItemsRef = useRef<string>(JSON.stringify(items));
+  useEffect(() => {
+    if (prefillApplied || duplicationApplied) {
+      baselineItemsRef.current = JSON.stringify(items);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillApplied, duplicationApplied]);
+
+  const hasUnsavedChanges =
+    !isLoading &&
+    (!!selectedClientId ||
+      notes.trim() !== '' ||
+      terms.trim() !== '' ||
+      summary.trim() !== '' ||
+      JSON.stringify(items) !== baselineItemsRef.current);
+
   // Invoice limit is now checked dynamically at issue time using checkTierLimit
 
   return (
+
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header */}
+      <UnsavedChangesGuard when={hasUnsavedChanges} entity="invoice" />
+
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />

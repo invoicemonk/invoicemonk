@@ -139,7 +139,7 @@ export default function Reports() {
       ) : (
         <div className="space-y-6">
           {/* Year selector */}
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2" data-tour="reports-range">
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-[120px]">
                 <Calendar className="h-4 w-4 mr-2" />
@@ -256,6 +256,7 @@ export default function Reports() {
                           </Button>
                         )}
                         <Button
+                          data-tour="reports-export"
                           variant="outline"
                           size="sm"
                           onClick={() => handleGenerateReport(report.id, 'csv')}

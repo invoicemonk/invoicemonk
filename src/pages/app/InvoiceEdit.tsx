@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { UnsavedChangesGuard } from '@/components/common/UnsavedChangesGuard';
 import { INPUT_LIMITS, combineLineItemDescription, splitLineItemDescription } from '@/lib/input-limits';
 import { getBusinessProfileMissingFields } from '@/lib/business-profile-guard';
 import { motion } from 'framer-motion';
@@ -456,8 +457,29 @@ export default function InvoiceEdit() {
     }
   };
 
-
   const isLoading = updateInvoice.isPending || issueInvoice.isPending;
+
+  // Unsaved-changes detection: snapshot the form once it is hydrated from the invoice
+  const formSnapshot = JSON.stringify({
+    selectedClientId,
+    issueDate,
+    dueDate,
+    notes,
+    terms,
+    summary,
+    items,
+  });
+  const baselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isInitialized && baselineRef.current === null) {
+      baselineRef.current = formSnapshot;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized]);
+  const hasUnsavedChanges =
+    !isLoading && baselineRef.current !== null && baselineRef.current !== formSnapshot;
+
+
 
   if (invoiceLoading) {
     return (
@@ -487,6 +509,7 @@ export default function InvoiceEdit() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
+      <UnsavedChangesGuard when={hasUnsavedChanges} entity="invoice" />
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate(`/invoices/${id}`)}>

@@ -19,6 +19,7 @@ import {
   getTour,
   tourForPath,
   type TourDefinition,
+  type TourStep,
 } from '@/lib/tours/registry';
 import { useSaveTourProgress, useTourProgress } from '@/hooks/use-tour-progress';
 
@@ -63,6 +64,18 @@ function waitForElement(selector: string, timeoutMs = 2500): Promise<boolean> {
   });
 }
 
+/** Click a selector if it exists — used by `beforeStep` helpers in the registry. */
+export function clickSelector(selector: string) {
+  const el = document.querySelector<HTMLElement>(selector);
+  el?.click();
+}
+
+const INTERACTIVE_HINT: Record<NonNullable<TourStep['advanceOn']>['type'], string> = {
+  click: 'Go ahead and click it — the tour continues automatically.',
+  input: 'Fill this in — the tour continues automatically.',
+  appear: 'The tour continues as soon as it shows up.',
+};
+
 export function TourProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,6 +86,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
   const driverRef = useRef<Driver | null>(null);
   const lastIndexRef = useRef(0);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const pendingRef = useRef<string | null>(null);
 
@@ -86,19 +100,18 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const runTour = useCallback(
     async (tour: TourDefinition) => {
       // Drop steps whose target isn't on the page so the tour never
-      // highlights nothing or stalls on a plan-gated card.
-      const resolved: { element?: string; popover: { title: string; description: string } }[] = [];
+      // highlights nothing or stalls on a plan-gated card. Steps that open
+      // something themselves (`beforeStep`) or wait for the user
+      // (`advanceOn`) are always kept — their target appears later.
+      const resolved: TourStep[] = [];
       for (const [index, step] of tour.steps.entries()) {
-        if (step.element) {
+        if (step.element && !step.beforeStep && !step.advanceOn) {
           // Only the first couple of steps are worth waiting for; later ones
           // should already be rendered.
           const present = await waitForElement(step.element, index === 0 ? 2500 : 300);
           if (!present) continue;
         }
-        resolved.push({
-          element: step.element,
-          popover: { title: step.title, description: step.description },
-        });
+        resolved.push(step);
       }
 
       if (resolved.length === 0) {
@@ -114,6 +127,105 @@ export function TourProvider({ children }: { children: ReactNode }) {
       lastIndexRef.current = 0;
       trackFunnel('tour_started', { tour_id: tour.id });
 
+      const detach = () => {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+      };
+
+      /** Prepare step `index` (run its opener, wait for its element). */
+      const prepare = async (index: number) => {
+        const step = resolved[index];
+        if (!step) return;
+        try {
+          await step.beforeStep?.();
+        } catch {
+          /* opening a tab/dialog is best effort */
+        }
+        if (step.element) {
+          await waitForElement(step.element, step.beforeStep || step.advanceOn ? 4000 : 500);
+        }
+      };
+
+      const goNext = async (index: number) => {
+        detach();
+        const nextIndex = index + 1;
+        if (nextIndex >= resolved.length) {
+          driverRef.current?.destroy();
+          return;
+        }
+        await prepare(nextIndex);
+        driverRef.current?.moveNext();
+      };
+
+      const goPrev = async (index: number) => {
+        detach();
+        const prevIndex = index - 1;
+        if (prevIndex < 0) return;
+        await prepare(prevIndex);
+        driverRef.current?.movePrevious();
+      };
+
+      /** Wire up the user action that auto-advances an interactive step. */
+      const attachAdvance = (index: number) => {
+        const step = resolved[index];
+        if (!step?.advanceOn) return;
+        const { type, selector } = step.advanceOn;
+        const target = selector ?? step.element;
+        if (!target) return;
+
+        let done = false;
+        const fire = () => {
+          if (done) return;
+          done = true;
+          window.setTimeout(() => void goNext(index), 350);
+        };
+
+        if (type === 'appear') {
+          void waitForElement(target, 120000).then((found) => {
+            if (found) fire();
+          });
+          cleanupRef.current = () => {
+            done = true;
+          };
+          return;
+        }
+
+        const handler = (event: Event) => {
+          const node = event.target as HTMLElement | null;
+          if (!node?.closest) return;
+          if (!node.closest(target)) return;
+          if (type === 'input') {
+            const value = (node as HTMLInputElement).value;
+            if (typeof value === 'string' && value.trim() === '') return;
+          }
+          fire();
+        };
+
+        const events = type === 'click' ? ['click'] : ['input', 'change'];
+        events.forEach((name) => document.addEventListener(name, handler, true));
+        cleanupRef.current = () => {
+          done = true;
+          events.forEach((name) => document.removeEventListener(name, handler, true));
+        };
+      };
+
+      const steps = resolved.map((step, index) => ({
+        element: step.element,
+        popover: {
+          title: step.title,
+          description: step.advanceOn
+            ? `${step.description}<span class="im-tour-hint">${INTERACTIVE_HINT[step.advanceOn.type]}</span>`
+            : step.description,
+          nextBtnText: step.advanceOn
+            ? 'Skip step'
+            : index === resolved.length - 1
+              ? 'Done'
+              : 'Next',
+          onNextClick: () => void goNext(index),
+          onPrevClick: () => void goPrev(index),
+        },
+      }));
+
       const instance = driver({
         showProgress: true,
         allowClose: true,
@@ -125,13 +237,17 @@ export function TourProvider({ children }: { children: ReactNode }) {
         prevBtnText: 'Back',
         doneBtnText: 'Done',
         progressText: 'Step {{current}} of {{total}}',
-        steps: resolved,
+        steps,
         onHighlighted: () => {
           // getActiveIndex() is only readable while the tour is alive, so we
           // mirror it here — after destroy() it returns undefined.
-          lastIndexRef.current = instance.getActiveIndex() ?? lastIndexRef.current;
+          const index = instance.getActiveIndex() ?? lastIndexRef.current;
+          lastIndexRef.current = index;
+          detach();
+          attachAdvance(index);
         },
         onDestroyed: () => {
+          detach();
           const activeIndex = lastIndexRef.current;
           const completed = activeIndex >= resolved.length - 1;
 
@@ -156,6 +272,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
       });
 
       driverRef.current = instance;
+      await prepare(0);
       instance.drive();
     },
     [saveProgress],
@@ -204,6 +321,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
       driverRef.current?.destroy();
       driverRef.current = null;
     };

@@ -117,7 +117,7 @@ export default function Receivables() {
       </motion.div>
 
       {/* Summary KPIs */}
-      <motion.div variants={item} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <motion.div variants={item} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-tour="receivables-summary">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Outstanding</p>
@@ -157,7 +157,7 @@ export default function Receivables() {
 
       {/* Aging Breakdown */}
       <motion.div variants={item}>
-        <Card>
+        <Card data-tour="receivables-table">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Clock className="h-5 w-5 text-primary" />

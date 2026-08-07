@@ -124,15 +124,18 @@ export default function Expenses() {
               Import
             </Button>
           } />
-          <ExpenseForm />
+          <div data-tour="expense-new">
+            <ExpenseForm />
+          </div>
         </div>
       </div>
 
       {/* Filters Row */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3" data-tour="expense-filters">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            data-tour="expense-search"
             placeholder="Search expenses..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -172,7 +175,7 @@ export default function Expenses() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2" data-tour="expense-summary">
         <MoneyFlowCard
           title={categoryFilter !== 'all' || searchQuery ? 'Filtered Expenses' : 'Total Expenses'}
           amount={filteredTotal}
@@ -233,7 +236,7 @@ export default function Expenses() {
       {!isLoading && !hasExpenses ? (
         <ExpenseEmptyState />
       ) : (
-        <Card>
+        <Card data-tour="expense-table">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>

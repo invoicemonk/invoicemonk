@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
@@ -74,7 +76,7 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
     watch,
     setValue,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -165,8 +167,14 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
   const saveLabel = type === 'product' ? 'Save Product' : 'Save Service';
   const currency = currentCurrencyAccount?.currency || '—';
 
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange: (next) => { onOpenChange(next); },
+    onDiscard: () => { reset(); },
+  });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
@@ -340,7 +348,7 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
@@ -350,6 +358,12 @@ export function ProductServiceDialog({ open, onOpenChange, editItem }: Props) {
           </DialogFooter>
         </form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="item"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
   );
 }

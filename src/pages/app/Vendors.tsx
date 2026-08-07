@@ -204,14 +204,17 @@ export default function Vendors() {
         </div>
         <div className="flex items-center gap-3">
           <AccountingPeriodSelector value={period} onChange={setPeriod} />
-          <AddVendorDialog />
+          <div data-tour="vendor-new">
+            <AddVendorDialog />
+          </div>
         </div>
       </div>
 
-      <Card>
+      <Card data-tour="vendor-table">
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <CardTitle>All Vendors</CardTitle>
           <Input
+            data-tour="vendor-search"
             placeholder="Search vendors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -20,6 +20,15 @@ export function TourLauncherMenu() {
 
   const pageTours = tours.filter((t) => t.id !== WELCOME_TOUR_ID);
 
+  const groups = Object.entries(
+    pageTours.reduce<Record<string, typeof pageTours>>((acc, tour) => {
+      const group = tour.group ?? 'Other';
+      (acc[group] ||= []).push(tour);
+      return acc;
+    }, {}),
+  );
+
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -45,26 +54,31 @@ export function TourLauncherMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          All tours
-        </DropdownMenuLabel>
-        <div className="max-h-72 overflow-y-auto">
-          {pageTours.map((tour) => (
-            <DropdownMenuItem
-              key={tour.id}
-              onClick={() => startTour(tour.id)}
-              className="flex items-start gap-2"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{tour.label}</p>
-                <p className="text-xs text-muted-foreground truncate">{tour.description}</p>
-              </div>
-              {hasSeen(tour.id) && (
-                <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-              )}
-            </DropdownMenuItem>
+        <div className="max-h-96 overflow-y-auto">
+          {groups.map(([group, groupTours]) => (
+            <div key={group}>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                {group}
+              </DropdownMenuLabel>
+              {groupTours.map((tour) => (
+                <DropdownMenuItem
+                  key={tour.id}
+                  onClick={() => startTour(tour.id)}
+                  className="flex items-start gap-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{tour.label}</p>
+                    <p className="text-xs text-muted-foreground truncate">{tour.description}</p>
+                  </div>
+                  {hasSeen(tour.id) && (
+                    <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </div>
           ))}
         </div>
+
       </DropdownMenuContent>
     </DropdownMenu>
   );

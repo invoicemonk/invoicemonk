@@ -194,6 +194,7 @@ export default function ExpenseInbox() {
 
       {/* Drop zone */}
       <Card
+        data-tour="inbox-upload"
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
@@ -301,7 +302,7 @@ export default function ExpenseInbox() {
               <Button size="sm" variant="ghost" onClick={handleBulkReject} disabled={reject.isPending}>
                 <X className="h-4 w-4 mr-1" /> Reject selected
               </Button>
-              <Button size="sm" onClick={handleBulkApprove} disabled={bulkApprove.isPending}>
+              <Button data-tour="inbox-review" size="sm" onClick={handleBulkApprove} disabled={bulkApprove.isPending}>
                 {bulkApprove.isPending ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 ) : (
@@ -325,7 +326,7 @@ export default function ExpenseInbox() {
           <p>No {tab} items.</p>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="inbox-list">
           {filtered.map((item) => (
             <InboxItemCard
               key={item.id}

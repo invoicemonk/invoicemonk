@@ -264,6 +264,7 @@ export default function Clients() {
                 </Label>
                 <Input
                   id="name"
+                  data-tour="client-form-name"
                   placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
@@ -297,7 +298,7 @@ export default function Clients() {
                   Client Location
                 </Label>
                 <Select value={clientCountry} onValueChange={setClientCountry}>
-                  <SelectTrigger>
+                  <SelectTrigger data-tour="client-form-country">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
@@ -352,6 +353,7 @@ export default function Clients() {
                   <Label htmlFor="tax_id">{jurisdictionConfig.clientTaxIdLabel}</Label>
                     <Input
                       id="tax_id"
+                      data-tour="client-form-tax"
                       placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
                       value={newClient.tax_id}
                       onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
@@ -397,7 +399,7 @@ export default function Clients() {
               {/* Address Section */}
               <Collapsible open={showAddress} onOpenChange={setShowAddress} className="space-y-2 pt-2 border-t">
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                  <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent" data-tour="client-form-address">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       Address (Optional)
@@ -481,6 +483,7 @@ export default function Clients() {
               <Button 
                 onClick={handleAddClient} 
                 disabled={!validation.valid || createClient.isPending}
+                data-tour="client-form-save"
               >
                 {createClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Add Client
@@ -497,6 +500,7 @@ export default function Clients() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              data-tour="client-search"
               placeholder="Search clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -547,7 +551,7 @@ export default function Clients() {
 
       {/* Client List */}
       {!isLoading && !error && filteredClients.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-tour="client-list">
           {filteredClients.map((client) => (
             <Card key={client.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
@@ -567,7 +571,7 @@ export default function Clients() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" data-tour="client-row-actions">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

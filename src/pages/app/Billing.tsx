@@ -145,7 +145,7 @@ export default function Billing() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour="billing-plan">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
@@ -358,7 +358,7 @@ export default function Billing() {
         </div>
       </div>
 
-      <Card>
+      <Card data-tour="billing-history">
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
             <CardTitle>Billing Management</CardTitle>

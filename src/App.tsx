@@ -3,7 +3,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  Route,
+  Navigate,
+  Outlet,
+  createBrowserRouter,
+  createRoutesFromElements,
+  RouterProvider,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -196,19 +203,21 @@ function TawkIdentityProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ImpersonationProvider>
-      <TawkIdentityProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <TawkTo />
-        <BrowserRouter>
-          <AnalyticsProvider>
-          <TawkTriggersProvider>
-          <Routes>
+// Root layout: hosts app-wide providers that need router context
+function RootLayout() {
+  return (
+    <AnalyticsProvider>
+      <TawkTriggersProvider>
+        <Outlet />
+      </TawkTriggersProvider>
+    </AnalyticsProvider>
+  );
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<RootLayout />}>
+
           {/* Root redirect - authenticated users go to dashboard, others to login */}
           <Route path="/" element={<RootRedirect />} />
           
@@ -429,15 +438,25 @@ const App = () => (
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
-          </TawkTriggersProvider>
-          </AnalyticsProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-      </TawkIdentityProvider>
+    </Route>
+  )
+);
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <ImpersonationProvider>
+        <TawkIdentityProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <TawkTo />
+            <RouterProvider router={router} />
+          </TooltipProvider>
+        </TawkIdentityProvider>
       </ImpersonationProvider>
-  </AuthProvider>
-</QueryClientProvider>
+    </AuthProvider>
+  </QueryClientProvider>
 );
 
 export default App;

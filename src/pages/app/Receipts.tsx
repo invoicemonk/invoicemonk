@@ -184,6 +184,7 @@ export default function Receipts() {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                data-tour="receipt-search"
                 placeholder="Search receipts..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -210,7 +211,7 @@ export default function Receipts() {
               <p className="text-sm text-muted-foreground mb-4">
                 The following payments don't have receipts. Click "Generate" to create them.
               </p>
-              <Table>
+              <Table data-tour="receipt-pending">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice</TableHead>
@@ -262,7 +263,7 @@ export default function Receipts() {
               </Table>
             </div>
           ) : (
-            <Table>
+            <Table data-tour="receipt-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Receipt #</TableHead>
@@ -307,7 +308,7 @@ export default function Receipts() {
                       {formatDate(receipt.issued_at)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1" data-tour="receipt-row-actions">
                         <Button 
                           variant="ghost" 
                           size="icon" 

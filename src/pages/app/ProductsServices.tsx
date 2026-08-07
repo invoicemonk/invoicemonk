@@ -117,6 +117,7 @@ export default function ProductsServices() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            data-tour="product-search"
             placeholder="Search by name, SKU, or category..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -124,7 +125,7 @@ export default function ProductsServices() {
           />
         </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" data-tour="product-filters">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -146,7 +147,7 @@ export default function ProductsServices() {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card data-tour="product-table">
         {isLoading ? (
           <CardContent className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />

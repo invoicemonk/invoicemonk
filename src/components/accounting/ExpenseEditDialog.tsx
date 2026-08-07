@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -56,7 +58,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
   );
 
   const {
-    register, handleSubmit, setValue, watch, reset, formState: { errors },
+    register, handleSubmit, setValue, watch, reset, formState: { errors, isDirty },
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
@@ -127,8 +129,14 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
       </Badge>
     ) : null;
 
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange: (next) => { onOpenChange(next); },
+    onDiscard: () => { reset(); },
+  });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
@@ -221,7 +229,7 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={updateExpense.isPending}>
               {updateExpense.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
@@ -229,6 +237,12 @@ export function ExpenseEditDialog({ expense, open, onOpenChange, onSuccess }: Pr
           </DialogFooter>
         </form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="expense"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
   );
 }

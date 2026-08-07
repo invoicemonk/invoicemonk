@@ -381,7 +381,7 @@ export default function Invoices() {
             <FileText className="h-4 w-4" />
             Invoices
           </TabsTrigger>
-          <TabsTrigger value="credit-notes" className="gap-1.5">
+          <TabsTrigger value="credit-notes" className="gap-1.5" data-tour="invoice-credit-notes-tab">
             <FileX className="h-4 w-4" />
             Credit Notes
           </TabsTrigger>
@@ -396,6 +396,7 @@ export default function Invoices() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                data-tour="invoice-search"
                 placeholder="Search invoices..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -406,7 +407,7 @@ export default function Invoices() {
             
             <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" data-tour="invoice-filter-button">
                   <Filter className="h-4 w-4" />
                   Filters
                   {hasActiveFilters && (
@@ -580,7 +581,7 @@ export default function Invoices() {
             {/* Export Button */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2" disabled={isExporting}>
+                <Button variant="outline" className="gap-2" disabled={isExporting} data-tour="invoice-export">
                   {isExporting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -623,7 +624,7 @@ export default function Invoices() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4">
-          <Card>
+          <Card data-tour="invoice-table">
             {isLoading ? (
               <CardContent className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

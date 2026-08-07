@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Plus, Sparkles } from 'lucide-react';
@@ -54,7 +56,7 @@ export function ExpenseForm({ onSuccess }: Props) {
   );
 
   const {
-    register, handleSubmit, setValue, watch, reset, formState: { errors },
+    register, handleSubmit, setValue, watch, reset, formState: { errors, isDirty },
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
@@ -114,8 +116,14 @@ export function ExpenseForm({ onSuccess }: Props) {
       </Badge>
     ) : null;
 
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange: (next) => { setOpen(next); },
+    onDiscard: () => { reset(); },
+  });
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setAiFilledFields(new Set()); setCurrencyMismatch(null); } }}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
       <DialogTrigger asChild>
         <Button><Plus className="h-4 w-4 mr-2" />Add Expense</Button>
       </DialogTrigger>
@@ -140,7 +148,7 @@ export function ExpenseForm({ onSuccess }: Props) {
             <div className="space-y-2">
               <Label htmlFor="category" className="flex items-center">Category *<AiBadge field="category" /></Label>
               <Select value={category} onValueChange={(v) => setValue('category', v)}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectTrigger data-tour="expense-form-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
                   {EXPENSE_CATEGORIES.map((cat) => (
                     <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
@@ -152,13 +160,13 @@ export function ExpenseForm({ onSuccess }: Props) {
 
             <div className="space-y-2">
               <Label htmlFor="amount" className="flex items-center">Amount ({activeCurrency}) *<AiBadge field="amount" /></Label>
-              <Input id="amount" type="number" step="0.01" placeholder="0.00" {...register('amount', { valueAsNumber: true })} />
+              <Input id="amount" data-tour="expense-form-amount" type="number" step="0.01" placeholder="0.00" {...register('amount', { valueAsNumber: true })} />
               {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="expenseDate" className="flex items-center">Date<AiBadge field="expenseDate" /></Label>
-              <Input id="expenseDate" type="date" {...register('expenseDate')} />
+              <Input id="expenseDate" data-tour="expense-form-date" type="date" {...register('expenseDate')} />
             </div>
 
             <div className="space-y-2">
@@ -168,14 +176,16 @@ export function ExpenseForm({ onSuccess }: Props) {
 
             <div className="space-y-2">
               <Label className="flex items-center">Vendor / Supplier<AiBadge field="vendor" /></Label>
-              <VendorPicker
-                value={watch('vendor')}
-                vendorId={watch('vendorId')}
-                onChange={({ vendor_id, vendor }) => {
-                  setValue('vendor', vendor);
-                  setValue('vendorId', vendor_id);
-                }}
-              />
+              <div data-tour="expense-form-vendor">
+                <VendorPicker
+                  value={watch('vendor')}
+                  vendorId={watch('vendorId')}
+                  onChange={({ vendor_id, vendor }) => {
+                    setValue('vendor', vendor);
+                    setValue('vendorId', vendor_id);
+                  }}
+                />
+              </div>
             </div>
 
             {products.filter(p => p.isActive).length > 0 && (
@@ -201,25 +211,33 @@ export function ExpenseForm({ onSuccess }: Props) {
 
             <div className="space-y-2">
               <Label>Receipt</Label>
-              <ReceiptUpload
-                value={receiptUrl}
-                onChange={(path) => setValue('receiptUrl', path)}
-                onScanComplete={handleScanComplete}
-                businessCurrency={activeCurrency}
-                businessJurisdiction={business?.jurisdiction || ''}
-              />
+              <div data-tour="expense-form-receipt">
+                <ReceiptUpload
+                  value={receiptUrl}
+                  onChange={(path) => setValue('receiptUrl', path)}
+                  onScanComplete={handleScanComplete}
+                  businessCurrency={activeCurrency}
+                  businessJurisdiction={business?.jurisdiction || ''}
+                />
+              </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={createExpense.isPending || !currentCurrencyAccount}>
+            <Button type="button" variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>Cancel</Button>
+            <Button type="submit" data-tour="expense-form-save" disabled={createExpense.isPending || !currentCurrencyAccount}>
               {createExpense.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Expense
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="expense"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
   );
 }

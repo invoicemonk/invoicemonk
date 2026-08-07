@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { stripUrls } from '@/lib/utils';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import {
@@ -155,8 +157,23 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
   const fieldError = (field: string) =>
     touched[field] ? validation.errors[field] : undefined;
 
+  // Unsaved-changes guard (ignores the auto-filled country field)
+  const isDirty =
+    !createClient.isPending &&
+    ([newClient.name, newClient.email, newClient.phone, newClient.tax_id, newClient.cac_number,
+      newClient.contact_person, newClient.notes].some(v => (v || '').trim() !== '') ||
+      [newClient.address.street, newClient.address.city, newClient.address.state,
+        newClient.address.postal_code].some(v => (v || '').trim() !== ''));
+
+  const closeGuard = useDialogCloseGuard({
+    isDirty,
+    onOpenChange,
+    onDiscard: () => setNewClient({ ...EMPTY_CLIENT }),
+  });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={closeGuard.handleOpenChange}>
+
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
@@ -211,6 +228,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
             </Label>
             <Input
               id="dialog-name"
+              data-tour="client-form-name"
               placeholder={newClient.client_type === 'company' ? 'Acme Corporation Ltd.' : 'John Doe'}
               value={newClient.name}
               onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
@@ -244,7 +262,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               Client Location *
             </Label>
             <Select value={clientCountry} onValueChange={setClientCountry}>
-              <SelectTrigger>
+              <SelectTrigger data-tour="client-form-country">
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
               <SelectContent>
@@ -263,6 +281,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               <Label htmlFor="dialog-email">Email *</Label>
               <Input
                 id="dialog-email"
+                data-tour="client-form-email"
                 type="email"
                 placeholder="client@example.com"
                 value={newClient.email}
@@ -307,6 +326,7 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
               </Label>
               <Input
                 id="dialog-tax_id"
+                data-tour="client-form-tax"
                 placeholder={jurisdictionConfig.clientTaxIdPlaceholder}
                 value={newClient.tax_id}
                 onChange={(e) => setNewClient({ ...newClient, tax_id: e.target.value })}
@@ -439,10 +459,11 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           </Collapsible>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => closeGuard.handleOpenChange(false)}>
             Cancel
           </Button>
           <Button
+            data-tour="client-form-save"
             onClick={handleAddClient}
             disabled={!validation.valid || createClient.isPending}
           >
@@ -451,6 +472,13 @@ export function AddClientDialog({ open, onOpenChange, onClientCreated }: AddClie
           </Button>
         </DialogFooter>
       </DialogContent>
+      <UnsavedChangesDialog
+        open={closeGuard.confirmOpen}
+        entity="client"
+        onKeepEditing={closeGuard.keepEditing}
+        onDiscard={closeGuard.discard}
+      />
     </Dialog>
+
   );
 }

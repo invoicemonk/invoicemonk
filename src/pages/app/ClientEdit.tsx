@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { UnsavedChangesGuard } from '@/components/common/UnsavedChangesGuard';
 import { stripUrls } from '@/lib/utils';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
@@ -149,7 +150,26 @@ export default function ClientEdit() {
     navigate(`/clients/${id}`);
   };
 
+  // Unsaved-changes detection: baseline captured once the client data hydrates
+  const formSnapshot = JSON.stringify(formData);
+  const baselineRef = useRef<string | null>(null);
+  const isHydrated =
+    !!client &&
+    formData.name === (client.name || '') &&
+    (clientCountry === 'OTHER' || formData.address.country === jurisdictionConfig.countryName);
+  useEffect(() => {
+    if (isHydrated && baselineRef.current === null) {
+      baselineRef.current = formSnapshot;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated, formSnapshot]);
+  const hasUnsavedChanges =
+    !updateClient.isPending &&
+    baselineRef.current !== null &&
+    baselineRef.current !== formSnapshot;
+
   if (clientLoading) {
+
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -180,6 +200,7 @@ export default function ClientEdit() {
   return (
     <BusinessAccessGuard businessId={client.business_id} resourceType="client">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <UnsavedChangesGuard when={hasUnsavedChanges} entity="client" />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
