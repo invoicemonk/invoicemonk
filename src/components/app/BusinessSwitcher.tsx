@@ -51,7 +51,7 @@ const tierLabels: Record<SubscriptionTier, string> = {
   business: 'Business',
 };
 
-const SUPPORTED_CURRENCY_CODES = new Set(ALL_CURRENCIES.map((c) => c.value));
+const SUPPORTED_CURRENCY_CODES = new Set<string>(ALL_CURRENCIES.map((c) => c.value as string));
 
 /** Returns the country's ISO currency if InvoiceMonk supports it, otherwise null. */
 function supportedCurrencyForCountry(countryCode: string): string | null {
