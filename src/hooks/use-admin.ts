@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { captureError } from '@/lib/sentry';
 import { Database } from '@/integrations/supabase/types';
 import { useCallback, useEffect, useRef } from 'react';
+import { requireFreshSession } from '@/lib/session-guard';
 
 type AuditEventType = Database['public']['Enums']['audit_event_type'];
 type SubscriptionStatus = Database['public']['Enums']['subscription_status'];
@@ -325,11 +326,15 @@ export function useAdminRevenueStats(startDate: Date, endDate: Date) {
     queryFn: async (): Promise<AdminRevenueStats> => {
       const startIso = startDate.toISOString();
       const endIso = endDate.toISOString();
+      // This endpoint exposes platform-wide financial data, so force a refresh
+      // to reject locally cached tokens whose server session was revoked.
+      const session = await requireFreshSession('admin-revenue-stats', undefined, true);
 
       // Call edge function that resolves each subscription's actual billed amount via Stripe
       // (with pricing_regions fallback). This avoids the legacy-vs-current price hardcoding bug.
       const { data, error } = await supabase.functions.invoke('admin-revenue-stats', {
         body: { startIso, endIso },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
 
@@ -362,6 +367,7 @@ export function useAdminRevenueStats(startDate: Date, endDate: Date) {
       };
     },
     staleTime: 60_000,
+    retry: false,
   });
 }
 

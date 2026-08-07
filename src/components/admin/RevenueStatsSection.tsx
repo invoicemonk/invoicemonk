@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subMonths, subQuarters } from 'date-fns';
-import { CalendarIcon, DollarSign, TrendingUp, Users, Activity } from 'lucide-react';
+import { CalendarIcon, DollarSign, TrendingUp, Users, Activity, AlertCircle } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
@@ -65,7 +65,7 @@ export function RevenueStatsSection() {
   const startDate = range?.from ?? startOfMonth(new Date());
   const endDate = range?.to ?? endOfMonth(new Date());
 
-  const { data, isLoading } = useAdminRevenueStats(startDate, endDate);
+  const { data, isLoading, isError, refetch, isFetching } = useAdminRevenueStats(startDate, endDate);
 
   const rangeLabel = useMemo(() => {
     if (!range?.from) return 'Pick a date range';
@@ -156,6 +156,17 @@ export function RevenueStatsSection() {
         </Popover>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isError && (
+          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Your session could not be verified. Sign in again if retrying does not resolve it.</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              Retry
+            </Button>
+          </div>
+        )}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {cards.map((c) => (
             <Card key={c.title}>

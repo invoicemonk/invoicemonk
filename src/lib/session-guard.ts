@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { captureError } from '@/lib/sentry';
 import * as Sentry from '@sentry/react';
@@ -21,10 +22,11 @@ export class SessionExpiredError extends Error {
  * @param context short label used for diagnostics (e.g. 'create-business')
  * @param expectedUserId the in-memory user id, logged when it disagrees
  */
-export async function requireFreshUserId(
+export async function requireFreshSession(
   context: string,
   expectedUserId?: string | null,
-): Promise<string> {
+  forceRefresh = false,
+): Promise<Session> {
   const { data: { session } } = await supabase.auth.getSession();
 
   const expiresAt = session?.expires_at ? session.expires_at * 1000 : null;
@@ -45,7 +47,7 @@ export async function requireFreshUserId(
     },
   });
 
-  const needsRefresh = !session || (secondsToExpiry !== null && secondsToExpiry < 60);
+  const needsRefresh = forceRefresh || !session || (secondsToExpiry !== null && secondsToExpiry < 60);
 
   if (needsRefresh) {
     const { data: refreshed, error } = await supabase.auth.refreshSession();
@@ -56,9 +58,17 @@ export async function requireFreshUserId(
       });
       throw new SessionExpiredError();
     }
-    return refreshed.session.user.id;
+    return refreshed.session;
   }
 
   if (!session.user) throw new SessionExpiredError();
+  return session;
+}
+
+export async function requireFreshUserId(
+  context: string,
+  expectedUserId?: string | null,
+): Promise<string> {
+  const session = await requireFreshSession(context, expectedUserId);
   return session.user.id;
 }

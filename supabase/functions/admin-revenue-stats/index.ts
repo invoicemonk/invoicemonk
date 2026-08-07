@@ -63,27 +63,31 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const authHeader = req.headers.get("Authorization") || "";
-    if (!authHeader) {
+    if (!authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const token = authHeader.replace("Bearer ", "").trim();
 
-    // Verify caller is admin
+    // Verify caller via JWT claims (works with signing keys; does not depend on
+    // a live session row, which 403s "Session not found" after sign-out/refresh).
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub as string | undefined;
+    if (claimsErr || !userId) {
       return new Response(JSON.stringify({ error: "Invalid auth" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const admin = createClient(supabaseUrl, serviceRoleKey);
     const { data: isAdmin } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
+      _user_id: userId,
       _role: "platform_admin",
     });
+
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
