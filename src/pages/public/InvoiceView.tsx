@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import invoicemonkLogo from "@/assets/invoicemonk-logo.png";
 import InvoicemonkCTA from "@/components/public/InvoicemonkCTA";
+import { LogoImage } from '@/components/common/LogoImage';
 
 interface InvoiceItem {
   id: string;
@@ -394,13 +395,11 @@ const InvoiceView = () => {
                 <div className="flex flex-col md:flex-row justify-between gap-6">
                   {/* Issuer Info */}
                   <div className="flex items-start gap-4">
-                    {invoice.issuer_snapshot?.logo_url && (
-                      <img
-                        src={invoice.issuer_snapshot.logo_url}
-                        alt="Business Logo"
-                        className="h-16 w-16 object-contain rounded-lg border border-border"
-                      />
-                    )}
+                    <LogoImage
+                      src={invoice.issuer_snapshot?.logo_url}
+                      alt="Business Logo"
+                      className="h-16 w-16 object-contain rounded-lg border border-border"
+                    />
                     <div>
                       <h1 className="text-2xl font-bold">
                         {invoice.issuer_snapshot?.legal_name ||

@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { Tables } from '@/integrations/supabase/types';
 import { useParentDepositInvoice } from '@/hooks/use-parent-deposit-invoice';
 import { splitLineItemDescription } from '@/lib/input-limits';
+import { LogoImage } from '@/components/common/LogoImage';
 
 type Invoice = Tables<'invoices'> & {
   clients?: Tables<'clients'> | null;
@@ -564,10 +565,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
           <div className="px-8 py-6" style={{ backgroundColor: primaryColor }}>
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
-                {layout.show_logo && displayIssuer?.logo_url && (
-                  <img 
-                    src={displayIssuer.logo_url} 
-                    alt="Logo" 
+                {layout.show_logo && (
+                  <LogoImage
+                    src={displayIssuer?.logo_url}
+                    alt="Logo"
                     className="h-14 w-auto max-w-[100px] object-contain rounded bg-white/90 p-1.5"
                   />
                 )}
@@ -683,10 +684,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
         <div className="relative z-10 p-8 space-y-6">
           {/* Formal letterhead: double border, centered logo + business name */}
           <div className="text-center pb-6 border-t-2 border-b-2 pt-6" style={{ borderColor: primaryColor }}>
-            {layout.show_logo && displayIssuer?.logo_url && (
-              <img 
-                src={displayIssuer.logo_url} 
-                alt="Logo" 
+            {layout.show_logo && (
+              <LogoImage
+                src={displayIssuer?.logo_url}
+                alt="Logo"
                 className="h-16 w-auto mx-auto mb-3 object-contain"
               />
             )}
@@ -813,10 +814,10 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
         <CardHeader className="pb-6">
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
-              {layout.show_logo && displayIssuer?.logo_url && (
-                <img 
-                  src={displayIssuer.logo_url} 
-                  alt="Business Logo" 
+              {layout.show_logo && (
+                <LogoImage
+                  src={displayIssuer?.logo_url}
+                  alt="Business Logo"
                   className="h-16 w-auto max-w-[120px] object-contain"
                 />
               )}

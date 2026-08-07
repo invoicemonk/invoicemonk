@@ -5,6 +5,8 @@ import { toast } from '@/hooks/use-toast';
 import { captureError } from '@/lib/sentry';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
 import { requireFreshUserId, SessionExpiredError } from '@/lib/session-guard';
+import { prepareLogoFile } from '@/lib/logo-image';
+
 
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
@@ -19,45 +21,73 @@ export function useUploadBusinessLogo() {
     mutationFn: async ({ businessId, file }: { businessId: string; file: File }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Validate file
-      const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Please upload a PNG, JPEG, SVG, or WebP image.');
-      }
-      if (file.size > 500 * 1024) {
-        throw new Error('File too large. Maximum size is 500KB.');
-      }
+      // Resolve a live user id first: a stale in-memory user makes the storage
+      // write reach the server without a valid token, which comes back as a raw
+      // row-level-security error.
+      const authedUserId = await requireFreshUserId('upload-business-logo', user.id);
 
-      // Create file path: businessId/logo.extension (business-scoped for RLS)
-      const fileExt = file.name.split('.').pop();
+      // Downscales oversized images instead of rejecting them.
+      const uploadFile = await prepareLogoFile(file);
+
+      const extByType: Record<string, string> = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/svg+xml': 'svg',
+        'image/webp': 'webp',
+      };
+      const fileExt = extByType[uploadFile.type] ?? 'png';
+      // Business-scoped path — the storage access rule reads the first folder
+      // segment as the business id.
       const filePath = `${businessId}/logo.${fileExt}`;
 
+      // Clear anything already stored for this business — including the exact
+      // target path. Replace-in-place (`upsert`) fails when a storage record
+      // exists whose underlying file is gone, so we always upload into an empty
+      // slot instead of relying on it.
+      const { data: existing, error: listError } = await supabase.storage
+        .from('business-logos')
+        .list(businessId);
+
+      if (listError) throw await describeLogoUploadError(listError, businessId, authedUserId);
+
+      const toRemove = new Set<string>([filePath, ...(existing ?? []).map((f) => `${businessId}/${f.name}`)]);
+      const { error: removeError } = await supabase.storage
+        .from('business-logos')
+        .remove([...toRemove]);
+      // A removal failure is not fatal on its own (the object may simply not
+      // exist), but it must not be silent.
+      if (removeError) {
+        captureError(removeError, { hook: 'useUploadBusinessLogo', stage: 'cleanup', businessId });
+      }
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('business-logos')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, uploadFile, { upsert: true, contentType: uploadFile.type });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) throw await describeLogoUploadError(uploadError, businessId, authedUserId, 'storage-upload');
 
-      // Get public URL
+      // Get public URL (cache-busted so replacements show up immediately)
       const { data: { publicUrl } } = supabase.storage
         .from('business-logos')
         .getPublicUrl(filePath);
+      const versionedUrl = `${publicUrl}?v=${Date.now()}`;
 
       // Update business with logo URL
       const { error: updateError } = await supabase
         .from('businesses')
-        .update({ logo_url: publicUrl })
+        .update({ logo_url: versionedUrl })
         .eq('id', businessId);
 
-      if (updateError) throw updateError;
+      if (updateError) throw await describeLogoUploadError(updateError, businessId, authedUserId, 'business-update');
 
-      return publicUrl;
+      return versionedUrl;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-business'] });
       queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
+      queryClient.invalidateQueries({ queryKey: ['user-organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['user-businesses-fallback'] });
       toast({
         title: 'Logo uploaded',
         description: 'Your business logo has been updated.',
@@ -66,14 +96,67 @@ export function useUploadBusinessLogo() {
     onError: (error) => {
       captureError(error, { hook: 'useUploadBusinessLogo' });
       toast({
-        title: 'Error uploading logo',
+        // Only the session guard itself can tell us the session is gone; a
+        // server-side policy rejection never means that.
+        title: error instanceof SessionExpiredError ? 'Session expired' : "Logo couldn't be uploaded",
         description: sanitizeErrorMessage(error),
-
         variant: 'destructive',
       });
     },
   });
 }
+
+/**
+ * Turns a raw storage/database rejection into something a business owner can
+ * act on, while keeping the exact technical detail in diagnostics.
+ */
+async function describeLogoUploadError(
+  error: { message?: string },
+  businessId: string,
+  userId: string,
+  stage = 'unknown',
+): Promise<Error> {
+  const raw = error?.message ?? '';
+
+  const { data: membership } = await supabase
+    .from('business_members')
+    .select('role, accepted_at')
+    .eq('business_id', businessId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  captureError(error, {
+    hook: 'useUploadBusinessLogo',
+    stage,
+    businessId,
+    userId,
+    raw,
+    membershipRole: String(membership?.role ?? 'none'),
+    membershipAccepted: String(!!membership?.accepted_at),
+  });
+
+
+  if (/row-level security|not authorized|permission|violates/i.test(raw)) {
+    if (!membership || !membership.accepted_at) {
+      return new Error(
+        "You don't have access to this business, so its logo can't be changed. Ask the business owner to invite you, then try again.",
+      );
+    }
+    if (!['owner', 'admin'].includes(membership.role as string)) {
+      return new Error('Only an owner or admin of this business can change its logo.');
+    }
+    return new Error(
+      "We couldn't save the logo — the storage service rejected the request. We've logged the details; please try again, and contact support if it keeps happening.",
+    );
+  }
+
+  if (/exceeded the maximum allowed size|payload too large/i.test(raw)) {
+    return new Error('That image is too large to store. Please upload a smaller logo.');
+  }
+
+  return error instanceof Error ? error : new Error(raw || 'Logo upload failed.');
+}
+
 
 // Delete business logo
 export function useDeleteBusinessLogo() {
@@ -84,20 +167,20 @@ export function useDeleteBusinessLogo() {
     mutationFn: async (businessId: string) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Get current business to find the logo path
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('logo_url')
-        .eq('id', businessId)
-        .single();
+      await requireFreshUserId('delete-business-logo', user.id);
 
-      if (business?.logo_url) {
-        // Extract path from URL and delete from storage
-        const url = new URL(business.logo_url);
-        const path = url.pathname.split('/storage/v1/object/public/business-logos/')[1];
-        if (path) {
-          await supabase.storage.from('business-logos').remove([path]);
-        }
+      // Remove every object stored under this business's folder
+      const { data: existing, error: listError } = await supabase.storage
+        .from('business-logos')
+        .list(businessId);
+
+      if (listError) throw listError;
+
+      if (existing?.length) {
+        const { error: removeError } = await supabase.storage
+          .from('business-logos')
+          .remove(existing.map((f) => `${businessId}/${f.name}`));
+        if (removeError) throw removeError;
       }
 
       // Clear logo URL in database
@@ -119,13 +202,14 @@ export function useDeleteBusinessLogo() {
     onError: (error) => {
       captureError(error, { hook: 'useDeleteBusinessLogo' });
       toast({
-        title: 'Error removing logo',
-        description: error.message,
+        title: "Logo couldn't be removed",
+        description: sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },
   });
 }
+
 
 // Fetch the current user's business (via business_members)
 // Prioritizes the default business

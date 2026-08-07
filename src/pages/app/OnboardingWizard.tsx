@@ -644,7 +644,7 @@ function StepBranding({ form, setForm, logoUrl, onLogoFile, uploading }: any) {
                 {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
                 {logoUrl ? 'Replace logo' : 'Upload logo'}
               </Button>
-              <p className="text-xs text-muted-foreground">PNG, JPEG, SVG, or WebP. Max 500KB.</p>
+              <p className="text-xs text-muted-foreground">PNG, JPEG, SVG, or WebP up to 5 MB — resized automatically.</p>
             </div>
           </div>
         </div>

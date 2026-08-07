@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
+import { AFFECTED_LOGO_BUSINESS_IDS } from '@/lib/logo-recovery';
+
 import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
 import { motion } from 'framer-motion';
 import { 
@@ -63,6 +65,7 @@ import { IdentityLevelBadge } from '@/components/app/IdentityLevelBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { LogoImage } from '@/components/common/LogoImage';
 
 interface AddressData {
   street?: string;
@@ -253,12 +256,20 @@ export default function BusinessProfile() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !business) return;
-    
-    await uploadLogo.mutateAsync({ businessId: business.id, file });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+
+    try {
+      // Errors are surfaced by the mutation's own toast; swallow here so the
+      // input still resets and the page doesn't hit an unhandled rejection.
+      await uploadLogo.mutateAsync({ businessId: business.id, file });
+    } catch {
+      /* handled in useUploadBusinessLogo onError */
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
+
 
   const handleUnlockCurrency = useCallback(async () => {
     if (!business) return;
@@ -491,10 +502,15 @@ export default function BusinessProfile() {
               <div className="shrink-0">
                 {business?.logo_url ? (
                   <div className="relative group">
-                    <img 
-                      src={business.logo_url} 
-                      alt="Business Logo" 
+                    <LogoImage
+                      src={business.logo_url}
+                      alt="Business Logo"
                       className="h-24 w-auto max-w-[180px] object-contain rounded-lg border border-border bg-muted/50 p-2"
+                      fallback={
+                        <div className="h-24 w-32 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      }
                     />
                     <button
                       onClick={handleLogoDelete}
@@ -543,8 +559,10 @@ export default function BusinessProfile() {
                 </Button>
 
                 <p className="text-xs text-muted-foreground">
-                  Your logo will appear on generated invoices and PDF exports. Max 500KB, PNG/JPEG/SVG/WebP.
+                  Your logo will appear on generated invoices and PDF exports. PNG, JPEG, SVG or WebP up to 5 MB —
+                  larger images are automatically resized for you.
                 </p>
+
                 
                 {!business && (
                   <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 rounded-md">
@@ -552,6 +570,18 @@ export default function BusinessProfile() {
                     <span>Fill in your business details and click "Save Changes" to enable logo upload.</span>
                   </div>
                 )}
+
+                {business && !business.logo_url && AFFECTED_LOGO_BUSINESS_IDS.has(business.id) && (
+                  <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 rounded-md">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>
+                      A storage migration on our side removed your logo from your profile — that was our mistake, and
+                      we're working to restore it for you. If you'd like it back on your invoices right now, you can
+                      re-upload it here and it will apply immediately.
+                    </span>
+                  </div>
+                )}
+
               </div>
             </div>
 

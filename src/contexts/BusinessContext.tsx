@@ -216,9 +216,12 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
     const apply = (membership: BusinessMembership | undefined) => {
       if (!membership) return;
-      if (baseBusiness?.id !== membership.business.id) {
-        setBaseBusiness(membership.business);
-      }
+      // A refetch can return updated fields (for example `logo_url`) for the
+      // same business id. Always adopt that refreshed record; only checking
+      // the id leaves the settings page rendering stale business data.
+      setBaseBusiness(previous =>
+        previous === membership.business ? previous : membership.business,
+      );
       const nextRole = membership.role as BusinessRole;
       if (currentRole !== nextRole) setCurrentRole(nextRole);
       setError(null);
