@@ -13,7 +13,7 @@ interface RequestBody {
   start_date?: string // YYYY-MM-DD
   end_date?: string   // YYYY-MM-DD
   period_label?: string
-  format?: 'print' | 'pdf' | 'csv' // 'pdf' kept as alias for 'print' (HTML print-ready)
+  format?: 'print' | 'pdf' | 'csv' | 'json' // 'pdf' kept as alias for 'print' (HTML print-ready)
 }
 
 interface ReportLine {
@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
       period_label,
     } = body
     // Normalize: 'pdf' is a legacy alias for 'print' (branded HTML, print-to-PDF in browser)
-    const format: 'print' | 'csv' = body.format === 'csv' ? 'csv' : 'print'
+    const format: 'print' | 'csv' | 'json' =
+      body.format === 'csv' ? 'csv' : body.format === 'json' ? 'json' : 'print'
 
     if (!businessId || !currency || !jurisdiction) {
       return new Response(JSON.stringify({ success: false, error: 'business_id, currency and jurisdiction are required' }), {
@@ -231,6 +232,40 @@ Deno.serve(async (req) => {
     const periodText = period_label || (start_date && end_date ? `${start_date} → ${end_date}` : 'All time')
     const safeJurisdiction = jurisdiction.toLowerCase()
     const stamp = generatedAt.replace(/[:.]/g, '-')
+
+    // ── JSON format (mobile app) ──
+    if (format === 'json') {
+      const payload = {
+        success: true,
+        generated_at: generatedAt,
+        business: { id: businessId, name: businessName },
+        jurisdiction,
+        currency,
+        period: { start_date: start_date ?? null, end_date: end_date ?? null, label: periodText },
+        lines: lines.map(l => ({
+          code: l.code,
+          label: l.label,
+          items: l.count,
+          raw_total: Number(l.rawTotal.toFixed(2)),
+          deductible_total: Number(l.deductibleTotal.toFixed(2)),
+          categories: l.categories,
+        })),
+        totals: {
+          raw_total: Number(totalRaw.toFixed(2)),
+          deductible_total: Number(totalDeductible.toFixed(2)),
+          items: lines.reduce((s, l) => s + l.count, 0),
+        },
+        vat: jurisdiction === 'EU' ? {
+          output_vat: Number(outputVat.toFixed(2)),
+          input_vat: Number(inputVat.toFixed(2)),
+          net_position: Number((outputVat - inputVat).toFixed(2)),
+        } : null,
+      }
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // ── CSV format (all tiers) ──
     if (format === 'csv') {

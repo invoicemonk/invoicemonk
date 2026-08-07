@@ -107,7 +107,45 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { report_title, report_data, recipient_email, format = 'csv', year } = body
+
+    // Mobile app shim — accept the { report_type, business_id, currency_account_id, period, format, recipient_email }
+    // shape by first calling generate-report internally to produce the CSV/JSON payload, then continuing with
+    // the existing report_title/report_data path.
+    let report_title: string | undefined = body.report_title
+    let report_data: string | undefined = body.report_data
+    let format: string = body.format || 'csv'
+    let recipient_email: string | undefined = body.recipient_email
+    let year: number | undefined = body.year
+
+    if (!report_data && body.report_type) {
+      const period = body.period || {}
+      const yr = typeof period.year === 'number' ? period.year : (typeof year === 'number' ? year : new Date().getFullYear())
+      year = yr
+      const genRes = await fetch(`${supabaseUrl}/functions/v1/generate-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader,
+          apikey: supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          report_type: body.report_type,
+          year: yr,
+          business_id: body.business_id,
+          currency_account_id: body.currency_account_id,
+          format: format === 'json' ? 'json' : 'csv',
+        }),
+      })
+      if (!genRes.ok) {
+        const err = await genRes.text()
+        return new Response(JSON.stringify({ success: false, error: `Report generation failed: ${err.slice(0, 300)}` }), {
+          status: genRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // generate-report returns raw CSV/JSON text for those formats
+      report_data = await genRes.text()
+      report_title = report_title || (body.report_type as string).replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    }
 
     if (!report_title || typeof report_title !== 'string' || report_title.length > 200) {
       return new Response(JSON.stringify({ success: false, error: 'Valid report_title is required (max 200 chars)' }), {
