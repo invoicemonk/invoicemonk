@@ -227,6 +227,7 @@ export function useCreateBusiness() {
       address?: Record<string, string | undefined> | null;
       invoice_prefix?: string | null;
       business_type?: string | null;
+      default_currency?: string | null;
       is_default?: boolean;
     }) => {
 
