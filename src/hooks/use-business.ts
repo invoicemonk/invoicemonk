@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { captureError } from '@/lib/sentry';
 import { sanitizeErrorMessage } from '@/lib/error-utils';
+import { requireFreshUserId, SessionExpiredError } from '@/lib/session-guard';
 
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
@@ -233,6 +234,11 @@ export function useCreateBusiness() {
 
       if (!user) throw new Error('Not authenticated');
 
+      // The in-memory user can outlive its token (failed refresh, long-idle tab).
+      // Resolve the live user id first so the insert always carries a valid JWT
+      // and a `created_by` the RLS policy will accept.
+      const authedUserId = await requireFreshUserId('create-business', user.id);
+
       // Split sensitive fields out — they live in business_sensitive_data, not businesses
       const { tax_id, ...businessCore } = business;
 
@@ -241,7 +247,7 @@ export function useCreateBusiness() {
         .from('businesses')
         .insert({
           ...businessCore,
-          created_by: user.id,
+          created_by: authedUserId,
           is_default: business.is_default ?? false,
         })
         .select()
@@ -272,7 +278,7 @@ export function useCreateBusiness() {
         _event_type: 'BUSINESS_CREATED',
         _entity_type: 'business',
         _entity_id: newBusiness.id,
-        _user_id: user.id,
+        _user_id: authedUserId,
         _new_state: newBusiness,
       });
 
@@ -288,9 +294,14 @@ export function useCreateBusiness() {
     },
     onError: (error) => {
       captureError(error, { hook: 'useCreateBusiness' });
+      const isSessionIssue =
+        error instanceof SessionExpiredError ||
+        /row-level security policy/i.test(error.message);
       toast({
-        title: 'Error creating business',
-        description: error.message,
+        title: isSessionIssue ? 'Session expired' : 'Error creating business',
+        description: isSessionIssue
+          ? "We couldn't create the business because your session expired. Sign in again and retry."
+          : sanitizeErrorMessage(error),
         variant: 'destructive',
       });
     },

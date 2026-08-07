@@ -129,7 +129,14 @@ export function useUploadAndScanInboxItem() {
         if (scan?.error) throw new Error(scan.error);
 
         const handwritten = !!scan?.handwritten;
-        const confidence = typeof scan?.confidence === 'number' ? scan.confidence : null;
+        // Scanners report confidence either as 0-1 or 0-100; the column is numeric(3,2)
+        // so always normalise to a 0.00-1.00 fraction before writing.
+        const rawConfidence = typeof scan?.confidence === 'number' && Number.isFinite(scan.confidence)
+          ? scan.confidence
+          : null;
+        const confidence = rawConfidence === null
+          ? null
+          : Math.min(1, Math.max(0, rawConfidence > 1 ? rawConfidence / 100 : rawConfidence));
 
         // Fuzzy-match vendor against existing vendors
         let matched: { id: string; name: string } | null = null;

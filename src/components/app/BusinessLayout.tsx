@@ -13,10 +13,11 @@ import { Link } from 'react-router-dom';
 import { UpgradeModal } from './UpgradeModal';
 import { PaymentIssueBanner } from '@/components/billing/PaymentIssueBanner';
 import { StarterSunsetBanner } from '@/components/billing/StarterSunsetBanner';
+import { CurrencyResolver } from './CurrencyResolver';
 
 
 function BusinessLayoutContent() {
-  const { loading, error, currentBusiness } = useBusiness();
+  const { loading, error, currentBusiness, refreshBusiness } = useBusiness();
 
   if (!currentBusiness && loading) {
     return (
@@ -56,6 +57,20 @@ function BusinessLayoutContent() {
   const onboardingStep = (currentBusiness as any).onboarding_step;
   if (onboardingStep != null && onboardingStep !== 'completed') {
     return <Navigate to={`/onboarding/${currentBusiness.id}`} replace />;
+  }
+
+  // Legacy businesses can be missing their invoicing currency, which makes the
+  // database reject every invoice. Try to infer it from their existing data
+  // first; only prompt when nothing can be derived.
+  if (!(currentBusiness as any).default_currency) {
+    return (
+      <CurrencyResolver
+        businessId={currentBusiness.id}
+        businessName={currentBusiness.name}
+        jurisdiction={(currentBusiness as any).jurisdiction ?? null}
+        onResolved={refreshBusiness}
+      />
+    );
   }
 
 

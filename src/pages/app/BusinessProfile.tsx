@@ -1183,11 +1183,19 @@ export default function BusinessProfile() {
               Permanently delete this business and all associated data.
             </CardDescription>
           </CardHeader>
+<<<<<<< Updated upstream
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Deletion is only possible while this business has no financial records. If it has any
               invoices, credit notes or receipts, it cannot be deleted — those records must be kept
               for compliance. Your primary business can never be deleted.
+=======
+          <CardContent>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Deletion is only possible while the business is empty. Once it has invoices,
+              receipts or payments, records must be kept for compliance and the business
+              can no longer be removed.
+>>>>>>> Stashed changes
             </p>
             <Button
               variant="destructive"

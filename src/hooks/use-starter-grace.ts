@@ -15,14 +15,17 @@ export function useStarterGrace() {
 
   const isLegacyFreeTier = tier === 'starter' || tier === 'starter_paid';
 
+  const subscriptionId = subscription?.id || null;
+
   const { data: graceRow } = useQuery({
-    queryKey: ['starter-grace', user?.id],
-    enabled: !!user?.id && isLegacyFreeTier,
+    queryKey: ['starter-grace', user?.id, subscriptionId],
+    // Never query with an empty id — Postgres rejects '' as a uuid.
+    enabled: !!user?.id && isLegacyFreeTier && !!subscriptionId,
     queryFn: async () => {
       const { data } = await supabase
         .from('subscriptions')
         .select('starter_grace_expires_at')
-        .eq('id', subscription?.id ?? '')
+        .eq('id', subscriptionId!)
         .maybeSingle();
       // Never return undefined — React Query treats that as an error and logs a warning.
       return ((data as any)?.starter_grace_expires_at as string | null | undefined) ?? null;

@@ -35,7 +35,13 @@ import { useBusinessOptional, type BusinessMembership, type SubscriptionTier } f
 import { useCreateBusiness } from '@/hooks/use-business';
 import { useDeleteBusiness } from '@/hooks/use-delete-business';
 import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
+<<<<<<< Updated upstream
 import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
+=======
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
+import { sanitizeErrorMessage } from '@/lib/error-utils';
+>>>>>>> Stashed changes
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,7 +77,10 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
   const [newBusinessCountry, setNewBusinessCountry] = useState('');
   const [newBusinessCurrency, setNewBusinessCurrency] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+<<<<<<< Updated upstream
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; country?: string; currency?: string }>({});
+=======
+>>>>>>> Stashed changes
   const [businessToDelete, setBusinessToDelete] = useState<{ id: string; name: string } | null>(null);
   const createBusiness = useCreateBusiness();
   const deleteBusiness = useDeleteBusiness();
@@ -153,6 +162,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
     setNewBusinessCountry('');
     setNewBusinessCurrency('');
     setFormError(null);
+<<<<<<< Updated upstream
     setFieldErrors({});
   };
 
@@ -178,10 +188,23 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
           ? `${countryCurrency} is not supported yet. Choose a supported currency to continue.`
           : 'Choose a supported currency to continue.',
       }));
+=======
+  };
+
+  const handleCountryChange = (code: string) => {
+    setNewBusinessCountry(code);
+    setFormError(null);
+    const suggested = COUNTRIES.find((c) => c.code === code)?.currency;
+    if (suggested && ALL_CURRENCIES.some((c) => c.value === suggested)) {
+      setNewBusinessCurrency(suggested);
+    } else {
+      setNewBusinessCurrency('');
+>>>>>>> Stashed changes
     }
   };
 
   const handleCreateBusiness = async () => {
+<<<<<<< Updated upstream
     const errors: { name?: string; country?: string; currency?: string } = {};
     if (!newBusinessName.trim()) errors.name = 'Business name is required.';
     if (!newBusinessCountry) errors.country = 'Country is required.';
@@ -198,6 +221,21 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
     }
 
     setFieldErrors({});
+=======
+    if (!newBusinessName.trim()) {
+      setFormError('Enter a business name.');
+      return;
+    }
+    if (!newBusinessCountry) {
+      setFormError('Select a country.');
+      return;
+    }
+    if (!newBusinessCurrency) {
+      setFormError('Select the currency this business invoices in.');
+      return;
+    }
+
+>>>>>>> Stashed changes
     setFormError(null);
 
     try {
@@ -208,7 +246,12 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
         default_currency: newBusinessCurrency,
       });
 
+<<<<<<< Updated upstream
       handleNewBusinessDialogChange(false);
+=======
+      setShowNewBusinessDialog(false);
+      resetNewBusinessForm();
+>>>>>>> Stashed changes
 
       await refreshBusiness();
 
@@ -218,11 +261,15 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
       }
     } catch (error) {
       console.error('Error creating business:', error);
+<<<<<<< Updated upstream
       setFormError(
         error instanceof Error && error.message
           ? error.message
           : 'Could not create the business. Please try again.'
       );
+=======
+      setFormError(sanitizeErrorMessage(error));
+>>>>>>> Stashed changes
     }
   };
 
@@ -481,6 +528,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
                     </Badge>
                   </div>
                 </div>
+<<<<<<< Updated upstream
                 {canDelete && (
                   <button
                     type="button"
@@ -500,6 +548,39 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
+=======
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={isDefault}
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          aria-label={`Delete ${membership.business.name}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsOpen(false);
+                            setBusinessToDelete({
+                              id: membership.business_id,
+                              name: membership.business.name,
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {isDefault
+                        ? 'Your primary business cannot be deleted.'
+                        : 'Delete this business'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+>>>>>>> Stashed changes
               </DropdownMenuItem>
             );
           })}
@@ -518,8 +599,133 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+<<<<<<< Updated upstream
       {newBusinessDialog}
       {deleteDialog}
+=======
+      {/* Create New Business Dialog */}
+      <Dialog
+        open={showNewBusinessDialog}
+        onOpenChange={(open) => {
+          setShowNewBusinessDialog(open);
+          if (!open) resetNewBusinessForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create a New Business</DialogTitle>
+            <DialogDescription>
+              Add another business to manage separately. Each business has its own subscription, invoices, and clients.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="businessName">Business Name</Label>
+              <Input
+                id="businessName"
+                placeholder="My New Business"
+                value={newBusinessName}
+                onChange={(e) => setNewBusinessName(e.target.value)}
+                maxLength={INPUT_LIMITS.NAME}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="businessType">Business Type</Label>
+              <Select value={newBusinessType} onValueChange={setNewBusinessType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="freelancer">Freelance / Individual</SelectItem>
+                  <SelectItem value="small_business">Small Business / SME</SelectItem>
+                  <SelectItem value="agency">Agency / Studio</SelectItem>
+                  <SelectItem value="registered_company">Registered Company</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="country">Country</Label>
+              <Select value={newBusinessCountry} onValueChange={handleCountryChange}>
+                <SelectTrigger id="country">
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="currency">Invoicing Currency</Label>
+              <Select
+                value={newBusinessCurrency}
+                onValueChange={(v) => {
+                  setNewBusinessCurrency(v);
+                  setFormError(null);
+                }}
+              >
+                <SelectTrigger id="currency">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {ALL_CURRENCIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This locks once you issue your first invoice. You can add other currencies later.
+              </p>
+            </div>
+            {formError && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewBusinessDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateBusiness} disabled={createBusiness.isPending}>
+              {createBusiness.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Business'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteBusinessDialog
+        open={!!businessToDelete}
+        onOpenChange={(open) => {
+          if (!open) setBusinessToDelete(null);
+        }}
+        businessName={businessToDelete?.name ?? ''}
+        isPending={deleteBusiness.isPending}
+        onConfirm={async () => {
+          if (!businessToDelete) return;
+          try {
+            await deleteBusiness.mutateAsync(businessToDelete.id);
+            setBusinessToDelete(null);
+            await refreshBusiness();
+          } catch {
+            // error toast handled in the hook
+          }
+        }}
+      />
+>>>>>>> Stashed changes
     </>
   );
 }

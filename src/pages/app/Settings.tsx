@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BusinessesSettingsCard } from '@/components/app/BusinessesSettingsCard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
@@ -249,6 +250,10 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          <div className="mt-6">
+            <BusinessesSettingsCard />
+          </div>
         </TabsContent>
 
         {/* Security Tab */}

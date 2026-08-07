@@ -32,7 +32,11 @@ export function useDeleteBusiness() {
     },
     onError: (error: any) => {
       captureError(error, { hook: 'useDeleteBusiness' });
-      const message = error?.message || 'Failed to delete business';
+      const raw = error?.message || '';
+      // Raw database permission errors are meaningless to users.
+      const message = /permission denied/i.test(raw)
+        ? "You don't have permission to delete this business. Only the owner can delete a business, and it can't be your primary one."
+        : raw || 'Failed to delete business';
       toast({
         title: 'Cannot delete business',
         description: message,
