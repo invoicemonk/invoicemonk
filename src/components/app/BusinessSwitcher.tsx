@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { useNavigate } from 'react-router-dom';
-import { ChevronsUpDown, Plus, Building2, User, Check, Loader2 } from 'lucide-react';
+import { ChevronsUpDown, Plus, Building2, User, Check, Loader2, Trash2, AlertCircle } from 'lucide-react';
 import { COUNTRIES } from '@/lib/countries';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +33,9 @@ import {
 } from '@/components/ui/select';
 import { useBusinessOptional, type BusinessMembership, type SubscriptionTier } from '@/contexts/BusinessContext';
 import { useCreateBusiness } from '@/hooks/use-business';
+import { useDeleteBusiness } from '@/hooks/use-delete-business';
+import { DeleteBusinessDialog } from '@/components/app/DeleteBusinessDialog';
+import { ALL_CURRENCIES } from '@/hooks/use-business-currency';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,12 +51,14 @@ const tierLabels: Record<SubscriptionTier, string> = {
   business: 'Business',
 };
 
-const businessTypeLabels: Record<string, string> = {
-  freelancer: 'Individual',
-  small_business: 'Small Business',
-  agency: 'Agency',
-  registered_company: 'Company',
-};
+const SUPPORTED_CURRENCY_CODES = new Set(ALL_CURRENCIES.map((c) => c.value));
+
+/** Returns the country's ISO currency if InvoiceMonk supports it, otherwise null. */
+function supportedCurrencyForCountry(countryCode: string): string | null {
+  const currency = COUNTRIES.find((c) => c.code === countryCode)?.currency;
+  if (!currency) return null;
+  return SUPPORTED_CURRENCY_CODES.has(currency) ? currency : null;
+}
 
 export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
   const businessContext = useBusinessOptional();
@@ -66,15 +69,19 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
   const [newBusinessName, setNewBusinessName] = useState('');
   const [newBusinessType, setNewBusinessType] = useState('freelancer');
   const [newBusinessCountry, setNewBusinessCountry] = useState('');
-  const [countryPopoverOpen, setCountryPopoverOpen] = useState(false);
+  const [newBusinessCurrency, setNewBusinessCurrency] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; country?: string; currency?: string }>({});
+  const [businessToDelete, setBusinessToDelete] = useState<{ id: string; name: string } | null>(null);
   const createBusiness = useCreateBusiness();
+  const deleteBusiness = useDeleteBusiness();
 
   // Fetch businesses directly when outside BusinessProvider
   const { data: fallbackBusinesses = [], isLoading: fallbackLoading } = useQuery({
     queryKey: ['user-businesses-fallback', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
+
       const { data, error } = await supabase
         .from('business_members')
         .select(`
@@ -117,7 +124,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
     queryKey: ['business-subscriptions', businesses.map(b => b.business_id)],
     queryFn: async () => {
       if (businesses.length === 0) return {};
-      
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -140,27 +147,82 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
     enabled: businesses.length > 0,
   });
 
+  const resetNewBusinessForm = () => {
+    setNewBusinessName('');
+    setNewBusinessType('freelancer');
+    setNewBusinessCountry('');
+    setNewBusinessCurrency('');
+    setFormError(null);
+    setFieldErrors({});
+  };
+
+  const handleNewBusinessDialogChange = (open: boolean) => {
+    setShowNewBusinessDialog(open);
+    if (!open) resetNewBusinessForm();
+  };
+
+  const handleCountryChange = (countryCode: string) => {
+    setNewBusinessCountry(countryCode);
+    setFieldErrors((prev) => ({ ...prev, country: undefined, currency: undefined }));
+    setFormError(null);
+
+    const currency = supportedCurrencyForCountry(countryCode);
+    if (currency) {
+      setNewBusinessCurrency(currency);
+    } else {
+      const countryCurrency = COUNTRIES.find((c) => c.code === countryCode)?.currency;
+      setNewBusinessCurrency('');
+      setFieldErrors((prev) => ({
+        ...prev,
+        currency: countryCurrency
+          ? `${countryCurrency} is not supported yet. Choose a supported currency to continue.`
+          : 'Choose a supported currency to continue.',
+      }));
+    }
+  };
+
   const handleCreateBusiness = async () => {
-    if (!newBusinessName.trim()) return;
+    const errors: { name?: string; country?: string; currency?: string } = {};
+    if (!newBusinessName.trim()) errors.name = 'Business name is required.';
+    if (!newBusinessCountry) errors.country = 'Country is required.';
+    if (!newBusinessCurrency) {
+      errors.currency = fieldErrors.currency || 'Currency is required.';
+    } else if (!SUPPORTED_CURRENCY_CODES.has(newBusinessCurrency)) {
+      errors.currency = 'This currency is not supported yet. Choose a supported currency.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setFormError('Please complete the highlighted fields before continuing.');
+      return;
+    }
+
+    setFieldErrors({});
+    setFormError(null);
 
     try {
       const newBusiness = await createBusiness.mutateAsync({
         name: newBusinessName.trim(),
         jurisdiction: newBusinessCountry,
+        business_type: newBusinessType,
+        default_currency: newBusinessCurrency,
       });
-      
-      setShowNewBusinessDialog(false);
-      setNewBusinessName('');
-      setNewBusinessType('freelancer');
-      
+
+      handleNewBusinessDialogChange(false);
+
       await refreshBusiness();
-      
+
       // Navigate to the new business
       if (newBusiness?.id) {
         navigate(`/b/${newBusiness.id}/dashboard`);
       }
     } catch (error) {
       console.error('Error creating business:', error);
+      setFormError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not create the business. Please try again.'
+      );
     }
   };
 
@@ -190,17 +252,161 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
     );
   }
 
+  const newBusinessDialog = (
+    <Dialog open={showNewBusinessDialog} onOpenChange={handleNewBusinessDialogChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Create a New Business</DialogTitle>
+          <DialogDescription>
+            Add another business to manage separately. Each business has its own subscription, invoices, and clients.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="businessName">
+              Business Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="businessName"
+              placeholder="My New Business"
+              value={newBusinessName}
+              onChange={(e) => {
+                setNewBusinessName(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                setFormError(null);
+              }}
+              maxLength={INPUT_LIMITS.NAME}
+              aria-invalid={!!fieldErrors.name}
+            />
+            {fieldErrors.name && (
+              <p className="text-xs text-destructive">{fieldErrors.name}</p>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="businessType">Business Type</Label>
+            <Select value={newBusinessType} onValueChange={setNewBusinessType}>
+              <SelectTrigger id="businessType">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="freelancer">Freelance / Individual</SelectItem>
+                <SelectItem value="small_business">Small Business / SME</SelectItem>
+                <SelectItem value="agency">Agency / Studio</SelectItem>
+                <SelectItem value="registered_company">Registered Company</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="country">
+              Country <span className="text-destructive">*</span>
+            </Label>
+            <Select value={newBusinessCountry} onValueChange={handleCountryChange}>
+              <SelectTrigger id="country" aria-invalid={!!fieldErrors.country}>
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {COUNTRIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {fieldErrors.country && (
+              <p className="text-xs text-destructive">{fieldErrors.country}</p>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="businessCurrency">
+              Currency <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={newBusinessCurrency}
+              onValueChange={(value) => {
+                setNewBusinessCurrency(value);
+                setFieldErrors((prev) => ({ ...prev, currency: undefined }));
+                setFormError(null);
+              }}
+            >
+              <SelectTrigger id="businessCurrency" aria-invalid={!!fieldErrors.currency}>
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {ALL_CURRENCIES.map((currency) => (
+                  <SelectItem key={currency.value} value={currency.value}>
+                    {currency.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {fieldErrors.currency ? (
+              <p className="text-xs text-destructive">{fieldErrors.currency}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Auto-filled from the country you select. This becomes the primary accounting currency for this business.
+              </p>
+            )}
+          </div>
+
+          {formError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+              <p className="text-sm text-destructive">{formError}</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleNewBusinessDialogChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreateBusiness} disabled={createBusiness.isPending}>
+            {createBusiness.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Business'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const deleteDialog = businessToDelete && (
+    <DeleteBusinessDialog
+      open={!!businessToDelete}
+      onOpenChange={(open) => {
+        if (!open) setBusinessToDelete(null);
+      }}
+      businessName={businessToDelete.name}
+      onConfirm={() =>
+        deleteBusiness.mutate(businessToDelete.id, {
+          onSuccess: () => setBusinessToDelete(null),
+        })
+      }
+      isPending={deleteBusiness.isPending}
+    />
+  );
+
   if (!currentBusiness) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setShowNewBusinessDialog(true)}
-        className={cn("w-full justify-start gap-2", collapsed && "justify-center px-2")}
-      >
-        <Plus className="h-4 w-4" />
-        {!collapsed && <span>Create Business</span>}
-      </Button>
+      <>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowNewBusinessDialog(true)}
+          className={cn("w-full justify-start gap-2", collapsed && "justify-center px-2")}
+        >
+          <Plus className="h-4 w-4" />
+          {!collapsed && <span>Create Business</span>}
+        </Button>
+        {newBusinessDialog}
+      </>
     );
   }
 
@@ -240,6 +446,7 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
             const isSelected = membership.business_id === currentBusiness.id;
             const tier = subscriptionMap[membership.business_id] || 'starter';
             const isDefault = membership.business.is_default;
+            const canDelete = !isDefault && membership.role === 'owner';
             
             return (
               <DropdownMenuItem
@@ -274,6 +481,25 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
                     </Badge>
                   </div>
                 </div>
+                {canDelete && (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${membership.business.name}`}
+                    title="Delete business"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      setBusinessToDelete({
+                        id: membership.business_id,
+                        name: membership.business.name,
+                      });
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </DropdownMenuItem>
             );
           })}
@@ -292,107 +518,8 @@ export function BusinessSwitcher({ collapsed }: BusinessSwitcherProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Create New Business Dialog */}
-      <Dialog open={showNewBusinessDialog} onOpenChange={setShowNewBusinessDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create a New Business</DialogTitle>
-            <DialogDescription>
-              Add another business to manage separately. Each business has its own subscription, invoices, and clients.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="businessName">Business Name</Label>
-              <Input
-                id="businessName"
-                placeholder="My New Business"
-                value={newBusinessName}
-                onChange={(e) => setNewBusinessName(e.target.value)}
-                maxLength={INPUT_LIMITS.NAME}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="businessType">Business Type</Label>
-              <Select value={newBusinessType} onValueChange={setNewBusinessType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="freelancer">Freelance / Individual</SelectItem>
-                  <SelectItem value="small_business">Small Business / SME</SelectItem>
-                  <SelectItem value="agency">Agency / Studio</SelectItem>
-                  <SelectItem value="registered_company">Registered Company</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="country">Country</Label>
-              <Popover open={countryPopoverOpen} onOpenChange={setCountryPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="country"
-                    variant="outline"
-                    role="combobox"
-                    className="justify-between font-normal"
-                  >
-                    {newBusinessCountry
-                      ? COUNTRIES.find((c) => c.code === newBusinessCountry)?.name
-                      : 'Select country'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search country..." />
-                    <CommandList>
-                      <CommandEmpty>No country found.</CommandEmpty>
-                      <CommandGroup>
-                        {COUNTRIES.map((c) => (
-                          <CommandItem
-                            key={c.code}
-                            value={c.name}
-                            onSelect={() => {
-                              setNewBusinessCountry(c.code);
-                              setCountryPopoverOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                newBusinessCountry === c.code ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            {c.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewBusinessDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateBusiness}
-              disabled={!newBusinessName.trim() || !newBusinessCountry || createBusiness.isPending}
-            >
-              {createBusiness.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create Business'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {newBusinessDialog}
+      {deleteDialog}
     </>
   );
 }
