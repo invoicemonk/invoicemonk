@@ -1,13 +1,29 @@
 import { useEffect } from 'react';
+import { clearTawkUserOpened, hideTawkUnlessOpened } from '@/lib/tawk-triggers';
 
 export function TawkTo() {
   useEffect(() => {
-    // Initialize Tawk_API before script loads to configure onLoad
+    // Initialize Tawk_API before script loads to configure callbacks
     (window as any).Tawk_API = (window as any).Tawk_API || {};
-    window.Tawk_API.onLoad = function () {
-      window.Tawk_API?.hideWidget();
+    const api = (window as any).Tawk_API;
+
+    // The widget must stay hidden unless it was intentionally opened.
+    // Tawk restores its own maximized/open state, so re-assert on every event.
+    api.onLoad = function () {
+      hideTawkUnlessOpened();
     };
-    window.Tawk_API.customStyle = {
+    api.onChatMinimized = function () {
+      clearTawkUserOpened();
+      hideTawkUnlessOpened();
+    };
+    api.onChatEnded = function () {
+      clearTawkUserOpened();
+      hideTawkUnlessOpened();
+    };
+    api.onChatMaximized = function () {
+      hideTawkUnlessOpened();
+    };
+    api.customStyle = {
       visibility: {
         desktop: { position: 'br', xOffset: 20, yOffset: 20 },
         mobile: { position: 'br', xOffset: 0, yOffset: 0 },

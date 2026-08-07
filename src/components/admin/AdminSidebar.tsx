@@ -18,6 +18,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { markTawkUserOpened } from '@/lib/tawk-triggers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -71,11 +72,9 @@ export function AdminSidebar() {
 
   const openSupportChat = () => {
     if (window.Tawk_API) {
+      markTawkUserOpened();
       window.Tawk_API.showWidget();
       window.Tawk_API.maximize();
-      window.Tawk_API.onChatMinimized = () => {
-        window.Tawk_API?.hideWidget();
-      };
     }
   };
 

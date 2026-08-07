@@ -5,6 +5,37 @@
 
 const SESSION_LOCK_KEY = 'tawk_trigger_fired';
 
+/**
+ * Widget visibility policy: the Tawk widget is hidden by default and only
+ * visible when the user (or a trigger) intentionally opens it. Tawk restores
+ * its own maximized state across page loads, so "hidden" has to be enforced
+ * rather than set once.
+ */
+let userOpened = false;
+
+export function markTawkUserOpened() {
+  userOpened = true;
+}
+
+export function clearTawkUserOpened() {
+  userOpened = false;
+}
+
+export function isTawkUserOpened(): boolean {
+  return userOpened;
+}
+
+/** Hide the widget unless the user intentionally opened it. */
+export function hideTawkUnlessOpened() {
+  if (userOpened) return;
+  try {
+    window.Tawk_API?.minimize?.();
+  } catch {}
+  try {
+    window.Tawk_API?.hideWidget?.();
+  } catch {}
+}
+
 export type TawkTriggerKey =
   | 'pricing_dwell'
   | 'invoice_milestone_5'
@@ -74,6 +105,7 @@ export async function fireTawkMessage(opts: FireOptions): Promise<boolean> {
   try {
     const tawk = await waitForTawk();
     try {
+      markTawkUserOpened();
       tawk.showWidget?.();
       tawk.maximize?.();
     } catch {}

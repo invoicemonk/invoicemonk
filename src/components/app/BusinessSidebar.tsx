@@ -23,6 +23,7 @@ import {
   Upload
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { markTawkUserOpened } from '@/lib/tawk-triggers';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -86,11 +87,9 @@ export function BusinessSidebar() {
 
   const openSupportChat = () => {
     if (window.Tawk_API) {
+      markTawkUserOpened();
       window.Tawk_API.showWidget();
       window.Tawk_API.maximize();
-      window.Tawk_API.onChatMinimized = () => {
-        window.Tawk_API?.hideWidget();
-      };
     }
   };
 

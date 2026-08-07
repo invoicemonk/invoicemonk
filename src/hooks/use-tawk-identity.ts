@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { clearTawkUserOpened, hideTawkUnlessOpened } from "@/lib/tawk-triggers";
 
 declare global {
   interface Window {
@@ -73,21 +74,27 @@ export function useTawkIdentity() {
             if (!err) {
               identifiedEmailRef.current = session.user.email || null;
             }
+            // Identity injection must never surface the widget.
+            hideTawkUnlessOpened();
           }
         );
         // Keep widget hidden after identity injection
-        tawk.hideWidget();
+        hideTawkUnlessOpened();
       } catch (e) {
         // Tawk not loaded — silent fail
+        hideTawkUnlessOpened();
       }
     };
 
     const clearIdentity = async () => {
       identifiedEmailRef.current = null;
+      clearTawkUserOpened();
       try {
         const tawk = await waitForTawk(3000);
-        tawk.endChat();
+        // Do NOT call endChat() here: it renders Tawk's "Your chat has ended"
+        // panel and forces the widget back into view on logout.
         tawk.logout?.();
+        hideTawkUnlessOpened();
       } catch {
         // Tawk not available
       }
