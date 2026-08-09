@@ -258,7 +258,7 @@ export default function Reports() {
                   <div className="grid gap-4 md:grid-cols-2">
                     {REPORT_DEFINITIONS.filter(r => r.category === cat.id).map(report => {
                       const isPreviewOpen = previewReportId === report.id;
-                      const tierLocked = !isPlatformAdmin && !hasTier(report.requiredTier as any);
+                      const tierLocked = !isPlatformAdmin && !hasTier(report.requiredTier as SubscriptionTier);
                       const needsCurrencyAccount = report.requiresCurrencyAccount && !currentCurrencyAccount;
                       const isComplianceReport = report.category === 'compliance' && report.id !== 'export-history';
                       const isGenerating = !!generatingReport?.startsWith(`${report.id}-`);
