@@ -329,7 +329,7 @@ export default function Reports() {
                                         </>
                                       )}
                                     </Button>
-                                    {!isPreviewOpen && (
+                                    {!isPreviewOpen && report.exportable && (
                                       <>
                                         {isComplianceReport && (
                                           <Button
@@ -341,16 +341,14 @@ export default function Reports() {
                                             {generatingReport === `${report.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
                                           </Button>
                                         )}
-                                        {report.exportable && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDownload(report.id, 'json')}
-                                            disabled={isGenerating}
-                                          >
-                                            {generatingReport === `${report.id}-json` ? <Loader2 className="h-4 w-4 animate-spin" /> : 'JSON'}
-                                          </Button>
-                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDownload(report.id, 'json')}
+                                          disabled={isGenerating}
+                                        >
+                                          {generatingReport === `${report.id}-json` ? <Loader2 className="h-4 w-4 animate-spin" /> : 'JSON'}
+                                        </Button>
                                         <Button
                                           data-tour="reports-export"
                                           variant="outline"
