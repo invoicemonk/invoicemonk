@@ -173,6 +173,18 @@ export function useGenerateReport() {
   });
 }
 
+export function useReportPreview() {
+  return useMutation({
+    mutationFn: async (request: ReportRequest): Promise<ReportResponse> => {
+      const result = await generateReport({ ...request, format: 'json' });
+      return result;
+    },
+    onError: (error: Error) => {
+      captureError(error, { hook: 'useReportPreview' });
+    },
+  });
+}
+
 // Hook to fetch audit events count for a given year
 interface EmailReportRequest extends ReportRequest {
   recipient_email: string;
