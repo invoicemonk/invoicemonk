@@ -42,7 +42,15 @@ function formatCellValue(value: unknown): string {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') return value.toLocaleString();
   if (typeof value === 'string') return value;
+  if (typeof value === 'object') return JSON.stringify(value).slice(0, 120);
   return JSON.stringify(value);
+}
+
+function isEmptyData(data: unknown): boolean {
+  if (data === null || data === undefined) return true;
+  if (Array.isArray(data)) return data.length === 0;
+  if (typeof data === 'object') return Object.keys(data).length === 0;
+  return false;
 }
 
 export function ReportPreviewCard({
