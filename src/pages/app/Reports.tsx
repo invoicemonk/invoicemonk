@@ -4,7 +4,6 @@ import {
   Download,
   Calendar,
   FileText,
-  TrendingUp,
   DollarSign,
   Loader2,
   Receipt,
@@ -18,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
-  ArrowRight,
 } from 'lucide-react';
 import Analytics from '@/pages/app/Analytics';
 import { EmailReportDialog } from '@/components/reports/EmailReportDialog';
