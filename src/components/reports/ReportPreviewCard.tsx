@@ -59,6 +59,7 @@ export function ReportPreviewCard({
   reportTitle,
   year,
   currency,
+  exportable = true,
   preview,
   isLoading,
   error,
