@@ -46,6 +46,8 @@ export interface ReportDefinition {
   id: ReportType;
   title: string;
   description: string;
+  tagline: string;
+  useCase: 'tax' | 'accountant' | 'review' | 'compliance';
   category: ReportCategory;
   requiresCurrencyAccount: boolean;
   exportable: boolean;
@@ -54,23 +56,23 @@ export interface ReportDefinition {
 
 export const REPORT_DEFINITIONS: ReportDefinition[] = [
   // Revenue
-  { id: 'invoice-register', title: 'Invoice Register', description: 'All issued invoices with payment & credit note status', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'revenue-by-period', title: 'Revenue by Period', description: 'Monthly revenue breakdown', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'revenue-by-client', title: 'Revenue by Client', description: 'Top clients by invoiced amount', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'outstanding-report', title: 'Outstanding Report', description: 'Invoices with unpaid balances', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'invoice-register', title: 'Invoice Register', description: 'All issued invoices with payment & credit note status', tagline: 'Every invoice you sent this year, with payment status.', useCase: 'accountant', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'revenue-by-period', title: 'Revenue by Period', description: 'Monthly revenue breakdown', tagline: 'Monthly revenue, tax, and invoice count.', useCase: 'review', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'revenue-by-client', title: 'Revenue by Client', description: 'Top clients by invoiced amount', tagline: 'Which clients bring in the most revenue.', useCase: 'review', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'outstanding-report', title: 'Outstanding Report', description: 'Invoices with unpaid balances', tagline: 'Who owes you money and how late it is.', useCase: 'review', category: 'revenue', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
   // Receipts
-  { id: 'receipt-register', title: 'Receipt Register', description: 'All receipts with verification status', category: 'receipts', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'receipt-register', title: 'Receipt Register', description: 'All receipts with verification status', tagline: 'Every payment receipt with verification hashes.', useCase: 'compliance', category: 'receipts', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
   // Expenses
-  { id: 'expense-register', title: 'Expense Register', description: 'All expenses for the currency account', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'expense-by-category', title: 'Expenses by Category', description: 'Category-level expense breakdown', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'expense-by-vendor', title: 'Expenses by Vendor', description: 'Vendor-level expense breakdown', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'expense-register', title: 'Expense Register', description: 'All expenses for the currency account', tagline: 'Every expense recorded in this account.', useCase: 'accountant', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'expense-by-category', title: 'Expenses by Category', description: 'Category-level expense breakdown', tagline: 'How your spending breaks down by category.', useCase: 'review', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'expense-by-vendor', title: 'Expenses by Vendor', description: 'Vendor-level expense breakdown', tagline: 'Which vendors you spend the most with.', useCase: 'review', category: 'expenses', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
   // Accounting
-  { id: 'income-statement', title: 'Income Statement (P&L)', description: 'Revenue minus expenses for the period', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
-  { id: 'cash-flow-summary', title: 'Cash Flow Summary', description: 'Cash inflow vs outflow with net position', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'income-statement', title: 'Income Statement (P&L)', description: 'Revenue minus expenses for the period', tagline: 'Your profit or loss for the selected year.', useCase: 'accountant', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
+  { id: 'cash-flow-summary', title: 'Cash Flow Summary', description: 'Cash inflow vs outflow with net position', tagline: 'Cash in, cash out, and your net position.', useCase: 'accountant', category: 'accounting', requiresCurrencyAccount: true, exportable: true, requiredTier: 'professional' },
   // Compliance
-  { id: 'tax-report', title: 'Tax Report', description: 'Tax collected by period with credit note adjustments', category: 'compliance', requiresCurrencyAccount: true, exportable: true, requiredTier: 'business' },
-  { id: 'audit-export', title: 'Audit Export', description: 'Full audit trail with state snapshots', category: 'compliance', requiresCurrencyAccount: false, exportable: true, requiredTier: 'business' },
-  { id: 'export-history', title: 'Export History', description: 'History of all data exports', category: 'compliance', requiresCurrencyAccount: false, exportable: false, requiredTier: 'business' },
+  { id: 'tax-report', title: 'Tax Report', description: 'Tax collected by period with credit note adjustments', tagline: 'Tax collected and adjustments for filing.', useCase: 'tax', category: 'compliance', requiresCurrencyAccount: true, exportable: true, requiredTier: 'business' },
+  { id: 'audit-export', title: 'Audit Export', description: 'Full audit trail with state snapshots', tagline: 'Complete audit trail for compliance proof.', useCase: 'compliance', category: 'compliance', requiresCurrencyAccount: false, exportable: true, requiredTier: 'business' },
+  { id: 'export-history', title: 'Export History', description: 'History of all data exports', tagline: 'History of every report you have exported.', useCase: 'compliance', category: 'compliance', requiresCurrencyAccount: false, exportable: false, requiredTier: 'business' },
 ];
 
 export const REPORT_CATEGORIES: { id: ReportCategory; label: string }[] = [
@@ -167,6 +169,24 @@ export function useGenerateReport() {
     onError: (error: Error) => {
       captureError(error, { hook: 'useGenerateReport' });
       toast.error(error.message || 'Failed to generate report');
+    },
+  });
+}
+
+export function useReportPreview() {
+  return useMutation({
+    mutationFn: async (request: ReportRequest): Promise<ReportResponse> => {
+      const result = await generateReport({ ...request, format: 'json' });
+      if (!result.success) {
+        if (result.upgrade_required) {
+          throw new Error('Upgrade required to access this report');
+        }
+        throw new Error(result.error || 'Failed to load preview');
+      }
+      return result;
+    },
+    onError: (error: Error) => {
+      captureError(error, { hook: 'useReportPreview' });
     },
   });
 }
