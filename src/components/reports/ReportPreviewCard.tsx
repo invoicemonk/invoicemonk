@@ -103,7 +103,7 @@ export function ReportPreviewCard({
     );
   }
 
-  if (preview && (!preview.data || (Array.isArray(preview.data) && preview.data.length === 0))) {
+  if (preview && isEmptyData(preview.data)) {
     const link = EMPTY_STATE_LINKS[reportId];
     return (
       <Card className="mt-4 border-dashed bg-muted/20">
@@ -130,6 +130,10 @@ export function ReportPreviewCard({
     );
   }
 
+  const dataIsArray = Array.isArray(preview?.data);
+  const dataIsObject = !dataIsArray && typeof preview?.data === 'object';
+  const objectRows = dataIsObject && preview?.data ? Object.entries(preview.data as Record<string, unknown>) : [];
+
   return (
     <Card className="mt-4 bg-muted/20">
       <CardContent className="p-4 space-y-4">
@@ -137,7 +141,11 @@ export function ReportPreviewCard({
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Preview</p>
             <p className="text-xs text-muted-foreground">
-              {Array.isArray(preview?.data) ? (preview?.data as unknown[]).length : 0} rows · {currency || 'No currency'} · {year}
+              {dataIsArray
+                ? `${(preview?.data as unknown[]).length} rows`
+                : dataIsObject
+                ? `${objectRows.length} summary fields`
+                : 'Single record'} · {currency || 'No currency'} · {year}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -192,6 +200,31 @@ export function ReportPreviewCard({
                         {formatCellValue((row as Record<string, unknown>)[col])}
                       </TableCell>
                     ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {dataIsObject && objectRows.length > 0 && (
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs whitespace-nowrap">Field</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {objectRows.slice(0, 8).map(([key, value]) => (
+                  <TableRow key={key}>
+                    <TableCell className="text-xs font-medium whitespace-nowrap">
+                      {key.replace(/_/g, ' ')}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[300px] truncate">
+                      {formatCellValue(value)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
