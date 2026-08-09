@@ -177,6 +177,12 @@ export function useReportPreview() {
   return useMutation({
     mutationFn: async (request: ReportRequest): Promise<ReportResponse> => {
       const result = await generateReport({ ...request, format: 'json' });
+      if (!result.success) {
+        if (result.upgrade_required) {
+          throw new Error('Upgrade required to access this report');
+        }
+        throw new Error(result.error || 'Failed to load preview');
+      }
       return result;
     },
     onError: (error: Error) => {
