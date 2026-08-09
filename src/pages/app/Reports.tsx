@@ -377,6 +377,7 @@ export default function Reports() {
                               reportTitle={report.title}
                               year={parseInt(selectedYear)}
                               currency={activeCurrency}
+                              exportable={report.exportable}
                               preview={previewReport.data}
                               isLoading={previewReport.isPending}
                               error={previewReport.error}
