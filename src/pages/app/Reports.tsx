@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useBusiness } from '@/contexts/BusinessContext';
+import { useBusiness, type SubscriptionTier } from '@/contexts/BusinessContext';
 import { useCurrencyAccount } from '@/contexts/CurrencyAccountContext';
 import { UpgradePrompt } from '@/components/app/UpgradePrompt';
 import {
