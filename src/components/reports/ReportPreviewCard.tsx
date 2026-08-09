@@ -13,6 +13,7 @@ interface ReportPreviewCardProps {
   reportTitle: string;
   year: number;
   currency?: string;
+  exportable?: boolean;
   preview: ReportResponse | undefined;
   isLoading: boolean;
   error: Error | null;
