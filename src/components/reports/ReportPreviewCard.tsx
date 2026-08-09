@@ -151,21 +151,27 @@ export function ReportPreviewCard({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => onDownload('json')} disabled={isGenerating}>
-              <FileJson className="h-4 w-4 mr-2" />
-              JSON
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onDownload('pdf')} disabled={isGenerating}>
-              <FileText className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
-            <Button size="sm" onClick={() => onDownload('csv')} disabled={isGenerating}>
-              {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              Download CSV
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onEmail} disabled={isGenerating}>
-              <Mail className="h-4 w-4" />
-            </Button>
+            {exportable ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => onDownload('json')} disabled={isGenerating}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  JSON
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => onDownload('pdf')} disabled={isGenerating}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button size="sm" onClick={() => onDownload('csv')} disabled={isGenerating}>
+                  {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                  Download CSV
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onEmail} disabled={isGenerating}>
+                  <Mail className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <Badge variant="outline" className="text-xs font-normal">View-only history</Badge>
+            )}
           </div>
         </div>
 
