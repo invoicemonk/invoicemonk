@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { initSentry, captureException } from '../_shared/sentry.ts'
+import { buildSignatureDiagnostics, logSignatureDiagnostics } from '../_shared/webhook-diagnostics.ts'
+
 initSentry()
 
 async function resolveBusinessId(
@@ -48,10 +50,27 @@ Deno.serve(async (req) => {
   try {
     event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
   } catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    captureException(err, { function_name: 'stripe-connect-webhook' })
-    return new Response('Invalid signature', { status: 400 })
+    const diag = buildSignatureDiagnostics({
+      functionName: 'stripe-connect-webhook',
+      secretEnvVar: 'STRIPE_CONNECT_WEBHOOK_SECRET',
+      secret: webhookSecret,
+      signatureHeader: signature,
+      body,
+      error: err,
+    })
+    logSignatureDiagnostics(diag)
+    captureException(err, diag as unknown as Record<string, unknown>)
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid signature',
+        reason: 'signature_mismatch',
+        function_name: diag.function_name,
+        event_id: diag.event_id,
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    )
   }
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

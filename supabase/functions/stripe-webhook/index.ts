@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { initSentry, captureException } from '../_shared/sentry.ts'
+import { buildSignatureDiagnostics, logSignatureDiagnostics } from '../_shared/webhook-diagnostics.ts'
+
 initSentry()
 
 function safeISODate(epochSeconds: number | undefined | null): string | undefined {
@@ -418,13 +420,27 @@ serve(async (req) => {
       // Use constructEventAsync for Deno's async SubtleCrypto
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (err) {
-      console.error("Webhook signature verification failed:", err);
-      captureException(err, { function_name: 'stripe-webhook' })
+      const diag = buildSignatureDiagnostics({
+        functionName: 'stripe-webhook',
+        secretEnvVar: 'STRIPE_WEBHOOK_SECRET',
+        secret: webhookSecret,
+        signatureHeader: signature,
+        body,
+        error: err,
+      });
+      logSignatureDiagnostics(diag);
+      captureException(err, diag as unknown as Record<string, unknown>)
       return new Response(
-        JSON.stringify({ error: "Webhook signature verification failed" }),
+        JSON.stringify({
+          error: "Webhook signature verification failed",
+          reason: "signature_mismatch",
+          function_name: diag.function_name,
+          event_id: diag.event_id,
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
 
     console.log("Received webhook event:", event.type);
 
