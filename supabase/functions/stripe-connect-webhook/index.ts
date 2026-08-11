@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { initSentry, captureException } from '../_shared/sentry.ts'
+import { buildSignatureDiagnostics, logSignatureDiagnostics } from '../_shared/webhook-diagnostics.ts'
+
 initSentry()
 
 async function resolveBusinessId(
