@@ -3,6 +3,10 @@ import { clearTawkUserOpened, hideTawkUnlessOpened } from '@/lib/tawk-triggers';
 
 export function TawkTo() {
   useEffect(() => {
+    if (/^\/(login|signup|forgot-password|reset-password|verify-email)(\/|$)/.test(window.location.pathname)) {
+      return;
+    }
+
     // Initialize Tawk_API before script loads to configure callbacks
     (window as any).Tawk_API = (window as any).Tawk_API || {};
     const api = (window as any).Tawk_API;
@@ -35,10 +39,10 @@ export function TawkTo() {
     script.async = true;
     script.src = 'https://embed.tawk.to/699086eff45fd51c3bd13d1e/1jhe8u6hu';
     script.charset = 'UTF-8';
-    script.setAttribute('crossorigin', '*');
-    document.head.appendChild(script);
+    const loadTimer = window.setTimeout(() => document.head.appendChild(script), 1_500);
 
     return () => {
+      window.clearTimeout(loadTimer);
       try { window.Tawk_API?.hideWidget(); } catch {}
       if (script.parentNode) {
         script.parentNode.removeChild(script);

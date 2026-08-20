@@ -20,61 +20,61 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
 import { useTawkTriggers } from "@/hooks/use-tawk-triggers";
-import NotFound from "./pages/NotFound";
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // App pages (authentication)
 import Login from "./pages/app/Login";
 import Signup from "./pages/app/Signup";
-import VerifyEmail from "./pages/app/VerifyEmail";
-import ForgotPassword from "./pages/app/ForgotPassword";
-import ResetPassword from "./pages/app/ResetPassword";
+const VerifyEmail = lazy(() => import("./pages/app/VerifyEmail"));
+const ForgotPassword = lazy(() => import("./pages/app/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/app/ResetPassword"));
 
 // Dashboard pages (legacy - for backward compatibility)
 import { DashboardLayout } from "./components/app/DashboardLayout";
 import { BusinessLayout } from "./components/app/BusinessLayout";
 import { BusinessRedirect } from "./components/app/BusinessRedirect";
 import { LegacyRouteRedirect } from "./components/app/LegacyRouteRedirect";
-import Dashboard from "./pages/app/Dashboard";
-import Invoices from "./pages/app/Invoices";
-import InvoiceNew from "./pages/app/InvoiceNew";
-import InvoiceDetail from "./pages/app/InvoiceDetail";
-import InvoiceEdit from "./pages/app/InvoiceEdit";
+const Dashboard = lazy(() => import("./pages/app/Dashboard"));
+const Invoices = lazy(() => import("./pages/app/Invoices"));
+const InvoiceNew = lazy(() => import("./pages/app/InvoiceNew"));
+const InvoiceDetail = lazy(() => import("./pages/app/InvoiceDetail"));
+const InvoiceEdit = lazy(() => import("./pages/app/InvoiceEdit"));
 
-import CreditNoteDetail from "./pages/app/CreditNoteDetail";
-import Clients from "./pages/app/Clients";
-import ClientDetail from "./pages/app/ClientDetail";
-import ClientEdit from "./pages/app/ClientEdit";
-import Reports from "./pages/app/Reports";
-import ProductsServices from "./pages/app/ProductsServices";
-import Analytics from "./pages/app/Analytics";
-import AuditLogs from "./pages/app/AuditLogs";
-import BusinessProfile from "./pages/app/BusinessProfile";
-import Billing from "./pages/app/Billing";
+const CreditNoteDetail = lazy(() => import("./pages/app/CreditNoteDetail"));
+const Clients = lazy(() => import("./pages/app/Clients"));
+const ClientDetail = lazy(() => import("./pages/app/ClientDetail"));
+const ClientEdit = lazy(() => import("./pages/app/ClientEdit"));
+const Reports = lazy(() => import("./pages/app/Reports"));
+const ProductsServices = lazy(() => import("./pages/app/ProductsServices"));
+const Analytics = lazy(() => import("./pages/app/Analytics"));
+const AuditLogs = lazy(() => import("./pages/app/AuditLogs"));
+const BusinessProfile = lazy(() => import("./pages/app/BusinessProfile"));
+const Billing = lazy(() => import("./pages/app/Billing"));
 const PlanSelection = lazy(() => import("./pages/app/PlanSelection"));
-import CheckoutSuccess from "./pages/app/CheckoutSuccess";
-import CheckoutCancel from "./pages/app/CheckoutCancel";
-import Settings from "./pages/app/Settings";
-import Notifications from "./pages/app/Notifications";
-import Team from "./pages/app/Team";
+const CheckoutSuccess = lazy(() => import("./pages/app/CheckoutSuccess"));
+const CheckoutCancel = lazy(() => import("./pages/app/CheckoutCancel"));
+const Settings = lazy(() => import("./pages/app/Settings"));
+const Notifications = lazy(() => import("./pages/app/Notifications"));
+const Team = lazy(() => import("./pages/app/Team"));
 
 // Accounting pages
-import AccountingOverview from "./pages/app/accounting/AccountingOverview";
-import AccountingIncome from "./pages/app/accounting/AccountingIncome";
-import AccountingExpenses from "./pages/app/accounting/AccountingExpenses";
-import AccountingResult from "./pages/app/accounting/AccountingResult";
+const AccountingOverview = lazy(() => import("./pages/app/accounting/AccountingOverview"));
+const AccountingIncome = lazy(() => import("./pages/app/accounting/AccountingIncome"));
+const AccountingExpenses = lazy(() => import("./pages/app/accounting/AccountingExpenses"));
+const AccountingResult = lazy(() => import("./pages/app/accounting/AccountingResult"));
 
 // Expenses page (standalone entry point)
-import Expenses from "./pages/app/Expenses";
-import Vendors from "./pages/app/Vendors";
-import ExpenseInbox from "./pages/app/ExpenseInbox";
-import Receivables from "./pages/app/Receivables";
-import Import from "./pages/app/Import";
-import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
-import AccountingTaxReports from "./pages/app/accounting/AccountingTaxReports";
+const Expenses = lazy(() => import("./pages/app/Expenses"));
+const Vendors = lazy(() => import("./pages/app/Vendors"));
+const ExpenseInbox = lazy(() => import("./pages/app/ExpenseInbox"));
+const Receivables = lazy(() => import("./pages/app/Receivables"));
+const Import = lazy(() => import("./pages/app/Import"));
+const AccountingProfitability = lazy(() => import("./pages/app/accounting/AccountingProfitability"));
+const AccountingTaxReports = lazy(() => import("./pages/app/accounting/AccountingTaxReports"));
 
 // Receipts pages
-import Receipts from "./pages/app/Receipts";
-import ReceiptDetail from "./pages/app/ReceiptDetail";
+const Receipts = lazy(() => import("./pages/app/Receipts"));
+const ReceiptDetail = lazy(() => import("./pages/app/ReceiptDetail"));
 
 
 // Legacy org route redirect component
@@ -94,70 +94,84 @@ function CreditNotesRedirect() {
 
 // Admin pages (Phase 6)
 import { AdminLayout } from "./components/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminBusinesses from "./pages/admin/AdminBusinesses";
-import AdminInvoices from "./pages/admin/AdminInvoices";
-import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
-import AdminBilling from "./pages/admin/AdminBilling";
-import AdminCountryModules from "./pages/admin/AdminCountryModules";
-import AdminSystem from "./pages/admin/AdminSystem";
-import AdminRetentionPolicies from "./pages/admin/AdminRetentionPolicies";
-import AdminTemplates from "./pages/admin/AdminTemplates";
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminBusinesses = lazy(() => import("./pages/admin/AdminBusinesses"));
+const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
+const AdminAuditLogs = lazy(() => import("./pages/admin/AdminAuditLogs"));
+const AdminBilling = lazy(() => import("./pages/admin/AdminBilling"));
+const AdminCountryModules = lazy(() => import("./pages/admin/AdminCountryModules"));
+const AdminSystem = lazy(() => import("./pages/admin/AdminSystem"));
+const AdminRetentionPolicies = lazy(() => import("./pages/admin/AdminRetentionPolicies"));
+const AdminTemplates = lazy(() => import("./pages/admin/AdminTemplates"));
 
-import AdminNotifications from "./pages/admin/AdminNotifications";
-import AdminPartners from "./pages/admin/AdminPartners";
-import AdminRegulatorySubmissions from "./pages/admin/AdminRegulatorySubmissions";
-import AdminRiskMonitoring from "./pages/admin/AdminRiskMonitoring";
-import AdminVerifications from "./pages/admin/AdminVerifications";
-import AdminSecurity from "./pages/admin/AdminSecurity";
-import AdminFeedback from "./pages/admin/AdminFeedback";
+const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminPartners = lazy(() => import("./pages/admin/AdminPartners"));
+const AdminRegulatorySubmissions = lazy(() => import("./pages/admin/AdminRegulatorySubmissions"));
+const AdminRiskMonitoring = lazy(() => import("./pages/admin/AdminRiskMonitoring"));
+const AdminVerifications = lazy(() => import("./pages/admin/AdminVerifications"));
+const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
+const AdminFeedback = lazy(() => import("./pages/admin/AdminFeedback"));
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
-import PartnerApply from "./pages/app/PartnerApply";
-import PartnerDashboard from "./pages/partner/PartnerDashboard";
-import PartnerLinks from "./pages/partner/PartnerLinks";
-import PartnerReferrals from "./pages/partner/PartnerReferrals";
-import PartnerCommissions from "./pages/partner/PartnerCommissions";
-import PartnerPayouts from "./pages/partner/PartnerPayouts";
-import PartnerSettings from "./pages/partner/PartnerSettings";
+const PartnerApply = lazy(() => import("./pages/app/PartnerApply"));
+const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
+const PartnerLinks = lazy(() => import("./pages/partner/PartnerLinks"));
+const PartnerReferrals = lazy(() => import("./pages/partner/PartnerReferrals"));
+const PartnerCommissions = lazy(() => import("./pages/partner/PartnerCommissions"));
+const PartnerPayouts = lazy(() => import("./pages/partner/PartnerPayouts"));
+const PartnerSettings = lazy(() => import("./pages/partner/PartnerSettings"));
 
 // Public pages
 import ReferralRedirect from "./components/app/ReferralRedirect";
-import VerifyInvoice from "./pages/verify/VerifyInvoice";
-import VerifyReceipt from "./pages/verify/VerifyReceipt";
-import InvoiceView from "./pages/public/InvoiceView";
+const VerifyInvoice = lazy(() => import("./pages/verify/VerifyInvoice"));
+const VerifyReceipt = lazy(() => import("./pages/verify/VerifyReceipt"));
+const InvoiceView = lazy(() => import("./pages/public/InvoiceView"));
 
 // Demo pages (public - no auth required)
-import { 
-  DemoDashboard,
-  DemoInvoices, 
-  DemoReceipts, 
-  DemoExpenses, 
-  DemoClients, 
-  DemoAccounting 
-} from "./pages/demo";
+const DemoDashboard = lazy(() => import("./pages/demo/DemoDashboard"));
+const DemoInvoices = lazy(() => import("./pages/demo/DemoInvoices"));
+const DemoReceipts = lazy(() => import("./pages/demo/DemoReceipts"));
+const DemoExpenses = lazy(() => import("./pages/demo/DemoExpenses"));
+const DemoClients = lazy(() => import("./pages/demo/DemoClients"));
+const DemoAccounting = lazy(() => import("./pages/demo/DemoAccounting"));
 
 // Legal and Documentation pages
-import SLA from "./pages/legal/SLA";
-import { APIDocumentation } from "./pages/docs";
-import HeroPreview from "./pages/demo/HeroPreview";
+const SLA = lazy(() => import("./pages/legal/SLA"));
+const APIDocumentation = lazy(() => import("./pages/docs/APIDocumentation"));
+const HeroPreview = lazy(() => import("./pages/demo/HeroPreview"));
 
 // Onboarding pages
 const CountryConfirmation = lazy(() => import("./pages/app/CountryConfirmation"));
 const OnboardingWizard = lazy(() => import("./pages/app/OnboardingWizard"));
 
 // Marketing screenshot routes (public, used to capture product images)
-import {
-  InvoicingEuVat, InvoicingAfrica, InvoicingGlobal,
-  EstimatesTemplates, EstimatesClientPortal, EstimatesTracking, EstimatesConversion,
-  ClientsProfiles, ClientsCommunication, ClientsSegmentation, ClientsAlternating,
-  ReceiptsScanning, ReceiptsStorage, ReceiptsSearch,
-  ExpensesReceiptScanning, ExpensesCategories, ExpensesTaxTracking, ExpensesAutomation,
-  AccountingChartOfAccounts, AccountingFinancialReports, AccountingMultiEntity, AccountingAutomation,
-  FeatureRelief, FeatureProfessional, FeatureCompliance,
-} from "./pages/marketing-shots";
+const InvoicingEuVat = lazy(() => import("./pages/marketing-shots/InvoicingEuVat"));
+const InvoicingAfrica = lazy(() => import("./pages/marketing-shots/InvoicingAfrica"));
+const InvoicingGlobal = lazy(() => import("./pages/marketing-shots/InvoicingGlobal"));
+const EstimatesTemplates = lazy(() => import("./pages/marketing-shots/EstimatesTemplates"));
+const EstimatesClientPortal = lazy(() => import("./pages/marketing-shots/EstimatesClientPortal"));
+const EstimatesTracking = lazy(() => import("./pages/marketing-shots/EstimatesTracking"));
+const EstimatesConversion = lazy(() => import("./pages/marketing-shots/EstimatesConversion"));
+const ClientsProfiles = lazy(() => import("./pages/marketing-shots/ClientsProfiles"));
+const ClientsCommunication = lazy(() => import("./pages/marketing-shots/ClientsCommunication"));
+const ClientsSegmentation = lazy(() => import("./pages/marketing-shots/ClientsSegmentation"));
+const ClientsAlternating = lazy(() => import("./pages/marketing-shots/ClientsAlternating"));
+const ReceiptsScanning = lazy(() => import("./pages/marketing-shots/ReceiptsScanning"));
+const ReceiptsStorage = lazy(() => import("./pages/marketing-shots/ReceiptsStorage"));
+const ReceiptsSearch = lazy(() => import("./pages/marketing-shots/ReceiptsSearch"));
+const ExpensesReceiptScanning = lazy(() => import("./pages/marketing-shots/ExpensesReceiptScanning"));
+const ExpensesCategories = lazy(() => import("./pages/marketing-shots/ExpensesCategories"));
+const ExpensesTaxTracking = lazy(() => import("./pages/marketing-shots/ExpensesTaxTracking"));
+const ExpensesAutomation = lazy(() => import("./pages/marketing-shots/ExpensesAutomation"));
+const AccountingChartOfAccounts = lazy(() => import("./pages/marketing-shots/AccountingChartOfAccounts"));
+const AccountingFinancialReports = lazy(() => import("./pages/marketing-shots/AccountingFinancialReports"));
+const AccountingMultiEntity = lazy(() => import("./pages/marketing-shots/AccountingMultiEntity"));
+const AccountingAutomation = lazy(() => import("./pages/marketing-shots/AccountingAutomation"));
+const FeatureRelief = lazy(() => import("./pages/marketing-shots/FeatureRelief"));
+const FeatureProfessional = lazy(() => import("./pages/marketing-shots/FeatureProfessional"));
+const FeatureCompliance = lazy(() => import("./pages/marketing-shots/FeatureCompliance"));
 
 // Lightweight fallback for lazy-loaded onboarding routes
 const LazyFallback = () => (
@@ -451,7 +465,9 @@ const App = () => (
             <Toaster />
             <Sonner />
             <TawkTo />
-            <RouterProvider router={router} />
+            <Suspense fallback={<LazyFallback />}>
+              <RouterProvider router={router} />
+            </Suspense>
           </TooltipProvider>
         </TawkIdentityProvider>
       </ImpersonationProvider>

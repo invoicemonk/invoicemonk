@@ -28,15 +28,28 @@
       gtag('config', 'G-TG0HV25RME');
     </script>
     
-    <!-- Contentsquare (Hotjar) -->
-    <script src="https://t.contentsquare.net/uxa/41b224112565d.js"></script>
+    <!-- Contentsquare is observational only; it must never block the app shell. -->
+    <script async src="https://t.contentsquare.net/uxa/41b224112565d.js"></script>
 
     <!-- OneSignal Web Push -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="startup-shell" role="status" aria-live="polite">
+        <div class="startup-mark" aria-hidden="true">IM</div>
+        <div class="startup-copy">
+          <strong>InvoiceMonk</strong>
+          <span>Loading secure workspace…</span>
+        </div>
+      </div>
+    </div>
+    <style>
+      #startup-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:14px;background:#fbfcfd;color:#0f172a;font:14px/1.5 Inter,system-ui,sans-serif}
+      .startup-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:8px;background:#1d6b5a;color:#fff;font-weight:700}
+      .startup-copy{display:flex;flex-direction:column}.startup-copy strong{font-size:16px}.startup-copy span{color:#526174}
+    </style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
