@@ -5,6 +5,7 @@ declare global {
 }
 
 export function initOneSignal(): void {
+  if (window.location.hostname !== 'app.invoicemonk.com') return;
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   window.OneSignalDeferred.push(async (OneSignal: any) => {
     try {
