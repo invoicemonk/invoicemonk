@@ -1,5 +1,4 @@
 import { createRoot } from "react-dom/client";
-import { type ReactNode } from "react";
 import "./index.css";
 
 const rootElement = document.getElementById("root");
@@ -58,11 +57,9 @@ async function startApp() {
 
     const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN || "phc_rbbFhXT5ChzKFa4DGdsfnBnpGQawxnyfFnPq37GED4QT";
     const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
-    const fallback = StartupFailure() as ReactNode;
-
     root.render(
       <Sentry.ErrorBoundary
-        fallback={fallback}
+        fallback={<StartupFailure />}
         onError={(error, componentStack, eventId) => {
           try {
             posthog.captureException(error, { componentStack, sentry_event_id: eventId, source: "react_error_boundary" });

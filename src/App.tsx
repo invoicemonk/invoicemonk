@@ -20,61 +20,61 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
 import { useTawkTriggers } from "@/hooks/use-tawk-triggers";
-import NotFound from "./pages/NotFound";
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // App pages (authentication)
 import Login from "./pages/app/Login";
 import Signup from "./pages/app/Signup";
-import VerifyEmail from "./pages/app/VerifyEmail";
-import ForgotPassword from "./pages/app/ForgotPassword";
-import ResetPassword from "./pages/app/ResetPassword";
+const VerifyEmail = lazy(() => import("./pages/app/VerifyEmail"));
+const ForgotPassword = lazy(() => import("./pages/app/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/app/ResetPassword"));
 
 // Dashboard pages (legacy - for backward compatibility)
 import { DashboardLayout } from "./components/app/DashboardLayout";
 import { BusinessLayout } from "./components/app/BusinessLayout";
 import { BusinessRedirect } from "./components/app/BusinessRedirect";
 import { LegacyRouteRedirect } from "./components/app/LegacyRouteRedirect";
-import Dashboard from "./pages/app/Dashboard";
-import Invoices from "./pages/app/Invoices";
-import InvoiceNew from "./pages/app/InvoiceNew";
-import InvoiceDetail from "./pages/app/InvoiceDetail";
-import InvoiceEdit from "./pages/app/InvoiceEdit";
+const Dashboard = lazy(() => import("./pages/app/Dashboard"));
+const Invoices = lazy(() => import("./pages/app/Invoices"));
+const InvoiceNew = lazy(() => import("./pages/app/InvoiceNew"));
+const InvoiceDetail = lazy(() => import("./pages/app/InvoiceDetail"));
+const InvoiceEdit = lazy(() => import("./pages/app/InvoiceEdit"));
 
-import CreditNoteDetail from "./pages/app/CreditNoteDetail";
-import Clients from "./pages/app/Clients";
-import ClientDetail from "./pages/app/ClientDetail";
-import ClientEdit from "./pages/app/ClientEdit";
-import Reports from "./pages/app/Reports";
-import ProductsServices from "./pages/app/ProductsServices";
-import Analytics from "./pages/app/Analytics";
-import AuditLogs from "./pages/app/AuditLogs";
-import BusinessProfile from "./pages/app/BusinessProfile";
-import Billing from "./pages/app/Billing";
+const CreditNoteDetail = lazy(() => import("./pages/app/CreditNoteDetail"));
+const Clients = lazy(() => import("./pages/app/Clients"));
+const ClientDetail = lazy(() => import("./pages/app/ClientDetail"));
+const ClientEdit = lazy(() => import("./pages/app/ClientEdit"));
+const Reports = lazy(() => import("./pages/app/Reports"));
+const ProductsServices = lazy(() => import("./pages/app/ProductsServices"));
+const Analytics = lazy(() => import("./pages/app/Analytics"));
+const AuditLogs = lazy(() => import("./pages/app/AuditLogs"));
+const BusinessProfile = lazy(() => import("./pages/app/BusinessProfile"));
+const Billing = lazy(() => import("./pages/app/Billing"));
 const PlanSelection = lazy(() => import("./pages/app/PlanSelection"));
-import CheckoutSuccess from "./pages/app/CheckoutSuccess";
-import CheckoutCancel from "./pages/app/CheckoutCancel";
-import Settings from "./pages/app/Settings";
-import Notifications from "./pages/app/Notifications";
-import Team from "./pages/app/Team";
+const CheckoutSuccess = lazy(() => import("./pages/app/CheckoutSuccess"));
+const CheckoutCancel = lazy(() => import("./pages/app/CheckoutCancel"));
+const Settings = lazy(() => import("./pages/app/Settings"));
+const Notifications = lazy(() => import("./pages/app/Notifications"));
+const Team = lazy(() => import("./pages/app/Team"));
 
 // Accounting pages
-import AccountingOverview from "./pages/app/accounting/AccountingOverview";
-import AccountingIncome from "./pages/app/accounting/AccountingIncome";
-import AccountingExpenses from "./pages/app/accounting/AccountingExpenses";
-import AccountingResult from "./pages/app/accounting/AccountingResult";
+const AccountingOverview = lazy(() => import("./pages/app/accounting/AccountingOverview"));
+const AccountingIncome = lazy(() => import("./pages/app/accounting/AccountingIncome"));
+const AccountingExpenses = lazy(() => import("./pages/app/accounting/AccountingExpenses"));
+const AccountingResult = lazy(() => import("./pages/app/accounting/AccountingResult"));
 
 // Expenses page (standalone entry point)
-import Expenses from "./pages/app/Expenses";
-import Vendors from "./pages/app/Vendors";
-import ExpenseInbox from "./pages/app/ExpenseInbox";
-import Receivables from "./pages/app/Receivables";
-import Import from "./pages/app/Import";
-import AccountingProfitability from "./pages/app/accounting/AccountingProfitability";
-import AccountingTaxReports from "./pages/app/accounting/AccountingTaxReports";
+const Expenses = lazy(() => import("./pages/app/Expenses"));
+const Vendors = lazy(() => import("./pages/app/Vendors"));
+const ExpenseInbox = lazy(() => import("./pages/app/ExpenseInbox"));
+const Receivables = lazy(() => import("./pages/app/Receivables"));
+const Import = lazy(() => import("./pages/app/Import"));
+const AccountingProfitability = lazy(() => import("./pages/app/accounting/AccountingProfitability"));
+const AccountingTaxReports = lazy(() => import("./pages/app/accounting/AccountingTaxReports"));
 
 // Receipts pages
-import Receipts from "./pages/app/Receipts";
-import ReceiptDetail from "./pages/app/ReceiptDetail";
+const Receipts = lazy(() => import("./pages/app/Receipts"));
+const ReceiptDetail = lazy(() => import("./pages/app/ReceiptDetail"));
 
 
 // Legacy org route redirect component
