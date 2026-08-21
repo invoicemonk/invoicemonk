@@ -46,32 +46,78 @@ const Signup = () => {
   const [isValidatingEmail, setIsValidatingEmail] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileFailed, setTurnstileFailed] = useState(false);
+  const [turnstileAttempt, setTurnstileAttempt] = useState(0);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const { user, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Load Turnstile script
+  // Load Turnstile script. Failures must never block the signup form from being usable.
   useEffect(() => {
-    if (document.getElementById('cf-turnstile-script')) return;
-    const script = document.createElement('script');
-    script.id = 'cf-turnstile-script';
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad';
-    script.async = true;
-    (window as any).onTurnstileLoad = () => {
-      if (turnstileRef.current && (window as any).turnstile) {
-        (window as any).turnstile.render(turnstileRef.current, {
-          sitekey: TURNSTILE_SITE_KEY,
-          callback: (token: string) => { setTurnstileToken(token); setTurnstileReady(true); },
-          'expired-callback': () => setTurnstileToken(null),
-          'error-callback': () => setTurnstileReady(false),
-          theme: 'auto',
-        });
+    let cancelled = false;
+    const markFailed = () => {
+      if (!cancelled) {
+        setTurnstileReady(false);
+        setTurnstileFailed(true);
       }
     };
-    document.head.appendChild(script);
-  }, []);
+
+    (window as any).onTurnstileLoad = () => {
+      if (cancelled) return;
+      try {
+        if (turnstileRef.current && (window as any).turnstile) {
+          (window as any).turnstile.render(turnstileRef.current, {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (token: string) => {
+              setTurnstileToken(token);
+              setTurnstileReady(true);
+              setTurnstileFailed(false);
+            },
+            'expired-callback': () => setTurnstileToken(null),
+            'error-callback': markFailed,
+            theme: 'auto',
+          });
+        }
+      } catch {
+        markFailed();
+      }
+    };
+
+    const existing = document.getElementById('cf-turnstile-script');
+    if (existing && (window as any).turnstile) {
+      (window as any).onTurnstileLoad();
+    } else {
+      existing?.remove();
+      const script = document.createElement('script');
+      script.id = 'cf-turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad';
+      script.async = true;
+      script.onerror = markFailed;
+      document.head.appendChild(script);
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (!(window as any).turnstile) markFailed();
+    }, 8_000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [turnstileAttempt]);
+
+  const retryTurnstile = () => {
+    setTurnstileFailed(false);
+    setTurnstileToken(null);
+    if (turnstileRef.current) turnstileRef.current.innerHTML = '';
+    document.getElementById('cf-turnstile-script')?.remove();
+    delete (window as any).turnstile;
+    setTurnstileAttempt((n) => n + 1);
+  };
+
+
 
   // Capture referral code from URL param or cookie
   useEffect(() => {
@@ -377,6 +423,15 @@ const Signup = () => {
 
           {/* Turnstile CAPTCHA */}
           <div ref={turnstileRef} className="flex justify-center" />
+          {turnstileFailed && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-center text-xs text-muted-foreground">
+              <p>Security check couldn't load. You can still sign up, or retry the check.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={retryTurnstile}>
+                Retry security check
+              </Button>
+            </div>
+          )}
+
 
           <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail}>
             {isLoading ? (
