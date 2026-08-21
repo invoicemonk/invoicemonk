@@ -423,6 +423,15 @@ const Signup = () => {
 
           {/* Turnstile CAPTCHA */}
           <div ref={turnstileRef} className="flex justify-center" />
+          {turnstileFailed && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-center text-xs text-muted-foreground">
+              <p>Security check couldn't load. You can still sign up, or retry the check.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={retryTurnstile}>
+                Retry security check
+              </Button>
+            </div>
+          )}
+
 
           <Button type="submit" className="w-full" disabled={isLoading || isDisposable || apiDisposable || isValidatingEmail}>
             {isLoading ? (
