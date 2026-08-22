@@ -461,6 +461,7 @@ export default function InvoiceEdit() {
   };
 
   const isLoading = updateInvoice.isPending || issueInvoice.isPending;
+  const lineItemsReady = hasValidLineItems(items);
 
   // Unsaved-changes detection: snapshot the form once it is hydrated from the invoice
   const formSnapshot = JSON.stringify({
@@ -1104,7 +1105,7 @@ export default function InvoiceEdit() {
                   variant="outline" 
                   className="w-full"
                   onClick={handleSave}
-                  disabled={isLoading}
+                  disabled={isLoading || !lineItemsReady}
                 >
                   {updateInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1116,7 +1117,7 @@ export default function InvoiceEdit() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || showTinWarning || isProfileIncomplete}
+                  disabled={isLoading || !lineItemsReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -686,6 +686,7 @@ export default function InvoiceNew() {
 
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
+  const lineItemsReady = hasValidLineItems(items);
 
   // Baseline for unsaved-changes detection
   const baselineItemsRef = useRef<string>(JSON.stringify(items));
@@ -1368,7 +1369,7 @@ export default function InvoiceNew() {
                   className="w-full"
                   data-tour="invoice-form-actions"
                   onClick={handleSaveDraft}
-                  disabled={isLoading}
+                  disabled={isLoading || !lineItemsReady}
                 >
                   {createInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1380,7 +1381,7 @@ export default function InvoiceNew() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || showTinWarning || isProfileIncomplete}
+                  disabled={isLoading || !lineItemsReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
