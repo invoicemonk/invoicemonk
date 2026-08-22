@@ -79,13 +79,6 @@ import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceKind = Database['public']['Enums']['invoice_kind'];
 
-function getSmartPrefillAmount(currency: string): number {
-  const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
-  const lowValue = ['NGN', 'KES', 'TZS', 'GHS', 'EGP', 'PKR', 'INR', 'PHP', 'BDT', 'LKR', 'MXN', 'COP', 'ARS', 'CZK', 'HUF', 'PLN', 'THB', 'ZAR', 'MAD', 'XOF', 'XAF', 'IDR'];
-  if (zeroDecimal.includes(currency)) return 10000;
-  if (lowValue.includes(currency)) return 10000;
-  return 100;
-}
 
 interface InvoiceItem {
   id: string;
