@@ -67,6 +67,8 @@ import { ProductServiceCombobox } from '@/components/products/ProductServiceComb
 import { useProductsServices } from '@/hooks/use-products-services';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
 import { stripUrls } from '@/lib/utils';
+import { validateLineItems, getValidLineItems, hasValidLineItems } from '@/lib/line-item-validation';
+
 import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
 import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
 import type { Database } from '@/integrations/supabase/types';
@@ -295,10 +297,11 @@ export default function InvoiceEdit() {
       });
       return false;
     }
-    if (!items.some(item => item.description && item.unitPrice > 0)) {
+    const lineItemCheck = validateLineItems(items);
+    if (!lineItemCheck.valid) {
       toast({
-        title: 'Line items required',
-        description: 'Please add at least one line item with a description and price.',
+        title: lineItemCheck.title,
+        description: lineItemCheck.description,
         variant: 'destructive',
       });
       return false;
@@ -322,7 +325,7 @@ export default function InvoiceEdit() {
   const handleSave = async () => {
     if (!validateForm() || !id) return;
 
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
 
     try {
       await updateInvoice.mutateAsync({
@@ -408,7 +411,7 @@ export default function InvoiceEdit() {
     if (!validateForm() || !id) return;
 
     // First save, then issue
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
 
     try {
       await updateInvoice.mutateAsync({

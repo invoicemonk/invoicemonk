@@ -73,6 +73,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCountryName } from '@/lib/countries';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
 import { stripUrls } from '@/lib/utils';
+import { validateLineItems, getValidLineItems, hasValidLineItems } from '@/lib/line-item-validation';
+
 import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
 import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
 import type { Database } from '@/integrations/supabase/types';
@@ -463,10 +465,11 @@ export default function InvoiceNew() {
       });
       return false;
     }
-    if (!items.some(item => item.description && item.unitPrice > 0)) {
+    const lineItemCheck = validateLineItems(items);
+    if (!lineItemCheck.valid) {
       toast({
-        title: 'Line items required',
-        description: 'Please add at least one line item with a description and price.',
+        title: lineItemCheck.title,
+        description: lineItemCheck.description,
         variant: 'destructive',
       });
       return false;
@@ -501,7 +504,7 @@ export default function InvoiceNew() {
 
     if (!validateForm()) return;
 
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
@@ -623,7 +626,7 @@ export default function InvoiceNew() {
       return;
     }
 
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
