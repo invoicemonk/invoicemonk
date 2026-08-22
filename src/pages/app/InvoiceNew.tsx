@@ -73,19 +73,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCountryName } from '@/lib/countries';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
 import { stripUrls } from '@/lib/utils';
+import { validateLineItems, getValidLineItems, hasValidLineItems } from '@/lib/line-item-validation';
+
 import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
 import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceKind = Database['public']['Enums']['invoice_kind'];
 
-function getSmartPrefillAmount(currency: string): number {
-  const zeroDecimal = ['JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF'];
-  const lowValue = ['NGN', 'KES', 'TZS', 'GHS', 'EGP', 'PKR', 'INR', 'PHP', 'BDT', 'LKR', 'MXN', 'COP', 'ARS', 'CZK', 'HUF', 'PLN', 'THB', 'ZAR', 'MAD', 'XOF', 'XAF', 'IDR'];
-  if (zeroDecimal.includes(currency)) return 10000;
-  if (lowValue.includes(currency)) return 10000;
-  return 100;
-}
 
 interface InvoiceItem {
   id: string;
@@ -201,22 +196,8 @@ export default function InvoiceNew() {
     }
   }, [activeCurrency]);
 
-  // First invoice prefill: populate a sample line item for new users
-  const [prefillApplied, setPrefillApplied] = useState(false);
-  useEffect(() => {
-    if (isFirstInvoice && !prefillApplied && activeCurrency) {
-      const amount = getSmartPrefillAmount(activeCurrency);
-      setItems([{
-        id: '1',
-        description: 'Sample Service',
-        quantity: 1,
-        unitPrice: amount,
-        taxRate: defaultVatRate,
-        isVatExempt: false,
-      }]);
-      setPrefillApplied(true);
-    }
-  }, [isFirstInvoice, prefillApplied, activeCurrency, defaultVatRate]);
+
+
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -304,8 +285,6 @@ export default function InvoiceNew() {
           isVatExempt: Number(it.tax_rate) === 0 && defaultVatRate > 0,
         };
       }));
-      // Prevent first-invoice sample override
-      setPrefillApplied(true);
     }
 
     setDuplicationApplied(true);
@@ -486,10 +465,11 @@ export default function InvoiceNew() {
       });
       return false;
     }
-    if (!items.some(item => item.description && item.unitPrice > 0)) {
+    const lineItemCheck = validateLineItems(items);
+    if (!lineItemCheck.valid) {
       toast({
-        title: 'Line items required',
-        description: 'Please add at least one line item with a description and price.',
+        title: lineItemCheck.title,
+        description: lineItemCheck.description,
         variant: 'destructive',
       });
       return false;
@@ -524,7 +504,7 @@ export default function InvoiceNew() {
 
     if (!validateForm()) return;
 
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
@@ -646,7 +626,7 @@ export default function InvoiceNew() {
       return;
     }
 
-    const validItems = items.filter(item => item.description && item.unitPrice > 0);
+    const validItems = getValidLineItems(items);
     // Use currency from active currency account
     const effectiveCurrency = currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency);
 
@@ -706,15 +686,16 @@ export default function InvoiceNew() {
 
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
+  const lineItemsReady = hasValidLineItems(items);
 
-  // Baseline for unsaved-changes detection (accounts for auto-prefilled sample data)
+  // Baseline for unsaved-changes detection
   const baselineItemsRef = useRef<string>(JSON.stringify(items));
   useEffect(() => {
-    if (prefillApplied || duplicationApplied) {
+    if (duplicationApplied) {
       baselineItemsRef.current = JSON.stringify(items);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillApplied, duplicationApplied]);
+  }, [duplicationApplied]);
 
   const hasUnsavedChanges =
     !isLoading &&
@@ -1113,9 +1094,22 @@ export default function InvoiceNew() {
           <Card>
             <CardHeader>
               <CardTitle data-tour="invoice-form-items">Line Items</CardTitle>
-              <CardDescription>Add products or services to the invoice</CardDescription>
+              <CardDescription>
+                Add what you're billing for — description, quantity and unit price. Every line must reflect
+                real goods or services supplied.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!lineItemsReady && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Add at least one line item with a description, quantity and a unit price above zero before
+                    saving or issuing this invoice.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {items.map((item) => (
                 <div key={item.id} className="space-y-4 pb-4 border-b last:border-0 last:pb-0">
                   <div className="flex items-start gap-4">
@@ -1388,7 +1382,7 @@ export default function InvoiceNew() {
                   className="w-full"
                   data-tour="invoice-form-actions"
                   onClick={handleSaveDraft}
-                  disabled={isLoading}
+                  disabled={isLoading || !lineItemsReady}
                 >
                   {createInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1400,7 +1394,7 @@ export default function InvoiceNew() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !isEmailVerified || showTinWarning || isProfileIncomplete}
+                  disabled={isLoading || !lineItemsReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
