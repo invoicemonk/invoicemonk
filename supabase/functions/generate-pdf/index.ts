@@ -740,7 +740,7 @@ Deno.serve(async (req) => {
       : null
     
     // ALWAYS show business logo if available (regardless of tier)
-    // Branding tier only affects watermark and "Powered by InvoiceMonk" text
+    // Branding tier only affects watermark and "Powered by Invoicemonk" text
     let issuerLogoUrl = issuerSnapshot?.logo_url || null
 
     // Defensive fallback: If no logo in snapshot, try to fetch from business table

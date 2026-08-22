@@ -29,7 +29,7 @@ export default function FeatureProfessional() {
           <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground px-10 py-8 flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-white rounded-lg p-2 shadow-sm">
-                <img src={logo} alt="InvoiceMonk" className="h-7 w-auto" />
+                <img src={logo} alt="Invoicemonk" className="h-7 w-auto" />
               </div>
               <div>
                 <div className="text-lg font-semibold leading-tight">Acme Studio</div>
@@ -111,7 +111,7 @@ export default function FeatureProfessional() {
               <div>Thank you for your business · payment due within 30 days</div>
               <div className="flex items-center gap-1.5">
                 <img src={logo} alt="" className="h-3.5 w-auto opacity-70" />
-                <span>Powered by InvoiceMonk</span>
+                <span>Powered by Invoicemonk</span>
               </div>
             </div>
           </div>

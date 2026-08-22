@@ -201,7 +201,7 @@ const VerifyInvoice = () => {
       <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={invoicemonkLogo} alt="InvoiceMonk" className="h-8 w-auto" />
+            <img src={invoicemonkLogo} alt="Invoicemonk" className="h-8 w-auto" />
           </Link>
           <Badge variant="secondary" className="gap-1.5">
             <Shield className="h-3 w-3" />
@@ -276,7 +276,7 @@ const VerifyInvoice = () => {
                           <div>
                             <h2 className="text-lg font-bold text-destructive mb-1">Fraud Warning</h2>
                             <p className="text-sm text-destructive/90">
-                              This invoice was issued by a business that has been flagged for suspicious activity by InvoiceMonk. 
+                              This invoice was issued by a business that has been flagged for suspicious activity by Invoicemonk. 
                               Exercise extreme caution before making any payments or sharing personal information.
                             </p>
                             {data.flag_reason && (

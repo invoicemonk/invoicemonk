@@ -35,7 +35,7 @@ function generateSubmissionEmail(businessName: string): string {
           <!-- Logo Bar -->
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <!-- Header -->
@@ -109,7 +109,7 @@ function generateApprovedEmail(businessName: string): string {
         <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <tr>
@@ -167,7 +167,7 @@ function generateRejectedEmail(businessName: string, reason: string): string {
         <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <tr>
@@ -227,7 +227,7 @@ function generateRequiresActionEmail(businessName: string, reason: string): stri
         <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <tr>

@@ -253,7 +253,7 @@ export function VerificationDocumentsSection({ business }: VerificationDocuments
                 {verificationSource === 'stripe_kyc'
                   ? 'Verified via Stripe identity verification.'
                   : verificationSource === 'manual_review'
-                  ? 'Verified by InvoiceMonk team review.'
+                  ? 'Verified by Invoicemonk team review.'
                   : verificationSource === 'government_api'
                   ? 'Verified via government registry.'
                   : isIndividual ? 'Your identity has been verified.' : 'Your business has been verified.'}

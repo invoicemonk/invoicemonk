@@ -373,8 +373,8 @@ function buildSAFTArtifact(input: ArtifactBuilderInput): Record<string, unknown>
       AuditFileVersion: '2.0',
       AuditFileCountry: 'BG',
       AuditFileDateCreated: new Date().toISOString().split('T')[0],
-      SoftwareCompanyName: 'InvoiceMonk',
-      SoftwareID: 'InvoiceMonk',
+      SoftwareCompanyName: 'Invoicemonk',
+      SoftwareID: 'Invoicemonk',
       SoftwareVersion: '1.0',
       Company: {
         Name: input.issuerSnapshot.legal_name || input.issuerSnapshot.business_name,

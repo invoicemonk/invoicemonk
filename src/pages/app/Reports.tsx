@@ -212,7 +212,7 @@ export default function Reports() {
                     </Badge>
                   )}
                   <span className="text-sm text-muted-foreground">
-                    Reports are scoped to this currency account. InvoiceMonk never mixes currencies.
+                    Reports are scoped to this currency account. Invoicemonk never mixes currencies.
                   </span>
                 </div>
               ) : (

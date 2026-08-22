@@ -10,15 +10,15 @@ function welcomeEmailTemplate(userName: string): string {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
-    <h1 style="margin: 0; font-size: 22px;">Welcome to InvoiceMonk! 🎉</h1>
+    <h1 style="margin: 0; font-size: 22px;">Welcome to Invoicemonk! 🎉</h1>
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Hi ${userName},</p>
-    <p>I'm Ayo, the founder of InvoiceMonk. Welcome aboard!</p>
-    <p>InvoiceMonk helps you create compliant invoices, track payments, and manage your business finances — all while staying aligned with tax regulations in your jurisdiction (IRS, HMRC, FIRS, CRA, ATO, and more).</p>
+    <p>I'm Ayo, the founder of Invoicemonk. Welcome aboard!</p>
+    <p>Invoicemonk helps you create compliant invoices, track payments, and manage your business finances — all while staying aligned with tax regulations in your jurisdiction (IRS, HMRC, FIRS, CRA, ATO, and more).</p>
 
     <h2 style="font-size: 18px; color: #1d6b5a; margin: 25px 0 15px;">🚀 Get Started in 4 Steps</h2>
 
@@ -70,12 +70,12 @@ function welcomeEmailTemplate(userName: string): string {
     <p style="margin-top: 25px;">
       Cheers,<br>
       <strong>Ayo</strong><br>
-      <span style="color: #666; font-size: 13px;">Founder, InvoiceMonk</span>
+      <span style="color: #666; font-size: 13px;">Founder, Invoicemonk</span>
     </p>
 
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+      Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -96,9 +96,9 @@ async function sendWelcomeEmail(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        sender: { name: "Ayo from InvoiceMonk", email: "hello@invoicemonk.com" },
+        sender: { name: "Ayo from Invoicemonk", email: "hello@invoicemonk.com" },
         to: [{ email, name: fullName }],
-        subject: `Welcome to InvoiceMonk, ${fullName || "there"}! Here's how to get started`,
+        subject: `Welcome to Invoicemonk, ${fullName || "there"}! Here's how to get started`,
         htmlContent: welcomeEmailTemplate(fullName || "there"),
       }),
     });

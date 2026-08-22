@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       .eq('id', invoice.business_id)
       .single()
 
-    const businessName = escapeHtml(business?.name || 'InvoiceMonk')
+    const businessName = escapeHtml(business?.name || 'Invoicemonk')
     const onlinePaymentsEnabled = business?.online_payments_enabled === true
 
     // Build email
@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
     <h1 style="margin: 0; font-size: 22px;">Payment Reminder</h1>
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     </div>
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
     <p style="color: #888; font-size: 12px; text-align: center;">
-      This reminder was sent on behalf of ${businessName} via InvoiceMonk.
+      This reminder was sent on behalf of ${businessName} via Invoicemonk.
     </p>
   </div>
 </body>
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Email service not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, sanitizeHeaderValue(business?.name || 'InvoiceMonk'), reminderEmail, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
+    const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, sanitizeHeaderValue(business?.name || 'Invoicemonk'), reminderEmail, `Reminder: Invoice ${invoice.invoice_number} is overdue`, htmlContent)
     if (!sent) {
       return new Response(JSON.stringify({ error: 'Failed to send reminder email' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }

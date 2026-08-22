@@ -549,7 +549,7 @@ Deno.serve(async (req) => {
     <!-- Compliance Sample Banner -->
     <div class="compliance-banner">
       🏛️ COMPLIANCE SAMPLE — FOR REGULATORY REVIEW
-      <div class="compliance-banner-sub">This is a demonstration invoice generated using InvoiceMonk's production rendering pipeline</div>
+      <div class="compliance-banner-sub">This is a demonstration invoice generated using Invoicemonk's production rendering pipeline</div>
     </div>
 
     <!-- Header -->
@@ -669,7 +669,7 @@ Deno.serve(async (req) => {
     <!-- Integrity Notice -->
     <div class="integrity-notice">
       <strong>🔒 Integrity Guarantee</strong><br>
-      This invoice is immutable and verifiable via the InvoiceMonk platform. Once issued, financial data cannot be modified. All changes are tracked in an immutable audit log.
+      This invoice is immutable and verifiable via the Invoicemonk platform. Once issued, financial data cannot be modified. All changes are tracked in an immutable audit log.
     </div>
 
     <!-- Footer with QR Code and Full Hash -->
