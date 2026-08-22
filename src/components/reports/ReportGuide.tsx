@@ -17,7 +17,7 @@ export function ReportGuide() {
           <CollapsibleContent className="pt-3 text-sm text-muted-foreground">
             <ul className="space-y-2 list-disc pl-4">
               <li>
-                <strong className="text-foreground">Currency scoped:</strong> each report is tied to the currency account you have selected. InvoiceMonk never mixes currencies in a single report, so switch currency accounts to see data in another currency.
+                <strong className="text-foreground">Currency scoped:</strong> each report is tied to the currency account you have selected. Invoicemonk never mixes currencies in a single report, so switch currency accounts to see data in another currency.
               </li>
               <li>
                 <strong className="text-foreground">Formats:</strong>

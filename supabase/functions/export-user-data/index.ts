@@ -34,7 +34,7 @@ async function sendBrevo(to: string, subject: string, html: string) {
     method: 'POST',
     headers: { 'api-key': BREVO, 'content-type': 'application/json' },
     body: JSON.stringify({
-      sender: { name: 'InvoiceMonk', email: SMTP_FROM },
+      sender: { name: 'Invoicemonk', email: SMTP_FROM },
       to: [{ email: to }],
       subject,
       htmlContent: html,
@@ -116,10 +116,10 @@ Deno.serve(async (req) => {
   if (user.email) {
     await sendBrevo(
       user.email,
-      'Your InvoiceMonk data export is ready',
+      'Your Invoicemonk data export is ready',
       `<p>Hi,</p><p>Your data export is ready. The link is valid for 7 days:</p>
        <p><a href="${signed.signedUrl}">Download my data</a></p>
-       <p>— InvoiceMonk</p>`,
+       <p>— Invoicemonk</p>`,
     ).catch(() => false);
   }
 

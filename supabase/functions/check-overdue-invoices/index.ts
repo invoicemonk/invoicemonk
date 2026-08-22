@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
             if (profile?.email) {
               try {
                 const business = invoice.businesses as any
-                const businessName = business?.name || 'InvoiceMonk'
+                const businessName = business?.name || 'Invoicemonk'
                 const daysOverdue = Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
 
                 const htmlContent = `
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
                   </head>
                   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                      <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+                      <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
                     </div>
                     <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
                       <h1 style="margin: 0; font-size: 22px;">⚠️ Overdue Invoice Alert</h1>
@@ -257,7 +257,7 @@ Deno.serve(async (req) => {
                       <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
                       <p style="color: #888; font-size: 12px; text-align: center;">
                         You can manage your email notification preferences in Settings.<br>
-                        Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #888;">invoicemonk.com</a>
+                        Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #888;">invoicemonk.com</a>
                       </p>
                     </div>
                   </body>
@@ -267,7 +267,7 @@ Deno.serve(async (req) => {
                 const sent = await sendBrevoEmail(
                   brevoApiKey,
                   smtpFrom,
-                  'InvoiceMonk',
+                  'Invoicemonk',
                   profile.email,
                   `⚠️ Invoice ${invoice.invoice_number} is ${daysOverdue} day(s) overdue`,
                   htmlContent

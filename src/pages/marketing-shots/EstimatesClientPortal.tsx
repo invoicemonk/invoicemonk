@@ -21,7 +21,7 @@ export default function EstimatesClientPortal() {
       <div className="bg-muted/30 overflow-hidden" style={{ width: 1600, height: 1200 }}>
         {/* Public top bar */}
         <div className="h-14 bg-card border-b flex items-center justify-between px-10">
-          <img src={logo} alt="InvoiceMonk" className="h-7 w-auto" />
+          <img src={logo} alt="Invoicemonk" className="h-7 w-auto" />
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-primary" />
             Secure client portal · Acme Studio
@@ -123,7 +123,7 @@ export default function EstimatesClientPortal() {
                 <li>Project kicks off within 3 business days.</li>
               </ol>
               <Badge variant="outline" className="mt-4 border-primary/30 bg-primary/5 text-primary">
-                <ShieldCheck className="h-3 w-3 mr-1" />Verified by InvoiceMonk
+                <ShieldCheck className="h-3 w-3 mr-1" />Verified by Invoicemonk
               </Badge>
             </Card>
           </div>

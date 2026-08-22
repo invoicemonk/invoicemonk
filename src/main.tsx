@@ -8,7 +8,7 @@ function StartupFailure() {
     <main className="min-h-screen bg-background px-6 flex items-center justify-center">
       <section className="w-full max-w-md border border-border bg-card p-8 text-center shadow-sm rounded-lg">
         <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">IM</div>
-        <h1 className="text-xl font-bold text-foreground">InvoiceMonk couldn't finish loading</h1>
+        <h1 className="text-xl font-bold text-foreground">Invoicemonk couldn't finish loading</h1>
         <p className="mt-3 text-sm text-muted-foreground">Your information is safe. Check your connection, then try again.</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground" onClick={() => window.location.reload()}>Reload</button>

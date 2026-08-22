@@ -61,7 +61,7 @@ export function MarketingShotFrame({
         {/* Sidebar */}
         <aside className="w-[248px] shrink-0 border-r bg-card flex flex-col">
           <div className="h-16 px-5 border-b flex items-center gap-2">
-            <img src={logo} alt="InvoiceMonk" className="h-8 w-auto" />
+            <img src={logo} alt="Invoicemonk" className="h-8 w-auto" />
           </div>
 
           <div className="px-3 py-3 border-b">

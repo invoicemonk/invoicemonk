@@ -269,7 +269,7 @@ export default function AdminSystem() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              These samples demonstrate InvoiceMonk's invoice format, tax calculations, 
+              These samples demonstrate Invoicemonk's invoice format, tax calculations, 
               and compliance fields for B2B/B2G and B2C transactions.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">

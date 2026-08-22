@@ -36,7 +36,7 @@ async function sendBrevoEmail(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        sender: { name: "InvoiceMonk", email: smtpFrom },
+        sender: { name: "Invoicemonk", email: smtpFrom },
         to: [{ email: toEmail, name: toName }],
         subject,
         htmlContent,
@@ -61,7 +61,7 @@ function professionalUpgradeEmailTemplate(userName: string, nextBillingDate: str
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
     <h1 style="margin: 0; font-size: 22px;">🎉 Welcome to Professional!</h1>
@@ -142,7 +142,7 @@ function professionalUpgradeEmailTemplate(userName: string, nextBillingDate: str
     <h2 style="font-size: 16px; color: #1d6b5a; margin: 25px 0 10px;">🏁 Recommended First Steps</h2>
 
     <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin: 15px 0;">
-      <p style="margin: 0 0 8px;"><strong>1.</strong> <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Upload your logo</a> to remove the InvoiceMonk watermark</p>
+      <p style="margin: 0 0 8px;"><strong>1.</strong> <a href="https://app.invoicemonk.com/settings" style="color: #1d6b5a;">Upload your logo</a> to remove the Invoicemonk watermark</p>
       <p style="margin: 0 0 8px;"><strong>2.</strong> <a href="https://app.invoicemonk.com/team" style="color: #1d6b5a;">Invite a team member</a> to help with invoicing</p>
       <p style="margin: 0;"><strong>3.</strong> <a href="https://app.invoicemonk.com/expenses" style="color: #1d6b5a;">Try AI Receipt Scanning</a> — snap a physical receipt and watch it auto-fill</p>
     </div>
@@ -174,11 +174,11 @@ function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string)
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
     <h1 style="margin: 0; font-size: 22px;">🎉 Welcome to Business!</h1>
-    <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">You've unlocked the most powerful InvoiceMonk plan</p>
+    <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">You've unlocked the most powerful Invoicemonk plan</p>
   </div>
   <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
     <p>Hi ${userName},</p>
@@ -244,7 +244,7 @@ function businessUpgradeEmailTemplate(userName: string, nextBillingDate: string)
 
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+      Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -257,7 +257,7 @@ function starterUpgradeEmailTemplate(userName: string, nextBillingDate: string):
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
     <h1 style="margin: 0; font-size: 22px;">🎉 Upgrade Confirmed!</h1>
@@ -282,7 +282,7 @@ function starterUpgradeEmailTemplate(userName: string, nextBillingDate: string):
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+      Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -306,7 +306,7 @@ function getUpgradeEmailTemplate(userName: string, tier: string, nextBillingDate
   // Starter or fallback
   const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
   return {
-    subject: `Your InvoiceMonk ${tierName} plan is now active!`,
+    subject: `Your Invoicemonk ${tierName} plan is now active!`,
     html: starterUpgradeEmailTemplate(userName, nextBillingDate),
   };
 }

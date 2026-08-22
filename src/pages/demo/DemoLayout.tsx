@@ -34,7 +34,7 @@ export function DemoLayout({ children }: DemoLayoutProps) {
       <div className="bg-primary text-primary-foreground py-2 px-4 text-center text-sm">
         <span className="font-medium">Demo Mode</span>
         <span className="mx-2">—</span>
-        <span>Explore InvoiceMonk with sample data</span>
+        <span>Explore Invoicemonk with sample data</span>
         <Button asChild variant="secondary" size="sm" className="ml-4">
           <Link to="/signup">
             <LogIn className="h-3 w-3 mr-1" />
@@ -50,7 +50,7 @@ export function DemoLayout({ children }: DemoLayoutProps) {
             <Link to="/demo/invoices" className="flex items-center gap-2">
               <img 
                 src="/invoicemonk-logo.png" 
-                alt="InvoiceMonk" 
+                alt="Invoicemonk" 
                 className="h-8"
               />
             </Link>

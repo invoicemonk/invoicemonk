@@ -56,7 +56,7 @@ function generateNewTicketEmail(ticket: Record<string, unknown>, userEmail: stri
           <!-- Logo Bar -->
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <!-- Header -->
@@ -165,7 +165,7 @@ function generateAdminReplyEmail(ticket: Record<string, unknown>, message: Recor
           <!-- Logo Bar -->
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <!-- Header -->
@@ -458,7 +458,7 @@ Deno.serve(async (req: Request) => {
           <!-- Logo Bar -->
           <tr>
             <td style="background: #ffffff; padding: 20px 30px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+              <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
             </td>
           </tr>
           <!-- Header -->

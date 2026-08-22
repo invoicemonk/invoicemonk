@@ -18,7 +18,7 @@ async function sendBrevoEmail(
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        sender: { name: 'InvoiceMonk', email: fromEmail },
+        sender: { name: 'Invoicemonk', email: fromEmail },
         to: [{ email: toEmail }],
         subject,
         htmlContent,
@@ -69,7 +69,7 @@ function buildRenewalEmailHtml(
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
         <tr><td style="background:#18181b;padding:24px 32px;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">InvoiceMonk</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">Invoicemonk</h1>
         </td></tr>
         <tr><td style="padding:32px;">
           <h2 style="margin:0 0 8px;font-size:18px;color:#18181b;">Your subscription is renewing soon</h2>
@@ -88,11 +88,11 @@ function buildRenewalEmailHtml(
           </table>
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
           <p style="margin:0;color:#a1a1aa;font-size:12px;">
-            You're receiving this because you have an active paid subscription on InvoiceMonk.
+            You're receiving this because you have an active paid subscription on Invoicemonk.
             If you have any questions, reach out to our support team.
           </p>
           <p style="margin:8px 0 0;color:#a1a1aa;font-size:12px;">
-            &copy; ${new Date().getFullYear()} InvoiceMonk. All rights reserved.
+            &copy; ${new Date().getFullYear()} Invoicemonk. All rights reserved.
           </p>
         </td></tr>
       </table>
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
         continue
       }
 
-      const subject = `Your ${sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1)} plan renews on ${formatDate(sub.current_period_end)} — InvoiceMonk`
+      const subject = `Your ${sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1)} plan renews on ${formatDate(sub.current_period_end)} — Invoicemonk`
       const html = buildRenewalEmailHtml(
         profile.full_name || '',
         sub.tier,

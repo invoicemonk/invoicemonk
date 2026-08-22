@@ -56,7 +56,7 @@ function emailWrapper(title: string, bodyHtml: string): string {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
   <div style="background: #ffffff; padding: 20px 30px; border-radius: 12px 12px 0 0; text-align: center; border-bottom: 1px solid #e5e7eb;">
-    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="InvoiceMonk" style="height: 36px;" />
+    <img src="https://app.invoicemonk.com/invoicemonk-logo.png" alt="Invoicemonk" style="height: 36px;" />
   </div>
   <div style="background: linear-gradient(135deg, #1d6b5a 0%, #155a4a 100%); color: white; padding: 24px 30px; text-align: center;">
     <h1 style="margin: 0; font-size: 22px;">${title}</h1>
@@ -65,7 +65,7 @@ function emailWrapper(title: string, bodyHtml: string): string {
     ${bodyHtml}
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 11px; text-align: center;">
-      Sent by InvoiceMonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
+      Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color: #999;">invoicemonk.com</a>
     </p>
   </div>
 </body>
@@ -76,7 +76,7 @@ function campaignATemplate(userName: string): string {
   return emailWrapper(
     'Complete Your Setup',
     `<p>Hi ${userName},</p>
-    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of InvoiceMonk:</p>
+    <p>We noticed you haven't verified your email yet. Verifying unlocks the full power of Invoicemonk:</p>
     <ul style="color: #555;">
       <li>Issue professional invoices with compliance features</li>
       <li>Get notified when clients view your invoices</li>
@@ -94,7 +94,7 @@ function campaignBTemplate(userName: string): string {
   return emailWrapper(
     'Ready to Send Your First Invoice?',
     `<p>Hi ${userName},</p>
-    <p>Your InvoiceMonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
+    <p>Your Invoicemonk account is verified and ready to go! Here's how to get started in under 2 minutes:</p>
     <ol style="color: #555;">
       <li><strong>Add a client</strong> — name and email is all you need</li>
       <li><strong>Create an invoice</strong> — add line items, set a due date</li>
@@ -128,7 +128,7 @@ function campaignDTemplate(userName: string): string {
   return emailWrapper(
     'We Miss You!',
     `<p>Hi ${userName},</p>
-    <p>It's been a while since you logged into InvoiceMonk. Your dashboard is ready and waiting — here's what you can do today:</p>
+    <p>It's been a while since you logged into Invoicemonk. Your dashboard is ready and waiting — here's what you can do today:</p>
     <ul style="color: #555;">
       <li>Check on outstanding invoices and payments</li>
       <li>Send reminders to clients with overdue balances</li>
