@@ -194,22 +194,8 @@ export default function InvoiceNew() {
     }
   }, [activeCurrency]);
 
-  // First invoice prefill: populate a sample line item for new users
-  const [prefillApplied, setPrefillApplied] = useState(false);
-  useEffect(() => {
-    if (isFirstInvoice && !prefillApplied && activeCurrency) {
-      const amount = getSmartPrefillAmount(activeCurrency);
-      setItems([{
-        id: '1',
-        description: 'Sample Service',
-        quantity: 1,
-        unitPrice: amount,
-        taxRate: defaultVatRate,
-        isVatExempt: false,
-      }]);
-      setPrefillApplied(true);
-    }
-  }, [isFirstInvoice, prefillApplied, activeCurrency, defaultVatRate]);
+
+
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
