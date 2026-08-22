@@ -283,8 +283,6 @@ export default function InvoiceNew() {
           isVatExempt: Number(it.tax_rate) === 0 && defaultVatRate > 0,
         };
       }));
-      // Prevent first-invoice sample override
-      setPrefillApplied(true);
     }
 
     setDuplicationApplied(true);
@@ -686,14 +684,14 @@ export default function InvoiceNew() {
 
   const isLoading = createInvoice.isPending || issueInvoice.isPending;
 
-  // Baseline for unsaved-changes detection (accounts for auto-prefilled sample data)
+  // Baseline for unsaved-changes detection
   const baselineItemsRef = useRef<string>(JSON.stringify(items));
   useEffect(() => {
-    if (prefillApplied || duplicationApplied) {
+    if (duplicationApplied) {
       baselineItemsRef.current = JSON.stringify(items);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillApplied, duplicationApplied]);
+  }, [duplicationApplied]);
 
   const hasUnsavedChanges =
     !isLoading &&
