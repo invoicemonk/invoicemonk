@@ -1094,9 +1094,22 @@ export default function InvoiceNew() {
           <Card>
             <CardHeader>
               <CardTitle data-tour="invoice-form-items">Line Items</CardTitle>
-              <CardDescription>Add products or services to the invoice</CardDescription>
+              <CardDescription>
+                Add what you're billing for — description, quantity and unit price. Every line must reflect
+                real goods or services supplied.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!lineItemsReady && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Add at least one line item with a description, quantity and a unit price above zero before
+                    saving or issuing this invoice.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {items.map((item) => (
                 <div key={item.id} className="space-y-4 pb-4 border-b last:border-0 last:pb-0">
                   <div className="flex items-start gap-4">
