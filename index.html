@@ -7,6 +7,7 @@
     <meta name="description" content="Create verifiable, audit-ready invoices with immutable records. The invoicing platform built for compliance." />
     <meta name="author" content="Invoicemonk" />
     <meta name="robots" content="noindex, nofollow" />
+    <link rel="preload" as="image" href="/invoicemonk-logo.png" />
     <link rel="icon" href="/favicon.png" type="image/png" />
 
     <meta property="og:title" content="Invoicemonk - Compliance-First Invoicing" />
@@ -38,17 +39,14 @@
   <body>
     <div id="root">
       <div id="startup-shell" role="status" aria-live="polite">
-        <div class="startup-mark" aria-hidden="true">IM</div>
-        <div class="startup-copy">
-          <strong>Invoicemonk</strong>
-          <span>Loading secure workspace…</span>
-        </div>
+        <img src="/invoicemonk-logo.png" alt="Invoicemonk" />
+        <span>Loading secure workspace…</span>
       </div>
     </div>
     <style>
-      #startup-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:14px;background:#fbfcfd;color:#0f172a;font:14px/1.5 Inter,system-ui,sans-serif}
-      .startup-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:8px;background:#1d6b5a;color:#fff;font-weight:700}
-      .startup-copy{display:flex;flex-direction:column}.startup-copy strong{font-size:16px}.startup-copy span{color:#526174}
+      #startup-shell{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#fbfcfd;color:#0f172a;font:14px/1.5 Inter,system-ui,sans-serif}
+      #startup-shell img{height:36px;width:auto}
+      #startup-shell span{color:#526174}
     </style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
