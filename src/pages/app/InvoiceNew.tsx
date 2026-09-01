@@ -77,6 +77,8 @@ import { validateLineItems, getValidLineItems, hasValidLineItems } from '@/lib/l
 
 import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
 import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
+import { InvoiceAdvancedSection } from '@/components/invoices/InvoiceAdvancedSection';
+import { InvoiceSectionHeader } from '@/components/invoices/InvoiceSectionHeader';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceKind = Database['public']['Enums']['invoice_kind'];
@@ -178,6 +180,13 @@ export default function InvoiceNew() {
   const [invoiceKind, setInvoiceKind] = useState<InvoiceKind>('standard');
   const [depositPercent, setDepositPercent] = useState<number | null>(null);
   const [parentInvoiceId, setParentInvoiceId] = useState<string | null>(null);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride || selectedTemplateId || depositPercent !== null || parentInvoiceId) {
+      setIsAdvancedOpen(true);
+    }
+  }, [invoiceKind, isReverseCharge, brandColorOverride, selectedTemplateId, depositPercent, parentInvoiceId]);
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
@@ -846,12 +855,16 @@ export default function InvoiceNew() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 flex flex-col gap-6">
           {/* Client Selection */}
           <Card data-tour="invoice-form-client">
             <CardHeader>
-              <CardTitle>Client Details</CardTitle>
-              <CardDescription>Select or create a client for this invoice</CardDescription>
+              <InvoiceSectionHeader
+                title="Client"
+                description="Choose who will receive this invoice."
+                help="Required. The selected client appears on the invoice and receives it when you send it. You can create a new client if they are not listed."
+                required
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -925,10 +938,15 @@ export default function InvoiceNew() {
           </Card>
 
           {/* Invoice Details */}
-          <Card>
+          <Card className="order-3">
             <CardHeader>
-              <CardTitle data-tour="invoice-form-dates">Invoice Details</CardTitle>
-              <CardDescription>Set invoice dates and terms</CardDescription>
+              <InvoiceSectionHeader
+                title="Invoice details"
+                description="Set the dates, currency, and a short summary."
+                help="Required for a clear, accurate record. The issue date identifies when the invoice was created; the due date tells your client when payment is expected."
+                dataTour="invoice-form-dates"
+                required
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1002,60 +1020,8 @@ export default function InvoiceNew() {
                 <p className="text-xs text-muted-foreground text-right">{summary.length}/{INPUT_LIMITS.TEXTAREA}</p>
               </div>
 
-              {/* Template Selection */}
-              <div className="space-y-2">
-                <Label>Invoice Template</Label>
-                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a template..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates?.map((template) => (
-                      <SelectItem 
-                        key={template.id} 
-                        value={template.id}
-                        disabled={!template.available}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>{template.name}</span>
-                          {!template.available && (
-                            <Badge variant="outline" className="text-xs">
-                              <Lock className="h-2.5 w-2.5 mr-1" />
-                              {template.tier_required}
-                            </Badge>
-                          )}
-                          {template.watermark_required && (
-                            <Badge variant="secondary" className="text-xs">
-                              Watermark
-                            </Badge>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {templates?.find(t => t.id === selectedTemplateId)?.watermark_required && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    This template includes Invoicemonk watermark
-                  </p>
-                )}
-              </div>
             </CardContent>
           </Card>
-
-          {/* Deposit / Final Invoice */}
-          <DepositInvoiceSection
-            businessId={currentBusiness?.id}
-            clientId={selectedClientId}
-            currency={currentCurrencyAccount?.currency || activeCurrency || (isCurrencyLocked && lockedCurrency ? lockedCurrency : currency)}
-            kind={invoiceKind}
-            depositPercent={depositPercent}
-            parentInvoiceId={parentInvoiceId}
-            onKindChange={setInvoiceKind}
-            onDepositPercentChange={setDepositPercent}
-            onParentInvoiceIdChange={setParentInvoiceId}
-          />
 
           {/* Payment Method Selector */}
           {paymentMethods && paymentMethods.length > 0 && (
