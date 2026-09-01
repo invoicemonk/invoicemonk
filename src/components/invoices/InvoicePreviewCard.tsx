@@ -7,6 +7,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { useParentDepositInvoice } from '@/hooks/use-parent-deposit-invoice';
 import { splitLineItemDescription } from '@/lib/input-limits';
 import { LogoImage } from '@/components/common/LogoImage';
+import { InvoiceWatermark } from './InvoiceWatermark';
 
 type Invoice = Tables<'invoices'> & {
   clients?: Tables<'clients'> | null;
@@ -85,19 +86,30 @@ export interface TemplateConfig {
   };
 }
 
+export interface PreviewPaymentMethod {
+  provider_type?: string | null;
+  display_name?: string | null;
+  instructions?: Record<string, string> | unknown | null;
+}
+
 interface InvoicePreviewCardProps {
   invoice: Invoice;
   showWatermark?: boolean;
   business?: Business | null;
   templateConfig?: TemplateConfig | null;
+  /** Live payment method used when the invoice has no immutable snapshot (drafts). */
+  paymentMethod?: PreviewPaymentMethod | null;
 }
 
+
+// Fallback layout when an invoice carries no template snapshot.
+// This MUST mirror the Basic (starter) template — never a paid layout.
 const DEFAULT_LAYOUT = {
-  header_style: 'standard',
-  show_logo: true,
-  show_terms: true,
+  header_style: 'minimal',
+  show_logo: false,
+  show_terms: false,
   show_notes: true,
-  show_verification_qr: true,
+  show_verification_qr: false,
   show_issuer_details: true,
   show_recipient_details: true,
   show_line_items: true,
@@ -105,7 +117,7 @@ const DEFAULT_LAYOUT = {
   show_bank_details: false,
 };
 
-export function InvoicePreviewCard({ invoice, showWatermark = false, business, templateConfig: templateConfigProp }: InvoicePreviewCardProps) {
+export function InvoicePreviewCard({ invoice, showWatermark = false, business, templateConfig: templateConfigProp, paymentMethod }: InvoicePreviewCardProps) {
   // Auto-derive templateConfig from invoice.template_snapshot when no explicit prop is passed
   const templateConfig = templateConfigProp ?? (invoice.template_snapshot ? {
     layout: (invoice.template_snapshot as Record<string, unknown>).layout as TemplateConfig['layout'],
@@ -383,11 +395,26 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   };
 
   const renderPaymentMethod = (accentColor?: string) => {
-    const pm = invoice.payment_method_snapshot as { provider_type?: string; display_name?: string; instructions?: Record<string, string> } | null;
-    if (!pm?.instructions) return null;
-    const entries = Object.entries(pm.instructions).filter(([, v]) => v);
-    if (entries.length === 0) return null;
     const color = accentColor || primaryColor;
+    // Issued invoices carry an immutable snapshot; drafts fall back to the live method.
+    const snapshot = invoice.payment_method_snapshot as PreviewPaymentMethod | null;
+    const pm: PreviewPaymentMethod | null = snapshot ?? paymentMethod ?? null;
+    const instructions = (pm?.instructions && typeof pm.instructions === 'object')
+      ? (pm.instructions as Record<string, string>)
+      : null;
+    const entries = instructions ? Object.entries(instructions).filter(([, v]) => v) : [];
+
+    if (!pm || entries.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed border-border p-4">
+          <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color }}>Payment Instructions</p>
+          <p className="text-sm text-muted-foreground">
+            No payment instructions — add a payment method in Settings so your client knows how to pay.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border border-border bg-muted/30 p-4">
         <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color }}>Payment Instructions</p>
@@ -467,9 +494,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
     return (
       <Card className="relative overflow-hidden bg-white dark:bg-card print:shadow-none">
         {showWatermark && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5 z-0">
-            <span className="text-8xl font-bold text-foreground rotate-[-30deg]">INVOICEMONK</span>
-          </div>
+          <InvoiceWatermark />
         )}
         <div className="relative z-10 p-8">
           {/* Compact header: invoice number + dates on one line */}
@@ -556,9 +581,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
     return (
       <Card className="relative overflow-hidden bg-white dark:bg-card print:shadow-none">
         {showWatermark && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5 z-0">
-            <span className="text-8xl font-bold text-foreground rotate-[-30deg]">INVOICEMONK</span>
-          </div>
+          <InvoiceWatermark />
         )}
         <div className="relative z-10">
           {/* Full-width brand color header bar */}
@@ -677,9 +700,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
     return (
       <Card className="relative overflow-hidden bg-white dark:bg-card print:shadow-none">
         {showWatermark && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5 z-0">
-            <span className="text-8xl font-bold text-foreground rotate-[-30deg]">INVOICEMONK</span>
-          </div>
+          <InvoiceWatermark />
         )}
         <div className="relative z-10 p-8 space-y-6">
           {/* Formal letterhead: double border, centered logo + business name */}
@@ -805,9 +826,7 @@ export function InvoicePreviewCard({ invoice, showWatermark = false, business, t
   return (
     <Card className="relative overflow-hidden bg-white dark:bg-card print:shadow-none">
       {showWatermark && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5 z-0">
-          <span className="text-8xl font-bold text-foreground rotate-[-30deg]">INVOICEMONK</span>
-        </div>
+        <InvoiceWatermark />
       )}
 
       <div className="relative z-10">

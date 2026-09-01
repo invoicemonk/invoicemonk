@@ -86,8 +86,17 @@ export default function Billing() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackTiers, setFeedbackTiers] = useState<{ previous: string; next: string } | null>(null);
   const previousTierRef = useRef<string | null>(null);
-  const hasPaidSubscriptionEarly = subscription?.stripe_subscription_id != null;
-  const { data: payments, isLoading: paymentsLoading, isError: paymentsError } = useBillingPayments(hasPaidSubscriptionEarly);
+  // "Paid" is a property of the plan and its coverage, not of the Stripe link.
+  // A paid account whose Stripe reference is missing (webhook glitch, mid-repair,
+  // invoice-billed) must never be shown the free-tier upgrade prompt.
+  const paidTier = tier === 'professional' || tier === 'business';
+  const goodStanding = ['active', 'trialing', 'past_due'].includes(subscription?.status ?? '');
+  const coverageValid = subscription?.paid_through
+    ? new Date(subscription.paid_through).getTime() > Date.now()
+    : false;
+  const isPaidAccount = paidTier && (goodStanding || coverageValid);
+  const canOpenPortal = Boolean(subscription?.stripe_customer_id || subscription?.stripe_subscription_id);
+  const { data: payments, isLoading: paymentsLoading, isError: paymentsError } = useBillingPayments(isPaidAccount);
 
   useEffect(() => {
     gaEvents.subscriptionViewed(tier);
@@ -117,7 +126,7 @@ export default function Billing() {
 
   const tiers: TierKey[] = ['professional', 'business'];
 
-  const hasPaidSubscription = subscription?.stripe_subscription_id != null;
+  
 
   const isLegacyFreeTier = tier === 'starter' || tier === 'starter_paid';
   const isLoadingData = pricingLoading || tierFeaturesLoading || businessLoading;
@@ -177,7 +186,7 @@ export default function Billing() {
                   <span className="text-sm font-normal text-muted-foreground">/month</span>
                 </div>
               )}
-              {hasPaidSubscription && (
+              {canOpenPortal && (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -299,18 +308,27 @@ export default function Billing() {
                       )}
                     </Button>
                   ) : isDowngradeTier ? (
-                    <Button 
-                      className="w-full" 
-                      variant="outline"
-                      onClick={handleManageSubscription}
-                      disabled={checkoutLoading || !hasPaidSubscription}
-                    >
-                      {checkoutLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Downgrade'
-                      )}
-                    </Button>
+                    canOpenPortal ? (
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={handleManageSubscription}
+                        disabled={checkoutLoading}
+                      >
+                        {checkoutLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Downgrade'
+                        )}
+                      </Button>
+                    ) : (
+                      <Button className="w-full" variant="outline" asChild>
+                        <a href="mailto:support@invoicemonk.com?subject=Downgrade%20request">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contact support to downgrade
+                        </a>
+                      </Button>
+                    )
                   ) : (
                     <Button className="w-full" variant="outline" disabled>
                       Not Available
@@ -364,7 +382,7 @@ export default function Billing() {
             <CardTitle>Billing Management</CardTitle>
             <CardDescription>Manage your payment methods and view invoices</CardDescription>
           </div>
-          {hasPaidSubscription && (
+          {canOpenPortal && (
             <Button
               variant="outline"
               size="sm"
@@ -381,7 +399,7 @@ export default function Billing() {
           )}
         </CardHeader>
         <CardContent>
-          {!hasPaidSubscription ? (
+          {!isPaidAccount ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="p-4 rounded-full bg-muted mb-4">
                 <CreditCard className="h-8 w-8 text-muted-foreground" />

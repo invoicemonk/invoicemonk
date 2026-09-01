@@ -299,6 +299,17 @@ interface RecipientSnapshot {
   phone?: string
 }
 
+// Fallback layout when an invoice has no template snapshot.
+// MUST mirror the Basic (starter) template — never a paid layout.
+const BASIC_FALLBACK_LAYOUT = {
+  header_style: 'minimal',
+  show_logo: false,
+  show_terms: false,
+  show_notes: true,
+  show_verification_qr: false,
+  show_bank_details: false,
+}
+
 interface TemplateSnapshot {
   id?: string
   name?: string
@@ -456,7 +467,7 @@ Deno.serve(async (req) => {
       // Include template header_style in cache key so each template layout gets its own cache entry
       const tplSnapshot = invoiceData.template_snapshot as Record<string, unknown> | null
       const tplLayout = tplSnapshot?.layout as Record<string, unknown> | null
-      const cacheHeaderStyle = (tplLayout?.header_style as string) || 'standard'
+      const cacheHeaderStyle = (tplLayout?.header_style as string) || BASIC_FALLBACK_LAYOUT.header_style
       const cachePath = `${invoiceData.business_id || 'personal'}/${invoiceData.id}_${cacheHeaderStyle}_v4.html`
       const supabaseAdminForCache = createClient(supabaseUrl, supabaseServiceKey)
       const { data: cachedFile } = await supabaseAdminForCache.storage
@@ -546,10 +557,10 @@ Deno.serve(async (req) => {
     const isNigerianVatRegistered = isNigerianInvoice && issuerSnapshot?.is_vat_registered === true
 
     // Template layout and styles
-    const tplLayout = templateSnapshot?.layout || {}
+    const tplLayout = templateSnapshot?.layout || BASIC_FALLBACK_LAYOUT
     const tplStyles = templateSnapshot?.styles || {}
     const tplPrimaryColor = tplStyles.primary_color || '#1a1a1a'
-    const tplHeaderStyle = tplLayout.header_style || 'standard'
+    const tplHeaderStyle = tplLayout.header_style || BASIC_FALLBACK_LAYOUT.header_style
     const showLogo = tplLayout.show_logo !== false
     const showTerms = tplLayout.show_terms !== false
     const showNotes = tplLayout.show_notes !== false
@@ -810,6 +821,10 @@ Deno.serve(async (req) => {
       tr:last-child td { border-bottom: 1px solid #d1d5db; }
       .footer-branding { text-align: center; font-size: 8px; color: #aaa; padding: 10px 0 0; margin-top: 16px; border-top: 1px solid #eee; }
       .footer-branding a { color: #888; text-decoration: none; }
+      .wm-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden; pointer-events: none; }
+      .wm-rotate { position: absolute; top: -30%; left: -30%; width: 160%; height: 160%; transform: rotate(-45deg); display: flex; flex-direction: column; justify-content: center; gap: 48px; opacity: 0.06; }
+      .wm-row { white-space: nowrap; text-align: center; font-size: 40px; font-weight: 800; letter-spacing: 0.25em; color: #111827; }
+      .container { position: relative; z-index: 1; }
     `
 
     // Items table HTML
@@ -1132,6 +1147,7 @@ Deno.serve(async (req) => {
   <style>${sharedCss}</style>
 </head>
 <body>
+  ${showWatermark ? `<div class="wm-layer"><div class="wm-rotate">${Array.from({ length: 9 }).map(() => '<div class="wm-row">INVOICEMONK&nbsp;&nbsp;INVOICEMONK&nbsp;&nbsp;INVOICEMONK&nbsp;&nbsp;INVOICEMONK</div>').join('')}</div></div>` : ''}
   ${bodyHtml}
 </body>
 </html>`

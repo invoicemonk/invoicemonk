@@ -17,7 +17,9 @@ import {
   HelpCircle,
   Sparkles,
   Info,
+  Eye,
   Building2
+
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +64,9 @@ import { useActiveTaxSchema } from '@/hooks/use-tax-schemas';
 import { InvoiceLimitBanner } from '@/components/app/InvoiceLimitBanner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
-import { usePaymentMethods } from '@/hooks/use-payment-methods';
+import { usePaymentMethods, usePaymentMethodsByBusiness } from '@/hooks/use-payment-methods';
+import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
+
 import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
 import { AddClientDialog } from '@/components/clients/AddClientDialog';
@@ -98,7 +102,7 @@ export default function InvoiceEdit() {
   const { data: invoice, isLoading: invoiceLoading } = useInvoice(id);
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: templates } = useInvoiceTemplates();
-  const { currentBusiness, isStarter, checkTierLimit } = useBusiness();
+  const { currentBusiness, isStarter, isProfessional, checkTierLimit } = useBusiness();
   const { activeCurrency } = useCurrencyAccount();
   // Pre-fetch products for the combobox (cached — no extra calls per line item interaction)
   useProductsServices(currentBusiness?.id);
@@ -148,9 +152,15 @@ export default function InvoiceEdit() {
   const [parentInvoiceId, setParentInvoiceId] = useState<string | null>(null);
 
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Fetch payment methods for the invoice's currency account
   const { data: paymentMethods } = usePaymentMethods(invoice?.currency_account_id || undefined);
+  // Business-wide methods, used only to explain a currency-account mismatch
+  const { data: businessPaymentMethods } = usePaymentMethodsByBusiness(currentBusiness?.id);
+  const hasMethodsOnOtherAccounts =
+    (paymentMethods?.length ?? 0) === 0 && (businessPaymentMethods?.length ?? 0) > 0;
+
 
   // Auto-inherit default payment method when payment methods load, or use existing
   useEffect(() => {
@@ -164,6 +174,40 @@ export default function InvoiceEdit() {
       setSelectedPaymentMethodId('');
     }
   }, [paymentMethods, isInitialized, invoice?.payment_method_id]);
+
+  // The template must be chosen explicitly — no silent default.
+  const templateSectionRef = useRef<HTMLDivElement | null>(null);
+  const templateTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const focusTemplateSection = () => {
+    templateSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => templateTriggerRef.current?.focus(), 400);
+  };
+
+  const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
+  const templateReady = Boolean(selectedTemplate?.available);
+
+  const requireSelectedTemplate = () => {
+    if (!selectedTemplateId) {
+      toast({
+        title: 'Template required',
+        description: 'Please choose an invoice template.',
+        variant: 'destructive',
+      });
+      focusTemplateSection();
+      return null;
+    }
+    if (!selectedTemplate || !selectedTemplate.available) {
+      toast({
+        title: 'Template unavailable',
+        description: 'Your selected template could not be verified. Please choose it again.',
+        variant: 'destructive',
+      });
+      focusTemplateSection();
+      return null;
+    }
+    return selectedTemplate;
+  };
 
   // Get selected client for B2B validation
   const selectedClient = clients?.find(c => c.id === selectedClientId);
@@ -280,6 +324,47 @@ export default function InvoiceEdit() {
     return calculateSubtotal() + calculateTax();
   };
 
+  // Build a draft invoice from the current form state so the preview matches what will be issued.
+  const buildPreviewInvoice = () => {
+    if (!invoice) return null;
+    const validItems = items.filter(item => item.description || item.unitPrice > 0);
+    return {
+      ...invoice,
+      client_id: selectedClientId || invoice.client_id,
+      template_id: selectedTemplateId || null,
+      currency: currency || invoice.currency,
+      issue_date: issueDate || invoice.issue_date,
+      due_date: dueDate || null,
+      notes: notes || null,
+      terms: terms || null,
+      summary: summary || null,
+      subtotal: calculateSubtotal(),
+      tax_amount: calculateTax(),
+      total_amount: calculateTotal(),
+      payment_method_id: selectedPaymentMethodId || null,
+      clients: selectedClient || null,
+      invoice_items: validItems.map((item, index) => ({
+        id: `item-${index}`,
+        invoice_id: invoice.id,
+        description: combineLineItemDescription(item.description, item.longDescription || ''),
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        tax_rate: item.taxRate,
+        tax_label: item.taxLabel || null,
+        tax_amount: (item.quantity * item.unitPrice * item.taxRate) / 100,
+        discount_percent: 0,
+        amount: item.quantity * item.unitPrice,
+        sort_order: index,
+        created_at: new Date().toISOString(),
+        product_service_id: item.productServiceId || null,
+      })),
+    } as any;
+  };
+
+  const previewPaymentMethod = paymentMethods?.find(m => m.id === selectedPaymentMethodId) || null;
+
+
+
   const formatCurrency = (amount: number) => {
     const currencyCode = currency || activeCurrency || 'USD';
     return new Intl.NumberFormat('en-NG', {
@@ -297,6 +382,7 @@ export default function InvoiceEdit() {
       });
       return false;
     }
+    if (!requireSelectedTemplate()) return false;
     const lineItemCheck = validateLineItems(items);
     if (!lineItemCheck.valid) {
       toast({
@@ -324,11 +410,13 @@ export default function InvoiceEdit() {
 
   const handleSave = async () => {
     if (!validateForm() || !id) return;
+    const template = requireSelectedTemplate();
+    if (!template) return;
 
     const validItems = getValidLineItems(items);
 
     try {
-      await updateInvoice.mutateAsync({
+      const updatedInvoice = await updateInvoice.mutateAsync({
         invoiceId: id,
         updates: {
           client_id: selectedClientId,
@@ -341,7 +429,7 @@ export default function InvoiceEdit() {
           subtotal: calculateSubtotal(),
           tax_amount: calculateTax(),
           total_amount: calculateTotal(),
-          template_id: selectedTemplateId || null,
+          template_id: template.id,
           exchange_rate_to_primary: null,
           exchange_rate_snapshot: null,
           payment_method_id: selectedPaymentMethodId || null,
@@ -361,6 +449,10 @@ export default function InvoiceEdit() {
           product_service_id: item.productServiceId || null,
         })),
       });
+
+      if (updatedInvoice.template_id !== template.id) {
+        throw new Error(`Template mismatch: ${template.name} was selected but was not saved. Please try again.`);
+      }
 
       navigate(`/invoices/${id}`);
     } catch (err) {
@@ -409,12 +501,14 @@ export default function InvoiceEdit() {
     }
 
     if (!validateForm() || !id) return;
+    const template = requireSelectedTemplate();
+    if (!template) return;
 
     // First save, then issue
     const validItems = getValidLineItems(items);
 
     try {
-      await updateInvoice.mutateAsync({
+      const updatedInvoice = await updateInvoice.mutateAsync({
         invoiceId: id,
         updates: {
           client_id: selectedClientId,
@@ -427,7 +521,7 @@ export default function InvoiceEdit() {
           subtotal: calculateSubtotal(),
           tax_amount: calculateTax(),
           total_amount: calculateTotal(),
-          template_id: selectedTemplateId || null,
+          template_id: template.id,
           exchange_rate_to_primary: null,
           exchange_rate_snapshot: null,
           payment_method_id: selectedPaymentMethodId || null,
@@ -447,6 +541,10 @@ export default function InvoiceEdit() {
           product_service_id: item.productServiceId || null,
         })),
       });
+
+      if (updatedInvoice.template_id !== template.id) {
+        throw new Error(`Template mismatch: ${template.name} was selected but was not saved. The invoice was not issued.`);
+      }
 
       await issueInvoice.mutateAsync(id);
       navigate(`/b/${currentBusiness?.id}/invoices/${id}`);
@@ -554,10 +652,10 @@ export default function InvoiceEdit() {
             <Sparkles className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1">
               <p className="font-medium text-primary">
-                Free tier: Invoices include Invoicemonk watermark
+                Free plan: Basic template with Invoicemonk watermark
               </p>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Professional to remove watermarks and access premium templates.
+                Your invoices use the Basic template. Upgrade to remove the watermark and unlock premium templates.
               </p>
             </div>
             <Button variant="outline" size="sm" asChild>
@@ -733,11 +831,13 @@ export default function InvoiceEdit() {
                 <p className="text-xs text-muted-foreground text-right">{summary.length}/{INPUT_LIMITS.TEXTAREA}</p>
               </div>
 
-              {/* Template Selection */}
-              <div className="space-y-2">
-                <Label>Invoice Template</Label>
+              {/* Template Selection — required */}
+              <div className="space-y-2" ref={templateSectionRef}>
+                <Label>
+                  Invoice Template <span className="text-xs font-normal text-muted-foreground">Required</span>
+                </Label>
                 <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger>
+                  <SelectTrigger ref={templateTriggerRef} aria-label="Invoice template">
                     <SelectValue placeholder="Select a template..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -760,7 +860,19 @@ export default function InvoiceEdit() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {templateReady
+                    ? 'Controls the layout of the invoice PDF and the copy emailed to your client.'
+                    : 'Pick a template to unlock preview, save, and issue. It controls the layout of the PDF and the emailed copy.'}
+                </p>
+                {selectedTemplate?.watermark_required && (
+                  <p className="text-xs text-muted-foreground">
+                    The {selectedTemplate.name} template includes the Invoicemonk watermark on the
+                    invoice PDF and emailed copy. Upgrade to remove it.
+                  </p>
+                )}
               </div>
+
             </CardContent>
           </Card>
 
@@ -937,11 +1049,22 @@ export default function InvoiceEdit() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No payment method configured. Your client won't see payment instructions.{' '}
-                <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
+                {hasMethodsOnOtherAccounts ? (
+                  <>
+                    Your payment methods are saved under a different currency account, so they can't be
+                    attached to this {invoice?.currency} invoice. Your client won't see payment instructions.{' '}
+                    <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one for {invoice?.currency}</Link>
+                  </>
+                ) : (
+                  <>
+                    No payment method configured. Your client won't see payment instructions.{' '}
+                    <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           )}
+
 
           {/* Reverse Charge Toggle (non-Nigerian businesses) */}
           {showTaxLabel && (
@@ -1101,11 +1224,24 @@ export default function InvoiceEdit() {
               <Separator />
 
               <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    if (!requireSelectedTemplate()) return;
+                    setIsPreviewOpen(true);
+                  }}
+                  disabled={!invoice || !templateReady}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
                 <Button 
+
                   variant="outline" 
                   className="w-full"
                   onClick={handleSave}
-                  disabled={isLoading || !lineItemsReady}
+                  disabled={isLoading || !lineItemsReady || !templateReady}
                 >
                   {updateInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1117,7 +1253,7 @@ export default function InvoiceEdit() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !lineItemsReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
+                  disabled={isLoading || !lineItemsReady || !templateReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1127,6 +1263,29 @@ export default function InvoiceEdit() {
                   Issue Invoice
                 </Button>
               </div>
+
+              {selectedTemplate?.available && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Selected template: <span className="font-medium text-foreground">{selectedTemplate.name}</span>
+                </p>
+              )}
+
+              {!templateReady && (
+                <Alert className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Choose an invoice template to preview, save, or issue this invoice.{' '}
+                    <button
+                      type="button"
+                      onClick={focusTemplateSection}
+                      className="underline font-medium"
+                    >
+                      Choose template
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
 
               {isProfileIncomplete && (
                 <Alert variant="destructive" className="mt-2">
@@ -1151,7 +1310,37 @@ export default function InvoiceEdit() {
         onOpenChange={setIsAddClientDialogOpen}
         onClientCreated={handleClientCreated}
       />
+
+      {/* Invoice Preview Dialog */}
+      {invoice && (
+        <InvoicePreviewDialog
+          open={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          invoice={buildPreviewInvoice()}
+          showWatermark={!isProfessional}
+          business={currentBusiness ? {
+            name: currentBusiness.name,
+            legal_name: currentBusiness.legal_name,
+            tax_id: currentBusiness.tax_id,
+            address: currentBusiness.address as { street?: string; city?: string; state?: string; postal_code?: string; country?: string } | null,
+            contact_email: currentBusiness.contact_email,
+            contact_phone: currentBusiness.contact_phone,
+            logo_url: currentBusiness.logo_url,
+          } : null}
+          templateConfig={(() => {
+            if (!selectedTemplate) return null;
+            const styles = (selectedTemplate.styles as Record<string, unknown>) || {};
+            const effectiveBrandColor = brandColorOverride || (currentBusiness as any)?.brand_color || styles.primary_color;
+            return {
+              layout: selectedTemplate.layout as Record<string, unknown>,
+              styles: { ...styles, primary_color: effectiveBrandColor },
+            } as any;
+          })()}
+          paymentMethod={previewPaymentMethod}
+        />
+      )}
     </motion.div>
+
     </BusinessAccessGuard>
   );
 }

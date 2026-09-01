@@ -17,6 +17,7 @@ import { CurrencyResolver } from './CurrencyResolver';
 import { TourProvider } from '@/contexts/TourContext';
 import { WelcomeTourAutoStart } from '@/components/tours/WelcomeTourAutoStart';
 import { PageTourHint } from '@/components/tours/PageTourHint';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 
 
 
@@ -93,7 +94,9 @@ function BusinessLayoutContent() {
               <PaymentIssueBanner />
               <main className="flex-1 p-6 overflow-auto space-y-4">
                 <PageTourHint />
-                <Outlet />
+                <AppErrorBoundary>
+                  <Outlet />
+                </AppErrorBoundary>
               </main>
 
             </SidebarInset>

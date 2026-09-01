@@ -59,6 +59,17 @@ interface InvoiceItem {
   discount_percent: number
 }
 
+// Fallback layout when an invoice has no template snapshot.
+// MUST mirror the Basic (starter) template — never a paid layout.
+const BASIC_FALLBACK_LAYOUT = {
+  header_style: 'minimal',
+  show_logo: false,
+  show_terms: false,
+  show_notes: true,
+  show_verification_qr: false,
+  show_bank_details: false,
+}
+
 interface TemplateSnapshot {
   id?: string
   name?: string
@@ -969,7 +980,7 @@ async function generateInvoicePdfBase64(
     qrDataUri = await fetchImageAsBase64(qrApiUrl)
   }
 
-  const tplLayout = templateSnapshot?.layout || {}
+  const tplLayout = templateSnapshot?.layout || BASIC_FALLBACK_LAYOUT
   const tplStyles = templateSnapshot?.styles || {}
 
   const invoiceKind = (invoice.kind as string) || 'standard'
@@ -1003,7 +1014,7 @@ async function generateInvoicePdfBase64(
     depositCreditAmount,
   }
 
-  const tplHeaderStyle = tplLayout.header_style || 'standard'
+  const tplHeaderStyle = tplLayout.header_style || BASIC_FALLBACK_LAYOUT.header_style
   let contentArray: unknown[]
 
   switch (tplHeaderStyle) {

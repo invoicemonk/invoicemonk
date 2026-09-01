@@ -35,6 +35,8 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { BusinessAccessGuard } from '@/components/app/BusinessAccessGuard';
 import { PaymentMethodCard } from '@/components/payment-methods/PaymentMethodCard';
+import { usePaymentMethods, usePaymentMethodsByBusiness } from '@/hooks/use-payment-methods';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Receipt as ReceiptIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -92,7 +94,7 @@ export default function InvoiceDetail() {
   const downloadReceiptPdf = useDownloadReceiptPdf();
   const generateReceipt = useGenerateReceipt();
   const uploadProof = useUploadPaymentProof();
-  const { isStarter, currentBusiness } = useBusiness();
+  const { isStarter, isProfessional, currentBusiness } = useBusiness();
   const { data: templates } = useInvoiceTemplates();
 
   // For drafts without a template_snapshot, look up the live template by template_id
@@ -103,6 +105,23 @@ export default function InvoiceDetail() {
     if (!tpl) return undefined;
     return { layout: tpl.layout, styles: tpl.styles };
   })();
+
+  // For drafts (no payment_method_snapshot yet) resolve the live payment method so the
+  // preview shows the same instructions the issued invoice will carry.
+  const invoiceCurrencyAccountId = (invoice as unknown as { currency_account_id?: string | null })?.currency_account_id || undefined;
+  const { data: accountPaymentMethods } = usePaymentMethods(invoiceCurrencyAccountId);
+  const { data: businessPaymentMethods } = usePaymentMethodsByBusiness(
+    !invoiceCurrencyAccountId ? currentBusiness?.id : undefined
+  );
+  const draftPaymentMethod = (() => {
+    if (invoice?.payment_method_snapshot) return undefined; // issued: snapshot wins
+    const pool = (accountPaymentMethods?.length ? accountPaymentMethods : businessPaymentMethods) || [];
+    if (pool.length === 0) return undefined;
+    const selectedId = (invoice as unknown as { payment_method_id?: string | null })?.payment_method_id;
+    return pool.find(m => m.id === selectedId) || pool.find(m => m.is_default) || pool[0];
+  })();
+
+
 
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -1042,7 +1061,7 @@ export default function InvoiceDetail() {
           open={previewOpen}
           onOpenChange={setPreviewOpen}
           invoice={invoice}
-          showWatermark={isStarter}
+          showWatermark={!isProfessional}
           business={currentBusiness ? {
             name: currentBusiness.name,
             legal_name: currentBusiness.legal_name,
@@ -1053,6 +1072,8 @@ export default function InvoiceDetail() {
             logo_url: currentBusiness.logo_url,
           } : undefined}
           templateConfig={draftTemplateConfig}
+          paymentMethod={draftPaymentMethod}
+
         />
       )}
 

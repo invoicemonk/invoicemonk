@@ -15,6 +15,8 @@ import { useAdminStats } from '@/hooks/use-admin';
 import { useRealtimeAdminStats } from '@/hooks/use-realtime-admin';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevenueStatsSection } from '@/components/admin/RevenueStatsSection';
+import { PaidThroughCoverageCard } from '@/components/admin/PaidThroughCoverageCard';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -150,8 +152,12 @@ export default function AdminBilling() {
         </CardContent>
       </Card>
 
+      {/* Prepaid coverage granted by support */}
+      <PaidThroughCoverageCard />
+
       {/* Revenue Metrics (MRR/ARR with date filter) */}
       <RevenueStatsSection />
+
 
       {/* Subscription Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

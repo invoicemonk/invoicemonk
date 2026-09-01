@@ -14,6 +14,7 @@ import {
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { TierGatedRoute } from "@/components/app/TierGatedRoute";
 import { StarterGraceGuard } from "@/components/app/StarterGraceGuard";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
@@ -220,11 +221,13 @@ function TawkIdentityProvider({ children }: { children: React.ReactNode }) {
 // Root layout: hosts app-wide providers that need router context
 function RootLayout() {
   return (
-    <AnalyticsProvider>
-      <TawkTriggersProvider>
-        <Outlet />
-      </TawkTriggersProvider>
-    </AnalyticsProvider>
+    <AppErrorBoundary>
+      <AnalyticsProvider>
+        <TawkTriggersProvider>
+          <Outlet />
+        </TawkTriggersProvider>
+      </AnalyticsProvider>
+    </AppErrorBoundary>
   );
 }
 

@@ -35,12 +35,31 @@ const TIER_ORDER: Record<SubscriptionTier, number> = {
   business: 3,
 };
 
+/**
+ * The template a user should get when they haven't explicitly chosen one:
+ * the best template their tier is entitled to (Basic for free plans).
+ * Never returns a locked template.
+ */
+export function pickDefaultTemplate(
+  templates: TemplateWithAccess[] | undefined
+): TemplateWithAccess | undefined {
+  const available = (templates || []).filter((t) => t.available);
+  if (available.length === 0) return undefined;
+  return [...available].sort((a, b) => {
+    const tierDiff = TIER_ORDER[b.tier_required] - TIER_ORDER[a.tier_required];
+    if (tierDiff !== 0) return tierDiff;
+    return a.sort_order - b.sort_order;
+  })[0];
+}
+
 export function useInvoiceTemplates() {
   const { tier } = useBusiness();
   const { isPlatformAdmin } = usePlatformAdmin();
 
   return useQuery({
-    queryKey: ['invoice-templates'],
+    // Availability is user-specific. Including access inputs prevents a cached
+    // Starter result from replacing a platform admin's template choices.
+    queryKey: ['invoice-templates', tier, isPlatformAdmin],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invoice_templates')

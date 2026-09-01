@@ -37,7 +37,7 @@ export default function AdminVerifications() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedBusiness, setSelectedBusiness] = useState<VerificationQueueItem | null>(null);
 
-  const { data: queue, isLoading } = useVerificationQueue(
+  const { data: queue, isLoading, isError, error, refetch, isFetching } = useVerificationQueue(
     statusFilter === 'all' ? null : statusFilter
   );
 
@@ -75,6 +75,17 @@ export default function AdminVerifications() {
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="text-center py-8">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-destructive" />
+              <p className="font-medium">Couldn't load the verification queue</p>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">
+                {(error as Error)?.message || 'The request failed. This is a backend error, not an empty queue.'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+                {isFetching ? 'Retrying…' : 'Retry'}
+              </Button>
             </div>
           ) : !queue || queue.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">

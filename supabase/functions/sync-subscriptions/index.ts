@@ -9,27 +9,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const TIER_ORDER: Record<string, number> = { starter: 0, starter_paid: 1, professional: 2, business: 3 };
+import {
+  TIER_ORDER,
+  tierFromStripeSub,
+  safeISODate,
+  hasPrepaidCoverage,
+} from "./coverage.ts";
 
-function tierFromStripeSub(stripeSub: any): string {
-  const t = stripeSub?.metadata?.tier;
-  if (typeof t === "string" && TIER_ORDER[t] !== undefined) return t;
-  return "professional";
-}
-
-// Stripe timestamps can be missing or null (e.g. paused/incomplete subs).
-// `new Date(undefined * 1000).toISOString()` throws "Invalid time value" and
-// used to abort the whole run, which is how Rico's row silently never synced.
-function safeISODate(epochSeconds: unknown): string | undefined {
-  const n = typeof epochSeconds === "number" ? epochSeconds : Number(epochSeconds);
-  if (!n || !isFinite(n)) return undefined;
-  const d = new Date(n * 1000);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-
-function hasPrepaidCoverage(sub: { paid_through?: string | null }): boolean {
-  return !!sub.paid_through && new Date(sub.paid_through).getTime() > Date.now();
-}
 
 
 Deno.serve(async (req) => {
@@ -54,18 +40,53 @@ Deno.serve(async (req) => {
 
     // If invoked with a user JWT (admin "Reconcile now" button), require
     // platform_admin. Otherwise (cron path) require the shared CRON_SECRET
-    // header — without this, any caller with the public anon apikey could
-    // trigger full Stripe reconciliation.
+    // header or the service-role key — without this, any caller with the
+    // public anon apikey could trigger full Stripe reconciliation.
     const authHeader = req.headers.get("Authorization");
     let triggeredBy: "cron" | "admin" = "cron";
     let triggeredByUser: string | null = null;
     const startedAt = Date.now();
-    if (authHeader?.startsWith("Bearer ")) {
+
+    // A rejected invocation must leave a trace. Otherwise a cron whose call
+    // fails auth is completely invisible: the job "runs" every night, the
+    // function 401s, and nothing is ever recorded (exactly what happened
+    // between May and Sep 2026 — every recorded run was triggered_by=admin).
+    const recordFailedRun = async (reason: string) => {
+      try {
+        await supabase.from("sync_subscription_runs").insert({
+          triggered_by: triggeredBy,
+          triggered_by_user: triggeredByUser,
+          synced: 0,
+          downgraded: 0,
+          renewed: 0,
+          repointed: 0,
+          errors: [reason],
+          duration_ms: Date.now() - startedAt,
+        });
+      } catch (e) {
+        console.error("[sync] failed to record failed run:", (e as Error).message);
+      }
+    };
+
+    const bearer = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+    const incomingSecret = req.headers.get("x-cron-secret") ?? "";
+    const isServiceRoleCall = !!bearer && bearer === serviceRoleKey;
+    const isCronSecretCall = !!cronSecret && incomingSecret === cronSecret;
+
+    if (isServiceRoleCall || isCronSecretCall) {
+      // Scheduled invocation — pg_cron posts the service-role key as a bearer
+      // token (and/or the shared cron secret).
+      triggeredBy = "cron";
+    } else if (bearer) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-        global: { headers: { Authorization: authHeader } },
+        global: { headers: { Authorization: authHeader! } },
       });
       const { data: { user } } = await userClient.auth.getUser();
       if (!user) {
+        await recordFailedRun("Unauthorized: bearer token is not a valid user session, service-role key or cron secret");
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -74,6 +95,9 @@ Deno.serve(async (req) => {
         _user_id: user.id, _role: "platform_admin",
       });
       if (!isAdmin) {
+        triggeredBy = "admin";
+        triggeredByUser = user.id;
+        await recordFailedRun("Forbidden: caller is not a platform_admin");
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -81,14 +105,12 @@ Deno.serve(async (req) => {
       triggeredBy = "admin";
       triggeredByUser = user.id;
     } else {
-      const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
-      const incomingSecret = req.headers.get("x-cron-secret") ?? "";
-      if (!cronSecret || incomingSecret !== cronSecret) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      await recordFailedRun("Unauthorized: no bearer token and no valid x-cron-secret header");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
 
 
     // Reconcile EVERY paid row against Stripe — not just stale ones. Otherwise

@@ -21,6 +21,8 @@ export interface Subscription {
   current_period_start: string | null;
   current_period_end: string | null;
   stripe_subscription_id: string | null;
+  stripe_customer_id?: string | null;
+  paid_through?: string | null;
 }
 
 export interface TierCheckResult {

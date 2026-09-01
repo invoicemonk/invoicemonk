@@ -66,7 +66,7 @@ import { toast } from '@/hooks/use-toast';
 import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { gaEvents } from '@/hooks/use-google-analytics';
-import { usePaymentMethods } from '@/hooks/use-payment-methods';
+import { usePaymentMethods, usePaymentMethodsByBusiness } from '@/hooks/use-payment-methods';
 import { ProductServiceCombobox } from '@/components/products/ProductServiceCombobox';
 import { useProductsServices } from '@/hooks/use-products-services';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,6 +111,7 @@ export default function InvoiceNew() {
   const { 
     currentBusiness, 
     isStarter, 
+    isProfessional,
     checkTierLimit 
   } = useBusiness();
   
@@ -183,10 +184,44 @@ export default function InvoiceNew() {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   useEffect(() => {
-    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride || selectedTemplateId || depositPercent !== null || parentInvoiceId) {
+    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride || depositPercent !== null || parentInvoiceId) {
       setIsAdvancedOpen(true);
     }
-  }, [invoiceKind, isReverseCharge, brandColorOverride, selectedTemplateId, depositPercent, parentInvoiceId]);
+  }, [invoiceKind, isReverseCharge, brandColorOverride, depositPercent, parentInvoiceId]);
+
+  // The template must be chosen explicitly — no silent default.
+  const templateSectionRef = useRef<HTMLDivElement | null>(null);
+  const templateTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const focusTemplateSection = () => {
+    templateSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => templateTriggerRef.current?.focus(), 400);
+  };
+
+  const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
+  const templateReady = Boolean(selectedTemplate?.available);
+
+  const requireSelectedTemplate = () => {
+    if (!selectedTemplateId) {
+      toast({
+        title: 'Template required',
+        description: 'Please choose an invoice template.',
+        variant: 'destructive',
+      });
+      focusTemplateSection();
+      return null;
+    }
+    if (!selectedTemplate || !selectedTemplate.available) {
+      toast({
+        title: 'Template unavailable',
+        description: 'Your selected template could not be verified. Please choose it again.',
+        variant: 'destructive',
+      });
+      focusTemplateSection();
+      return null;
+    }
+    return selectedTemplate;
+  };
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
@@ -214,6 +249,11 @@ export default function InvoiceNew() {
 
   // Fetch payment methods for the active currency account
   const { data: paymentMethods } = usePaymentMethods(currentCurrencyAccount?.id);
+  // Business-wide methods, used only to explain a currency-account mismatch
+  const { data: businessPaymentMethods } = usePaymentMethodsByBusiness(currentBusiness?.id);
+  const hasMethodsOnOtherAccounts =
+    (paymentMethods?.length ?? 0) === 0 && (businessPaymentMethods?.length ?? 0) > 0;
+
 
   // Auto-inherit default payment method when currency account changes
   useEffect(() => {
@@ -474,6 +514,7 @@ export default function InvoiceNew() {
       });
       return false;
     }
+    if (!requireSelectedTemplate()) return false;
     const lineItemCheck = validateLineItems(items);
     if (!lineItemCheck.valid) {
       toast({
@@ -512,6 +553,8 @@ export default function InvoiceNew() {
     }
 
     if (!validateForm()) return;
+    const template = requireSelectedTemplate();
+    if (!template) return;
 
     const validItems = getValidLineItems(items);
     // Use currency from active currency account
@@ -542,6 +585,7 @@ export default function InvoiceNew() {
           subtotal: calculateSubtotal(),
           tax_amount: calculateTax(),
           total_amount: calculateTotal(),
+          template_id: template.id,
           // Legacy FX fields - null for new records created through currency accounts
           exchange_rate_to_primary: null,
           exchange_rate_snapshot: null,
@@ -563,6 +607,9 @@ export default function InvoiceNew() {
       });
 
       if (invoice) {
+        if (invoice.template_id !== template.id) {
+          throw new Error(`Template mismatch: ${template.name} was selected but was not saved. Please try again.`);
+        }
         // Track invoice created as draft
         gaEvents.invoiceCreated(invoice.id);
       }
@@ -624,6 +671,8 @@ export default function InvoiceNew() {
     }
 
     if (!validateForm()) return;
+    const template = requireSelectedTemplate();
+    if (!template) return;
 
     // Final invoice must have a linked parent
     if (invoiceKind === 'final' && !parentInvoiceId) {
@@ -655,7 +704,7 @@ export default function InvoiceNew() {
           subtotal: calculateSubtotal(),
           tax_amount: calculateTax(),
           total_amount: calculateTotal(),
-          template_id: selectedTemplateId || null,
+          template_id: template.id,
           // Legacy FX fields - null for new records created through currency accounts
           exchange_rate_to_primary: null,
           exchange_rate_snapshot: null,
@@ -677,6 +726,9 @@ export default function InvoiceNew() {
       });
 
       if (invoice) {
+        if (invoice.template_id !== template.id) {
+          throw new Error(`Template mismatch: ${template.name} was selected but was not saved. The invoice was not issued.`);
+        }
         // Track invoice issued event
         gaEvents.invoiceIssued(invoice.id, calculateTotal());
         // Then issue it
@@ -782,43 +834,11 @@ export default function InvoiceNew() {
               <p className="text-sm text-muted-foreground">
                 You can save drafts, but issuing requires email verification.
               </p>
-              </div>
-
-              {/* Brand Color Override */}
-              <div className="space-y-2">
-                <Label>Brand Color</Label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={brandColorOverride || (currentBusiness as any)?.brand_color || '#1d6b5a'}
-                    onChange={(e) => setBrandColorOverride(e.target.value)}
-                    className="h-10 w-12 rounded border border-input cursor-pointer bg-transparent p-0.5"
-                  />
-                  <Input
-                    value={brandColorOverride}
-                    onChange={(e) => setBrandColorOverride(e.target.value)}
-                    placeholder={(currentBusiness as any)?.brand_color || 'Default'}
-                    className="w-32 font-mono text-sm"
-                    maxLength={7}
-                  />
-                  {brandColorOverride && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setBrandColorOverride('')}
-                      className="text-muted-foreground"
-                    >
-                      Reset
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Override the accent color for this invoice only.
-                </p>
-              </div>
-            </CardContent>
+            </div>
+          </CardContent>
         </Card>
       )}
+
 
       {/* Starter tier watermark notice */}
       {isStarter && (
@@ -827,10 +847,10 @@ export default function InvoiceNew() {
             <Sparkles className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1">
               <p className="font-medium text-primary">
-                Free tier: Invoices include Invoicemonk watermark
+                Free plan: Basic template with Invoicemonk watermark
               </p>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Professional to remove watermarks and access premium templates.
+                Your invoices use the Basic template. Upgrade to remove the watermark and unlock premium templates.
               </p>
             </div>
             <Button variant="outline" size="sm" asChild>
@@ -1050,8 +1070,19 @@ export default function InvoiceNew() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No payment method configured for {currentCurrencyAccount.currency}. Your client won't see payment instructions.{' '}
-                <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
+                {hasMethodsOnOtherAccounts ? (
+                  <>
+                    Your payment methods are saved under a different currency account, so they can't be
+                    attached to this {currentCurrencyAccount.currency} invoice. Your client won't see payment instructions.{' '}
+                    <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one for {currentCurrencyAccount.currency}</Link>
+                  </>
+                ) : (
+                  <>
+                    No payment method configured for {currentCurrencyAccount.currency}. Your client won't see payment instructions.{' '}
+                    <Link to={`/b/${currentBusiness?.id}/settings`} className="underline font-medium">Add one</Link>
+                  </>
+                )}
+
               </AlertDescription>
             </Alert>
           )}
@@ -1235,7 +1266,115 @@ export default function InvoiceNew() {
             </Card>
           )}
 
+          {/* Invoice template — required step */}
+          <Card ref={templateSectionRef} className={!templateReady ? 'border-primary/40' : undefined}>
+            <CardHeader>
+              <InvoiceSectionHeader
+                title="Invoice template"
+                description="Choose the layout used for the invoice PDF and the copy emailed to your client."
+                help="The template controls how the invoice looks: header, layout and typography. Templates above your plan are locked — upgrade to use them. You must pick a template before you can preview, save, or issue an invoice."
+                required
+              />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Select
+                value={selectedTemplateId}
+                onValueChange={(v) => setSelectedTemplateId(v)}
+              >
+                <SelectTrigger ref={templateTriggerRef} aria-label="Invoice template">
+                  <SelectValue placeholder="Select a template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(templates || []).map((t: TemplateWithAccess) => (
+                    <SelectItem key={t.id} value={t.id} disabled={!t.available}>
+                      <span className="flex items-center gap-2">
+                        <span>{t.name}</span>
+                        {!t.available && (
+                          <Badge variant="outline" className="text-xs">
+                            {t.locked_reason}
+                          </Badge>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {!templateReady && (
+                <p className="text-xs text-muted-foreground">
+                  Pick a template to unlock preview, save as draft, and issue.
+                </p>
+              )}
+
+              {selectedTemplate?.watermark_required && (
+                <p className="text-xs text-muted-foreground">
+                  The {selectedTemplate.name} template includes the Invoicemonk watermark on the
+                  invoice PDF and emailed copy. Upgrade to remove it.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Advanced options */}
+          <InvoiceAdvancedSection open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+            <DepositInvoiceSection
+              businessId={currentBusiness?.id}
+              clientId={selectedClientId}
+              currency={currency}
+              kind={invoiceKind}
+              depositPercent={depositPercent}
+              parentInvoiceId={parentInvoiceId}
+              onKindChange={setInvoiceKind}
+              onDepositPercentChange={setDepositPercent}
+              onParentInvoiceIdChange={setParentInvoiceId}
+            />
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Presentation</CardTitle>
+                <CardDescription>Fine-tune how this single invoice looks.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+
+
+                {/* Brand Color Override */}
+                <div className="space-y-2">
+                  <Label>Brand Color</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={brandColorOverride || (currentBusiness as any)?.brand_color || '#1d6b5a'}
+                      onChange={(e) => setBrandColorOverride(e.target.value)}
+                      className="h-10 w-12 rounded border border-input cursor-pointer bg-transparent p-0.5"
+                    />
+                    <Input
+                      value={brandColorOverride}
+                      onChange={(e) => setBrandColorOverride(e.target.value)}
+                      placeholder={(currentBusiness as any)?.brand_color || 'Default'}
+                      className="w-32 font-mono text-sm"
+                      maxLength={7}
+                    />
+                    {brandColorOverride && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setBrandColorOverride('')}
+                        className="text-muted-foreground"
+                      >
+                        Reset
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Override the accent color for this invoice only.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </InvoiceAdvancedSection>
+
           {/* Notes & Terms */}
+
           <Card>
             <CardHeader>
               <CardTitle>Notes & Terms</CardTitle>
@@ -1335,7 +1474,10 @@ export default function InvoiceNew() {
                 <Button
                   variant="ghost"
                   className="w-full"
+                  disabled={!templateReady}
                   onClick={() => {
+                    const template = requireSelectedTemplate();
+                    if (!template) return;
                     gaEvents.invoicePreviewed();
                     setIsPreviewOpen(true);
                   }}
@@ -1348,7 +1490,7 @@ export default function InvoiceNew() {
                   className="w-full"
                   data-tour="invoice-form-actions"
                   onClick={handleSaveDraft}
-                  disabled={isLoading || !lineItemsReady}
+                  disabled={isLoading || !lineItemsReady || !templateReady}
                 >
                   {createInvoice.isPending && !issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1360,7 +1502,7 @@ export default function InvoiceNew() {
                 <Button 
                   className="w-full"
                   onClick={handleIssue}
-                  disabled={isLoading || !lineItemsReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
+                  disabled={isLoading || !lineItemsReady || !templateReady || !isEmailVerified || showTinWarning || isProfileIncomplete}
                 >
                   {issueInvoice.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1370,6 +1512,29 @@ export default function InvoiceNew() {
                   Issue Invoice
                 </Button>
               </div>
+
+              {selectedTemplate?.available && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Selected template: <span className="font-medium text-foreground">{selectedTemplate.name}</span>
+                </p>
+              )}
+
+              {!templateReady && (
+                <Alert className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Choose an invoice template to preview, save, or issue this invoice.{' '}
+                    <button
+                      type="button"
+                      onClick={focusTemplateSection}
+                      className="underline font-medium"
+                    >
+                      Choose template
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
 
               {isProfileIncomplete && (
                 <Alert variant="destructive" className="mt-2">
@@ -1400,7 +1565,7 @@ export default function InvoiceNew() {
         open={isPreviewOpen}
         onOpenChange={setIsPreviewOpen}
         invoice={buildPreviewInvoice()}
-        showWatermark={isStarter}
+        showWatermark={!isProfessional}
         business={currentBusiness ? {
           name: currentBusiness.name,
           legal_name: currentBusiness.legal_name,
@@ -1411,12 +1576,11 @@ export default function InvoiceNew() {
           logo_url: currentBusiness.logo_url,
         } : null}
         templateConfig={(() => {
-          const selected = templates?.find(t => t.id === selectedTemplateId);
-          if (!selected) return null;
-          const styles = (selected.styles as Record<string, unknown>) || {};
+          if (!selectedTemplate?.available) return null;
+          const styles = (selectedTemplate.styles as Record<string, unknown>) || {};
           const effectiveBrandColor = brandColorOverride || (currentBusiness as any)?.brand_color || styles.primary_color;
           return {
-            layout: selected.layout as Record<string, unknown>,
+            layout: selectedTemplate.layout as Record<string, unknown>,
             styles: { ...styles, primary_color: effectiveBrandColor },
           };
         })()}
