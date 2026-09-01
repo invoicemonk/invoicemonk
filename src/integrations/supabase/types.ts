@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -41,6 +41,33 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      ai_discovery_prompts: {
+        Row: {
+          assistant: string | null
+          created_at: string
+          email: string | null
+          id: string
+          prompt: string
+          source: string | null
+        }
+        Insert: {
+          assistant?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          prompt: string
+          source?: string | null
+        }
+        Update: {
+          assistant?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          prompt?: string
+          source?: string | null
         }
         Relationships: []
       }
@@ -2660,6 +2687,48 @@ export type Database = {
         }
         Relationships: []
       }
+      reviews: {
+        Row: {
+          author_name: string
+          company: string | null
+          created_at: string
+          email: string
+          id: string
+          published_at: string | null
+          rating: number
+          review_text: string
+          role: string | null
+          status: string
+          verified: boolean
+        }
+        Insert: {
+          author_name: string
+          company?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          published_at?: string | null
+          rating: number
+          review_text: string
+          role?: string | null
+          status?: string
+          verified?: boolean
+        }
+        Update: {
+          author_name?: string
+          company?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          published_at?: string | null
+          rating?: number
+          review_text?: string
+          role?: string | null
+          status?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       scan_jobs: {
         Row: {
           business_id: string
@@ -3407,7 +3476,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_reviews: {
+        Row: {
+          author_name: string | null
+          company: string | null
+          id: string | null
+          published_at: string | null
+          rating: number | null
+          review_text: string | null
+          role: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          author_name?: string | null
+          company?: string | null
+          id?: string | null
+          published_at?: never
+          rating?: number | null
+          review_text?: string | null
+          role?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          author_name?: string | null
+          company?: string | null
+          id?: string | null
+          published_at?: never
+          rating?: number | null
+          review_text?: string | null
+          role?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_get_business_documents: {
