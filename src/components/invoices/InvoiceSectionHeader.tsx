@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardDescription, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,7 @@ interface InvoiceSectionHeaderProps {
   description: string;
   help: string;
   required?: boolean;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 export function InvoiceSectionHeader({
