@@ -17,6 +17,21 @@ function tierFromStripeSub(stripeSub: any): string {
   return "professional";
 }
 
+// Stripe timestamps can be missing or null (e.g. paused/incomplete subs).
+// `new Date(undefined * 1000).toISOString()` throws "Invalid time value" and
+// used to abort the whole run, which is how Rico's row silently never synced.
+function safeISODate(epochSeconds: unknown): string | undefined {
+  const n = typeof epochSeconds === "number" ? epochSeconds : Number(epochSeconds);
+  if (!n || !isFinite(n)) return undefined;
+  const d = new Date(n * 1000);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+function hasPrepaidCoverage(sub: { paid_through?: string | null }): boolean {
+  return !!sub.paid_through && new Date(sub.paid_through).getTime() > Date.now();
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -84,7 +99,7 @@ Deno.serve(async (req) => {
     // subscription to reconcile against, so skip them entirely.
     const { data: staleSubscriptions, error: fetchError } = await supabase
       .from("subscriptions")
-      .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, status, current_period_end, updated_at")
+      .select("id, stripe_subscription_id, stripe_customer_id, business_id, tier, status, current_period_end, updated_at, paid_through")
       .in("status", ["active", "trialing", "past_due"])
       .not("tier", "in", "(starter,starter_paid)")
       .order("updated_at", { ascending: true })
@@ -117,11 +132,13 @@ Deno.serve(async (req) => {
     let downgraded = 0;
     let renewed = 0;
     let repointed = 0;
+    let skippedPaidThrough = 0;
     const errors: string[] = [];
 
     const logAudit = async (
       businessId: string | null,
-      action: "renewed" | "downgraded" | "repointed",
+      action: "renewed" | "downgraded" | "repointed" | "skipped_paid_through",
+
       meta: Record<string, unknown>,
     ) => {
       try {
@@ -162,18 +179,23 @@ Deno.serve(async (req) => {
         if (!liveSub) return false;
 
         const newTier = tierFromStripeSub(liveSub);
+        const repointPatch: Record<string, unknown> = {
+          stripe_subscription_id: liveSub.id,
+          tier: newTier,
+          status: "active",
+          cancelled_at: null,
+          updated_at: new Date().toISOString(),
+        };
+        const rps = safeISODate(liveSub.current_period_start);
+        const rpe = safeISODate(liveSub.current_period_end);
+        if (rps) repointPatch.current_period_start = rps;
+        if (rpe) repointPatch.current_period_end = rpe;
+
         await supabase
           .from("subscriptions")
-          .update({
-            stripe_subscription_id: liveSub.id,
-            tier: newTier,
-            status: "active",
-            current_period_start: new Date(liveSub.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(liveSub.current_period_end * 1000).toISOString(),
-            cancelled_at: null,
-            updated_at: new Date().toISOString(),
-          })
+          .update(repointPatch)
           .eq("id", sub.id);
+
 
         await logAudit(sub.business_id, "repointed", {
           old_stripe_subscription_id: sub.stripe_subscription_id,
@@ -193,14 +215,28 @@ Deno.serve(async (req) => {
 
     for (const sub of staleSubscriptions) {
       try {
+        // HARD GUARD: prepaid coverage outranks every Stripe signal. A customer
+        // who has paid ahead is never downgraded by reconciliation.
+        if (hasPrepaidCoverage(sub)) {
+          skippedPaidThrough++;
+          await logAudit(sub.business_id, "skipped_paid_through", {
+            subscription_row_id: sub.id,
+            paid_through: sub.paid_through,
+            tier: sub.tier,
+          });
+          console.log(`[paid-through] Skipping ${sub.id} — covered until ${sub.paid_through}`);
+          continue;
+        }
+
         if (!sub.stripe_subscription_id) {
           if (await tryRepointFromCustomer(sub)) {
             repointed++;
             synced++;
             continue;
           }
-          // Starter is retired — just mark the row cancelled and keep the
-          // historical tier so reporting/audit stays accurate.
+          // No Stripe subscription and no live sibling: mark the row cancelled
+          // but KEEP the tier. Revoking paid features requires a real failed
+          // charge, handled by the invoice.payment_failed webhook path.
           const { error: updateError } = await supabase
             .from("subscriptions")
             .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -256,13 +292,20 @@ Deno.serve(async (req) => {
         const stripeSub = await stripeResponse.json();
 
         if (stripeSub.status === "active" || stripeSub.status === "trialing") {
-          const newPeriodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+          const newPeriodEnd = safeISODate(stripeSub.current_period_end);
+          const newPeriodStart = safeISODate(stripeSub.current_period_start);
+          const renewPatch: Record<string, unknown> = {};
+          if (newPeriodEnd) renewPatch.current_period_end = newPeriodEnd;
+          if (newPeriodStart) renewPatch.current_period_start = newPeriodStart;
+
+          if (Object.keys(renewPatch).length === 0) {
+            console.log(`[renew] ${sub.id}: Stripe returned no usable period timestamps, skipping`);
+            continue;
+          }
+
           const { error: updateError } = await supabase
             .from("subscriptions")
-            .update({
-              current_period_end: newPeriodEnd,
-              current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
-            })
+            .update(renewPatch)
             .eq("id", sub.id);
 
           if (updateError) {
@@ -272,11 +315,12 @@ Deno.serve(async (req) => {
             synced++;
             await logAudit(sub.business_id, "renewed", {
               stripe_subscription_id: sub.stripe_subscription_id,
-              new_period_end: newPeriodEnd,
+              new_period_end: newPeriodEnd ?? null,
             });
             console.log(`Renewed sub ${sub.id}, new period end: ${newPeriodEnd}`);
           }
         } else if (stripeSub.status === "past_due") {
+
           // GUARD: before mirroring past_due, look for an active sibling on
           // the same customer. If one exists, our row is tracking a stale sub
           // (typical after a broken upgrade) — repoint instead of marking
@@ -312,6 +356,43 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Revoking access on a non-voluntary status requires evidence of a
+          // genuine failed charge on THIS subscription. Reaching the end of a
+          // prepaid/credited window is never grounds for a downgrade.
+          if (stripeSub.status !== "canceled") {
+            let hadFailedCharge = false;
+            try {
+              const invResp = await fetch(
+                `https://api.stripe.com/v1/invoices?subscription=${sub.stripe_subscription_id}&limit=10`,
+                { headers: { Authorization: `Bearer ${stripeSecretKey}` } },
+              );
+              if (invResp.ok) {
+                const invList = await invResp.json();
+                hadFailedCharge = (invList?.data || []).some(
+                  (inv: any) =>
+                    (inv.status === "open" || inv.status === "uncollectible") &&
+                    (inv.attempted === true || (inv.attempt_count ?? 0) > 0),
+                );
+              } else {
+                console.log(`[downgrade-guard] invoice lookup failed for ${sub.id}: ${invResp.status}`);
+                errors.push(`Invoice lookup failed for ${sub.id}: ${invResp.status}`);
+                continue;
+              }
+            } catch (invErr) {
+              errors.push(`Invoice lookup error for ${sub.id}: ${(invErr as Error).message}`);
+              continue;
+            }
+            if (!hadFailedCharge) {
+              await logAudit(sub.business_id, "skipped_paid_through", {
+                reason: "no_failed_charge_yet",
+                stripe_status: stripeSub.status,
+                stripe_subscription_id: sub.stripe_subscription_id,
+              });
+              console.log(`[downgrade-guard] ${sub.id}: status ${stripeSub.status} but no failed charge — keeping access`);
+              continue;
+            }
+          }
+
           const { error: updateError } = await supabase
             .from("subscriptions")
             .update({
@@ -342,20 +423,40 @@ Deno.serve(async (req) => {
               voided_commissions: voidedComms?.length ?? 0,
             });
             console.log(`Downgraded sub ${sub.id} (Stripe status: ${stripeSub.status}, no sibling)`);
+
+            if (sub.tier !== "starter" && sub.tier !== "starter_paid") {
+              try {
+                const { data: bizRow } = await supabase
+                  .from("businesses").select("name").eq("id", sub.business_id).maybeSingle();
+                await supabase.rpc("notify_admin_paid_downgrade", {
+                  _subscription_id: sub.id,
+                  _business_name: bizRow?.name ?? null,
+                  _previous_tier: sub.tier,
+                  _reason: `Reconciliation: Stripe status "${stripeSub.status}" with a failed charge and no live replacement`,
+                });
+              } catch (notifyErr) {
+                console.error("[sync] admin notify failed:", (notifyErr as Error).message);
+              }
+            }
           }
         }
       } catch (err) {
+        // Per-row isolation: one bad row must never abort the whole run.
+        console.error(`[sync] row ${sub.id} failed:`, (err as Error).message);
         errors.push(`Exception processing ${sub.id}: ${(err as Error).message}`);
       }
     }
+
 
     const result = {
       synced,
       downgraded,
       renewed,
       repointed,
+      skipped_paid_through: skippedPaidThrough,
       errors: errors.length > 0 ? errors : undefined,
     };
+
 
     console.log("Sync complete:", JSON.stringify(result));
 

@@ -2829,6 +2829,10 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           id: string
+          paid_through: string | null
+          paid_through_granted_at: string | null
+          paid_through_granted_by: string | null
+          paid_through_reason: string | null
           pricing_region: string | null
           revenuecat_app_user_id: string | null
           revenuecat_product_id: string | null
@@ -2849,6 +2853,10 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          paid_through?: string | null
+          paid_through_granted_at?: string | null
+          paid_through_granted_by?: string | null
+          paid_through_reason?: string | null
           pricing_region?: string | null
           revenuecat_app_user_id?: string | null
           revenuecat_product_id?: string | null
@@ -2869,6 +2877,10 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          paid_through?: string | null
+          paid_through_granted_at?: string | null
+          paid_through_granted_by?: string | null
+          paid_through_reason?: string | null
           pricing_region?: string | null
           revenuecat_app_user_id?: string | null
           revenuecat_product_id?: string | null
@@ -3791,6 +3803,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      notify_admin_paid_downgrade: {
+        Args: {
+          _business_name: string
+          _previous_tier: string
+          _reason: string
+          _subscription_id: string
+        }
+        Returns: undefined
+      }
       notify_admin_payment_failed: {
         Args: { _business_name: string; _subscription_id: string }
         Returns: undefined
@@ -3798,6 +3819,10 @@ export type Database = {
       set_default_currency_account: {
         Args: { _account_id: string; _business_id: string }
         Returns: undefined
+      }
+      subscription_has_prepaid_coverage: {
+        Args: { _subscription_id: string }
+        Returns: boolean
       }
       unban_user: { Args: { _user_id: string }; Returns: undefined }
       update_compliance_analytics: {

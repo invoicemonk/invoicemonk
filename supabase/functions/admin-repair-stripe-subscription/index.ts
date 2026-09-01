@@ -10,11 +10,15 @@
 //     status?: string;
 //     tier?: string;
 //     current_period_end?: string;         // ISO
+//     paid_through?: string;               // ISO — durable "do not downgrade before" date
+//     paid_through_reason?: string;        // required whenever paid_through is set
 //   }
 //   audit: { business_id?: string; user_id?: string; note: string; metadata?: Record<string,unknown> }
 //
-// A convenience preset is available: { preset: "rico_2026_07" } which runs the
-// pre-approved plan for Rico's customer cus_U8TCXJm3KyLHQH.
+// Always set paid_through when a repair grants prepaid coverage: Stripe
+// trial_end alone is not durable — reconciliation and webhooks only respect
+// paid_through, which is what protects the customer from being downgraded.
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -37,57 +41,19 @@ interface RepairRequest {
     status?: string;
     tier?: string;
     current_period_end?: string;
+    paid_through?: string;
+    paid_through_reason?: string;
   };
+
   audit?: { business_id?: string; user_id?: string; note: string; metadata?: Record<string, unknown> };
 }
 
-function ricoPreset(): RepairRequest {
-  // 2026-09-01 00:00:00 UTC
-  const trialEndUnix = Math.floor(Date.UTC(2026, 8, 1, 0, 0, 0) / 1000);
-  return {
-    void_invoice_ids: ["in_1Tsia4FQfE4jyFlFQByDQfo9"],
-    cancel_subscription_ids: [
-      {
-        id: "sub_1TAUQyFQfE4jyFlFqddXkC6k",
-        reason: "duplicate_of_15_plan",
-        metadata: { cancellation_reason: "duplicate_of_15_plan", handled_by: "support_manual_fix" },
-      },
-      {
-        id: "sub_1TqZFlFQfE4jyFlFCbCm2Rzb",
-        reason: "duplicate_charge_of_sub_1TqZCqFQfE4jyFlFVXDZj2Q8",
-        metadata: {
-          cancellation_reason: "duplicate_charge_of_sub_1TqZCqFQfE4jyFlFVXDZj2Q8",
-          handled_by: "support_manual_fix",
-        },
-      },
-    ],
-    extend_subscription: {
-      id: "sub_1TqZCqFQfE4jyFlFVXDZj2Q8",
-      trial_end_unix: trialEndUnix,
-      metadata: {
-        reason: "credit_for_duplicate_15_charge_2026_07_05",
-        covers: "July+August_2026",
-      },
-    },
-    update_db_subscription: {
-      id: "b2430849-0fa3-48f0-9d90-3282eb988109",
-      stripe_subscription_id: "sub_1TqZCqFQfE4jyFlFVXDZj2Q8",
-      status: "active",
-      tier: "professional",
-      current_period_end: new Date(trialEndUnix * 1000).toISOString(),
-    },
-    audit: {
-      note:
-        "Manual repair: cancelled old $5 sub + duplicate $15 sub; extended surviving $15 sub via trial_end to cover July+August 2026 per customer request.",
-      metadata: {
-        old_stripe_subscription_id: "sub_1TAUQyFQfE4jyFlFqddXkC6k",
-        cancelled_duplicate: "sub_1TqZFlFQfE4jyFlFCbCm2Rzb",
-        kept_stripe_subscription_id: "sub_1TqZCqFQfE4jyFlFVXDZj2Q8",
-        voided_invoice: "in_1Tsia4FQfE4jyFlFQByDQfo9",
-      },
-    },
-  };
-}
+// NOTE: the historical "rico_2026_07" preset was removed. It hardcoded a
+// one-off July 2026 repair (cancelling specific Stripe subs and voiding an
+// invoice) that must never run again, and it granted coverage only through
+// Stripe trial_end — which is not durable. Pass explicit actions instead, and
+// always include paid_through when granting prepaid coverage.
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -151,9 +117,13 @@ serve(async (req) => {
       body = {};
     }
 
-    if (body.preset === "rico_2026_07") {
-      body = { ...ricoPreset(), ...body, preset: "rico_2026_07" };
+    if (body.preset) {
+      errors.push(
+        `preset "${body.preset}" is no longer supported — pass explicit actions (and paid_through) instead`,
+      );
+      body = { ...body, preset: undefined };
     }
+
 
     // 1. Void invoices
     if (body.void_invoice_ids?.length) {
@@ -239,20 +209,35 @@ serve(async (req) => {
     // 4. Update DB subscription row
     if (body.update_db_subscription) {
       const u = body.update_db_subscription;
-      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (u.stripe_subscription_id) patch.stripe_subscription_id = u.stripe_subscription_id;
-      if (u.status) patch.status = u.status;
-      if (u.tier) patch.tier = u.tier;
-      if (u.current_period_end) patch.current_period_end = u.current_period_end;
-      const { data, error } = await admin
-        .from("subscriptions")
-        .update(patch)
-        .eq("id", u.id)
-        .select("id, tier, status, stripe_subscription_id, current_period_end, business_id, user_id")
-        .maybeSingle();
-      if (error) errors.push(`db update: ${error.message}`);
-      else results.db_subscription = data;
+      if (u.paid_through && !u.paid_through_reason) {
+        errors.push("db update: paid_through requires paid_through_reason");
+      } else {
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (u.stripe_subscription_id) patch.stripe_subscription_id = u.stripe_subscription_id;
+        if (u.status) patch.status = u.status;
+        if (u.tier) patch.tier = u.tier;
+        if (u.current_period_end) patch.current_period_end = u.current_period_end;
+        if (u.paid_through) {
+          // Durable credit: this is what actually stops future downgrades.
+          patch.paid_through = u.paid_through;
+          patch.paid_through_reason = u.paid_through_reason;
+          patch.paid_through_granted_by = user.id;
+          patch.paid_through_granted_at = new Date().toISOString();
+          patch.cancelled_at = null;
+        }
+        const { data, error } = await admin
+          .from("subscriptions")
+          .update(patch)
+          .eq("id", u.id)
+          .select(
+            "id, tier, status, stripe_subscription_id, current_period_end, paid_through, paid_through_reason, business_id, user_id",
+          )
+          .maybeSingle();
+        if (error) errors.push(`db update: ${error.message}`);
+        else results.db_subscription = data;
+      }
     }
+
 
     // 5. Audit log
     const auditMeta = {

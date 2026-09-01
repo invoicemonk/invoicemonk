@@ -946,40 +946,146 @@ serve(async (req) => {
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        console.log("Subscription deleted:", subscription.id);
+        const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+        console.log(`[sub.deleted] incoming=${subscription.id} customer=${customerId}`);
 
-        // Find the subscription record before updating. Prefer match by
-        // stripe_subscription_id, but fall back to stripe_customer_id so a
-        // delete event for a sub we never recorded (e.g. the upgrade row was
-        // overwritten by a later checkout) still downgrades the right row.
-        let { data: cancelledSub } = await supabase
+        // Decision logging helper — every deletion event now leaves a trail,
+        // whatever the outcome.
+        const logDeletion = async (
+          businessId: string | null,
+          outcome:
+            | "ignored_untracked"
+            | "ignored_duplicate"
+            | "repointed"
+            | "blocked_by_paid_through"
+            | "downgraded_terminal"
+            | "error",
+          meta: Record<string, unknown>,
+        ) => {
+          console.log(`[sub.deleted] outcome=${outcome} ${JSON.stringify(meta)}`);
+          try {
+            await supabase.rpc("log_audit_event", {
+              _event_type: "SUBSCRIPTION_CHANGED",
+              _entity_type: "subscription",
+              _business_id: businessId,
+              _metadata: {
+                source: "stripe-webhook",
+                event: "customer.subscription.deleted",
+                incoming_stripe_subscription_id: subscription.id,
+                stripe_customer_id: customerId,
+                outcome,
+                ...meta,
+              },
+            });
+          } catch (e) {
+            console.error("[sub.deleted] audit write failed:", (e as Error).message);
+          }
+        };
+
+        // FAIL CLOSED: only the local row that actually tracks THIS Stripe
+        // subscription may be cancelled. The old customer-ID fallback let a
+        // late deletion event for an unrelated/duplicate subscription clobber
+        // a live paying customer's row (Rico, 1 Sep 2026).
+        const { data: cancelledSub, error: lookupErr } = await supabase
           .from("subscriptions")
-          .select("id, business_id")
+          .select("id, business_id, tier, status, paid_through, stripe_customer_id, stripe_subscription_id")
           .eq("stripe_subscription_id", subscription.id)
           .maybeSingle();
 
-        let matchedBy: "subscription_id" | "customer_id" = "subscription_id";
-
-        if (!cancelledSub && typeof subscription.customer === "string") {
-          const { data: byCustomer } = await supabase
-            .from("subscriptions")
-            .select("id, business_id")
-            .eq("stripe_customer_id", subscription.customer)
-            .neq("tier", "starter")
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (byCustomer) {
-            cancelledSub = byCustomer;
-            matchedBy = "customer_id";
-          }
-        }
-
-        if (!cancelledSub) {
-          console.log("No local subscription row matched delete event:", subscription.id);
+        if (lookupErr) {
+          console.error("[sub.deleted] lookup failed:", lookupErr.message);
+          await logDeletion(null, "error", { stage: "lookup", message: lookupErr.message });
           break;
         }
 
+        if (!cancelledSub) {
+          // Untracked or duplicate subscription — record it, change nothing.
+          let outcome: "ignored_untracked" | "ignored_duplicate" = "ignored_untracked";
+          let businessId: string | null = null;
+          if (customerId) {
+            const { data: customerRows } = await supabase
+              .from("subscriptions")
+              .select("id, business_id, stripe_subscription_id, tier, status")
+              .eq("stripe_customer_id", customerId);
+            if (customerRows && customerRows.length > 0) {
+              outcome = "ignored_duplicate";
+              businessId = customerRows[0].business_id ?? null;
+            }
+          }
+          await logDeletion(businessId, outcome, {
+            reason: "no_local_row_tracks_this_subscription",
+          });
+          break;
+        }
+
+        // Prepaid coverage always wins over any Stripe lifecycle event.
+        if (cancelledSub.paid_through && new Date(cancelledSub.paid_through).getTime() > Date.now()) {
+          await logDeletion(cancelledSub.business_id, "blocked_by_paid_through", {
+            subscription_row_id: cancelledSub.id,
+            paid_through: cancelledSub.paid_through,
+          });
+          break;
+        }
+
+        // SAFETY NET: if the customer has another live subscription, repoint
+        // instead of downgrading.
+        if (cancelledSub.stripe_customer_id) {
+          try {
+            const siblings = await stripe.subscriptions.list({
+              customer: cancelledSub.stripe_customer_id,
+              status: "all",
+              limit: 20,
+            });
+            const liveSibling = siblings.data.find(
+              (s) => s.id !== subscription.id && (s.status === "active" || s.status === "trialing" || s.status === "past_due"),
+            );
+            if (liveSibling) {
+              const patch: Record<string, unknown> = {
+                stripe_subscription_id: liveSibling.id,
+                status: liveSibling.status === "past_due" ? "past_due" : "active",
+                cancelled_at: null,
+                updated_at: new Date().toISOString(),
+              };
+              const ps = safeISODate((liveSibling as any).current_period_start);
+              const pe = safeISODate((liveSibling as any).current_period_end);
+              if (ps) patch.current_period_start = ps;
+              if (pe) patch.current_period_end = pe;
+
+              const { error: repointErr } = await supabase
+                .from("subscriptions")
+                .update(patch)
+                .eq("id", cancelledSub.id);
+
+              if (repointErr) {
+                await logDeletion(cancelledSub.business_id, "error", {
+                  stage: "repoint",
+                  message: repointErr.message,
+                });
+              } else {
+                await logDeletion(cancelledSub.business_id, "repointed", {
+                  subscription_row_id: cancelledSub.id,
+                  new_stripe_subscription_id: liveSibling.id,
+                  sibling_status: liveSibling.status,
+                });
+              }
+              break;
+            }
+          } catch (siblingErr) {
+            // Never downgrade on an inconclusive Stripe lookup.
+            console.error("[sub.deleted] sibling lookup failed:", (siblingErr as Error).message);
+            captureException(siblingErr, { function_name: "stripe-webhook", stage: "sub.deleted.siblings" });
+            await logDeletion(cancelledSub.business_id, "error", {
+              stage: "sibling_lookup",
+              message: (siblingErr as Error).message,
+              action: "left_entitlement_untouched",
+            });
+            break;
+          }
+        }
+
+        // Terminal: this exact subscription ended, no live replacement, no
+        // prepaid coverage.
+        const previousTier = cancelledSub.tier;
         const { error } = await supabase
           .from("subscriptions")
           .update({
@@ -993,29 +1099,50 @@ serve(async (req) => {
 
         if (error) {
           console.error("Error updating cancelled subscription:", error);
-        } else {
-          console.log(`Subscription cancelled (matched by ${matchedBy}), reverted to starter`);
+          await logDeletion(cancelledSub.business_id, "error", {
+            stage: "downgrade",
+            message: error.message,
+          });
+          break;
         }
 
         // Void any pending/locked commissions tied to this subscription
-        if (cancelledSub?.id) {
-          const { data: voidedComms, error: voidErr } = await supabase
-            .from("commissions")
-            .update({
-              status: "voided" as const,
-            })
-            .eq("subscription_id", cancelledSub.id)
-            .in("status", ["pending", "locked"])
-            .select("id");
+        const { data: voidedComms, error: voidErr } = await supabase
+          .from("commissions")
+          .update({ status: "voided" as const })
+          .eq("subscription_id", cancelledSub.id)
+          .in("status", ["pending", "locked"])
+          .select("id");
+        if (voidErr) console.error("Error voiding commissions:", voidErr);
 
-          if (voidErr) {
-            console.error("Error voiding commissions:", voidErr);
-          } else {
-            console.log(`Voided ${voidedComms?.length || 0} commissions for cancelled subscription`);
+        await logDeletion(cancelledSub.business_id, "downgraded_terminal", {
+          subscription_row_id: cancelledSub.id,
+          previous_tier: previousTier,
+          voided_commissions: voidedComms?.length ?? 0,
+        });
+
+        // Tell admins whenever a paying customer loses access.
+        if (previousTier && previousTier !== "starter" && previousTier !== "starter_paid") {
+          try {
+            const { data: biz } = await supabase
+              .from("businesses")
+              .select("name")
+              .eq("id", cancelledSub.business_id)
+              .maybeSingle();
+            await supabase.rpc("notify_admin_paid_downgrade", {
+              _subscription_id: cancelledSub.id,
+              _business_name: biz?.name ?? null,
+              _previous_tier: previousTier,
+              _reason: `Stripe subscription ${subscription.id} ended with no live replacement and no prepaid coverage`,
+            });
+
+          } catch (notifyErr) {
+            console.error("[sub.deleted] admin notify failed:", (notifyErr as Error).message);
           }
         }
         break;
       }
+
 
       case "invoice.payment_action_required":
       case "invoice.payment_failed": {
@@ -1344,7 +1471,7 @@ async function doUpdateSubscriptionByBusiness(
   // Check current DB tier and tracked Stripe sub
   const { data: currentSub } = await supabase
     .from("subscriptions")
-    .select("tier, stripe_subscription_id")
+    .select("tier, stripe_subscription_id, paid_through")
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -1363,11 +1490,14 @@ async function doUpdateSubscriptionByBusiness(
 
   const dbTier = currentSub?.tier || "starter";
   const stripeStatus = subscription.status;
+  const hasPrepaidCoverage = !!currentSub?.paid_through &&
+    new Date(currentSub.paid_through).getTime() > Date.now();
 
   // Map Stripe status -> our local status, and decide whether to keep tier
   // or revert to starter. We treat past_due as a grace period (keep tier).
   // unpaid / incomplete / incomplete_expired / canceled all mean the customer
-  // is not paying — revert tier to starter so paid features are revoked.
+  // is not paying — revert tier to starter so paid features are revoked,
+  // UNLESS durable prepaid coverage is still valid.
   let status: string;
   let tier: string;
   if (stripeStatus === "active") {
@@ -1379,6 +1509,14 @@ async function doUpdateSubscriptionByBusiness(
   } else if (stripeStatus === "past_due") {
     status = "past_due";
     tier = dbTier; // keep tier during retry grace period
+  } else if (hasPrepaidCoverage) {
+    // Paid in advance — keep entitlement no matter what Stripe says.
+    status = "active";
+    tier = dbTier;
+    console.log(
+      `[entitlement] Stripe status="${stripeStatus}" for sub ${subscription.id} but business ${businessId} ` +
+      `is paid through ${currentSub?.paid_through} — keeping tier ${dbTier}.`
+    );
   } else {
     // unpaid | incomplete | incomplete_expired | canceled | paused
     status = stripeStatus === "canceled" ? "cancelled" : "past_due";
@@ -1387,6 +1525,7 @@ async function doUpdateSubscriptionByBusiness(
       `[entitlement] Stripe status="${stripeStatus}" for sub ${subscription.id} — reverting business ${businessId} to starter.`
     );
   }
+
 
   if (tier !== metadataTier) {
     console.log("Tier-protection applied: keeping/forcing tier", tier, "(metadata wanted", metadataTier + ")");
@@ -1421,6 +1560,26 @@ async function doUpdateSubscriptionByBusiness(
       status,
     },
   });
+
+  // Alert admins whenever a paying customer loses paid features.
+  if (tier === "starter" && dbTier !== "starter" && dbTier !== "starter_paid") {
+    try {
+      const { data: bizRow } = await supabase
+        .from("businesses").select("name").eq("id", businessId).maybeSingle();
+      const { data: subRow } = await supabase
+        .from("subscriptions").select("id").eq("business_id", businessId).maybeSingle();
+      await supabase.rpc("notify_admin_paid_downgrade", {
+        _subscription_id: subRow?.id ?? null,
+        _business_name: bizRow?.name ?? null,
+        _previous_tier: dbTier,
+        _reason: `Stripe status "${stripeStatus}" on subscription ${subscription.id}`,
+      });
+    } catch (notifyErr) {
+      console.error("[entitlement] admin notify failed:", (notifyErr as Error).message);
+    }
+  }
+
+
 
   console.log("Updated subscription for business:", businessId, "tier:", tier, "status:", status);
 }
