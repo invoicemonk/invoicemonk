@@ -14,6 +14,7 @@ interface InvoiceSectionHeaderProps {
   description: string;
   help: string;
   required?: boolean;
+  dataTour?: string;
   children?: ReactNode;
 }
 
@@ -22,11 +23,12 @@ export function InvoiceSectionHeader({
   description,
   help,
   required,
+  dataTour,
   children,
 }: InvoiceSectionHeaderProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4" data-tour={dataTour}>
         <div className="space-y-1.5">
           <CardTitle className="flex items-center gap-2 text-xl">
             {title}

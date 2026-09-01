@@ -183,10 +183,10 @@ export default function InvoiceNew() {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   useEffect(() => {
-    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride) {
+    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride || selectedTemplateId || depositPercent !== null || parentInvoiceId) {
       setIsAdvancedOpen(true);
     }
-  }, [invoiceKind, isReverseCharge, brandColorOverride]);
+  }, [invoiceKind, isReverseCharge, brandColorOverride, selectedTemplateId, depositPercent, parentInvoiceId]);
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
