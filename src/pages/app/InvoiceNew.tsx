@@ -77,6 +77,8 @@ import { validateLineItems, getValidLineItems, hasValidLineItems } from '@/lib/l
 
 import { DepositInvoiceSection } from '@/components/invoices/DepositInvoiceSection';
 import { LineItemDescriptionField } from '@/components/invoices/LineItemDescriptionField';
+import { InvoiceAdvancedSection } from '@/components/invoices/InvoiceAdvancedSection';
+import { InvoiceSectionHeader } from '@/components/invoices/InvoiceSectionHeader';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvoiceKind = Database['public']['Enums']['invoice_kind'];
@@ -178,6 +180,13 @@ export default function InvoiceNew() {
   const [invoiceKind, setInvoiceKind] = useState<InvoiceKind>('standard');
   const [depositPercent, setDepositPercent] = useState<number | null>(null);
   const [parentInvoiceId, setParentInvoiceId] = useState<string | null>(null);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    if (invoiceKind !== 'standard' || isReverseCharge || brandColorOverride) {
+      setIsAdvancedOpen(true);
+    }
+  }, [invoiceKind, isReverseCharge, brandColorOverride]);
 
   // Update default tax rate when business or tax schema changes
   useEffect(() => {
