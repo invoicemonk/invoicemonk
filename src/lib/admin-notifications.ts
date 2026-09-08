@@ -81,7 +81,7 @@ export function getAdminNotificationConfig(type: string): AdminNotificationVisua
 
 export function getNotificationCategory(type: string): AdminNotificationCategory | null {
   for (const [category, types] of Object.entries(ADMIN_NOTIFICATION_CATEGORIES)) {
-    if (types.includes(type as AdminNotificationType)) {
+    if ((types as readonly string[]).includes(type)) {
       return category as AdminNotificationCategory;
     }
   }
@@ -92,7 +92,7 @@ export function isNotificationInCategory(
   type: string,
   category: AdminNotificationCategory,
 ): boolean {
-  return ADMIN_NOTIFICATION_CATEGORIES[category].includes(type as AdminNotificationType);
+  return (ADMIN_NOTIFICATION_CATEGORIES[category] as readonly string[]).includes(type);
 }
 
 export function formatAdminNotificationTime(value: string | null | undefined): string {
