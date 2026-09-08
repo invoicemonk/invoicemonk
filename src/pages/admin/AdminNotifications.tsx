@@ -13,6 +13,7 @@ import {
   AdminNotificationCategory 
 } from '@/hooks/use-admin-notifications';
 import { AdminNotificationItem } from '@/components/admin/AdminNotificationItem';
+import { isNotificationInCategory } from '@/lib/admin-notifications';
 
 const categoryTabs: { value: AdminNotificationCategory | 'all'; label: string; icon: typeof Users }[] = [
   { value: 'all', label: 'All', icon: Bell },
@@ -69,15 +70,9 @@ export default function AdminNotifications() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         {categoryTabs.slice(1).map((cat) => {
-          const categoryNotifications = notifications.filter(n => {
-            const catTypes = {
-              users: ['ADMIN_USER_REGISTERED', 'ADMIN_EMAIL_VERIFIED'],
-              billing: ['ADMIN_SUBSCRIPTION_UPGRADED', 'ADMIN_SUBSCRIPTION_DOWNGRADED', 'ADMIN_PAYMENT_FAILED', 'ADMIN_FIRST_INVOICE_ISSUED'],
-              support: ['SUPPORT_TICKET_CREATED', 'SUPPORT_TICKET_USER_REPLY'],
-              compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED', 'ADMIN_VERIFICATION_SUBMITTED'],
-            };
-            return catTypes[cat.value as AdminNotificationCategory]?.includes(n.type);
-          });
+          const categoryNotifications = notifications.filter((notification) =>
+            isNotificationInCategory(notification.type, cat.value as AdminNotificationCategory)
+          );
           const unread = categoryNotifications.filter(n => !n.is_read).length;
 
           return (

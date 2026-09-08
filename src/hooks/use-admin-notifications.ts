@@ -2,6 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
+import {
+  ADMIN_NOTIFICATION_CATEGORIES,
+  ADMIN_NOTIFICATION_TYPES,
+  getNotificationCategory as getSharedNotificationCategory,
+} from '@/lib/admin-notifications';
+import type {
+  AdminNotificationCategory,
+  AdminNotificationType,
+} from '@/lib/admin-notifications';
+
+export type { AdminNotificationCategory, AdminNotificationType } from '@/lib/admin-notifications';
 
 export interface AdminNotification {
   id: string;
@@ -16,46 +27,8 @@ export interface AdminNotification {
   created_at: string;
 }
 
-// Admin-only notification types (Phase-1)
-// These are strictly admin-scoped and separate from user notification types
-export type AdminNotificationType =
-  | 'ADMIN_USER_REGISTERED'
-  | 'ADMIN_EMAIL_VERIFIED'
-  | 'ADMIN_SUBSCRIPTION_UPGRADED'
-  | 'ADMIN_SUBSCRIPTION_DOWNGRADED'
-  | 'ADMIN_PAYMENT_FAILED'
-  | 'ADMIN_FIRST_INVOICE_ISSUED'
-  | 'SUPPORT_TICKET_CREATED'
-  | 'SUPPORT_TICKET_USER_REPLY'
-  | 'ADMIN_EXPORT_FAILED'
-  | 'ADMIN_VERIFICATION_FAILED'
-  | 'ADMIN_VERIFICATION_SUBMITTED';
-
-// Whitelist of admin-only notification types
-// This prevents admins from seeing business-scoped user notifications
-const ADMIN_ONLY_TYPES: AdminNotificationType[] = [
-  'ADMIN_USER_REGISTERED',
-  'ADMIN_EMAIL_VERIFIED',
-  'ADMIN_SUBSCRIPTION_UPGRADED',
-  'ADMIN_SUBSCRIPTION_DOWNGRADED',
-  'ADMIN_PAYMENT_FAILED',
-  'ADMIN_FIRST_INVOICE_ISSUED',
-  'SUPPORT_TICKET_CREATED',
-  'SUPPORT_TICKET_USER_REPLY',
-  'ADMIN_EXPORT_FAILED',
-  'ADMIN_VERIFICATION_FAILED',
-  'ADMIN_VERIFICATION_SUBMITTED',
-];
-
-// Category mapping for filtering
-export const ADMIN_NOTIFICATION_CATEGORIES = {
-  users: ['ADMIN_USER_REGISTERED', 'ADMIN_EMAIL_VERIFIED'],
-  billing: ['ADMIN_SUBSCRIPTION_UPGRADED', 'ADMIN_SUBSCRIPTION_DOWNGRADED', 'ADMIN_PAYMENT_FAILED', 'ADMIN_FIRST_INVOICE_ISSUED'],
-  support: ['SUPPORT_TICKET_CREATED', 'SUPPORT_TICKET_USER_REPLY'],
-  compliance: ['ADMIN_EXPORT_FAILED', 'ADMIN_VERIFICATION_FAILED', 'ADMIN_VERIFICATION_SUBMITTED'],
-} as const;
-
-export type AdminNotificationCategory = keyof typeof ADMIN_NOTIFICATION_CATEGORIES;
+// The shared allowlist keeps the page, dropdown, and item renderer in sync.
+const ADMIN_ONLY_TYPES = ADMIN_NOTIFICATION_TYPES;
 
 export function useAdminNotifications(limit = 50, category?: AdminNotificationCategory) {
   const { user } = useAuth();
@@ -207,10 +180,5 @@ export function useAdminMarkAllAsRead() {
 
 // Helper to get category from notification type
 export function getNotificationCategory(type: string): AdminNotificationCategory | null {
-  for (const [category, types] of Object.entries(ADMIN_NOTIFICATION_CATEGORIES)) {
-    if (types.includes(type as never)) {
-      return category as AdminNotificationCategory;
-    }
-  }
-  return null;
+  return getSharedNotificationCategory(type);
 }
