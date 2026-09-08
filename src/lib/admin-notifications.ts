@@ -1,7 +1,6 @@
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertTriangle,
-  CreditCard,
   Download,
   FileText,
   Headphones,
@@ -103,6 +102,3 @@ export function formatAdminNotificationTime(value: string | null | undefined): s
 
   return formatDistanceToNow(date, { addSuffix: true });
 }
-
-// Kept as a named export for consumers that need the payment icon in admin surfaces.
-export { CreditCard };
