@@ -1,106 +1,25 @@
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
-import { 
-  UserPlus, 
-  Mail, 
-  CreditCard, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle,
-  FileText,
-  MessageCircle,
-  Headphones,
-  ShieldAlert,
-  Download
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   AdminNotification, 
-  AdminNotificationType,
   getNotificationCategory,
   useAdminMarkAsRead 
 } from '@/hooks/use-admin-notifications';
+import {
+  formatAdminNotificationTime,
+  getAdminNotificationConfig,
+} from '@/lib/admin-notifications';
 
 interface AdminNotificationItemProps {
   notification: AdminNotification;
   onClose?: () => void;
 }
 
-// Icon and color mapping for admin notification types
-const notificationConfig: Record<AdminNotificationType, { 
-  icon: typeof UserPlus; 
-  colorClass: string;
-  bgClass: string;
-}> = {
-  'ADMIN_USER_REGISTERED': { 
-    icon: UserPlus, 
-    colorClass: 'text-blue-600 dark:text-blue-400',
-    bgClass: 'bg-blue-100 dark:bg-blue-900/30'
-  },
-  'ADMIN_EMAIL_VERIFIED': { 
-    icon: Mail, 
-    colorClass: 'text-green-600 dark:text-green-400',
-    bgClass: 'bg-green-100 dark:bg-green-900/30'
-  },
-  'ADMIN_SUBSCRIPTION_UPGRADED': { 
-    icon: TrendingUp, 
-    colorClass: 'text-emerald-600 dark:text-emerald-400',
-    bgClass: 'bg-emerald-100 dark:bg-emerald-900/30'
-  },
-  'ADMIN_SUBSCRIPTION_DOWNGRADED': { 
-    icon: TrendingDown, 
-    colorClass: 'text-amber-600 dark:text-amber-400',
-    bgClass: 'bg-amber-100 dark:bg-amber-900/30'
-  },
-  'ADMIN_PAYMENT_FAILED': { 
-    icon: AlertTriangle, 
-    colorClass: 'text-destructive',
-    bgClass: 'bg-destructive/10'
-  },
-  'ADMIN_FIRST_INVOICE_ISSUED': { 
-    icon: FileText, 
-    colorClass: 'text-primary',
-    bgClass: 'bg-primary/10'
-  },
-  'SUPPORT_TICKET_CREATED': { 
-    icon: MessageCircle, 
-    colorClass: 'text-yellow-600 dark:text-yellow-400',
-    bgClass: 'bg-yellow-100 dark:bg-yellow-900/30'
-  },
-  'SUPPORT_TICKET_USER_REPLY': { 
-    icon: Headphones, 
-    colorClass: 'text-blue-600 dark:text-blue-400',
-    bgClass: 'bg-blue-100 dark:bg-blue-900/30'
-  },
-  'ADMIN_EXPORT_FAILED': { 
-    icon: Download, 
-    colorClass: 'text-orange-600 dark:text-orange-400',
-    bgClass: 'bg-orange-100 dark:bg-orange-900/30'
-  },
-  'ADMIN_VERIFICATION_FAILED': { 
-    icon: ShieldAlert, 
-    colorClass: 'text-orange-600 dark:text-orange-400',
-    bgClass: 'bg-orange-100 dark:bg-orange-900/30'
-  },
-  'ADMIN_VERIFICATION_SUBMITTED': { 
-    icon: FileText, 
-    colorClass: 'text-cyan-600 dark:text-cyan-400',
-    bgClass: 'bg-cyan-100 dark:bg-cyan-900/30'
-  },
-};
-
-// Default fallback config
-const defaultConfig = {
-  icon: MessageCircle,
-  colorClass: 'text-muted-foreground',
-  bgClass: 'bg-muted'
-};
-
 export function AdminNotificationItem({ notification, onClose }: AdminNotificationItemProps) {
   const navigate = useNavigate();
   const markAsRead = useAdminMarkAsRead();
 
-  const config = notificationConfig[notification.type] || defaultConfig;
+  const config = getAdminNotificationConfig(notification.type);
   const Icon = config.icon;
   const category = getNotificationCategory(notification.type);
 
@@ -169,7 +88,7 @@ export function AdminNotificationItem({ notification, onClose }: AdminNotificati
           {notification.message}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+           {formatAdminNotificationTime(notification.created_at)}
         </p>
       </div>
     </button>
