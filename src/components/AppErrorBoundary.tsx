@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { captureError } from '@/lib/sentry';
+import { isChunkLoadError } from '@/lib/lazy-import';
 
 interface Props {
   children: ReactNode;
@@ -33,18 +34,24 @@ class ErrorBoundaryInner extends Component<Props, State> {
     const { error, info } = this.state;
     if (!error) return this.props.children;
 
+    const isChunkError = isChunkLoadError(error);
+
     return (
       <main className="min-h-[60vh] flex items-center justify-center p-6">
         <section className="w-full max-w-md rounded-lg border border-border bg-card p-8 text-center shadow-sm">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <AlertTriangle className="h-6 w-6 text-muted-foreground" />
           </div>
-          <h1 className="text-lg font-semibold text-foreground">This page ran into a problem</h1>
+          <h1 className="text-lg font-semibold text-foreground">
+            {isChunkError ? 'This page could not load' : 'This page ran into a problem'}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your data is safe. Try again, or reload the page if the problem persists.
+            {isChunkError
+              ? 'A newer version of Invoicemonk may be available. Reload the page to continue.'
+              : 'Your data is safe. Try again, or reload the page if the problem persists.'}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button onClick={this.handleRetry}>
+             <Button onClick={isChunkError ? () => window.location.reload() : this.handleRetry}>
               <RotateCcw className="mr-2 h-4 w-4" />
               Try again
             </Button>
