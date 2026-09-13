@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,61 +21,62 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { TawkTo } from "@/components/TawkTo";
 import { useTawkIdentity } from "@/hooks/use-tawk-identity";
 import { useTawkTriggers } from "@/hooks/use-tawk-triggers";
-const NotFound = lazy(() => import("./pages/NotFound"));
+import { lazyWithRetry } from "@/lib/lazy-import";
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 // App pages (authentication)
 import Login from "./pages/app/Login";
 import Signup from "./pages/app/Signup";
-const VerifyEmail = lazy(() => import("./pages/app/VerifyEmail"));
-const ForgotPassword = lazy(() => import("./pages/app/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/app/ResetPassword"));
+const VerifyEmail = lazyWithRetry(() => import("./pages/app/VerifyEmail"));
+const ForgotPassword = lazyWithRetry(() => import("./pages/app/ForgotPassword"));
+const ResetPassword = lazyWithRetry(() => import("./pages/app/ResetPassword"));
 
 // Dashboard pages (legacy - for backward compatibility)
 import { DashboardLayout } from "./components/app/DashboardLayout";
 import { BusinessLayout } from "./components/app/BusinessLayout";
 import { BusinessRedirect } from "./components/app/BusinessRedirect";
 import { LegacyRouteRedirect } from "./components/app/LegacyRouteRedirect";
-const Dashboard = lazy(() => import("./pages/app/Dashboard"));
-const Invoices = lazy(() => import("./pages/app/Invoices"));
-const InvoiceNew = lazy(() => import("./pages/app/InvoiceNew"));
-const InvoiceDetail = lazy(() => import("./pages/app/InvoiceDetail"));
-const InvoiceEdit = lazy(() => import("./pages/app/InvoiceEdit"));
+const Dashboard = lazyWithRetry(() => import("./pages/app/Dashboard"));
+const Invoices = lazyWithRetry(() => import("./pages/app/Invoices"));
+const InvoiceNew = lazyWithRetry(() => import("./pages/app/InvoiceNew"));
+const InvoiceDetail = lazyWithRetry(() => import("./pages/app/InvoiceDetail"));
+const InvoiceEdit = lazyWithRetry(() => import("./pages/app/InvoiceEdit"));
 
-const CreditNoteDetail = lazy(() => import("./pages/app/CreditNoteDetail"));
-const Clients = lazy(() => import("./pages/app/Clients"));
-const ClientDetail = lazy(() => import("./pages/app/ClientDetail"));
-const ClientEdit = lazy(() => import("./pages/app/ClientEdit"));
-const Reports = lazy(() => import("./pages/app/Reports"));
-const ProductsServices = lazy(() => import("./pages/app/ProductsServices"));
-const Analytics = lazy(() => import("./pages/app/Analytics"));
-const AuditLogs = lazy(() => import("./pages/app/AuditLogs"));
-const BusinessProfile = lazy(() => import("./pages/app/BusinessProfile"));
-const Billing = lazy(() => import("./pages/app/Billing"));
-const PlanSelection = lazy(() => import("./pages/app/PlanSelection"));
-const CheckoutSuccess = lazy(() => import("./pages/app/CheckoutSuccess"));
-const CheckoutCancel = lazy(() => import("./pages/app/CheckoutCancel"));
-const Settings = lazy(() => import("./pages/app/Settings"));
-const Notifications = lazy(() => import("./pages/app/Notifications"));
-const Team = lazy(() => import("./pages/app/Team"));
+const CreditNoteDetail = lazyWithRetry(() => import("./pages/app/CreditNoteDetail"));
+const Clients = lazyWithRetry(() => import("./pages/app/Clients"));
+const ClientDetail = lazyWithRetry(() => import("./pages/app/ClientDetail"));
+const ClientEdit = lazyWithRetry(() => import("./pages/app/ClientEdit"));
+const Reports = lazyWithRetry(() => import("./pages/app/Reports"));
+const ProductsServices = lazyWithRetry(() => import("./pages/app/ProductsServices"));
+const Analytics = lazyWithRetry(() => import("./pages/app/Analytics"));
+const AuditLogs = lazyWithRetry(() => import("./pages/app/AuditLogs"));
+const BusinessProfile = lazyWithRetry(() => import("./pages/app/BusinessProfile"));
+const Billing = lazyWithRetry(() => import("./pages/app/Billing"));
+const PlanSelection = lazyWithRetry(() => import("./pages/app/PlanSelection"));
+const CheckoutSuccess = lazyWithRetry(() => import("./pages/app/CheckoutSuccess"));
+const CheckoutCancel = lazyWithRetry(() => import("./pages/app/CheckoutCancel"));
+const Settings = lazyWithRetry(() => import("./pages/app/Settings"));
+const Notifications = lazyWithRetry(() => import("./pages/app/Notifications"));
+const Team = lazyWithRetry(() => import("./pages/app/Team"));
 
 // Accounting pages
-const AccountingOverview = lazy(() => import("./pages/app/accounting/AccountingOverview"));
-const AccountingIncome = lazy(() => import("./pages/app/accounting/AccountingIncome"));
-const AccountingExpenses = lazy(() => import("./pages/app/accounting/AccountingExpenses"));
-const AccountingResult = lazy(() => import("./pages/app/accounting/AccountingResult"));
+const AccountingOverview = lazyWithRetry(() => import("./pages/app/accounting/AccountingOverview"));
+const AccountingIncome = lazyWithRetry(() => import("./pages/app/accounting/AccountingIncome"));
+const AccountingExpenses = lazyWithRetry(() => import("./pages/app/accounting/AccountingExpenses"));
+const AccountingResult = lazyWithRetry(() => import("./pages/app/accounting/AccountingResult"));
 
 // Expenses page (standalone entry point)
-const Expenses = lazy(() => import("./pages/app/Expenses"));
-const Vendors = lazy(() => import("./pages/app/Vendors"));
-const ExpenseInbox = lazy(() => import("./pages/app/ExpenseInbox"));
-const Receivables = lazy(() => import("./pages/app/Receivables"));
-const Import = lazy(() => import("./pages/app/Import"));
-const AccountingProfitability = lazy(() => import("./pages/app/accounting/AccountingProfitability"));
-const AccountingTaxReports = lazy(() => import("./pages/app/accounting/AccountingTaxReports"));
+const Expenses = lazyWithRetry(() => import("./pages/app/Expenses"));
+const Vendors = lazyWithRetry(() => import("./pages/app/Vendors"));
+const ExpenseInbox = lazyWithRetry(() => import("./pages/app/ExpenseInbox"));
+const Receivables = lazyWithRetry(() => import("./pages/app/Receivables"));
+const Import = lazyWithRetry(() => import("./pages/app/Import"));
+const AccountingProfitability = lazyWithRetry(() => import("./pages/app/accounting/AccountingProfitability"));
+const AccountingTaxReports = lazyWithRetry(() => import("./pages/app/accounting/AccountingTaxReports"));
 
 // Receipts pages
-const Receipts = lazy(() => import("./pages/app/Receipts"));
-const ReceiptDetail = lazy(() => import("./pages/app/ReceiptDetail"));
+const Receipts = lazyWithRetry(() => import("./pages/app/Receipts"));
+const ReceiptDetail = lazyWithRetry(() => import("./pages/app/ReceiptDetail"));
 
 
 // Legacy org route redirect component
