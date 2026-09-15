@@ -25,8 +25,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useUploadBusinessLogo } from '@/hooks/use-business';
 import { useCreatePaymentMethod, PROVIDER_TYPES, getBankTransferFields, PROVIDER_INSTRUCTION_FIELDS } from '@/hooks/use-payment-methods';
+import { FieldError, focusFirstInvalid } from '@/components/ui/field-error';
 
 type EntityType = 'individual' | 'business' | 'nonprofit';
+type OnboardingErrors = Record<string, string>;
 
 const STEP_LABELS = [
   'Location',
@@ -173,6 +175,16 @@ export default function OnboardingWizard() {
   const uploadLogo = useUploadBusinessLogo();
   const createPayment = useCreatePaymentMethod();
   const [savingStep, setSavingStep] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<OnboardingErrors>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
   const persistAll = async (stepKey: string, completed = false): Promise<void> => {
     if (!businessId) return;
@@ -234,54 +246,57 @@ export default function OnboardingWizard() {
     }
   };
 
-  const validateStep = (): string | null => {
+  const validateStep = (): OnboardingErrors => {
+    const errors: OnboardingErrors = {};
     switch (step) {
       case 0:
-        if (!form.jurisdiction) return 'Select your country.';
-        if (!form.entityType) return 'Pick your entity type.';
-        if (!form.currency) return 'A currency is required.';
-        if (!form.name?.trim()) return 'Enter your business or trading name.';
-        return null;
+        if (!form.name?.trim()) errors.name = 'Enter your business or trading name.';
+        if (!form.jurisdiction) errors.jurisdiction = 'Select your country.';
+        if (!form.entityType) errors.entityType = 'Pick your entity type.';
+        if (!form.currency) errors.currency = 'A currency is required.';
+        break;
       case 1:
-        if (form.entityType !== 'individual' && !form.legalName?.trim()) return 'Enter your legal / registered name.';
+        if (form.entityType !== 'individual' && !form.legalName?.trim()) errors.legalName = 'Enter your legal / registered name.';
         if (taxIdRequired && !(form.governmentIdValue || form.taxId)?.trim()) {
-          return `${jurisdictionConfig?.taxIdLabel || 'Tax ID'} is required.`;
+          errors.taxId = `${jurisdictionConfig?.taxIdLabel || 'Tax ID'} is required.`;
         }
         if (cacRequired && !form.cacNumber?.trim()) {
-          return `${jurisdictionConfig?.cacLabel || 'Commercial registration'} is required.`;
+          errors.cacNumber = `${jurisdictionConfig?.cacLabel || 'Commercial registration'} is required.`;
         }
-        return null;
+        break;
       case 2:
-        if (!form.contactEmail?.trim()) return 'Contact email is required for invoices.';
-        if (form.entityType !== 'individual' && !form.city?.trim()) return 'City is required.';
-        return null;
+        if (!form.contactEmail?.trim()) errors.contactEmail = 'Contact email is required for invoices.';
+        if (form.entityType !== 'individual' && !form.city?.trim()) errors.city = 'City is required.';
+        break;
       case 3:
         if (showVat && form.isVatRegistered && !form.vatRegistrationNumber?.trim()) {
-          return `${jurisdictionConfig?.vatLabel || 'VAT number'} is required.`;
+          errors.vatRegistrationNumber = `${jurisdictionConfig?.vatLabel || 'VAT number'} is required.`;
         }
-        return null;
-      case 4:
-        // Logo is optional — users can add or replace it later from Business Profile.
-        return null;
+        break;
 
       case 5: {
         const fields = form.paymentProviderType === 'bank_transfer'
           ? getBankTransferFields(form.currency)
           : (PROVIDER_INSTRUCTION_FIELDS[form.paymentProviderType] || []);
         for (const f of fields) {
-          if (f.required && !form.paymentInstructions[f.key]?.trim()) return `${f.label} is required.`;
+          if (f.required && !form.paymentInstructions[f.key]?.trim()) errors[`payment.${f.key}`] = `${f.label} is required.`;
         }
-        if (!form.paymentDisplayName?.trim()) return 'Give this payment method a display name.';
-        return null;
+        if (!form.paymentDisplayName?.trim()) errors.paymentDisplayName = 'Give this payment method a display name.';
+        break;
       }
-      default:
-        return null;
     }
+    return errors;
   };
 
   const handleNext = async () => {
-    const err = validateStep();
-    if (err) { toast({ title: 'Missing information', description: err, variant: 'destructive' }); return; }
+    const errors = validateStep();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast({ title: 'Complete the highlighted fields', description: 'Review the messages shown in red.', variant: 'destructive' });
+      focusFirstInvalid();
+      return;
+    }
+    setFieldErrors({});
     if (!businessId) return;
     setSavingStep(true);
     try {
@@ -386,12 +401,12 @@ export default function OnboardingWizard() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.2 }}
           >
-            {step === 0 && <StepLocation form={form} setForm={setForm} />}
-            {step === 1 && <StepIdentity form={form} setForm={setForm} jurisdictionConfig={jurisdictionConfig} taxIdRequired={taxIdRequired} cacRequired={cacRequired} />}
-            {step === 2 && <StepAddress form={form} setForm={setForm} jurisdictionConfig={jurisdictionConfig} />}
-            {step === 3 && <StepTax form={form} setForm={setForm} showVat={showVat} jurisdictionConfig={jurisdictionConfig} />}
+            {step === 0 && <StepLocation form={form} setForm={setForm} errors={fieldErrors} clearError={clearFieldError} />}
+            {step === 1 && <StepIdentity form={form} setForm={setForm} jurisdictionConfig={jurisdictionConfig} taxIdRequired={taxIdRequired} cacRequired={cacRequired} errors={fieldErrors} clearError={clearFieldError} />}
+            {step === 2 && <StepAddress form={form} setForm={setForm} jurisdictionConfig={jurisdictionConfig} errors={fieldErrors} clearError={clearFieldError} />}
+            {step === 3 && <StepTax form={form} setForm={setForm} showVat={showVat} jurisdictionConfig={jurisdictionConfig} errors={fieldErrors} clearError={clearFieldError} />}
             {step === 4 && <StepBranding form={form} setForm={setForm} logoUrl={business.logo_url} onLogoFile={onLogoFile} uploading={uploadLogo.isPending} />}
-            {step === 5 && <StepGetPaid form={form} setForm={setForm} />}
+            {step === 5 && <StepGetPaid form={form} setForm={setForm} errors={fieldErrors} clearError={clearFieldError} />}
           </motion.div>
         </AnimatePresence>
 
@@ -430,7 +445,7 @@ function StepHeader({ icon: Icon, title, subtitle }: { icon: any; title: string;
   );
 }
 
-function StepLocation({ form, setForm }: any) {
+function StepLocation({ form, setForm, errors, clearError }: any) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-6">
@@ -438,27 +453,31 @@ function StepLocation({ form, setForm }: any) {
 
         <div className="space-y-2">
           <Label htmlFor="name">Business / trading name</Label>
-          <Input id="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Acme Studio" />
+          <Input id="name" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); if (e.target.value.trim()) clearError('name'); }} placeholder="e.g. Acme Studio" aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} />
+          <FieldError id="name-error" message={errors.name} />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
-          <Select value={form.jurisdiction} onValueChange={(v) => {
+           <Select value={form.jurisdiction} onValueChange={(v) => {
             const cur = getCountryCurrency(v) || form.currency;
             setForm({ ...form, jurisdiction: v, currency: cur });
+             clearError('jurisdiction');
+             if (cur) clearError('currency');
           }}>
-            <SelectTrigger id="country" className="h-11">
+            <SelectTrigger id="country" className="h-11" aria-invalid={!!errors.jurisdiction} aria-describedby={errors.jurisdiction ? 'country-error' : undefined}>
               <SelectValue placeholder="Select your country..." />
             </SelectTrigger>
             <SelectContent>
               {COUNTRY_OPTIONS.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
+          <FieldError id="country-error" message={errors.jurisdiction || errors.currency} />
         </div>
 
         <div className="space-y-2">
           <Label>Entity type</Label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className={`grid grid-cols-3 gap-2 rounded-md ${errors.entityType ? 'ring-2 ring-destructive/20' : ''}`} role="radiogroup" aria-invalid={!!errors.entityType} aria-describedby={errors.entityType ? 'entity-type-error' : undefined}>
             {[
               { v: 'individual', l: 'Individual', d: 'Freelancer / sole proprietor', i: User },
               { v: 'business', l: 'Business', d: 'Registered company', i: Building2 },
@@ -467,8 +486,8 @@ function StepLocation({ form, setForm }: any) {
               const Icon = o.i;
               const active = form.entityType === o.v;
               return (
-                <button key={o.v} type="button" onClick={() => setForm({ ...form, entityType: o.v })}
-                  className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all ${active ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
+                <button key={o.v} type="button" onClick={() => { setForm({ ...form, entityType: o.v }); clearError('entityType'); }}
+                  className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all ${errors.entityType ? 'border-destructive' : active ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
                   <Icon className={`h-5 w-5 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
                   <span className="text-sm font-medium">{o.l}</span>
                   <span className="text-xs text-muted-foreground leading-tight">{o.d}</span>
@@ -476,6 +495,7 @@ function StepLocation({ form, setForm }: any) {
               );
             })}
           </div>
+          <FieldError id="entity-type-error" message={errors.entityType} />
         </div>
 
         {form.currency && (
@@ -490,7 +510,7 @@ function StepLocation({ form, setForm }: any) {
   );
 }
 
-function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacRequired }: any) {
+function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacRequired, errors, clearError }: any) {
   const isIndividual = form.entityType === 'individual';
   const taxIdLabel = jurisdictionConfig?.taxIdLabel || 'Tax ID';
   return (
@@ -501,7 +521,8 @@ function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacReq
         {!isIndividual && (
           <div className="space-y-2">
             <Label htmlFor="legalName">Legal / registered name</Label>
-            <Input id="legalName" value={form.legalName} onChange={e => setForm({ ...form, legalName: e.target.value })} placeholder="As shown on registration" />
+            <Input id="legalName" value={form.legalName} onChange={e => { setForm({ ...form, legalName: e.target.value }); if (e.target.value.trim()) clearError('legalName'); }} placeholder="As shown on registration" aria-invalid={!!errors.legalName} aria-describedby={errors.legalName ? 'legalName-error' : undefined} />
+            <FieldError id="legalName-error" message={errors.legalName} />
           </div>
         )}
 
@@ -515,11 +536,14 @@ function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacReq
               id="taxId"
               value={isIndividual ? form.governmentIdValue : form.taxId}
               onChange={e => isIndividual
-                ? setForm({ ...form, governmentIdValue: e.target.value })
-                : setForm({ ...form, taxId: e.target.value })
+                ? (setForm({ ...form, governmentIdValue: e.target.value }), e.target.value.trim() && clearError('taxId'))
+                : (setForm({ ...form, taxId: e.target.value }), e.target.value.trim() && clearError('taxId'))
               }
               placeholder={jurisdictionConfig?.taxIdPlaceholder || ''}
+              aria-invalid={!!errors.taxId}
+              aria-describedby={errors.taxId ? 'taxId-error' : undefined}
             />
+            <FieldError id="taxId-error" message={errors.taxId} />
             {jurisdictionConfig?.taxIdHint && <p className="text-xs text-muted-foreground">{jurisdictionConfig.taxIdHint}</p>}
           </div>
         )}
@@ -529,7 +553,8 @@ function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacReq
             <Label htmlFor="cac">
               {jurisdictionConfig?.cacLabel || 'Commercial Registration'}<span className="text-destructive ml-1">*</span>
             </Label>
-            <Input id="cac" value={form.cacNumber} onChange={e => setForm({ ...form, cacNumber: e.target.value })} placeholder={jurisdictionConfig?.cacPlaceholder || ''} />
+            <Input id="cac" value={form.cacNumber} onChange={e => { setForm({ ...form, cacNumber: e.target.value }); if (e.target.value.trim()) clearError('cacNumber'); }} placeholder={jurisdictionConfig?.cacPlaceholder || ''} aria-invalid={!!errors.cacNumber} aria-describedby={errors.cacNumber ? 'cac-error' : undefined} />
+            <FieldError id="cac-error" message={errors.cacNumber} />
             {jurisdictionConfig?.cacHint && <p className="text-xs text-muted-foreground">{jurisdictionConfig.cacHint}</p>}
           </div>
         )}
@@ -538,7 +563,7 @@ function StepIdentity({ form, setForm, jurisdictionConfig, taxIdRequired, cacReq
   );
 }
 
-function StepAddress({ form, setForm, jurisdictionConfig }: any) {
+function StepAddress({ form, setForm, jurisdictionConfig, errors, clearError }: any) {
   const isIndividual = form.entityType === 'individual';
   return (
     <Card>
@@ -547,7 +572,8 @@ function StepAddress({ form, setForm, jurisdictionConfig }: any) {
 
         <div className="space-y-2">
           <Label htmlFor="email">Contact email <span className="text-destructive">*</span></Label>
-          <Input id="email" type="email" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} />
+          <Input id="email" type="email" value={form.contactEmail} onChange={e => { setForm({ ...form, contactEmail: e.target.value }); if (e.target.value.trim()) clearError('contactEmail'); }} aria-invalid={!!errors.contactEmail} aria-describedby={errors.contactEmail ? 'email-error' : undefined} />
+          <FieldError id="email-error" message={errors.contactEmail} />
         </div>
 
         <div className="space-y-2">
@@ -563,7 +589,8 @@ function StepAddress({ form, setForm, jurisdictionConfig }: any) {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="city">City {!isIndividual && <span className="text-destructive">*</span>}</Label>
-            <Input id="city" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder={jurisdictionConfig?.cityPlaceholder || ''} />
+            <Input id="city" value={form.city} onChange={e => { setForm({ ...form, city: e.target.value }); if (e.target.value.trim()) clearError('city'); }} placeholder={jurisdictionConfig?.cityPlaceholder || ''} aria-invalid={!!errors.city} aria-describedby={errors.city ? 'city-error' : undefined} />
+            <FieldError id="city-error" message={errors.city} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="state">{jurisdictionConfig?.stateLabel || 'State / Region'}</Label>
@@ -580,7 +607,7 @@ function StepAddress({ form, setForm, jurisdictionConfig }: any) {
   );
 }
 
-function StepTax({ form, setForm, showVat, jurisdictionConfig }: any) {
+function StepTax({ form, setForm, showVat, jurisdictionConfig, errors, clearError }: any) {
   if (!showVat) {
     return (
       <Card>
@@ -613,7 +640,8 @@ function StepTax({ form, setForm, showVat, jurisdictionConfig }: any) {
         {form.isVatRegistered && (
           <div className="space-y-2">
             <Label htmlFor="vat">{vatLabel}<span className="text-destructive ml-1">*</span></Label>
-            <Input id="vat" value={form.vatRegistrationNumber} onChange={e => setForm({ ...form, vatRegistrationNumber: e.target.value })} placeholder={jurisdictionConfig?.vatPlaceholder || ''} />
+            <Input id="vat" value={form.vatRegistrationNumber} onChange={e => { setForm({ ...form, vatRegistrationNumber: e.target.value }); if (e.target.value.trim()) clearError('vatRegistrationNumber'); }} placeholder={jurisdictionConfig?.vatPlaceholder || ''} aria-invalid={!!errors.vatRegistrationNumber} aria-describedby={errors.vatRegistrationNumber ? 'vat-error' : undefined} />
+            <FieldError id="vat-error" message={errors.vatRegistrationNumber} />
             {jurisdictionConfig?.vatHint && <p className="text-xs text-muted-foreground">{jurisdictionConfig.vatHint}</p>}
           </div>
         )}
@@ -667,7 +695,7 @@ function StepBranding({ form, setForm, logoUrl, onLogoFile, uploading }: any) {
   );
 }
 
-function StepGetPaid({ form, setForm }: any) {
+function StepGetPaid({ form, setForm, errors, clearError }: any) {
   const fields = form.paymentProviderType === 'bank_transfer'
     ? getBankTransferFields(form.currency)
     : (PROVIDER_INSTRUCTION_FIELDS[form.paymentProviderType] || []);
@@ -692,8 +720,10 @@ function StepGetPaid({ form, setForm }: any) {
 
         <div className="space-y-2">
           <Label htmlFor="payname">Display name on invoices</Label>
-          <Input id="payname" value={form.paymentDisplayName} onChange={e => setForm({ ...form, paymentDisplayName: e.target.value })}
+          <Input id="payname" value={form.paymentDisplayName} onChange={e => { setForm({ ...form, paymentDisplayName: e.target.value }); if (e.target.value.trim()) clearError('paymentDisplayName'); }}
+            aria-invalid={!!errors.paymentDisplayName} aria-describedby={errors.paymentDisplayName ? 'payname-error' : undefined}
             placeholder={`${PROVIDER_TYPES.find(p => p.value === form.paymentProviderType)?.label || 'Payment'} (${form.currency || ''})`} />
+          <FieldError id="payname-error" message={errors.paymentDisplayName} />
         </div>
 
         {fields.map((f: any) => (
@@ -702,10 +732,13 @@ function StepGetPaid({ form, setForm }: any) {
             <Input
               id={f.key}
               value={form.paymentInstructions[f.key] || ''}
-              onChange={e => setField(f.key, e.target.value)}
+              onChange={e => { setField(f.key, e.target.value); if (e.target.value.trim()) clearError(`payment.${f.key}`); }}
               placeholder={f.placeholder}
               inputMode={f.inputMode}
+              aria-invalid={!!errors[`payment.${f.key}`]}
+              aria-describedby={errors[`payment.${f.key}`] ? `${f.key}-error` : undefined}
             />
+            <FieldError id={`${f.key}-error`} message={errors[`payment.${f.key}`]} />
           </div>
         ))}
       </CardContent>
