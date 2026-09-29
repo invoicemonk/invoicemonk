@@ -55,6 +55,7 @@ export default function Settings() {
     emailInvoice: true,
     emailPayment: true,
     emailReminders: false,
+    emailProductTips: true,
     emailOverdue: true,
     browserNotifications: false,
     reminderDaysBefore: 3,
@@ -71,6 +72,7 @@ export default function Settings() {
         emailInvoice: preferences.email_invoice_issued,
         emailPayment: preferences.email_payment_received,
         emailReminders: preferences.email_payment_reminders,
+        emailProductTips: preferences.email_product_tips ?? true,
         emailOverdue: preferences.email_overdue_alerts,
         browserNotifications: preferences.browser_notifications,
         reminderDaysBefore: preferences.reminder_days_before,
@@ -140,6 +142,7 @@ export default function Settings() {
       email_invoice_issued: notifications.emailInvoice,
       email_payment_received: notifications.emailPayment,
       email_payment_reminders: notifications.emailReminders,
+      email_product_tips: notifications.emailProductTips,
       email_overdue_alerts: notifications.emailOverdue,
       browser_notifications: notifications.browserNotifications,
       reminder_days_before: notifications.reminderDaysBefore,
@@ -378,6 +381,21 @@ export default function Settings() {
                   </div>
                   <Separator />
                   
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Product tips</p>
+                      <p className="text-sm text-muted-foreground">
+                        Occasional emails to help you finish something you started
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.emailProductTips}
+                      onCheckedChange={(checked) => handleNotificationChange('emailProductTips', checked)}
+                    />
+                  </div>
+
+                  <Separator />
+
                   {/* Enhanced Payment Reminders Section */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">

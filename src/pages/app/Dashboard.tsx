@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ComplianceConfidenceCard } from '@/components/dashboard/ComplianceConfidenceCard';
 import { ComplianceAnalyticsCard } from '@/components/dashboard/ComplianceAnalyticsCard';
 import { QuickSetupChecklist } from '@/components/dashboard/QuickSetupChecklist';
+import { IntentCapturePrompt } from '@/components/activation/IntentCapturePrompt';
 import { ImmutabilityBanner } from '@/components/dashboard/ImmutabilityBanner';
 import { OnlinePaymentsBanner } from '@/components/dashboard/OnlinePaymentsBanner';
 import { FrEInvoicingBanner } from '@/components/dashboard/FrEInvoicingBanner';
@@ -343,6 +344,8 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       )}
+
+      <IntentCapturePrompt surface="dashboard_card" variant="dialog" />
 
       {/* ===== FIRST VISIT LAYOUT ===== */}
       {isFirstVisit ? (

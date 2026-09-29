@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { stripUrls } from '@/lib/utils';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { applyTemplate, type ImportDataType } from '@/lib/import-templates';
+import { trackProductEvent } from '@/lib/product-tracking';
 
 export type ImportType = 'expenses' | 'clients' | 'invoices' | 'products';
 
@@ -221,6 +222,7 @@ export function useCsvImport() {
       business_id: currentBusiness.id,
       metadata: { import_type: 'expenses', total: parsedRows.length, success, failed: parsedRows.length - success },
     });
+    if (success > 0) trackProductEvent('data_import', 'import_completed', { workflow: 'csv_import', milestone: 'activated', businessId: currentBusiness.id, props: { import_type: 'expenses', imported_count: success } });
 
     toast({
       title: 'Import complete',
@@ -288,6 +290,7 @@ export function useCsvImport() {
       business_id: currentBusiness.id,
       metadata: { import_type: 'clients', total: parsedRows.length, success, failed: parsedRows.length - success },
     });
+    if (success > 0) trackProductEvent('data_import', 'import_completed', { workflow: 'csv_import', milestone: 'activated', businessId: currentBusiness.id, props: { import_type: 'clients', imported_count: success } });
 
     toast({
       title: 'Import complete',
@@ -477,6 +480,7 @@ export function useCsvImport() {
       business_id: currentBusiness.id,
       metadata: { import_type: 'invoices', total: totalInvoices, success, failed: totalInvoices - success },
     });
+    if (success > 0) trackProductEvent('data_import', 'import_completed', { workflow: 'csv_import', milestone: 'activated', businessId: currentBusiness.id, props: { import_type: 'invoices', imported_count: success } });
 
     toast({
       title: 'Import complete',
@@ -574,6 +578,7 @@ export function useCsvImport() {
       business_id: currentBusiness.id,
       metadata: { import_type: 'products', total: totalAttempted, success, skipped, failed: totalAttempted - success - skipped },
     });
+    if (success > 0) trackProductEvent('data_import', 'import_completed', { workflow: 'csv_import', milestone: 'activated', businessId: currentBusiness.id, props: { import_type: 'products', imported_count: success } });
 
     toast({
       title: 'Import complete',

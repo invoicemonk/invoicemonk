@@ -10,6 +10,7 @@ export interface UserPreferences {
   email_payment_received: boolean;
   email_payment_reminders: boolean;
   email_overdue_alerts: boolean;
+  email_product_tips?: boolean;
   browser_notifications: boolean;
   reminder_days_before: number;
   reminder_schedule: number[];
@@ -26,6 +27,7 @@ const DEFAULT_PREFERENCES: Omit<UserPreferences, 'user_id' | 'created_at' | 'upd
   email_payment_received: true,
   email_payment_reminders: false,
   email_overdue_alerts: true,
+  email_product_tips: true,
   browser_notifications: false,
   reminder_days_before: 3,
   reminder_schedule: [],

@@ -87,7 +87,13 @@ export default function AdminFeedback() {
             <UserX className="h-4 w-4" />
             Inactive Users
           </TabsTrigger>
+          <TabsTrigger value="product" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Product feedback
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="product"><ProductFeedbackList /></TabsContent>
 
         <TabsContent value="churn" className="space-y-4">
           <Card>
@@ -224,5 +230,43 @@ export default function AdminFeedback() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ProductFeedbackList() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-product-feedback'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('product_feedback' as any).select('*').order('created_at', { ascending: false }).limit(500);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Contextual product feedback</CardTitle>
+        <CardDescription>One-question answers after a first result or an abandoned workflow</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <Skeleton className="h-32 w-full" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>When</TableHead><TableHead>Product</TableHead><TableHead>Moment</TableHead><TableHead>Answer</TableHead><TableHead>Alternative tool</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {data?.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-xs">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</TableCell>
+                  <TableCell>{String(r.product_area).replace(/_/g, ' ')}{r.workflow ? ` / ${r.workflow}` : ''}</TableCell>
+                  <TableCell><Badge variant={r.prompt_reason === 'abandoned' ? 'destructive' : 'secondary'}>{r.prompt_reason}</Badge></TableCell>
+                  <TableCell>{r.dismissed ? <span className="text-muted-foreground">Dismissed</span> : r.response}</TableCell>
+                  <TableCell>{r.alternative_tool ?? '–'}</TableCell>
+                </TableRow>
+              ))}
+              {!data?.length && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No product feedback yet</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }

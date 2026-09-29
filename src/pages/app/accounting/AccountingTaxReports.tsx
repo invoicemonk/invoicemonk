@@ -23,6 +23,7 @@ import {
   type TaxReportJurisdiction,
 } from '@/lib/tax-report-mappings';
 import { formatCurrency } from '@/lib/utils';
+import { trackProductEvent } from '@/lib/product-tracking';
 
 const JURISDICTION_OPTIONS: TaxReportJurisdiction[] = ['US', 'GB', 'EU', 'NG', 'XX'];
 
@@ -117,6 +118,10 @@ export default function AccountingTaxReports() {
         window.URL.revokeObjectURL(url);
         toast.success('Tax report CSV downloaded.');
       }
+      trackProductEvent('tax_reports', 'tax_report_exported', {
+        workflow: 'tax_report', milestone: 'outcome', businessId: business.id,
+        props: { format, jurisdiction, currency: activeCurrency },
+      });
     } catch (e) {
       toast.error((e as Error).message || 'Export failed');
     } finally {

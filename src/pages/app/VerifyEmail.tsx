@@ -9,6 +9,7 @@ import { Mail, CheckCircle, Loader2, Shield, AlertCircle, RefreshCw } from 'luci
 import logo from '@/assets/logo-red.png';
 import { addTags } from '@/lib/onesignal';
 import { trackFunnel, trackFunnelOnce } from '@/lib/funnel-tracking';
+import { IntentCapturePrompt } from '@/components/activation/IntentCapturePrompt';
 
 const VerifyEmail = () => {
   const { user } = useAuth();
@@ -164,6 +165,13 @@ const VerifyEmail = () => {
               </div>
             )}
           </div>
+
+          {/* Optional stated-intent prompt — shown while waiting for the verification email */}
+          {!isVerified && user && (
+            <div className="mt-4 text-left">
+              <IntentCapturePrompt surface="verify_email" variant="card" />
+            </div>
+          )}
 
           {/* Trust badge */}
           <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">

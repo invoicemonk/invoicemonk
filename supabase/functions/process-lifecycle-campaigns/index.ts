@@ -8,6 +8,59 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Run-scoped delivery context: DB-backed test-mode config + delivery audit log.
+type DeliveryCtx = { admin: any; testMode: boolean; recipients: string[]; cooldownDays: number; dryRun: boolean }
+let deliveryCtx: DeliveryCtx | null = null
+
+export function checkEligibility(
+  toEmail: string,
+  cfg: { testMode: boolean; recipients: string[] },
+  recentSameSubject: boolean,
+  optedOut = false,
+): { eligible: boolean; reason: string | null } {
+  if (optedOut) return { eligible: false, reason: 'unsubscribed' }
+  if (cfg.testMode && !cfg.recipients.includes(toEmail.toLowerCase())) return { eligible: false, reason: 'test_mode_not_allowlisted' }
+  if (recentSameSubject) return { eligible: false, reason: 'cooldown_or_duplicate' }
+  return { eligible: true, reason: null }
+}
+
+async function logDelivery(toEmail: string, subject: string, status: string, eligible: boolean, reason: string | null) {
+  if (!deliveryCtx) return
+  try {
+    const { data: prof } = await deliveryCtx.admin.from('profiles').select('id').ilike('email', toEmail).maybeSingle()
+    if (!prof?.id) return
+    await deliveryCtx.admin.from('lifecycle_email_deliveries').insert({
+      user_id: prof.id, campaign_key: subject.slice(0, 120), recipient_email: toEmail,
+      eligible, suppression_reason: reason, delivery_status: status,
+      metadata: { test_mode: deliveryCtx.testMode, dry_run: deliveryCtx.dryRun },
+    })
+  } catch (e) { console.warn('delivery log failed', e) }
+}
+
+// Product-aware copy (DRAFT — needs approval before test mode is switched off).
+const PRODUCT_COPY: Record<string, { name: string; next: string; path: string }> = {
+  invoicing: { name: 'invoicing', next: 'issue and send your first invoice', path: '/invoices/new' },
+  payments: { name: 'payment tracking', next: 'record a payment against an invoice', path: '/receivables' },
+  receipts: { name: 'receipts', next: 'send a receipt to your client', path: '/receipts' },
+  expenses: { name: 'expense tracking', next: 'add a receipt to an expense', path: '/expenses' },
+  receipt_capture: { name: 'receipt scanning', next: 'approve a scanned receipt into an expense', path: '/expenses/inbox' },
+  accounting: { name: 'your accounting overview', next: 'check your profit result', path: '/accounting/result' },
+  tax_reports: { name: 'tax reports', next: 'export your tax report', path: '/accounting/tax-reports' },
+  reports: { name: 'reports', next: 'download or email a report', path: '/reports' },
+  data_import: { name: 'importing your data', next: 'finish your import', path: '/import' },
+  e_invoicing: { name: 'e-invoicing', next: 'complete a regulator submission', path: '/invoices' },
+}
+function productNudgeSubject(area: string): string {
+  return `Pick up where you left off with ${PRODUCT_COPY[area]?.name ?? area.replace(/_/g, ' ')}`
+}
+function productNudgeTemplate(name: string, area: string, statedIntents: string[]): string {
+  const c = PRODUCT_COPY[area] ?? { name: area.replace(/_/g, ' '), next: 'finish what you started', path: '/dashboard' }
+  const esc = (v: string) => v.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
+  // Stated intent is only referenced when the user actually told us it; never inferred.
+  const why = statedIntents.length ? `<p>You told us you wanted to ${esc(statedIntents[0].replace(/_/g, ' '))}.</p>` : ''
+  return emailWrapper('Still with you', `<p>Hi ${esc(name || 'there')},</p><p>You started using ${esc(c.name)} but didn't get to the finish line.</p>${why}<p>The next step is to <strong>${esc(c.next)}</strong>. It only takes a minute.</p><p><a href="https://app.invoicemonk.com${c.path}" style="background:#1d6b5a;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">Continue</a></p><p style="color:#999;font-size:12px;">Don't want these tips? Turn off "Product tips" in Settings → Notifications.</p>`)
+}
+
 // Send email via Brevo (Sendinblue) API
 async function sendBrevoEmail(
   brevoApiKey: string,
@@ -18,6 +71,29 @@ async function sendBrevoEmail(
   htmlContent: string
 ): Promise<boolean> {
   try {
+    const testMode = (Deno.env.get('LIFECYCLE_EMAIL_TEST_MODE') ?? 'true').toLowerCase() !== 'false'
+    const testRecipients = (Deno.env.get('LIFECYCLE_EMAIL_TEST_RECIPIENTS') ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+    if (testMode && !testRecipients.includes(toEmail.toLowerCase())) {
+      console.log(`Lifecycle email suppressed by test mode for ${toEmail}`)
+      await logDelivery(toEmail, subject, 'suppressed', false, 'test_mode_not_allowlisted')
+      return false
+    }
+    if (deliveryCtx) {
+      const since = new Date(Date.now() - deliveryCtx.cooldownDays * 86400000).toISOString()
+      const { count } = await deliveryCtx.admin.from('lifecycle_email_deliveries').select('id', { count: 'exact', head: true })
+        .eq('recipient_email', toEmail).eq('campaign_key', subject.slice(0, 120)).eq('delivery_status', 'sent').gte('created_at', since)
+      const { data: prof } = await deliveryCtx.admin.from('profiles').select('id').ilike('email', toEmail).maybeSingle()
+      const { data: pref } = prof?.id
+        ? await deliveryCtx.admin.from('user_preferences').select('email_product_tips').eq('user_id', prof.id).maybeSingle()
+        : { data: null }
+      const verdict = checkEligibility(toEmail, deliveryCtx, (count ?? 0) > 0, pref?.email_product_tips === false)
+      if (!verdict.eligible) { await logDelivery(toEmail, subject, 'suppressed', false, verdict.reason); return false }
+      if (deliveryCtx.dryRun) { await logDelivery(toEmail, subject, 'dry_run', true, null); return false }
+    }
+    const safeSubject = testMode ? `[TEST] ${subject}` : subject
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -28,7 +104,7 @@ async function sendBrevoEmail(
       body: JSON.stringify({
         sender: { name: fromName, email: fromEmail },
         to: [{ email: toEmail }],
-        subject,
+        subject: safeSubject,
         htmlContent,
       }),
     })
@@ -36,8 +112,10 @@ async function sendBrevoEmail(
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Brevo API error (${response.status}):`, errorText)
+      await logDelivery(toEmail, subject, 'failed', true, `brevo_${response.status}`)
       return false
     }
+    await logDelivery(toEmail, subject, 'sent', true, null)
     return true
   } catch (err) {
     console.error('Brevo email send error:', err)
@@ -348,6 +426,19 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
+    // DB config can only make delivery stricter than the env settings.
+    const { data: cfg } = await adminClient.from('lifecycle_campaign_config').select('*').eq('id', true).maybeSingle()
+    const envTest = (Deno.env.get('LIFECYCLE_EMAIL_TEST_MODE') ?? 'true').toLowerCase() !== 'false'
+    const envRecipients = (Deno.env.get('LIFECYCLE_EMAIL_TEST_RECIPIENTS') ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    const dbRecipients: string[] = (cfg?.test_recipients ?? []).map((e: string) => e.toLowerCase())
+    const url = new URL(req.url)
+    deliveryCtx = {
+      admin: adminClient,
+      testMode: envTest || cfg?.test_mode !== false,
+      recipients: dbRecipients.length ? envRecipients.filter((e) => dbRecipients.includes(e)) : envRecipients,
+      cooldownDays: cfg?.cooldown_days ?? 14,
+      dryRun: url.searchParams.get('dry_run') === 'true',
+    }
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
@@ -1401,6 +1492,34 @@ Deno.serve(async (req) => {
         console.error('Inactive follow-up failed:', e)
         captureException(e, { function_name: 'process-lifecycle-campaigns' })
       }
+    }
+
+    // =============================================
+    // Product-aware nudge: abandoned journey without an outcome.
+    // Gated by product_campaigns_enabled AND test mode rules; one email per journey.
+    // =============================================
+    summary.product_nudge = { targeted: 0, sent: 0, skipped: 0, errors: 0 }
+    if (cfg?.product_campaigns_enabled && !checkTimeout('Product nudge')) {
+      try {
+        const { data: journeys } = await adminClient.from('product_activation')
+          .select('id, user_id, product_area, workflow, stopped_step')
+          .eq('status', 'abandoned').is('outcome_at', null).limit(100)
+        for (const j of journeys ?? []) {
+          try {
+            const { count: prior } = await adminClient.from('lifecycle_email_deliveries')
+              .select('id', { count: 'exact', head: true }).eq('user_id', j.user_id).eq('campaign_key', productNudgeSubject(j.product_area).slice(0, 120)).eq('delivery_status', 'sent')
+            if ((prior ?? 0) > 0) { summary.product_nudge.skipped++; continue }
+            const profile = await getUserProfile(j.user_id)
+            if (!profile) { summary.product_nudge.skipped++; continue }
+            const { data: intents } = await adminClient.from('user_intents').select('intent').eq('user_id', j.user_id)
+            summary.product_nudge.targeted++
+            const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, 'The Invoicemonk team', profile.email,
+              productNudgeSubject(j.product_area),
+              productNudgeTemplate(profile.name, j.product_area, (intents ?? []).map((i: any) => i.intent)))
+            if (sent) summary.product_nudge.sent++; else summary.product_nudge.skipped++
+          } catch (e) { summary.product_nudge.errors++; captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
+        }
+      } catch (e) { captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
     }
 
     console.log(`Lifecycle campaigns complete (${Date.now() - startTime}ms, timedOut=${timedOut}):`, JSON.stringify(summary))

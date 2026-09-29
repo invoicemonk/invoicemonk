@@ -114,6 +114,7 @@ const AdminRiskMonitoring = lazyWithRetry(() => import("./pages/admin/AdminRiskM
 const AdminVerifications = lazyWithRetry(() => import("./pages/admin/AdminVerifications"));
 const AdminSecurity = lazyWithRetry(() => import("./pages/admin/AdminSecurity"));
 const AdminFeedback = lazyWithRetry(() => import("./pages/admin/AdminFeedback"));
+const AdminProductDiscovery = lazyWithRetry(() => import("./pages/admin/AdminProductDiscovery"));
 
 // Partner pages
 import { PartnerLayout } from "./components/partner/PartnerLayout";
@@ -390,6 +391,7 @@ const router = createBrowserRouter(
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/security" element={<AdminSecurity />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />
+            <Route path="/admin/product-discovery" element={<AdminProductDiscovery />} />
             <Route path="/admin/system" element={<AdminSystem />} />
           </Route>
 

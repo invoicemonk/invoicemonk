@@ -1504,27 +1504,111 @@ export type Database = {
           },
         ]
       }
+      lifecycle_campaign_config: {
+        Row: {
+          cooldown_days: number
+          id: boolean
+          product_campaigns_enabled: boolean
+          test_mode: boolean
+          test_recipients: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cooldown_days?: number
+          id?: boolean
+          product_campaigns_enabled?: boolean
+          test_mode?: boolean
+          test_recipients?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cooldown_days?: number
+          id?: boolean
+          product_campaigns_enabled?: boolean
+          test_mode?: boolean
+          test_recipients?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      lifecycle_email_deliveries: {
+        Row: {
+          campaign_key: string
+          created_at: string
+          delivery_status: string
+          eligible: boolean
+          id: string
+          metadata: Json
+          product_area: string | null
+          recipient_email: string
+          suppression_reason: string | null
+          user_id: string
+        }
+        Insert: {
+          campaign_key: string
+          created_at?: string
+          delivery_status: string
+          eligible?: boolean
+          id?: string
+          metadata?: Json
+          product_area?: string | null
+          recipient_email: string
+          suppression_reason?: string | null
+          user_id: string
+        }
+        Update: {
+          campaign_key?: string
+          created_at?: string
+          delivery_status?: string
+          eligible?: boolean
+          id?: string
+          metadata?: Json
+          product_area?: string | null
+          recipient_email?: string
+          suppression_reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       lifecycle_events: {
         Row: {
+          business_id: string | null
           created_at: string
           event_type: string
           id: string
           metadata: Json | null
+          product_area: string | null
+          source: string
+          stage: string | null
           user_id: string
+          workflow: string | null
         }
         Insert: {
+          business_id?: string | null
           created_at?: string
           event_type: string
           id?: string
           metadata?: Json | null
+          product_area?: string | null
+          source?: string
+          stage?: string | null
           user_id: string
+          workflow?: string | null
         }
         Update: {
+          business_id?: string | null
           created_at?: string
           event_type?: string
           id?: string
           metadata?: Json | null
+          product_area?: string | null
+          source?: string
+          stage?: string | null
           user_id?: string
+          workflow?: string | null
         }
         Relationships: []
       }
@@ -1962,6 +2046,149 @@ export type Database = {
           yearly_price?: number | null
         }
         Relationships: []
+      }
+      product_activation: {
+        Row: {
+          abandoned_after_days: number
+          activated_at: string | null
+          business_id: string | null
+          created_at: string
+          id: string
+          inactive_after_days: number
+          last_active_at: string
+          outcome_at: string | null
+          product_area: string
+          reactivated_at: string | null
+          repeated_at: string | null
+          started_at: string
+          status: string
+          stopped_step: string | null
+          updated_at: string
+          user_id: string
+          workflow: string | null
+        }
+        Insert: {
+          abandoned_after_days?: number
+          activated_at?: string | null
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          inactive_after_days?: number
+          last_active_at: string
+          outcome_at?: string | null
+          product_area: string
+          reactivated_at?: string | null
+          repeated_at?: string | null
+          started_at: string
+          status?: string
+          stopped_step?: string | null
+          updated_at?: string
+          user_id: string
+          workflow?: string | null
+        }
+        Update: {
+          abandoned_after_days?: number
+          activated_at?: string | null
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          inactive_after_days?: number
+          last_active_at?: string
+          outcome_at?: string | null
+          product_area?: string
+          reactivated_at?: string | null
+          repeated_at?: string | null
+          started_at?: string
+          status?: string
+          stopped_step?: string | null
+          updated_at?: string
+          user_id?: string
+          workflow?: string | null
+        }
+        Relationships: []
+      }
+      product_activation_rules: {
+        Row: {
+          abandoned_after_days: number
+          inactive_after_days: number
+          product_area: string
+          updated_at: string
+          workflow: string
+        }
+        Insert: {
+          abandoned_after_days: number
+          inactive_after_days: number
+          product_area: string
+          updated_at?: string
+          workflow?: string
+        }
+        Update: {
+          abandoned_after_days?: number
+          inactive_after_days?: number
+          product_area?: string
+          updated_at?: string
+          workflow?: string
+        }
+        Relationships: []
+      }
+      product_feedback: {
+        Row: {
+          activation_id: string | null
+          alternative_tool: string | null
+          business_id: string
+          created_at: string
+          dismissed: boolean
+          id: string
+          product_area: string
+          prompt_reason: string
+          prompted_at: string
+          responded_at: string | null
+          response: string | null
+          updated_at: string
+          user_id: string
+          workflow: string | null
+        }
+        Insert: {
+          activation_id?: string | null
+          alternative_tool?: string | null
+          business_id: string
+          created_at?: string
+          dismissed?: boolean
+          id?: string
+          product_area: string
+          prompt_reason: string
+          prompted_at?: string
+          responded_at?: string | null
+          response?: string | null
+          updated_at?: string
+          user_id: string
+          workflow?: string | null
+        }
+        Update: {
+          activation_id?: string | null
+          alternative_tool?: string | null
+          business_id?: string
+          created_at?: string
+          dismissed?: boolean
+          id?: string
+          product_area?: string
+          prompt_reason?: string
+          prompted_at?: string
+          responded_at?: string | null
+          response?: string | null
+          updated_at?: string
+          user_id?: string
+          workflow?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_feedback_activation_id_fkey"
+            columns: ["activation_id"]
+            isOneToOne: false
+            referencedRelation: "product_activation"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products_services: {
         Row: {
@@ -3227,6 +3454,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_intents: {
+        Row: {
+          created_at: string
+          id: string
+          intent: string
+          is_primary: boolean
+          other_text: string | null
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intent: string
+          is_primary?: boolean
+          other_text?: string | null
+          source?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intent?: string
+          is_primary?: boolean
+          other_text?: string | null
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_login_events: {
         Row: {
           created_at: string
@@ -3262,6 +3522,7 @@ export type Database = {
           email_overdue_alerts: boolean
           email_payment_received: boolean
           email_payment_reminders: boolean
+          email_product_tips: boolean
           overdue_reminder_enabled: boolean | null
           overdue_reminder_schedule: Json | null
           reminder_days_before: number
@@ -3277,6 +3538,7 @@ export type Database = {
           email_overdue_alerts?: boolean
           email_payment_received?: boolean
           email_payment_reminders?: boolean
+          email_product_tips?: boolean
           overdue_reminder_enabled?: boolean | null
           overdue_reminder_schedule?: Json | null
           reminder_days_before?: number
@@ -3292,6 +3554,7 @@ export type Database = {
           email_overdue_alerts?: boolean
           email_payment_received?: boolean
           email_payment_reminders?: boolean
+          email_product_tips?: boolean
           overdue_reminder_enabled?: boolean | null
           overdue_reminder_schedule?: Json | null
           reminder_days_before?: number
@@ -3560,6 +3823,17 @@ export type Database = {
         }[]
       }
       admin_paid_intent_lost_count: { Args: { days?: number }; Returns: number }
+      admin_product_discovery_overview: {
+        Args: {
+          _area?: string
+          _business_id?: string
+          _days?: number
+          _intent?: string
+          _status?: string
+          _workflow?: string
+        }
+        Returns: Json
+      }
       admin_set_verification: {
         Args: {
           _business_id: string
@@ -3570,6 +3844,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_user_product_timeline: { Args: { _email: string }; Returns: Json }
       ban_user: {
         Args: { _reason: string; _user_id: string }
         Returns: undefined
@@ -3636,6 +3911,7 @@ export type Database = {
         Args: { _business_id: string }
         Returns: undefined
       }
+      evaluate_product_abandonment: { Args: never; Returns: number }
       generate_invoice_number: {
         Args: { _business_id: string }
         Returns: string
@@ -3722,6 +3998,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_product_feedback_prompt: {
+        Args: { _business_id: string }
+        Returns: {
+          activation_id: string
+          product_area: string
+          prompt_reason: string
+          workflow: string
+        }[]
+      }
       get_profitability_stats: {
         Args: {
           _business_id: string
@@ -3794,6 +4079,19 @@ export type Database = {
         }
         Returns: string
       }
+      log_product_event: {
+        Args: {
+          _area: string
+          _business_id: string
+          _event: string
+          _metadata?: Json
+          _milestone?: string
+          _source?: string
+          _user_id: string
+          _workflow: string
+        }
+        Returns: undefined
+      }
       nextval: { Args: { seq_name: string }; Returns: number }
       notify_admin_first_invoice_issued: {
         Args: {
@@ -3823,6 +4121,17 @@ export type Database = {
       subscription_has_prepaid_coverage: {
         Args: { _subscription_id: string }
         Returns: boolean
+      }
+      track_product_event: {
+        Args: {
+          _area: string
+          _business_id?: string
+          _event: string
+          _metadata?: Json
+          _milestone?: string
+          _workflow: string
+        }
+        Returns: undefined
       }
       unban_user: { Args: { _user_id: string }; Returns: undefined }
       update_compliance_analytics: {

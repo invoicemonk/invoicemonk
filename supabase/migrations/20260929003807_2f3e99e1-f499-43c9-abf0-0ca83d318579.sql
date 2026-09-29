@@ -1,0 +1,1 @@
+ALTER TABLE public.user_preferences ADD COLUMN IF NOT EXISTS email_product_tips boolean NOT NULL DEFAULT true;

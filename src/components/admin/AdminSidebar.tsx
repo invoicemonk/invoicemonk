@@ -15,7 +15,8 @@ import {
   Clock,
   MessageCircle,
   Bell,
-  MessageSquare
+  MessageSquare,
+  Target
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { markTawkUserOpened } from '@/lib/tawk-triggers';
@@ -49,6 +50,7 @@ const mainNavItems = [
   { title: 'Risk Monitoring', url: '/admin/risk-monitoring', icon: ShieldAlert },
   { title: 'Notifications', url: '/admin/notifications', icon: Bell },
   { title: 'Feedback', url: '/admin/feedback', icon: MessageSquare },
+  { title: 'Product Discovery', url: '/admin/product-discovery', icon: Target },
   { title: 'Audit Logs', url: '/admin/audit-logs', icon: History },
 ];
 

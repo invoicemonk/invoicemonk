@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import { captureError } from '@/lib/sentry';
+import { trackProductEvent } from '@/lib/product-tracking';
 
 export interface Receipt {
   id: string;
@@ -232,6 +233,7 @@ export function useDownloadReceiptPdf() {
       return { success: true };
     },
     onSuccess: () => {
+      trackProductEvent('receipts', 'receipt_delivered', { workflow: 'receipt_pdf', milestone: 'outcome' });
       toast.success('Receipt PDF downloaded successfully');
     },
     onError: (error: Error) => {

@@ -18,6 +18,8 @@ import { TourProvider } from '@/contexts/TourContext';
 import { WelcomeTourAutoStart } from '@/components/tours/WelcomeTourAutoStart';
 import { PageTourHint } from '@/components/tours/PageTourHint';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { ProductRouteTracker } from '@/components/activation/ProductRouteTracker';
+import { ProductFeedbackPrompt } from '@/components/activation/ProductFeedbackPrompt';
 
 
 
@@ -84,6 +86,7 @@ function BusinessLayoutContent() {
       <CurrencyAccountProvider>
         <TourProvider>
         <WelcomeTourAutoStart />
+        <ProductRouteTracker />
         <SidebarProvider>
           <div className="min-h-screen flex w-full bg-background">
             <BusinessSidebar />
@@ -96,6 +99,7 @@ function BusinessLayoutContent() {
                 <PageTourHint />
                 <AppErrorBoundary>
                   <Outlet />
+                  <ProductFeedbackPrompt />
                 </AppErrorBoundary>
               </main>
 

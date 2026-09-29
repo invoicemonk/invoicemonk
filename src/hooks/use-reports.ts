@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { captureError } from '@/lib/sentry';
+import { trackProductEvent } from '@/lib/product-tracking';
 
 export type ReportType =
   | 'invoice-register'
@@ -159,6 +160,7 @@ export function useGenerateReport() {
     },
     onSuccess: (data, variables) => {
       if (data.success) {
+        trackProductEvent('reports', 'report_delivered', { workflow: 'report_download', milestone: 'outcome', props: { report_type: variables.report_type, format: variables.format } });
         toast.success(`${variables.report_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} downloaded`);
       } else if (data.upgrade_required) {
         toast.error('Upgrade required to access this report');
@@ -183,6 +185,7 @@ export function useReportPreview() {
         }
         throw new Error(result.error || 'Failed to load preview');
       }
+      trackProductEvent('reports', 'report_previewed', { workflow: 'report_preview', milestone: 'activated', props: { report_type: request.report_type } });
       return result;
     },
     onError: (error: Error) => {
@@ -268,6 +271,7 @@ export function useEmailReport() {
       return data;
     },
     onSuccess: (data) => {
+      trackProductEvent('reports', 'report_delivered', { workflow: 'report_email', milestone: 'outcome' });
       toast.success(data.message || 'Report sent successfully');
     },
     onError: (error: Error) => {

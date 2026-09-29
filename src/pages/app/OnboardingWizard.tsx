@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUploadBusinessLogo } from '@/hooks/use-business';
 import { useCreatePaymentMethod, PROVIDER_TYPES, getBankTransferFields, PROVIDER_INSTRUCTION_FIELDS } from '@/hooks/use-payment-methods';
 import { FieldError, focusFirstInvalid } from '@/components/ui/field-error';
+import { IntentCapturePrompt } from '@/components/activation/IntentCapturePrompt';
 
 type EntityType = 'individual' | 'business' | 'nonprofit';
 type OnboardingErrors = Record<string, string>;
@@ -392,6 +393,10 @@ export default function OnboardingWizard() {
           </div>
           <Progress value={progressPct} className="h-2" />
         </div>
+
+        {/* Optional stated-intent prompt — not a step, never blocks Continue */}
+        <IntentCapturePrompt surface="onboarding" variant="banner" />
+
 
         <AnimatePresence mode="wait">
           <motion.div
