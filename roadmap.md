@@ -15,7 +15,7 @@
 - [x] Phase 7: journey checks B,C,E,F,G,J,K passed in database; email rules (L) tested
 - [x] Phase 7: database checks for A, H, I passed
 - [ ] Phase 7: D and L dashboard checks, signed-in browser runs of A–L (blocked: needs test account secrets TEST_USER/TEST_PASS)
-- [ ] Product tip email copy (blocked: awaiting approval)
+- [x] Product tip email copy redesigned around recorded journeys; awaiting review before any campaign enablement
 
 # Form validation rollout
 

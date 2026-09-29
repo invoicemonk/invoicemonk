@@ -1,3 +1,4 @@
+import { trackProductEvent } from '@/lib/product-tracking';
 import { useState, useEffect, useMemo } from 'react';
 import { INPUT_LIMITS } from '@/lib/input-limits';
 import { motion } from 'framer-motion';
@@ -75,6 +76,7 @@ export default function Clients() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  useEffect(() => { if (isAddDialogOpen) trackProductEvent('clients', 'client_form_opened', { workflow: 'client_management' }); }, [isAddDialogOpen]);
   const [newClient, setNewClient] = useState({
     name: '',
     email: '',

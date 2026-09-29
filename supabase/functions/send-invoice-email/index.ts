@@ -1210,7 +1210,8 @@ Deno.serve(async (req) => {
     const canUseBranding = brandingData.allowed === true && templateSnapshot?.supports_branding !== false
 
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
-    const showWatermark = templateRequiresWatermark && !canRemoveWatermark
+    const showWatermark = !canRemoveWatermark // plan decides; template flag no longer bypasses it
+    void templateRequiresWatermark
 
     let appUrl = body.app_url || Deno.env.get('APP_URL') || 'https://app.invoicemonk.com'
     if (appUrl.includes('lovableproject.com') || appUrl.includes('lovable.app')) {

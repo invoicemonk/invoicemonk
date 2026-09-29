@@ -1,3 +1,4 @@
+import { trackProductEvent } from '@/lib/product-tracking';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Package, MoreHorizontal, Pencil, Archive, ArchiveRestore } from 'lucide-react';
@@ -75,6 +76,7 @@ export default function ProductsServices() {
   };
 
   const handleAdd = () => {
+    trackProductEvent('products_services', 'item_form_opened', { workflow: 'catalog' });
     setEditItem(null);
     setDialogOpen(true);
   };

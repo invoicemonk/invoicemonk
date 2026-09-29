@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { initSentry, captureException } from '../_shared/sentry.ts'
+import { findJob, productTipCampaignKey, resolveJourney } from '../_shared/product-tip-email.ts'
+import { nextResearchStep, renderResearchEmail, RESEARCH_DORMANT_DAYS, RESEARCH_REPLY_TO, RESEARCH_SENDER_NAME } from '../_shared/research-email.ts'
 initSentry()
 
 
@@ -37,30 +39,6 @@ async function logDelivery(toEmail: string, subject: string, status: string, eli
   } catch (e) { console.warn('delivery log failed', e) }
 }
 
-// Product-aware copy (DRAFT — needs approval before test mode is switched off).
-const PRODUCT_COPY: Record<string, { name: string; next: string; path: string }> = {
-  invoicing: { name: 'invoicing', next: 'issue and send your first invoice', path: '/invoices/new' },
-  payments: { name: 'payment tracking', next: 'record a payment against an invoice', path: '/receivables' },
-  receipts: { name: 'receipts', next: 'send a receipt to your client', path: '/receipts' },
-  expenses: { name: 'expense tracking', next: 'add a receipt to an expense', path: '/expenses' },
-  receipt_capture: { name: 'receipt scanning', next: 'approve a scanned receipt into an expense', path: '/expenses/inbox' },
-  accounting: { name: 'your accounting overview', next: 'check your profit result', path: '/accounting/result' },
-  tax_reports: { name: 'tax reports', next: 'export your tax report', path: '/accounting/tax-reports' },
-  reports: { name: 'reports', next: 'download or email a report', path: '/reports' },
-  data_import: { name: 'importing your data', next: 'finish your import', path: '/import' },
-  e_invoicing: { name: 'e-invoicing', next: 'complete a regulator submission', path: '/invoices' },
-}
-function productNudgeSubject(area: string): string {
-  return `Pick up where you left off with ${PRODUCT_COPY[area]?.name ?? area.replace(/_/g, ' ')}`
-}
-function productNudgeTemplate(name: string, area: string, statedIntents: string[]): string {
-  const c = PRODUCT_COPY[area] ?? { name: area.replace(/_/g, ' '), next: 'finish what you started', path: '/dashboard' }
-  const esc = (v: string) => v.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
-  // Stated intent is only referenced when the user actually told us it; never inferred.
-  const why = statedIntents.length ? `<p>You told us you wanted to ${esc(statedIntents[0].replace(/_/g, ' '))}.</p>` : ''
-  return emailWrapper('Still with you', `<p>Hi ${esc(name || 'there')},</p><p>You started using ${esc(c.name)} but didn't get to the finish line.</p>${why}<p>The next step is to <strong>${esc(c.next)}</strong>. It only takes a minute.</p><p><a href="https://app.invoicemonk.com${c.path}" style="background:#1d6b5a;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">Continue</a></p><p style="color:#999;font-size:12px;">Don't want these tips? Turn off "Product tips" in Settings → Notifications.</p>`)
-}
-
 // Send email via Brevo (Sendinblue) API
 async function sendBrevoEmail(
   brevoApiKey: string,
@@ -68,7 +46,9 @@ async function sendBrevoEmail(
   fromName: string,
   toEmail: string,
   subject: string,
-  htmlContent: string
+  htmlContent: string,
+  campaignKey = subject,
+  opts: { replyTo?: string; textContent?: string } = {},
 ): Promise<boolean> {
   try {
     const testMode = (Deno.env.get('LIFECYCLE_EMAIL_TEST_MODE') ?? 'true').toLowerCase() !== 'false'
@@ -78,20 +58,20 @@ async function sendBrevoEmail(
       .filter(Boolean)
     if (testMode && !testRecipients.includes(toEmail.toLowerCase())) {
       console.log(`Lifecycle email suppressed by test mode for ${toEmail}`)
-      await logDelivery(toEmail, subject, 'suppressed', false, 'test_mode_not_allowlisted')
+      await logDelivery(toEmail, campaignKey, 'suppressed', false, 'test_mode_not_allowlisted')
       return false
     }
     if (deliveryCtx) {
       const since = new Date(Date.now() - deliveryCtx.cooldownDays * 86400000).toISOString()
       const { count } = await deliveryCtx.admin.from('lifecycle_email_deliveries').select('id', { count: 'exact', head: true })
-        .eq('recipient_email', toEmail).eq('campaign_key', subject.slice(0, 120)).eq('delivery_status', 'sent').gte('created_at', since)
+        .eq('recipient_email', toEmail).eq('campaign_key', campaignKey.slice(0, 120)).eq('delivery_status', 'sent').gte('created_at', since)
       const { data: prof } = await deliveryCtx.admin.from('profiles').select('id').ilike('email', toEmail).maybeSingle()
       const { data: pref } = prof?.id
         ? await deliveryCtx.admin.from('user_preferences').select('email_product_tips').eq('user_id', prof.id).maybeSingle()
         : { data: null }
       const verdict = checkEligibility(toEmail, deliveryCtx, (count ?? 0) > 0, pref?.email_product_tips === false)
-      if (!verdict.eligible) { await logDelivery(toEmail, subject, 'suppressed', false, verdict.reason); return false }
-      if (deliveryCtx.dryRun) { await logDelivery(toEmail, subject, 'dry_run', true, null); return false }
+      if (!verdict.eligible) { await logDelivery(toEmail, campaignKey, 'suppressed', false, verdict.reason); return false }
+      if (deliveryCtx.dryRun) { await logDelivery(toEmail, campaignKey, 'dry_run', true, null); return false }
     }
     const safeSubject = testMode ? `[TEST] ${subject}` : subject
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -106,16 +86,18 @@ async function sendBrevoEmail(
         to: [{ email: toEmail }],
         subject: safeSubject,
         htmlContent,
+        ...(opts.textContent ? { textContent: opts.textContent } : {}),
+        ...(opts.replyTo ? { replyTo: { email: opts.replyTo } } : {}),
       }),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Brevo API error (${response.status}):`, errorText)
-      await logDelivery(toEmail, subject, 'failed', true, `brevo_${response.status}`)
+      await logDelivery(toEmail, campaignKey, 'failed', true, `brevo_${response.status}`)
       return false
     }
-    await logDelivery(toEmail, subject, 'sent', true, null)
+    await logDelivery(toEmail, campaignKey, 'sent', true, null)
     return true
   } catch (err) {
     console.error('Brevo email send error:', err)
@@ -347,21 +329,6 @@ function campaignITemplate(userName: string, invoiceCount: number): string {
 // Founder-led plain-text templates
 // =============================================
 
-function inactiveCheckinTemplate(userName: string): string {
-  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-<p>Hi ${userName},</p>
-<p>I noticed you signed up for Invoicemonk a little while ago but haven't sent your first invoice yet.</p>
-<p>Quick question — what brought you to Invoicemonk in the first place, and what's stopping you from getting started?</p>
-<p>Was it:</p>
-<ul>
-  <li>The setup felt confusing?</li>
-  <li>You're missing a feature you need?</li>
-  <li>Something else got in the way?</li>
-</ul>
-<p>Just hit reply — even one line helps me improve the product.</p>
-<p>Thanks,<br>The Invoicemonk team</p>
-</div>`
-}
 
 function churnFollowupTemplate(userName: string): string {
   return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -373,21 +340,6 @@ function churnFollowupTemplate(userName: string): string {
 </div>`
 }
 
-function inactiveFollowupTemplate(userName: string): string {
-  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-<p>Hi ${userName},</p>
-<p>Just checking in once more — still haven't seen you send an invoice.</p>
-<p>If there's anything blocking you, I'd love to hear it. Even a one-word answer helps:</p>
-<ul>
-  <li>"confusing"</li>
-  <li>"missing X feature"</li>
-  <li>"signed up by mistake"</li>
-  <li>"already using something else"</li>
-</ul>
-<p>Whatever it is, just reply. No pitch — just trying to learn.</p>
-<p>Thanks,<br>The Invoicemonk team</p>
-</div>`
-}
 
 // =============================================
 // Main Handler
@@ -453,9 +405,7 @@ Deno.serve(async (req) => {
       campaign_g: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
       campaign_h: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
       campaign_i: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
-      inactive_checkin: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
       churn_followup: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
-      inactive_followup: { targeted: 0, sent: 0, skipped: 0, errors: 0 },
     }
 
     let timedOut = false
@@ -1296,76 +1246,6 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // Inactive User Check-in: signed up 7-14 days ago, zero invoices issued
-    // =============================================
-    if (!checkTimeout('Inactive Check-in')) {
-      try {
-        console.log('Inactive Check-in: scanning targets...')
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()
-
-        const { data: candidates } = await adminClient
-          .from('profiles')
-          .select('id, email, full_name, created_at')
-          .gte('created_at', fourteenDaysAgo)
-          .lte('created_at', sevenDaysAgo)
-          .not('email', 'is', null)
-          .limit(100)
-
-        if (candidates && candidates.length > 0) {
-          for (const cand of candidates) {
-            try {
-              // Skip if already sent
-              const { data: already } = await adminClient
-                .from('lifecycle_events')
-                .select('id')
-                .eq('user_id', cand.id)
-                .eq('event_type', 'inactive_user_checkin')
-                .limit(1)
-                .maybeSingle()
-              if (already) { summary.inactive_checkin.skipped++; continue }
-
-              // Skip if user has issued any invoices
-              const { count } = await adminClient
-                .from('invoices')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', cand.id)
-                .neq('status', 'draft')
-              if ((count ?? 0) > 0) { summary.inactive_checkin.skipped++; continue }
-
-              summary.inactive_checkin.targeted++
-              const daysSince = Math.floor((now.getTime() - new Date(cand.created_at).getTime()) / (24 * 60 * 60 * 1000))
-              const sent = await sendBrevoEmail(
-                brevoApiKey,
-                smtpFrom,
-                'The Invoicemonk team',
-                cand.email,
-                "Quick question about your Invoicemonk signup",
-                inactiveCheckinTemplate(cand.full_name || 'there')
-              )
-              if (sent) {
-                await adminClient.from('lifecycle_events').insert({
-                  user_id: cand.id,
-                  event_type: 'inactive_user_checkin',
-                  metadata: { sent_at: now.toISOString(), days_since_signup: daysSince },
-                })
-                summary.inactive_checkin.sent++
-              } else {
-                summary.inactive_checkin.errors++
-              }
-            } catch (e) {
-              summary.inactive_checkin.errors++
-              captureException(e, { function_name: 'process-lifecycle-campaigns' })
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Inactive checkin failed:', e)
-        captureException(e, { function_name: 'process-lifecycle-campaigns' })
-      }
-    }
-
-    // =============================================
     // Churn Follow-up: 4+ days after a churn_feedback row with no details
     // =============================================
     if (!checkTimeout('Churn Follow-up')) {
@@ -1427,97 +1307,85 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // Inactive Follow-up: 4+ days after inactive_user_checkin if still zero invoices
-    // =============================================
-    if (!checkTimeout('Inactive Follow-up')) {
-      try {
-        console.log('Inactive Follow-up: scanning targets...')
-        const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString()
-
-        const { data: checkins } = await adminClient
-          .from('lifecycle_events')
-          .select('id, user_id, created_at')
-          .eq('event_type', 'inactive_user_checkin')
-          .lte('created_at', fourDaysAgo)
-          .limit(100)
-
-        if (checkins && checkins.length > 0) {
-          for (const ck of checkins) {
-            try {
-              const { data: already } = await adminClient
-                .from('lifecycle_events')
-                .select('id')
-                .eq('user_id', ck.user_id)
-                .eq('event_type', 'inactive_followup')
-                .limit(1)
-                .maybeSingle()
-              if (already) { summary.inactive_followup.skipped++; continue }
-
-              const { count } = await adminClient
-                .from('invoices')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', ck.user_id)
-                .neq('status', 'draft')
-              if ((count ?? 0) > 0) { summary.inactive_followup.skipped++; continue }
-
-              const profile = await getUserProfile(ck.user_id)
-              if (!profile) { summary.inactive_followup.skipped++; continue }
-
-              summary.inactive_followup.targeted++
-              const sent = await sendBrevoEmail(
-                brevoApiKey,
-                smtpFrom,
-                'The Invoicemonk team',
-                profile.email,
-                'One last check-in',
-                inactiveFollowupTemplate(profile.name)
-              )
-              if (sent) {
-                await adminClient.from('lifecycle_events').insert({
-                  user_id: ck.user_id,
-                  event_type: 'inactive_followup',
-                  metadata: { sent_at: now.toISOString(), checkin_event_id: ck.id },
-                })
-                summary.inactive_followup.sent++
-              } else {
-                summary.inactive_followup.errors++
-              }
-            } catch (e) {
-              summary.inactive_followup.errors++
-              captureException(e, { function_name: 'process-lifecycle-campaigns' })
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Inactive follow-up failed:', e)
-        captureException(e, { function_name: 'process-lifecycle-campaigns' })
-      }
-    }
-
-    // =============================================
-    // Product-aware nudge: abandoned journey without an outcome.
-    // Gated by product_campaigns_enabled AND test mode rules; one email per journey.
+    // Product abandonment: per user JOB, from the recorded trail.
+    // Gated by product_campaigns_enabled AND test mode rules; one email per job.
+    // Insufficient context => no email; logged for admin review.
     // =============================================
     summary.product_nudge = { targeted: 0, sent: 0, skipped: 0, errors: 0 }
     if (cfg?.product_campaigns_enabled && !checkTimeout('Product nudge')) {
       try {
         const { data: journeys } = await adminClient.from('product_activation')
-          .select('id, user_id, product_area, workflow, stopped_step')
+          .select('id, user_id, business_id, product_area, workflow, stopped_step')
           .eq('status', 'abandoned').is('outcome_at', null).limit(100)
+        const recentResearch = new Date(now.getTime() - RESEARCH_DORMANT_DAYS * 86400000).toISOString()
         for (const j of journeys ?? []) {
           try {
-            const { count: prior } = await adminClient.from('lifecycle_email_deliveries')
-              .select('id', { count: 'exact', head: true }).eq('user_id', j.user_id).eq('campaign_key', productNudgeSubject(j.product_area).slice(0, 120)).eq('delivery_status', 'sent')
-            if ((prior ?? 0) > 0) { summary.product_nudge.skipped++; continue }
+            const job = findJob(j.product_area, j.workflow)
             const profile = await getUserProfile(j.user_id)
             if (!profile) { summary.product_nudge.skipped++; continue }
-            const { data: intents } = await adminClient.from('user_intents').select('intent').eq('user_id', j.user_id)
+            const logSuppressed = async (reason: string, detail: string, key: string) => {
+              const { count: logged } = await adminClient.from('lifecycle_email_deliveries').select('id', { count: 'exact', head: true })
+                .eq('user_id', j.user_id).eq('suppression_reason', reason).eq('metadata->>journey_id', j.id)
+              if ((logged ?? 0) > 0) return
+              await adminClient.from('lifecycle_email_deliveries').insert({
+                user_id: j.user_id, product_area: j.product_area, campaign_key: key, recipient_email: profile.email,
+                eligible: false, suppression_reason: reason, delivery_status: 'suppressed',
+                metadata: { journey_id: j.id, workflow: j.workflow, job_id: job?.id ?? null, detail, test_mode: deliveryCtx?.testMode ?? true },
+              })
+            }
+            // Never overlap with an in-progress dormant research sequence.
+            const { count: research } = await adminClient.from('lifecycle_email_deliveries').select('id', { count: 'exact', head: true })
+              .eq('user_id', j.user_id).like('campaign_key', 'research-v1:%').eq('delivery_status', 'sent').gte('created_at', recentResearch)
+            if ((research ?? 0) > 0) { summary.product_nudge.skipped++; continue }
+            const campaignKey = productTipCampaignKey(job?.id ?? `${j.product_area}:${j.workflow ?? 'none'}`)
+            const { count: prior } = await adminClient.from('lifecycle_email_deliveries')
+              .select('id', { count: 'exact', head: true }).eq('user_id', j.user_id).eq('campaign_key', campaignKey).eq('delivery_status', 'sent')
+            if ((prior ?? 0) > 0) { summary.product_nudge.skipped++; continue }
+            // A job may span several recorded workflows (e.g. upload → scan).
+            let eventQuery = adminClient.from('lifecycle_events').select('event_type, stage, created_at, metadata')
+              .eq('user_id', j.user_id).eq('product_area', j.product_area)
+            if (job) eventQuery = eventQuery.in('workflow', job.workflows); else if (j.workflow) eventQuery = eventQuery.eq('workflow', j.workflow)
+            eventQuery = j.business_id ? eventQuery.eq('business_id', j.business_id) : eventQuery.is('business_id', null)
+            const [{ data: events }, { data: intents }, { data: refreshed }] = await Promise.all([
+              eventQuery.order('created_at', { ascending: true }).limit(200),
+              adminClient.from('user_intents').select('intent, other_text, is_primary').eq('user_id', j.user_id).order('is_primary', { ascending: false }).limit(1),
+              adminClient.from('product_activation').select('status, outcome_at').eq('id', j.id).maybeSingle(),
+            ])
+            if (refreshed?.outcome_at || refreshed?.status === 'outcome') { summary.product_nudge.skipped++; continue }
+            const intent = intents?.[0]
+            const result = resolveJourney({ name: profile.name, productArea: j.product_area, workflow: j.workflow, stoppedStep: j.stopped_step, statedIntent: intent?.intent, statedIntentText: intent?.other_text, events: events ?? [] })
+            if (result.status === 'insufficient_journey_context') { await logSuppressed('insufficient_journey_context', result.detail, campaignKey); summary.product_nudge.skipped++; continue }
+            if (result.status !== 'email') { summary.product_nudge.skipped++; continue }
             summary.product_nudge.targeted++
             const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, 'The Invoicemonk team', profile.email,
-              productNudgeSubject(j.product_area),
-              productNudgeTemplate(profile.name, j.product_area, (intents ?? []).map((i: any) => i.intent)))
+              result.email.subject, result.email.html, campaignKey, { textContent: result.email.text })
             if (sent) summary.product_nudge.sent++; else summary.product_nudge.skipped++
           } catch (e) { summary.product_nudge.errors++; captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
+        }
+      } catch (e) { captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
+    }
+
+    // =============================================
+    // Dormant-user RESEARCH: separate from abandonment. Max 3 emails,
+    // stops on a logged reply, never overlaps an open abandonment journey.
+    // Gated by research_campaigns_enabled AND test mode rules.
+    // =============================================
+    summary.dormant_research = { targeted: 0, sent: 0, skipped: 0, errors: 0 }
+    if (cfg?.research_campaigns_enabled && !checkTimeout('Dormant research')) {
+      try {
+        const { data: candidates, error: candErr } = await adminClient.rpc('get_dormant_research_candidates', { _days: RESEARCH_DORMANT_DAYS })
+        if (candErr) throw candErr
+        for (const c of (candidates ?? []).slice(0, 100)) {
+          try {
+            const decision = nextResearchStep(c, now)
+            if (!decision.send) { summary.dormant_research.skipped++; continue }
+            const email = renderResearchEmail({ name: c.full_name, segment: c.segment, step: decision.step, cancellationReason: c.cancellation_reason, cancellationDetails: c.cancellation_details, hasUsageHistory: c.segment === 'A' })
+            if (!email || !c.email) { summary.dormant_research.skipped++; continue }
+            summary.dormant_research.targeted++
+            const sent = await sendBrevoEmail(brevoApiKey, smtpFrom, RESEARCH_SENDER_NAME, c.email, email.subject, email.html, email.campaignKey,
+              { replyTo: RESEARCH_REPLY_TO, textContent: email.text })
+            if (sent) summary.dormant_research.sent++; else summary.dormant_research.skipped++
+          } catch (e) { summary.dormant_research.errors++; captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
         }
       } catch (e) { captureException(e, { function_name: 'process-lifecycle-campaigns' }) }
     }

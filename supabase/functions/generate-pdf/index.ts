@@ -568,7 +568,8 @@ Deno.serve(async (req) => {
 
     // Determine if watermark should be applied
     const templateRequiresWatermark = templateSnapshot?.watermark_required !== false
-    const showWatermark = templateRequiresWatermark && !canRemoveWatermark
+    const showWatermark = !canRemoveWatermark // plan decides; template flag no longer bypasses it
+    void templateRequiresWatermark
 
     // Check branding permission
     const { data: brandingResult } = await supabaseAdmin.rpc('check_tier_limit', {

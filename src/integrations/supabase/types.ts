@@ -1509,28 +1509,34 @@ export type Database = {
           cooldown_days: number
           id: boolean
           product_campaigns_enabled: boolean
+          research_campaigns_enabled: boolean
           test_mode: boolean
           test_recipients: string[]
           updated_at: string
           updated_by: string | null
+          upgrade_campaigns_enabled: boolean
         }
         Insert: {
           cooldown_days?: number
           id?: boolean
           product_campaigns_enabled?: boolean
+          research_campaigns_enabled?: boolean
           test_mode?: boolean
           test_recipients?: string[]
           updated_at?: string
           updated_by?: string | null
+          upgrade_campaigns_enabled?: boolean
         }
         Update: {
           cooldown_days?: number
           id?: boolean
           product_campaigns_enabled?: boolean
+          research_campaigns_enabled?: boolean
           test_mode?: boolean
           test_recipients?: string[]
           updated_at?: string
           updated_by?: string | null
+          upgrade_campaigns_enabled?: boolean
         }
         Relationships: []
       }
@@ -3822,6 +3828,14 @@ export type Database = {
           verification_submitted_at: string
         }[]
       }
+      admin_log_research_response: {
+        Args: {
+          _alternative_tool?: string
+          _response: string
+          _user_id: string
+        }
+        Returns: string
+      }
       admin_paid_intent_lost_count: { Args: { days?: number }; Returns: number }
       admin_product_discovery_overview: {
         Args: {
@@ -3975,6 +3989,26 @@ export type Database = {
         }
         Returns: Json
       }
+      get_dormant_research_candidates: {
+        Args: { _days?: number }
+        Returns: {
+          alternative_tool: string
+          cancellation_details: string
+          cancellation_reason: string
+          email: string
+          excluded_reason: string
+          full_name: string
+          has_open_abandonment: boolean
+          last_active_at: string
+          last_research_at: string
+          last_research_step: string
+          research_sent_count: number
+          responded_at: string
+          response: string
+          segment: string
+          user_id: string
+        }[]
+      }
       get_due_date_stats: {
         Args: { _business_id: string; _currency_account_id?: string }
         Returns: Json
@@ -4035,6 +4069,26 @@ export type Database = {
           invoice_count: number
           month: string
           revenue: number
+        }[]
+      }
+      get_upgrade_candidates: {
+        Args: never
+        Returns: {
+          business_id: string
+          email: string
+          excluded_reason: string
+          full_name: string
+          has_open_abandonment: boolean
+          invoices_this_month: number
+          issued_invoices: number
+          last_upgrade_at: string
+          receipts_count: number
+          research_active: boolean
+          sent_triggers: string[]
+          tier: string
+          triggers: string[]
+          upgrade_sent_count: number
+          user_id: string
         }[]
       }
       has_audit_access: { Args: { _user_id: string }; Returns: boolean }

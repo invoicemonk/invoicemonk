@@ -1,3 +1,4 @@
+import { InvoiceWatermark } from '@/components/invoices/InvoiceWatermark';
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -357,8 +358,11 @@ const InvoiceView = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="space-y-6"
+            className="relative space-y-6"
           >
+            {(data?.issuer_tier ?? 'starter').startsWith('starter') && (
+              <div className="pointer-events-none absolute inset-0 z-10" aria-hidden="true"><InvoiceWatermark /></div>
+            )}
             {/* Fraud Warning Banner */}
             {data?.is_flagged && (
               <motion.div

@@ -25,3 +25,17 @@ describe('product registry', () => {
     expect(areaForPath('/b/x/invoices')).toBeNull();
   });
 });
+
+import { PRODUCT_JOBS } from './product-registry';
+import { PRODUCT_JOBS as SERVER_JOBS } from '../../supabase/functions/_shared/product-tip-email';
+
+describe('product jobs', () => {
+  it('matches the server-side job definitions exactly', () => {
+    expect(PRODUCT_JOBS.map(({ id, area, label, workflows }) => ({ id, area, label, workflows })))
+      .toEqual(SERVER_JOBS.map(({ id, area, label, workflows }) => ({ id, area, label, workflows })));
+  });
+  it('covers every registered workflow with a job', () => {
+    for (const p of PRODUCT_REGISTRY) for (const w of p.workflows)
+      expect(PRODUCT_JOBS.some((j) => j.area === p.area && j.workflows.includes(w))).toBe(true);
+  });
+});

@@ -30,3 +30,10 @@ Deno.test('product nudges are off unless explicitly enabled', async () => {
   const src = await Deno.readTextFile(new URL('./index.ts', import.meta.url))
   assertEquals(src.includes('if (cfg?.product_campaigns_enabled &&'), true)
 })
+
+Deno.test('research emails are off unless explicitly enabled and use Yinka reply-to', async () => {
+  const src = await Deno.readTextFile(new URL('./index.ts', import.meta.url))
+  assertEquals(src.includes('if (cfg?.research_campaigns_enabled &&'), true)
+  assertEquals(src.includes('replyTo: RESEARCH_REPLY_TO'), true)
+  assertEquals(src.includes('inactiveCheckinTemplate'), false)
+})

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCT_REGISTRY, INTENT_OPTIONS } from '@/lib/product-registry';
-import { PRODUCT_EMAIL_COPY, productEmailSubject, productEmailHtml, productEmailBodyText } from '@/lib/product-email-draft';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { JourneyEmails, InsufficientContextQueue } from '@/components/admin/discovery/JourneyEmails';
+import { DormantResearch } from '@/components/admin/discovery/DormantResearch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const LOW_VOLUME = 5;
@@ -63,7 +64,7 @@ export default function AdminProductDiscovery() {
       {isLoading ? <Skeleton className="h-96 w-full" /> : error ? <p className="text-sm text-destructive">Product discovery data could not be loaded.</p> : data && (
         <Tabs defaultValue="overview">
           <TabsList className="flex h-auto flex-wrap justify-start">
-            {[['overview','Overview'],['activation','Activation by product'],['intent','Intent vs behavior'],['funnel','Funnel by intent'],['abandonment','Abandonment'],['feedback','Feedback & alternatives'],['timeline','User timeline'],['email','Email draft']].map(([v,l])=><TabsTrigger key={v} value={v}>{l}</TabsTrigger>)}
+            {[['overview','Overview'],['activation','Activation by product'],['intent','Intent vs behavior'],['funnel','Funnel by intent'],['abandonment','Abandonment'],['feedback','Feedback & alternatives'],['timeline','User timeline'],['review','Needs review'],['email','Abandonment emails'],['research','Dormant research']].map(([v,l])=><TabsTrigger key={v} value={v}>{l}</TabsTrigger>)}
           </TabsList>
           <TabsContent value="overview"><OverviewCards o={data.overview} /></TabsContent>
           <TabsContent value="activation"><AreaTable rows={data.areas} /></TabsContent>
@@ -72,7 +73,9 @@ export default function AdminProductDiscovery() {
           <TabsContent value="abandonment"><AbandonTable rows={data.workflows} /></TabsContent>
           <TabsContent value="feedback"><FeedbackTable rows={data.feedback} /></TabsContent>
           <TabsContent value="timeline"><Timeline /></TabsContent>
-          <TabsContent value="email"><EmailDraft /></TabsContent>
+          <TabsContent value="review"><InsufficientContextQueue /></TabsContent>
+          <TabsContent value="email"><JourneyEmails /></TabsContent>
+          <TabsContent value="research"><DormantResearch /></TabsContent>
         </Tabs>
       )}
     </div>
@@ -161,52 +164,4 @@ function Timeline() {
       </TableBody></Table>
     </>}
   </CardContent></Card>;
-}
-
-function EmailDraft() {
-  const areas = PRODUCT_REGISTRY.filter((p) => p.area !== 'discovery');
-  const [area, setArea] = useState<string>(areas[0]?.area ?? 'invoicing');
-  const [withIntent, setWithIntent] = useState(false);
-  const sampleIntent = INTENT_OPTIONS[0]?.key ?? 'get_paid_faster';
-  const copy = PRODUCT_EMAIL_COPY[area];
-  return <Card>
-    <CardHeader>
-      <CardTitle>Product tip email — draft</CardTitle>
-      <CardDescription>
-        What an abandoned-journey recipient would receive. Currently switched off: nothing sends until the campaign is enabled, and even then only in test mode to allowlisted recipients — one email per person per product, opt-out via Settings → Notifications.
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        <Select value={area} onValueChange={setArea}>
-          <SelectTrigger><SelectValue placeholder="Product" /></SelectTrigger>
-          <SelectContent>{areas.map((p) => <SelectItem key={p.area} value={p.area}>{p.label}{copy ? '' : ' (generic wording)'}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={withIntent ? 'yes' : 'no'} onValueChange={(v) => setWithIntent(v === 'yes')}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="no">Without a stated goal</SelectItem>
-            <SelectItem value="yes">With a stated goal</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {!copy && <p className="text-sm text-muted-foreground">This product has no specific copy yet, so it falls back to the generic wording.</p>}
-      <div>
-        <p className="text-sm"><span className="font-medium">Subject:</span> {productEmailSubject(area)}</p>
-        <p className="text-xs text-muted-foreground">Sample recipient: Ada{withIntent ? `, stated goal "${sampleIntent.replace(/_/g, ' ')}"` : ''}</p>
-      </div>
-      <div className="rounded-md border bg-muted/30 p-3">
-        <iframe
-          title="Product tip email preview"
-          srcDoc={productEmailHtml(area, { name: 'Ada', statedIntent: withIntent ? sampleIntent : null })}
-          sandbox=""
-          className="h-[560px] w-full rounded-md border bg-white"
-        />
-      </div>
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground">Plain-text version</summary>
-        <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">{productEmailBodyText(area, { name: 'Ada', statedIntent: withIntent ? sampleIntent : null })}</pre>
-      </details>
-    </CardContent>
-  </Card>;
 }

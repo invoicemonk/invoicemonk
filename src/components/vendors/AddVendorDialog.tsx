@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { trackProductEvent } from '@/lib/product-tracking';
+import { useState, useEffect } from 'react';
 import { useDialogCloseGuard } from '@/hooks/use-dialog-close-guard';
 import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 import { Loader2, Plus } from 'lucide-react';
@@ -21,6 +22,7 @@ import { INPUT_LIMITS } from '@/lib/input-limits';
 
 export function AddVendorDialog() {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (open) trackProductEvent('vendors', 'vendor_form_opened', { workflow: 'vendor_management' }); }, [open]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');

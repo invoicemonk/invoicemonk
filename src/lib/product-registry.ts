@@ -72,3 +72,32 @@ export function areaForPath(path: string): { area: ProductArea; workflow: string
   if (p === '/import') return { area: 'data_import', workflow: 'csv_import', event: 'import_opened', milestone: 'progress' };
   return null;
 }
+
+/**
+ * User jobs beneath each product area. An area is only a container; emails and
+ * journeys are reasoned about per job. Mirrors PRODUCT_JOBS in
+ * supabase/functions/_shared/product-tip-email.ts (kept in sync by tests).
+ */
+export const PRODUCT_JOBS: { id: string; area: ProductArea; label: string; workflows: string[] }[] = [
+  { id: 'create_and_send_invoice', area: 'invoicing', label: 'Create and send an invoice', workflows: ['standard_invoice', 'deposit_invoice', 'final_invoice'] },
+  { id: 'get_invoice_paid', area: 'payments', label: 'Get an invoice paid', workflows: ['invoice_payment'] },
+  { id: 'record_payment', area: 'payments', label: 'Record a payment', workflows: ['record_payment'] },
+  { id: 'share_payment_receipt', area: 'receipts', label: 'Share a payment receipt', workflows: ['payment_receipt', 'receipt_pdf'] },
+  { id: 'issue_credit_note', area: 'credit_notes', label: 'Issue a credit note by voiding an invoice', workflows: ['credit_note'] },
+  { id: 'add_client', area: 'clients', label: 'Add a client', workflows: ['client_management'] },
+  { id: 'add_catalogue_item', area: 'products_services', label: 'Add a product or service', workflows: ['catalog'] },
+  { id: 'add_vendor', area: 'vendors', label: 'Add a vendor', workflows: ['vendor_management'] },
+  { id: 'add_team_member', area: 'team', label: 'Add a team member', workflows: ['invite_member'] },
+  { id: 'record_expense', area: 'expenses', label: 'Record an expense', workflows: ['manual_expense'] },
+  { id: 'record_documented_expense', area: 'expenses', label: 'Record an expense with its receipt', workflows: ['expense_with_receipt'] },
+  { id: 'capture_receipt_to_expense', area: 'receipt_capture', label: 'Turn a receipt into an expense', workflows: ['expense_inbox', 'scan_receipt', 'scan_invoice'] },
+  { id: 'set_up_recurring_expense', area: 'recurring_expenses', label: 'Set up a recurring expense', workflows: ['recurring_expense'] },
+  { id: 'review_overview', area: 'accounting', label: 'Review the account overview', workflows: ['overview'] },
+  { id: 'review_income', area: 'accounting', label: 'Review income', workflows: ['income'] },
+  { id: 'review_profit', area: 'accounting', label: 'Review profit and result', workflows: ['result', 'profitability'] },
+  { id: 'export_tax_report', area: 'tax_reports', label: 'Export a tax report', workflows: ['tax_report'] },
+  { id: 'deliver_report', area: 'reports', label: 'Download or email a report', workflows: ['reports', 'analytics', 'report_preview', 'report_download', 'report_email'] },
+  { id: 'import_records', area: 'data_import', label: 'Import records', workflows: ['csv_import', 'migration'] },
+  { id: 'export_data', area: 'data_export', label: 'Export data', workflows: ['export'] },
+  { id: 'submit_to_regulator', area: 'e_invoicing', label: 'Submit an invoice to the tax authority', workflows: ['regulator_submission'] },
+];

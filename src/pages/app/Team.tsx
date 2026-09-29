@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { trackProductEvent } from '@/lib/product-tracking';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -92,6 +93,7 @@ export default function Team() {
   const canManageTeam = isOwner || isAdmin;
 
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  useEffect(() => { if (inviteDialogOpen) trackProductEvent('team', 'member_invite_opened', { workflow: 'invite_member' }); }, [inviteDialogOpen]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<BusinessRole>('member');
 
