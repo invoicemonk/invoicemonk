@@ -30,7 +30,7 @@ const SURFACE_LABELS: Record<IntentSurface, string> = {
 };
 
 /**
- * Shared, optional, skippable "What brought you to Invoicemonk?" prompt.
+ * Shared stated-intent prompt; optional on verification/dashboard and required during onboarding.
  * Stores STATED intent only (user_intents). One shared suppression check:
  * a saved answer suppresses the prompt everywhere; skipping hides it only
  * for the current visit so it can return on the next dashboard visit.
