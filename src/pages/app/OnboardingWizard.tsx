@@ -74,6 +74,26 @@ export default function OnboardingWizard() {
 
   const businessId = business?.id;
 
+  const {
+    data: onboardingIntentComplete,
+    isLoading: loadingOnboardingIntent,
+    isError: onboardingIntentError,
+    refetch: refetchOnboardingIntent,
+  } = useQuery({
+    queryKey: ['onboarding-intent-complete', user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { count, error } = await supabase
+        .from('user_intents' as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: Infinity,
+  });
+
   // Load sensitive
   const { data: sensitive } = useQuery({
     queryKey: ['onboarding-sensitive', businessId],
@@ -370,7 +390,7 @@ export default function OnboardingWizard() {
     } catch {/* toast handled in hook */}
   };
 
-  if (loadingBusiness || !business) {
+  if (loadingBusiness || !business || loadingOnboardingIntent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -378,7 +398,41 @@ export default function OnboardingWizard() {
     );
   }
 
-  const progressPct = Math.round(((step + 1) / STEP_KEYS.length) * 100);
+  if (onboardingIntentError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="space-y-4 pt-6 text-center">
+            <p className="text-sm text-muted-foreground">We couldn’t check your discovery response. Please try again.</p>
+            <Button onClick={() => void refetchOnboardingIntent()}>Try again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!onboardingIntentComplete) {
+    return (
+      <div className="min-h-screen bg-background px-4 py-10">
+        <div className="max-w-2xl mx-auto space-y-8">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Badge variant="secondary" className="text-xs">Step 1 of 7 · Your goals</Badge>
+              <span className="text-xs text-muted-foreground">14% complete</span>
+            </div>
+            <Progress value={14} className="h-2" />
+          </div>
+          <IntentCapturePrompt
+            surface="onboarding"
+            required
+            onRequiredComplete={() => queryClient.setQueryData(['onboarding-intent-complete', user?.id], true)}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const progressPct = Math.round(((step + 2) / (STEP_KEYS.length + 1)) * 100);
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
@@ -387,15 +441,12 @@ export default function OnboardingWizard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Badge variant="secondary" className="text-xs">
-              Step {step + 1} of {STEP_KEYS.length} · {STEP_LABELS[step]}
+              Step {step + 2} of {STEP_KEYS.length + 1} · {STEP_LABELS[step]}
             </Badge>
             <span className="text-xs text-muted-foreground">{progressPct}% complete</span>
           </div>
           <Progress value={progressPct} className="h-2" />
         </div>
-
-        {/* Optional stated-intent prompt — not a step, never blocks Continue */}
-        <IntentCapturePrompt surface="onboarding" variant="banner" />
 
 
         <AnimatePresence mode="wait">

@@ -39,9 +39,13 @@ const SURFACE_LABELS: Record<IntentSurface, string> = {
 export function IntentCapturePrompt({
   surface,
   variant = 'card',
+  required = false,
+  onRequiredComplete,
 }: {
   surface: IntentSurface;
   variant?: IntentVariant;
+  required?: boolean;
+  onRequiredComplete?: () => void;
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -66,7 +70,8 @@ export function IntentCapturePrompt({
     },
   });
 
-  if (!user || !shouldShow || hidden) return null;
+  const isRequired = required && surface === 'onboarding';
+  if (!user || (!shouldShow && !isRequired) || hidden) return null;
 
   const toggle = (key: string) => {
     setSelected((s) => {
@@ -84,12 +89,13 @@ export function IntentCapturePrompt({
   };
 
   const save = async () => {
-    if (!selected.length) return;
+    const validSelected = [...new Set(selected)].filter((intent) => INTENT_OPTIONS.some((option) => option.key === intent));
+    if (!validSelected.length) return;
     setSaving(true);
-    const rows = selected.map((intent) => ({
+    const rows = validSelected.map((intent) => ({
       user_id: user.id,
       intent,
-      is_primary: intent === (primary ?? selected[0]),
+      is_primary: intent === (primary ?? validSelected[0]),
       other_text: intent === 'other' ? other.trim().slice(0, 500) || null : null,
       source: surface,
     }));
@@ -97,11 +103,12 @@ export function IntentCapturePrompt({
     setSaving(false);
     if (error) { toast.error('Could not save — please try again'); return; }
     try {
-      posthog.setPersonProperties({ stated_intents: selected.join(','), stated_primary_intent: primary ?? selected[0] });
-      posthog.capture('intent_stated', { intents: selected.join(','), primary: primary ?? selected[0], surface });
+      posthog.setPersonProperties({ stated_intents: validSelected.join(','), stated_primary_intent: primary ?? validSelected[0] });
+      posthog.capture('intent_stated', { intents: validSelected.join(','), primary: primary ?? validSelected[0], surface });
     } catch { /* ignore */ }
     setHidden(true);
     qc.setQueryData(['intent-prompt', user.id], false);
+    if (isRequired) onRequiredComplete?.();
     toast.success('Thanks — this helps us tailor Invoicemonk for you');
   };
 
@@ -195,20 +202,26 @@ export function IntentCapturePrompt({
         <div>
           <CardTitle className="text-base">What brought you to Invoicemonk?</CardTitle>
           <CardDescription>
-            {surface === 'verify_email'
+            {isRequired
+              ? 'Choose at least one goal to continue setting up your account. You can select more than one.'
+              : surface === 'verify_email'
               ? `Optional — ${SURFACE_LABELS[surface].toLowerCase()}. Pick any that apply; tap the star for your main goal.`
               : 'Optional — pick any that apply. Tap the star to mark your main goal.'}
           </CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={dismiss} aria-label="Dismiss">
-          <X className="h-4 w-4" />
-        </Button>
+        {!isRequired && (
+          <Button variant="ghost" size="icon" onClick={dismiss} aria-label="Dismiss">
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {options}
         <div className="flex gap-2 justify-end">
-          <Button variant="ghost" size="sm" onClick={dismiss}>Skip</Button>
-          <Button size="sm" onClick={save} disabled={!selected.length || saving}>Save</Button>
+          {!isRequired && <Button variant="ghost" size="sm" onClick={dismiss}>Skip</Button>}
+          <Button size="sm" onClick={save} disabled={!selected.length || saving}>
+            {saving ? 'Saving…' : isRequired ? 'Save and continue' : 'Save'}
+          </Button>
         </div>
       </CardContent>
     </Card>
