@@ -16,6 +16,7 @@
 - [x] Phase 7: database checks for A, H, I passed
 - [ ] Phase 7: D and L dashboard checks, signed-in browser runs of A–L (blocked: needs test account secrets TEST_USER/TEST_PASS)
 - [x] Product tip email copy redesigned around recorded journeys; awaiting review before any campaign enablement
+- [x] Require a stated product-discovery answer before users enter onboarding setup
 
 # Form validation rollout
 
