@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import invoicemonkLogo from "@/assets/invoicemonk-logo.png";
 import InvoicemonkCTA from "@/components/public/InvoicemonkCTA";
 import { LogoImage } from '@/components/common/LogoImage';
+import { resolveIssuerName } from '@/lib/issuer-name';
 
 interface InvoiceItem {
   id: string;
@@ -50,6 +51,7 @@ interface InvoiceItem {
 
 interface IssuerIdentity {
   legal_name?: string;
+  business_name?: string;
   name?: string;
   tax_id?: string;
   cac_number?: string;
@@ -406,9 +408,7 @@ const InvoiceView = () => {
                     />
                     <div>
                       <h1 className="text-2xl font-bold">
-                        {invoice.issuer_snapshot?.legal_name ||
-                          invoice.issuer_snapshot?.name ||
-                          "Business"}
+                        {resolveIssuerName(invoice.issuer_snapshot)}
                       </h1>
                       {formatAddress(invoice.issuer_snapshot?.address) && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">

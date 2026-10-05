@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUUIDStr as validateUUID, getCorsHeaders, checkRateLimit, rateLimitResponse, escapeHtml, stripUrls } from '../_shared/validation.ts'
 import { initSentry, captureException } from '../_shared/sentry.ts'
+import { resolveIssuerName } from '../../../src/lib/issuer-name.ts'
 initSentry()
 
 // ── Inline QR Code Generator ──
@@ -276,6 +277,7 @@ interface InvoiceItem {
 
 interface IssuerSnapshot {
   legal_name?: string
+  business_name?: string
   name?: string
   tax_id?: string
   cac_number?: string
@@ -617,7 +619,7 @@ Deno.serve(async (req) => {
     }
 
     // Get issuer and recipient data from snapshots
-    const issuerName = issuerSnapshot?.legal_name || issuerSnapshot?.name || 'Invoicemonk User'
+    const issuerName = resolveIssuerName(issuerSnapshot)
     const issuerTaxId = issuerSnapshot?.tax_id || ''
     const issuerCacNumber = issuerSnapshot?.cac_number || ''
     const issuerVatRegNumber = issuerSnapshot?.vat_registration_number || ''
