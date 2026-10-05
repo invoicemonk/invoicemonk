@@ -26,3 +26,8 @@
 - [ ] Update settings, payment, invitation, auth, and send forms
 - [ ] Add validation tests and verify desktop/mobile behavior
 - [ ] Run type checks, tests, production build, and review roadmap
+
+# Invoice identity display
+
+- [x] Prefer the saved business name when the legal name is blank on public invoice pages and generated PDFs
+- [x] Add coverage for legal, business, legacy, and missing issuer names
