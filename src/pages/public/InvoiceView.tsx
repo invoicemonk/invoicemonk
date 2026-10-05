@@ -36,7 +36,7 @@ import { toast } from "sonner";
 import invoicemonkLogo from "@/assets/invoicemonk-logo.png";
 import InvoicemonkCTA from "@/components/public/InvoicemonkCTA";
 import { LogoImage } from '@/components/common/LogoImage';
-import { resolveIssuerName } from '@/lib/issuer-name';
+import { resolveIssuerName } from '../../../supabase/functions/_shared/issuer-name';
 
 interface InvoiceItem {
   id: string;

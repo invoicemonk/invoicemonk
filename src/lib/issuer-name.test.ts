@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveIssuerName } from './issuer-name';
+import { resolveIssuerName } from '../../supabase/functions/_shared/issuer-name';
 
 describe('resolveIssuerName', () => {
   it('prefers the legal name', () => {
