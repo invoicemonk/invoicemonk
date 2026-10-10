@@ -7,6 +7,7 @@ export const RESEARCH_SENDER_NAME = 'Yinka'
 export const RESEARCH_REPLY_TO = 'yinka@invoicemonk.com'
 export const RESEARCH_DORMANT_DAYS = 21
 export const RESEARCH_STEP_GAPS_DAYS = { 2: 7, 3: 14 } as const
+const RESEARCH_EMAIL_LOGO_URL = 'https://skcxogeaerudoadluexz.supabase.co/storage/v1/object/public/email-assets/invoicemonk-logo.png'
 export type ResearchSegment = 'A' | 'B' | 'C' | 'D' | 'E'
 export type ResearchStep = 1 | 2 | 3
 export const researchCampaignKey = (step: ResearchStep) => `${RESEARCH_CAMPAIGN_PREFIX}:${step}`
@@ -86,6 +87,7 @@ export function renderResearchEmail(i: ResearchEmailInput): ResearchEmail | null
   const sign = ['Thanks,', 'Yinka', 'Invoicemonk']
   const text = [hi, ...lines, sign.join('\n')].join('\n\n')
   const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c] ?? c))
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222"><div style="max-width:560px;padding:24px">${[hi, ...lines].map((l) => `<p style="margin:0 0 14px">${esc(l)}</p>`).join('')}<p style="margin:18px 0 0">${sign.map(esc).join('<br>')}</p></div></body></html>`
+  const body = `${[hi, ...lines].map((l) => `<p style="margin:0 0 14px">${esc(l)}</p>`).join('')}<p style="margin:18px 0 0">${sign.map(esc).join('<br>')}</p>`
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;padding:20px"><div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden"><div style="padding:22px 30px;text-align:center;border-bottom:1px solid #e5e7eb"><img src="${RESEARCH_EMAIL_LOGO_URL}" width="186" height="36" alt="Invoicemonk" style="display:inline-block;width:186px;height:36px;object-fit:contain"></div><div style="background:#1d6b5a;color:#fff;padding:24px 30px;text-align:center"><h1 style="margin:0;font-size:22px">${esc(subject)}</h1></div><div style="padding:30px">${body}<hr style="border:none;border-top:1px solid #eee;margin:30px 0"><p style="color:#777;font-size:11px;text-align:center">Sent by Invoicemonk · <a href="https://invoicemonk.com" style="color:#777">invoicemonk.com</a></p></div></div></body></html>`
   return { campaignKey: researchCampaignKey(i.step), subject, text, html }
 }

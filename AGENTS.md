@@ -32,6 +32,7 @@ verify the new key downloads, and only then update any URLs in the database.
 - Stated intent (`user_intents`) is user-level while product journeys (`product_activation`) are per user + business + area + workflow. Why: intent describes the person; behaviour belongs to a business.
 - Activation/abandonment windows live in `product_activation_rules` (one row per product area, optional workflow override). Why: one server-owned rules list the daily evaluator and summaries share.
 - Lifecycle email safety settings live in `lifecycle_campaign_config`; env settings and DB settings combine so the strictest wins, and every send decision is logged to `lifecycle_email_deliveries`. Why: test mode can't be accidentally disabled from one place.
+- Manual dormant-research sends use a dedicated authenticated server function that rechecks each recipient's sequence eligibility and existing email safeguards; never send directly from the browser. Why: user-initiated sends must remain controlled, private, and auditable.
 - Intent-prompt interactions use product area `discovery`, which is excluded from activation summaries. Why: skipping a question must not look like product usage.
 - Keep the shared stated-intent prompt optional on verification/dashboard surfaces and support a required onboarding mode. Why: required discovery must not change optional prompts elsewhere.
 - Keep issuer-name fallback logic in one pure helper shared by the public invoice page and PDF generator. Why: issued snapshots must display the same business identity in every invoice representation.
