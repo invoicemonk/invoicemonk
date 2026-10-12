@@ -55,17 +55,15 @@ Deno.serve(async (req) => {
   const brevoApiKey = Deno.env.get('BREVO_API_KEY')
   if (!brevoApiKey) return response({ error: 'Email sending is not configured.' }, 503)
 
+  // Admin-initiated sends deliver directly to the real recipient: no test mode
+  // or allowlist. Opt-out, sequence, duplicate and cap checks still apply.
   const [{ data: config, error: configError }, { data: candidates, error: candidateError }] = await Promise.all([
-    admin.from('lifecycle_campaign_config').select('test_mode, test_recipients, cooldown_days').eq('id', true).maybeSingle(),
+    admin.from('lifecycle_campaign_config').select('cooldown_days').eq('id', true).maybeSingle(),
     admin.rpc('get_dormant_research_candidates', { _days: 21 }),
   ])
-  if (configError || candidateError) return response({ error: 'Could not verify current email safeguards or recipient eligibility.' }, 503)
+  if (configError || candidateError) return response({ error: 'Could not verify recipient eligibility.' }, 503)
 
-  const envTestMode = (Deno.env.get('LIFECYCLE_EMAIL_TEST_MODE') ?? 'true').toLowerCase() !== 'false'
-  const envRecipients = (Deno.env.get('LIFECYCLE_EMAIL_TEST_RECIPIENTS') ?? '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
-  const dbRecipients: string[] = (config?.test_recipients ?? []).map((item: string) => item.toLowerCase())
-  const allowedRecipients = dbRecipients.length ? envRecipients.filter((item) => dbRecipients.includes(item)) : envRecipients
-  const testMode = envTestMode || config?.test_mode !== false
+  const testMode = false
   const cooldownDays = config?.cooldown_days ?? 14
   const candidateById = new Map<string, Candidate>((candidates ?? []).map((candidate: Candidate) => [candidate.user_id, candidate]))
   const smtpFrom = Deno.env.get('SMTP_FROM') || 'noreply@invoicemonk.com'
@@ -133,9 +131,6 @@ Deno.serve(async (req) => {
       continue
     }
     const reason = manualResearchSuppressionReason({
-      email: candidate.email,
-      testMode,
-      allowedRecipients,
       optedOut: preference?.email_product_tips === false || candidate.segment === 'E',
       duplicateOrCooldown: (recentDuplicate ?? 0) > 0,
       underDeliveryCap: (recentEmails ?? 0) < 5,
@@ -153,7 +148,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           sender: { name: RESEARCH_SENDER_NAME, email: smtpFrom },
           to: [{ email: candidate.email }],
-          subject: testMode ? `[TEST] ${campaignEmail.subject}` : campaignEmail.subject,
+          subject: campaignEmail.subject,
           htmlContent: campaignEmail.html,
           textContent: campaignEmail.text,
           replyTo: { email: RESEARCH_REPLY_TO },

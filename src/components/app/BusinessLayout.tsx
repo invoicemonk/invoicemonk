@@ -24,7 +24,7 @@ import { ProductFeedbackPrompt } from '@/components/activation/ProductFeedbackPr
 
 
 function BusinessLayoutContent() {
-  const { loading, error, currentBusiness, refreshBusiness } = useBusiness();
+  const { loading, error, loadError, currentBusiness, refreshBusiness } = useBusiness();
 
   if (!currentBusiness && loading) {
     return (
@@ -33,6 +33,24 @@ function BusinessLayoutContent() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading business...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness && loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Alert className="max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>We couldn't load your business</AlertTitle>
+          <AlertDescription className="mt-2">
+            This is usually a slow connection. Please try again.
+          </AlertDescription>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={() => { void refreshBusiness(); }}>Try again</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>Reload page</Button>
+          </div>
+        </Alert>
       </div>
     );
   }

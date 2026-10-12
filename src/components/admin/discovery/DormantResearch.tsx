@@ -95,14 +95,27 @@ export function DormantResearch() {
       return;
     }
     const result = data as { sent: number; suppressed: number; failed: number; results: { reason?: string }[] };
-    const reasons = [...new Set((result.results ?? []).map((item) => item.reason).filter(Boolean))];
-    const reasonText = reasons.includes('test_mode_not_allowlisted')
-      ? ' Test mode is on; recipients not on the approved test list were not emailed.'
-      : reasons.length ? ` Some recipients were held: ${reasons.map((item) => String(item).replace(/_/g, ' ')).join(', ')}.` : '';
-    setSendFeedback(`Email ${step}: ${result.sent} sent, ${result.suppressed} held, ${result.failed} failed.${reasonText}`);
+    const REASON_LABELS: Record<string, string> = {
+      unsubscribed: 'unsubscribed from emails',
+      already_received: `already received Email ${step}`,
+      email_cap_reached: 'already got 5 emails from us in the last 30 days',
+      sequence_step_mismatch: `not due for Email ${step} yet`,
+      waiting_for_next_step: 'still in the waiting gap before the next email',
+      sequence_complete: 'already received all 3 emails',
+      responded: 'already replied',
+      abandonment_active: 'currently receiving another follow-up email',
+      account_excluded: 'account is closed or suspended',
+      candidate_not_eligible: 'no longer on the dormant list',
+      policy_check_failed: 'could not be checked, try again',
+    };
+    const reasons = [...new Set((result.results ?? []).map((item) => item.reason).filter(Boolean))] as string[];
+    const failedText = result.failed ? ' Some emails could not be delivered by the email service.' : '';
+    const skippedText = result.suppressed ? ` Skipped: ${reasons.filter((r) => !r.startsWith('brevo_') && r !== 'provider_request_failed').map((r) => REASON_LABELS[r] ?? r.replace(/_/g, ' ')).join(', ')}.` : '';
+    const summary = `${result.sent} sent${result.suppressed ? ` · ${result.suppressed} skipped` : ''}${result.failed ? ` · ${result.failed} failed` : ''}.${skippedText}${failedText}`;
+    setSendFeedback(`Email ${step}: ${summary}`);
     toast({
-      title: result.sent ? 'Research send complete' : 'No research emails were sent',
-      description: `${result.sent} sent · ${result.suppressed} held · ${result.failed} failed.${reasonText}`,
+      title: result.sent ? 'Sent' : 'No emails were sent',
+      description: summary,
       variant: result.failed ? 'destructive' : 'default',
     });
     setSelected([]);
@@ -120,7 +133,7 @@ export function DormantResearch() {
           <span className="text-sm text-muted-foreground">{selected.length} selected</span>
           <Button size="sm" disabled={!selected.length} onClick={() => openSend(selected)}>Send selected</Button>
         </div>
-        <p className="text-xs text-muted-foreground">Every send is checked against the current sequence step, reply status, opt-outs, duplicates, delivery cap, and test-mode allowlist. Blocked sends are reported here.</p>
+        <p className="text-xs text-muted-foreground">Emails go straight to the recipient. People who unsubscribed, already got this email, aren't due for this step yet, or got 5 emails from us in 30 days are skipped.</p>
         {sendFeedback && <p role="status" className="text-sm">{sendFeedback}</p>}
         <div className="overflow-x-auto">
         <Table><TableHeader><TableRow><TableHead className="w-10"><span className="sr-only">Select</span></TableHead><TableHead>User</TableHead><TableHead>Last active</TableHead><TableHead>Segment</TableHead><TableHead>Known cancellation reason</TableHead><TableHead>Research status</TableHead><TableHead>Response</TableHead><TableHead>Alternative tool</TableHead><TableHead /></TableRow></TableHeader>
@@ -159,7 +172,7 @@ export function DormantResearch() {
       </DialogContent>
     </Dialog>
     <Dialog open={sendOpen} onOpenChange={(open) => !sending && setSendOpen(open)}>
-      <DialogContent><DialogHeader><DialogTitle>Send Email {step} to {pendingSendIds.length} {pendingSendIds.length === 1 ? 'person' : 'people'}?</DialogTitle><DialogDescription>The server will recheck each recipient’s next sequence step and current safety settings. Test mode, opt-outs, duplicate/cooldown checks, and the delivery cap can hold individual messages; held messages will not be sent.</DialogDescription></DialogHeader>
+      <DialogContent><DialogHeader><DialogTitle>Send Email {step} to {pendingSendIds.length} {pendingSendIds.length === 1 ? 'person' : 'people'}?</DialogTitle><DialogDescription>Each person will get the email in their inbox. Anyone who unsubscribed, already got this email, or isn't due for this step will be skipped.</DialogDescription></DialogHeader>
         <DialogFooter><Button variant="outline" onClick={() => setSendOpen(false)} disabled={sending}>Cancel</Button><Button onClick={sendResearch} disabled={sending}>{sending ? 'Checking and sending…' : `Confirm Email ${step}`}</Button></DialogFooter>
       </DialogContent>
     </Dialog>

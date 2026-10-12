@@ -63,6 +63,8 @@ interface BusinessContextType {
   // Loading states
   loading: boolean;
   error: string | null;
+  /** True when the business list could not be loaded (network/session), not a permission denial. */
+  loadError: boolean;
   
   // Actions
   switchBusiness: (businessId: string) => void;
@@ -123,12 +125,16 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all businesses the effective user (self or impersonation target) belongs to.
-  const { data: businesses = [], isLoading: loadingBusinesses } = useQuery({
+  const {
+    data: businesses = [],
+    isLoading: loadingBusinesses,
+    isError: businessesFailed,
+  } = useQuery({
     queryKey: ['user-businesses', effectiveUserId, isImpersonating ? 'imp' : 'self'],
     queryFn: async () => {
       if (!effectiveUserId) return [];
 
-      const { data, error: fetchError } = await supabase
+      const load = () => supabase
         .from('business_members')
         .select(`
           *,
@@ -136,7 +142,17 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         `)
         .eq('user_id', effectiveUserId);
 
+      let { data, error: fetchError } = await load();
       if (fetchError) throw fetchError;
+
+      // Every signed-in user has at least one business. An empty answer usually
+      // means the sign-in token wasn't attached yet (slow restore on mobile), so
+      // wait briefly and ask once more before concluding there are none.
+      if (!data || data.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        ({ data, error: fetchError } = await load());
+        if (fetchError) throw fetchError;
+      }
 
       return (data || []).map(item => ({
         ...item,
@@ -146,6 +162,8 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     enabled: !!effectiveUserId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
   });
 
 
@@ -390,8 +408,14 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   // Report loading only for the INITIAL load. Once we have a `baseBusiness`,
   // background refetches must not toggle `loading` back to true — otherwise
   // BusinessLayout unmounts the page tree and wipes form state.
+  // Memberships are loaded but the effect hasn't adopted one yet — keep showing
+  // the loader instead of flashing "Access Denied" for a render.
+  const urlMembershipPending =
+    !baseBusiness && !error && businesses.length > 0 &&
+    (!businessId || businesses.some((m) => m.business_id === businessId));
   const loading =
     (loadingBusinesses && !baseBusiness) ||
+    urlMembershipPending ||
     (loadingSubscription && !!baseBusiness?.id && subscription === undefined);
 
 
@@ -404,6 +428,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         businesses,
         loading,
         error,
+        loadError: businessesFailed && !baseBusiness,
         switchBusiness,
         refreshBusiness,
         isOwner,
