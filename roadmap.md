@@ -32,3 +32,6 @@
 
 - [x] Prefer the saved business name when the legal name is blank on public invoice pages and generated PDFs
 - [x] Add coverage for legal, business, legacy, and missing issuer names
+
+- [x] Dormant Research admin sends deliver to real recipients (no test mode)
+- [x] Business pages retry instead of showing "Access Denied" on slow loads
