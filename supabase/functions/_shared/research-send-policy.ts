@@ -1,18 +1,15 @@
-/** Pure suppression rules shared by manual research sends and focused tests. */
+/**
+ * Pure suppression rules for admin-initiated dormant-research sends.
+ * Manual sends deliver to the real recipient (no test mode / allowlist);
+ * opt-outs, duplicates and the rolling delivery cap still apply.
+ */
 export function manualResearchSuppressionReason(input: {
-  email: string
-  testMode: boolean
-  allowedRecipients: string[]
   optedOut: boolean
   duplicateOrCooldown: boolean
   underDeliveryCap: boolean
 }): string | null {
   if (input.optedOut) return 'unsubscribed'
-  const email = input.email.trim().toLowerCase()
-  if (input.testMode && !input.allowedRecipients.map((item) => item.trim().toLowerCase()).includes(email)) {
-    return 'test_mode_not_allowlisted'
-  }
-  if (input.duplicateOrCooldown) return 'cooldown_or_duplicate'
+  if (input.duplicateOrCooldown) return 'already_received'
   if (!input.underDeliveryCap) return 'email_cap_reached'
   return null
 }
