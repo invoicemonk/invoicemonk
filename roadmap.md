@@ -35,3 +35,13 @@
 
 - [x] Dormant Research admin sends deliver to real recipients (no test mode)
 - [x] Business pages retry instead of showing "Access Denied" on slow loads
+
+# Shorter signup + one-page onboarding + unified invoice page
+
+- [ ] Migration: new signups gated on explicit plan choice (has_selected_plan=false via handle_new_user), reconcile existing users
+- [ ] Signup: collect intent, country, entity type; persist answers for post-verification prefill
+- [ ] Plan selection: required choice page, Professional preselected, explicit Free option, no dashboard exit
+- [ ] VerifyEmail / Signup / BusinessRedirect route new users through plan choice
+- [ ] Onboarding: consume signup answers (intent → user_intents, country/entity → business), single setup page
+- [ ] InvoiceNew + InvoiceEdit: unified invoice-like layout (issuer & client top, dates, items, notes, template, sidebar totals)
+- [ ] Type-check, tests, production build, verify
