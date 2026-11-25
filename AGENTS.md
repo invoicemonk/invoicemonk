@@ -36,3 +36,4 @@ verify the new key downloads, and only then update any URLs in the database.
 - Intent-prompt interactions use product area `discovery`, which is excluded from activation summaries. Why: skipping a question must not look like product usage.
 - Keep the shared stated-intent prompt optional on verification/dashboard surfaces and support a required onboarding mode. Why: required discovery must not change optional prompts elsewhere.
 - Keep issuer-name fallback logic in one pure helper shared by the public invoice page and PDF generator. Why: issued snapshots must display the same business identity in every invoice representation.
+- Centralize signup plan access in a shared policy used by protected routes and business creation, with the selected-plan flag written only by trusted server actions. Why: new-user access checks must agree and browser edits must not bypass checkout.

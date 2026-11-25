@@ -40,8 +40,18 @@
 
 - [ ] Migration: new signups gated on explicit plan choice (has_selected_plan=false via handle_new_user), reconcile existing users
 - [ ] Signup: collect intent, country, entity type; persist answers for post-verification prefill
-- [ ] Plan selection: required choice page, Professional preselected, explicit Free option, no dashboard exit
+- [ ] Plan selection: paid plan required for new signups; existing Free users retain dashboard access
 - [ ] VerifyEmail / Signup / BusinessRedirect route new users through plan choice
 - [ ] Onboarding: consume signup answers (intent → user_intents, country/entity → business), single setup page
 - [ ] InvoiceNew + InvoiceEdit: unified invoice-like layout (issuer & client top, dates, items, notes, template, sidebar totals)
 - [ ] Type-check, tests, production build, verify
+
+# Signup security and paid-only access
+
+- [x] Confirmed an active annual Professional subscription remains selected and at the payment-method setup step; no account data changed
+- [ ] Support paid checkout before business creation and persist the resulting user-level subscription
+- [ ] Protect plan selection from browser edits and enforce the same access rule on dashboard, onboarding, and business creation
+- [ ] Remove the Free exit for new signups while preserving existing Free accounts
+- [ ] Route email-verified new signups to paid plan selection and verify Stripe session ownership and active status
+- [ ] Repair Turnstile after the user adds TURNSTILE_SECRET_KEY; confirm Cloudflare’s allowed-host setting before changing server verification
+- [ ] Run focused signup/checkout tests, type checks, and preview verification
