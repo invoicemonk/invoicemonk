@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { useRegionalPricing } from '@/hooks/use-regional-pricing';
 import { useCheckout } from '@/hooks/use-checkout';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useSignupPlanAccess } from '@/hooks/use-signup-plan-access';
 import { useTierFeatures } from '@/hooks/use-tier-features';
 import logoImage from '@/assets/invoicemonk-logo.png';
 import { addTags } from '@/lib/onesignal';
@@ -73,6 +74,7 @@ export default function PlanSelection() {
   const { pricingByTier, formatPrice, isLoading: pricingLoading } = useRegionalPricing();
   const { createCheckoutSession, isLoading: checkoutLoading } = useCheckout();
   const { subscription } = useSubscription();
+  const signupPlanAccess = useSignupPlanAccess();
   const { buildFeatureList, isLoading: tierFeaturesLoading } = useTierFeatures();
   const queryClient = useQueryClient();
 
@@ -81,10 +83,11 @@ export default function PlanSelection() {
     queryKey: ['paid-intent', user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
+      if (!user?.id) return null;
       const { data } = await supabase
         .from('profiles')
         .select('intended_tier, intended_billing_period, failed_checkout_attempts')
-        .eq('id', user!.id)
+        .eq('id', user.id)
         .maybeSingle();
       return data;
     },
@@ -151,6 +154,19 @@ export default function PlanSelection() {
   };
 
   const tiers: TierKey[] = ['professional', 'business'];
+  const canReturnToDashboard = signupPlanAccess.data?.canEnterApp === true;
+  const currentPlanIsFree = !subscription || subscription.tier === 'starter';
+  const isExistingFreeUser = canReturnToDashboard && currentPlanIsFree;
+  const pageTitle = !canReturnToDashboard
+    ? 'Choose a paid plan'
+    : currentPlanIsFree
+      ? 'Upgrade your plan'
+      : 'Manage your plan';
+  const pageDescription = !canReturnToDashboard
+    ? 'Choose a paid plan to continue to your business setup.'
+    : currentPlanIsFree
+      ? "You're on the Free plan — upgrade when you're ready for more features. Cancel anytime."
+      : 'Review your plan options or return to your workspace.';
 
   // Skeleton-only state: data still loading AND fallback hasn't kicked in yet (<1.5s)
   const showSkeleton = !dataReady && !useFallback;
@@ -170,16 +186,18 @@ export default function PlanSelection() {
             className="h-12 mx-auto mb-6"
           />
           <h1 className="text-4xl font-bold tracking-tight mb-3">
-            Upgrade your plan
+            {pageTitle}
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            You're on the Free plan — upgrade only when you hit a limit or need more features. Cancel anytime.
+            {pageDescription}
           </p>
-          <div className="mt-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
-              ← Back to dashboard (stay on Free)
-            </Button>
-          </div>
+          {canReturnToDashboard && (
+            <div className="mt-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+                ← Back to dashboard
+              </Button>
+            </div>
+          )}
 
         </motion.div>
 
@@ -432,9 +450,11 @@ export default function PlanSelection() {
           </div>
         </div>
 
-        <p className="mt-10 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
-          Not ready to upgrade? You can keep using the free plan — the "Back to dashboard" link above returns you to your workspace.
-        </p>
+        {isExistingFreeUser && (
+          <p className="mt-10 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+            You can keep using your current Free workspace and upgrade whenever you need more features.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -4,31 +4,23 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { trackFunnelOnce } from '@/lib/funnel-tracking';
+import { useSignupPlanAccess } from '@/hooks/use-signup-plan-access';
 
 /**
  * Redirects the user to their default/first business dashboard.
  *
- * Gate: `profiles.has_selected_plan` must be true. New signups default to
- * `true` (free tier is a valid selected plan), so the paywall only fires
- * for pre-existing accounts flagged `false` from the legacy paid-only flow.
- * We no longer require a live Stripe subscription here — free users are
- * first-class.
+ * New signups must have server-confirmed paid access before entering setup.
+ * Existing accounts that already selected a plan retain their access.
  */
 export function BusinessRedirect() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const planAccess = useSignupPlanAccess();
 
   const { data, isLoading } = useQuery({
     queryKey: ['business-redirect', user?.id],
     queryFn: async () => {
       if (!user) return null;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('has_selected_plan')
-        .eq('id', user.id)
-        .maybeSingle();
 
       const { data: defaultMembership } = await supabase
         .from('business_members')
@@ -60,7 +52,6 @@ export function BusinessRedirect() {
       }
 
       return {
-        hasSelectedPlan: profile?.has_selected_plan ?? true,
         businessId,
         onboardingStep,
       };
@@ -69,20 +60,14 @@ export function BusinessRedirect() {
   });
 
   useEffect(() => {
-    if (authLoading || isLoading || !data) return;
+    if (authLoading || isLoading || planAccess.isLoading || !data) return;
 
-    // Only legacy accounts explicitly flagged `has_selected_plan = false`
-    // still get pushed to the pricing page.
-    if (!data.hasSelectedPlan) {
+    if (planAccess.isError || !planAccess.data?.canEnterApp) {
       navigate('/select-plan', { replace: true });
       return;
     }
 
     if (data.businessId) {
-      trackFunnelOnce('onboarding_free_plan_entered', `im_free_plan_entered_${user?.id ?? 'anon'}`, {
-        user_id: user?.id,
-        business_id: data.businessId,
-      });
       if (data.onboardingStep !== 'completed') {
         navigate(`/onboarding/${data.businessId}`, { replace: true });
         return;
@@ -92,7 +77,7 @@ export function BusinessRedirect() {
       // No business yet — start them in onboarding on the free tier.
       navigate('/onboarding', { replace: true });
     }
-  }, [data, authLoading, isLoading, navigate]);
+  }, [data, authLoading, isLoading, navigate, planAccess.data?.canEnterApp, planAccess.isError, planAccess.isLoading]);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">

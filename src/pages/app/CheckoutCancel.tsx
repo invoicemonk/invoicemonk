@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckout } from '@/hooks/use-checkout';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useSignupPlanAccess } from '@/hooks/use-signup-plan-access';
 import { trackFunnel } from '@/lib/funnel-tracking';
 
 const TIER_NAME: Record<string, string> = {
@@ -18,6 +20,8 @@ export default function CheckoutCancel() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { createCheckoutSession } = useCheckout();
+  const { subscription, isLoading: subscriptionLoading } = useSubscription();
+  const signupPlanAccess = useSignupPlanAccess();
   const [intendedTier, setIntendedTier] = useState<'professional' | 'business' | null>(null);
   const [intendedBilling, setIntendedBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [attempts, setAttempts] = useState(0);
@@ -90,7 +94,10 @@ export default function CheckoutCancel() {
   };
 
   const tierLabel = intendedTier ? TIER_NAME[intendedTier] : null;
-  const showAbandonLink = attempts >= 3;
+  const canReturnToFree = signupPlanAccess.data?.canEnterApp === true &&
+    !subscriptionLoading &&
+    (!subscription || subscription.tier === 'starter');
+  const showAbandonLink = attempts >= 3 && canReturnToFree;
   const showSupportCTA = attempts >= 2;
 
   return (
@@ -169,13 +176,15 @@ export default function CheckoutCancel() {
               </Button>
 
               {showAbandonLink && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={handleAbandon}
                   className="text-xs text-muted-foreground underline hover:text-foreground mt-2"
                 >
                   Continue on Starter (free) instead
-                </button>
+                </Button>
               )}
             </div>
 

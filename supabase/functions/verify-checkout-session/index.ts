@@ -54,23 +54,45 @@ serve(async (req) => {
       });
     }
 
-    // Must belong to this user
-    if (session.client_reference_id && session.client_reference_id !== user.id) {
+    // Require both Stripe ownership markers; never accept an unbound session.
+    if (
+      session.client_reference_id !== user.id ||
+      session.metadata?.user_id !== user.id
+    ) {
       return new Response(JSON.stringify({ paid: false, error: "Session does not belong to user" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
     }
 
-    const paid =
-      session.payment_status === "paid" ||
-      session.payment_status === "no_payment_required" ||
-      session.status === "complete";
-
-    if (!paid) {
+    if (
+      session.mode !== "subscription" ||
+      session.status !== "complete" ||
+      session.payment_status !== "paid" ||
+      typeof session.subscription !== "string"
+    ) {
       return new Response(JSON.stringify({
         paid: false,
         payment_status: session.payment_status,
         status: session.status,
+        error: "A completed paid subscription is required.",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+      });
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(session.subscription, {
+      expand: ["latest_invoice.payment_intent"],
+    });
+    const latestInvoice: any = (subscription as any).latest_invoice;
+    const invoicePaid = latestInvoice?.status === "paid" ||
+      latestInvoice?.payment_intent?.status === "succeeded";
+
+    if (subscription.status !== "active" || !invoicePaid) {
+      return new Response(JSON.stringify({
+        paid: false,
+        subscription_status: subscription.status,
+        invoice_status: latestInvoice?.status ?? null,
+        error: "Stripe has not confirmed an active, paid subscription.",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
@@ -81,7 +103,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-    await supabaseAdmin
+    const { error: profileUpdateError } = await supabaseAdmin
       .from("profiles")
       .update({
         has_selected_plan: true,
@@ -92,9 +114,11 @@ serve(async (req) => {
       })
       .eq("id", user.id);
 
+    if (profileUpdateError) throw profileUpdateError;
+
     return new Response(JSON.stringify({
       paid: true,
-      tier: (session.metadata as any)?.tier ?? null,
+      tier: subscription.metadata?.tier ?? session.metadata?.tier ?? null,
       businessId: (session.metadata as any)?.business_id ?? null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,

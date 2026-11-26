@@ -17,16 +17,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
-    );
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -34,6 +24,16 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
@@ -107,7 +107,9 @@ serve(async (req) => {
     });
 
     // Determine the business to bill (use provided businessId or user's default)
-    let targetBusinessId = businessId;
+    let targetBusinessId: string | undefined = typeof businessId === "string" && businessId.length > 0
+      ? businessId
+      : undefined;
     if (targetBusinessId) {
       // SECURITY: Verify caller is a member of the provided business_id.
       // Without this check, any user could attach a subscription to another
@@ -139,20 +141,28 @@ serve(async (req) => {
       targetBusinessId = defaultBusiness?.business_id;
     }
 
-    if (!targetBusinessId) {
-      return new Response(
-        JSON.stringify({ error: "No business found. Please create a business first." }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
-
-
     // Check if business has existing subscription with stripe customer
-    const { data: existingSubscription } = await supabaseClient
-      .from("subscriptions")
-      .select("stripe_customer_id")
-      .eq("business_id", targetBusinessId)
-      .maybeSingle();
+    let existingSubscription: { stripe_customer_id: string | null } | null = null;
+    if (targetBusinessId) {
+      const { data } = await supabaseClient
+        .from("subscriptions")
+        .select("stripe_customer_id")
+        .eq("business_id", targetBusinessId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      existingSubscription = data;
+    } else {
+      const { data } = await supabaseClient
+        .from("subscriptions")
+        .select("stripe_customer_id")
+        .eq("user_id", user.id)
+        .is("business_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      existingSubscription = data;
+    }
 
     let customerId = existingSubscription?.stripe_customer_id;
 
@@ -259,7 +269,7 @@ serve(async (req) => {
               metadata: {
                 ...(livePaid.metadata || {}),
                 user_id: user.id,
-                business_id: targetBusinessId,
+                ...(targetBusinessId ? { business_id: targetBusinessId } : {}),
                 tier,
                 billing_period: billingPeriod,
                 pricing_region: finalPricing.country_code,
@@ -321,12 +331,29 @@ serve(async (req) => {
     // suppresses rapid double-submits (double click, retry after network hiccup)
     // by making Stripe return the same session for repeated calls in the same
     // minute. Client-supplied idempotency_key wins if provided.
-    const bodyForKey = { user: user.id, tier, billing_period: billingPeriod, business: targetBusinessId };
+    const bodyForKey = { user: user.id, tier, billing_period: billingPeriod, business: targetBusinessId ?? "new-business" };
     const minuteBucket = Math.floor(Date.now() / 60000);
     const idempotencyKey =
       (typeof clientIdempotencyKey === "string" && clientIdempotencyKey.length > 0)
         ? `checkout-client:${clientIdempotencyKey}`
         : `checkout:${bodyForKey.user}:${bodyForKey.business}:${tier}:${billingPeriod}:${minuteBucket}`;
+
+    const subscriptionMetadata: Record<string, string> = {
+      user_id: user.id,
+      tier,
+      billing_period: billingPeriod,
+      pricing_region: finalPricing.country_code,
+      billing_currency: finalPricing.currency,
+    };
+    const checkoutMetadata: Record<string, string> = {
+      user_id: user.id,
+      tier,
+      billing_period: billingPeriod,
+    };
+    if (targetBusinessId) {
+      subscriptionMetadata.business_id = targetBusinessId;
+      checkoutMetadata.business_id = targetBusinessId;
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -341,21 +368,9 @@ serve(async (req) => {
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/checkout/cancel`,
       subscription_data: {
-        metadata: {
-          user_id: user.id,
-          business_id: targetBusinessId,
-          tier,
-          billing_period: billingPeriod,
-          pricing_region: finalPricing.country_code,
-          billing_currency: finalPricing.currency,
-        },
+        metadata: subscriptionMetadata,
       },
-      metadata: {
-        user_id: user.id,
-        business_id: targetBusinessId,
-        tier,
-        billing_period: billingPeriod,
-      },
+      metadata: checkoutMetadata,
     }, { idempotencyKey });
 
     console.log("Checkout session created:", session.id);

@@ -674,10 +674,7 @@ serve(async (req) => {
           const invoiceStatus: string | undefined = latestInvoice?.status;
           const piStatus: string | undefined = latestInvoice?.payment_intent?.status;
           const amountDue: number = latestInvoice?.amount_due ?? 0;
-          const paymentConfirmed =
-            subscription.status === "trialing" && amountDue === 0
-              ? true
-              : invoiceStatus === "paid" || piStatus === "succeeded";
+          const paymentConfirmed = invoiceStatus === "paid" || piStatus === "succeeded";
 
           if (!paymentConfirmed) {
             console.warn(
@@ -755,7 +752,7 @@ serve(async (req) => {
           const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
 
           if (!businessId) {
-            console.error("No business_id in metadata - falling back to user_id lookup");
+            console.log("No business_id in metadata - checking for an existing workspace or saving a user-level subscription");
             if (userId) {
               const { data: userBusiness } = await supabase
                 .from("business_members")
@@ -765,9 +762,53 @@ serve(async (req) => {
               
               const defaultBusiness = userBusiness?.find((m: any) => m.businesses?.is_default) || userBusiness?.[0];
               if (defaultBusiness) {
-                await updateSubscriptionByBusiness(supabase, subscription, defaultBusiness.business_id, tier, pricingRegion, billingCurrency, session.customer as string);
+                await updateSubscriptionByBusiness(supabase, subscription, defaultBusiness.business_id, tier, pricingRegion, billingCurrency, session.customer as string, userId);
                 await sendUpgradeEmail(supabase, defaultBusiness.business_id, tier, periodEnd);
+              } else {
+                const { data: existingUserSub, error: lookupError } = await supabase
+                  .from("subscriptions")
+                  .select("id")
+                  .eq("stripe_subscription_id", subscriptionId)
+                  .maybeSingle();
+
+                if (lookupError) throw lookupError;
+
+                const userSubscriptionData = {
+                  business_id: null,
+                  user_id: userId,
+                  tier,
+                  status: "active",
+                  stripe_customer_id: session.customer as string,
+                  stripe_subscription_id: subscriptionId,
+                  current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+                  current_period_end: periodEnd,
+                  pricing_region: pricingRegion,
+                  billing_currency: billingCurrency,
+                  updated_at: new Date().toISOString(),
+                };
+
+                const { error: persistError } = existingUserSub
+                  ? await supabase.from("subscriptions").update(userSubscriptionData).eq("id", existingUserSub.id)
+                  : await supabase.from("subscriptions").insert(userSubscriptionData);
+
+                if (persistError) throw persistError;
+                console.log("Saved paid subscription for user before workspace creation:", userId);
               }
+
+              const { error: profileError } = await supabase
+                .from("profiles")
+                .update({
+                  intended_tier: null,
+                  intended_billing_period: null,
+                  intended_tier_set_at: null,
+                  failed_checkout_attempts: 0,
+                  has_selected_plan: true,
+                })
+                .eq("id", userId);
+
+              if (profileError) throw profileError;
+            } else {
+              console.error("Cannot persist pre-workspace subscription: checkout metadata has no user_id");
             }
             break;
           }
@@ -1610,7 +1651,8 @@ async function updateSubscriptionByBusiness(
   tier: string,
   pricingRegion: string | undefined,
   billingCurrency: string | undefined,
-  stripeCustomerId: string
+  stripeCustomerId: string,
+  userId?: string,
 ) {
   const { data: existingSub } = await supabase
     .from("subscriptions")
@@ -1625,6 +1667,7 @@ async function updateSubscriptionByBusiness(
       pricing_region: pricingRegion, billing_currency: billingCurrency,
       updated_at: new Date().toISOString(),
     };
+    if (userId) upd.user_id = userId;
     const ps3 = safeISODate(subscription.current_period_start);
     const pe3 = safeISODate(subscription.current_period_end);
     if (ps3) upd.current_period_start = ps3;
@@ -1637,6 +1680,7 @@ async function updateSubscriptionByBusiness(
       stripe_customer_id: stripeCustomerId, stripe_subscription_id: subscription.id,
       pricing_region: pricingRegion, billing_currency: billingCurrency,
     };
+    if (userId) ins.user_id = userId;
     const ps4 = safeISODate(subscription.current_period_start);
     const pe4 = safeISODate(subscription.current_period_end);
     if (ps4) ins.current_period_start = ps4;

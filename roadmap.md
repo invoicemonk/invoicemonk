@@ -49,6 +49,7 @@
 # Signup security and paid-only access
 
 - [x] Confirmed an active annual Professional subscription remains selected and at the payment-method setup step; no account data changed
+- [ ] Confirm whether payment instructions can be deferred until after setup (waiting for user answer; requirement unchanged)
 - [ ] Support paid checkout before business creation and persist the resulting user-level subscription
 - [ ] Protect plan selection from browser edits and enforce the same access rule on dashboard, onboarding, and business creation
 - [ ] Remove the Free exit for new signups while preserving existing Free accounts

@@ -51,6 +51,8 @@ export default function CheckoutSuccess() {
           queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
           queryClient.invalidateQueries({ queryKey: ['user-businesses'] });
           queryClient.invalidateQueries({ queryKey: ['tier-features'] });
+          queryClient.invalidateQueries({ queryKey: ['signup-plan-access', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['business-redirect', user.id] });
         } else {
           setState({ kind: 'unpaid', reason: data.error || 'Your payment was not completed.' });
         }
